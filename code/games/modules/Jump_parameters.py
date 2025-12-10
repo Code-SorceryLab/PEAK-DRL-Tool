@@ -1,0 +1,7 @@
+# Jump parameters
+JUMP_VEL_MIN       = -500.0
+JUMP_VEL_MAX       = -600.0
+JUMP_HOLD_FRAMES   = 14
+SPEED_JUMP_BONUS   = 0.18
+COYOTE_FRAMES      = 5
+JUMP_BUFFER_FRAMES = 6

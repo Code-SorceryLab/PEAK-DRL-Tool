@@ -1,0 +1,55 @@
+defaults:
+  - game: none         # pick any file from conf/game/*.yaml
+  - callback: none
+  - _self_
+
+# lists of experiment dimensions
+games: [ flappy, tetris, asteroids, snake, mario] # flappy, tetris, asteroids, pacman, snake, mario
+models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
+personas: [
+  #flappy_simple, 
+  flappy_master, 
+  #flappy_speedrunner, 
+  #flappy_baseline, 
+  flappy_shaped,
+  tetris_baseline,
+  tetris_hunter,
+  tetris_shaped,
+  tetris_simple,
+  asteroids_simple,
+  asteroids_hunter,
+  asteroids_survivor,
+  #pacman_baseline,
+  snake_baseline,
+  snake_aggressive,
+  mario_baseline,
+  mario_simple,
+  mario_speedrunner,
+  mario_coin_collector,
+  mario_master,
+]
+
+# skill -> training steps
+skills:
+  Novice: 100_000
+  Expert: 1_000_000
+
+# generic env params
+seed: 1234
+render_mode: none        # none / human
+fps: 60
+max_steps: 10000
+
+tb_root: mylogs     # folder where TensorBoard logs go (tensorboard --logdir runs)
+eval_freq: 10000  # evaluate every N steps (EvalCallback)
+save_freq: 20000  # save model every N steps (CheckpointCallback)
+
+device: cpu      # cuda or cpu
+n_envs: 8      # 1 for cpu or 16 gpu , or whatever you want
+
+
+
+# null values mean "no override"
+model: null     # optional single selection
+persona: null   # optional single selection
+skill: null     # optional single selection

@@ -1,0 +1,1 @@
+from .flappy_balance import FlappyBalanceStats  # noqa: F401 – export default collector

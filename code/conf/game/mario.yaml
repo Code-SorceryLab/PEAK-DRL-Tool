@@ -1,0 +1,52 @@
+# conf/game/mario.yaml
+
+_target_: code.games.mario_core.MarioCore
+
+name: mario
+env_cls: MarioCore
+module: code.games.mario_core
+
+# Optional: keep your current setting
+render_mode: human
+fps: 30
+
+# Strongly recommended so the env’s built-in step limit is respected:
+max_steps: 10000
+
+observation_space:
+  type: Box
+  shape: [36]
+  low: -500.0
+  high: 500.0
+
+action_space:
+  type: Discrete
+  n: 8
+
+reward:
+  type: progress_flag
+  shaping:
+    step: 0.01
+    goal: 1.0
+    fall: -1.0
+
+episode:
+  max_steps: 1000
+
+init:
+  seed: 42
+  level: easy
+
+persona: null
+
+metrics:
+  - episode_reward
+  - episode_length
+
+render:
+  window_size: [640, 480]
+  show_fps: false
+  debug_overlay: false
+
+logging:
+  tensorboard: true
