@@ -61,6 +61,11 @@ The recommended way to use the framework is via the GUI Control Center:
 python gui.py
 ```
 
+
+![Screenshot](image_GUI.png)
+
+
+
 This interface allows you to:
 
   * **Status**: View trained models and configuration status.
@@ -73,6 +78,9 @@ Alternatively, use the CLI menu:
 ```bash
 python menu.py
 ```
+
+![Screenshot](image._CLI.png)
+
 
 ## 🎮 Environments
 
