@@ -1,7 +1,3 @@
-# code/games/mario_core.py
-"""
-SMB1-style core with deterministic 1-1 layout, faster feel, visualizer, and anti-stall shaping.
-"""
 
 from __future__ import annotations
 import os
@@ -92,12 +88,12 @@ class MarioCore:
         self.dt = 0.0001
 
         self.level_file = kwargs.pop("level_file", None)
-        self.level_list = ["world1_1.txt", "world1_2.txt", "world0-1.txt"]
+        self.level_list = ["world1_1.txt", "world1_2.txt"]
         self.current_level_idx = 0
 
         if self.level_file is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            candidate = os.path.join(base_dir, "levels", "world0-1.txt")
+            candidate = os.path.join(base_dir, "levels", self.level_list[0])
             if os.path.exists(candidate):
                 self.level_file = candidate
 
@@ -154,8 +150,11 @@ class MarioCore:
 
         self.reset()
 
-    def get_action_space(self): return self._act_space
-    def get_observation_space(self): return self._obs_space
+    def get_action_space(self): 
+        return self._act_space
+    
+    def get_observation_space(self): 
+        return self._obs_space
 
     def reset(self) -> np.ndarray:
 
@@ -242,9 +241,7 @@ class MarioCore:
             self.level_file = candidate
 
     def complete_level(self):
-        #print ("completed level\n")
         if self.current_level_idx < len(self.level_list) - 1:
-            #print("next level\n")
             self.current_level_idx += 1
             self.load_level(self.current_level_idx)
         else:
@@ -400,6 +397,7 @@ class MarioCore:
                 if c.auto_collect and c.flyup and c.life <= 0:
                     c.gObj.active = False
                     self.coins_total += 1; self.coins_step += 1; self.score += 10
+    
     def _resolve_enemy_tiles(self, e: Enemy):
         r = e.gObj.get_rect()
         nearby_objects = self.dynamic_hash.query(e)
@@ -447,7 +445,7 @@ class MarioCore:
                     e_center = e.gObj.y + e.gObj.height/2
                     
                     if p_bottom < e_center + 10 and moving_down:
-                        # Mario jumped on enemy
+                        # MARIO jumped on enemy
                         e.gObj.active = False
                         p.vy = JUMP_VEL_MIN * 0.6
                         self.score += 100; self.kills_step += 1
@@ -486,7 +484,7 @@ class MarioCore:
         Called when player hits an enemy, pit, or time runs out.
         """
         self.lives -= 1
-        #print(f"Player Died! Lives remaining: {self.lives}")
+        
         
         if self.lives > 0:
             # We have lives left, reset the level state but keep score
@@ -548,19 +546,25 @@ class MarioCore:
         prog_x, prog_y = self._progress_components()
         progressed = False
 
-        if prog_x > self.progress_x_best + self.stall_eps:
-            self.progress_x_best = prog_x; progressed = True
-        if prog_y > self.progress_y_best + self.stall_eps:
-            self.progress_y_best = prog_y; progressed = True
+        if prog_x > self.progress_x_best + (TILE_SIZE / 2 ):
+            self.progress_x_best = prog_x
+            progressed = True
+            
+            
+        if prog_y > self.progress_y_best + (TILE_SIZE / 2 ):
+            self.progress_y_best = prog_y 
+            progressed = True
 
         if progressed:
-            self.stall_timer = 0; self.stall_windows_count = 0; self.stalled_this_frame = False
+            self.stall_timer = 0  
+            self.stalled_this_frame = False
             return
 
         self.stall_timer += self.dt
+        
         if self.stall_timer >= self.stall_window:
             self.stalled_this_frame = True
-            self.stall_timer -= self.stall_window
+            self.stall_timer = 0
             self.stall_windows_count += 1
 
     def _check_termination(self) -> bool:
@@ -786,26 +790,87 @@ class MarioCore:
         px, py, _ = self._world_to_screen(p.gObj)
         
         if self.db_hitboxes:
+            px, py, _ = self._world_to_screen(p.gObj)
             pygame.draw.rect(surface, COLOR_HITBOX, (px, py, p.gObj.width, p.gObj.height), 2)
             visible = self.dynamic_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)
             for o in visible:
                 sx, sy, _ = self._world_to_screen(o.gObj)
-                w = o.gObj.width
-                h = o.gObj.height
-                pygame.draw.rect(surface, (255, 255, 255), (sx, sy, w, h), 1)
+                pygame.draw.rect(surface, (255, 255, 255), (sx, sy, o.gObj.width, o.gObj.height), 1)
+                
+                
+        if self.db_agentview:
+            # Settings for the mini-window
+            cell_w, cell_h = 16, 16  # Size of each "pixel" in the agent view
+            grid_w, grid_h = 11, 9   # Dimensions of the agent's observation grid
+            panel_x, panel_y = 10, 50 # Position on screen
+            
+            # Draw Background for the panel
+            pygame.draw.rect(surface, (20, 20, 30), 
+                           (panel_x - 5, panel_y - 5, grid_w * cell_w + 10, grid_h * cell_h + 10))
+            pygame.draw.rect(surface, (255, 255, 255), 
+                           (panel_x - 5, panel_y - 5, grid_w * cell_w + 10, grid_h * cell_h + 10), 2)
 
+            # Calculate Player Grid Coordinates
+            p_cx = int((p.gObj.x + p.gObj.width / 2) // TILE_SIZE)
+            p_cy = int((p.gObj.y + p.gObj.height / 2) // TILE_SIZE)
+
+            # Cache entity locations for fast lookup
+            enemy_locs = {(int(e.gObj.x // TILE_SIZE), int(e.gObj.y // TILE_SIZE)) 
+                          for e in self.enemies if e.gObj.active}
+            coin_locs = {(int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE)) 
+                         for c in self.coins if c.gObj.active and not c.collected}
+
+            # Draw the 11x9 Observation Grid
+            # The agent sees: dx=[-5, 5], dy=[-4, 4]
+            for dy_i, dy in enumerate(range(-4, 5)):
+                for dx_i, dx in enumerate(range(-5, 6)):
+                    tx, ty = p_cx + dx, p_cy + dy
+                    
+                    draw_x = panel_x + dx_i * cell_w
+                    draw_y = panel_y + dy_i * cell_h
+                    
+                    color = (50, 50, 50) # Default: Empty Air (Dark Grey)
+
+                    # 1. Check Level Geometry
+                    if 0 <= ty < self.level_rows and 0 <= tx < self.level_cols:
+                        tile_type = self.level_data[ty][tx]
+                        if tile_type != TILE_AIR:
+                            color = (180, 180, 180) # Solid Wall (Light Grey)
+                            if tile_type == TILE_SPIKE: color = (255, 0, 255) # Spike (Purple)
+                            elif tile_type == TILE_GOAL: color = (0, 255, 0)  # Goal (Green)
+                    else:
+                        color = (0, 0, 0) # Out of bounds (Black)
+
+                    # 2. Check Entities (Overlay)
+                    if (tx, ty) in enemy_locs:
+                        color = (255, 50, 50) # Enemy (Red)
+                    elif (tx, ty) in coin_locs:
+                        color = (255, 215, 0) # Coin (Gold)
+                    
+                    # 3. Draw The Player (Center)
+                    if dx == 0 and dy == 0:
+                        color = (50, 150, 255) # Player (Blue)
+
+                    pygame.draw.rect(surface, color, (draw_x, draw_y, cell_w - 1, cell_h - 1))
+
+            # Label
+            surface.blit(self.ui_font.render("Agent View", True, (255, 255, 255)), (panel_x, panel_y - 25))
+            
+        
         if self.db_obs_panel:
             obs = self._obs()
             lines = [
-                f"obs[0:5]=[{obs[0]:.3f},{obs[1]:.3f},{obs[2]:.3f},{obs[3]:.3f},{obs[4]:.1f}]",
-                f"max_x={int(self.max_x_seen)} stalled={self.stalled_this_frame} stallW={self.stall_windows_count}",
+                f"Pos: {int(p.gObj.x)}, {int(p.gObj.y)}",
+                f"Vel: {p.vx:.1f}, {p.vy:.1f}",
+                f"Stall Timer: {self.stall_timer:.2f}s",
+                f"Stall Count: {self.stall_windows_count}",
+                f"Best X: {int(self.progress_x_best)}"
             ]
-            line_height = self.ui_font.get_height()
-            box = pygame.Surface((400, line_height * len(lines) + 10), pygame.SRCALPHA)
-            box.fill((0, 0, 0, 160))
-            surface.blit(box, (10, 10))
+            
+            panel_y_start = 220 if self.db_agentview else 50
             for i, ln in enumerate(lines):
-                surface.blit(self.ui_font.render(ln, True, COLOR_WHITE), (16, 16 + i * line_height))
+                surface.blit(self.ui_font.render(ln, True, (200, 200, 200)), (10, panel_y_start + i * 20))
+            
 
     def _draw_ui(self, surface: pygame.Surface):
         p = self.player
