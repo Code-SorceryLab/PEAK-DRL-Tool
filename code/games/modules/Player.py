@@ -24,6 +24,7 @@ class Player():
     on_ground: bool = False
     facing_right: bool = True
     powered_up: bool = False
+    
     invincible_timer: int = 0
     coyote: int = 0
     jump_hold: int = 0
@@ -31,12 +32,19 @@ class Player():
     last_jump_pressed: bool = False
     run_pressed: bool = False
     dt = 1.0
+    
+    # Input State
+    input_dir: int = 0
+    run_held: bool = False
+    jump_pressed: bool = False
+    
     # Input handling constants
     max_run: float = MAX_RUN_SPEED
     max_walk: float = MAX_WALK_SPEED
     run_accel: float = RUN_ACCEL
     walk_accel: float = WALK_ACCEL
-
+    
+    
     def update(self, dt: float):
         self.dt = dt
         # 1. Handle Timers
@@ -63,19 +71,41 @@ class Player():
         # DECOUPLED: This function now only sets state flags.
         # It does NOT calculate physics.
         
-        # Input Decoding
-        left  = (a in (1, 6))
-        right = (a in (2, 4, 5, 7))
-        self.jump_pressed = (a in (3, 4, 6, 7))
+        #Decode Agent Actions (0-7)
+        agent_left = (a in (1,6))
+        agent_right = (a in (2,4,5,7))
+        agent_jump = (a in (3,4,6,7))
+        agent_run = (a in (5,7))
+        
+        # Decode Keyboard Input (Manual Override)
+        kb_left = False
+        kb_right = False
+        kb_jump = False
+        kb_run = False
+        
+        if pygame.get_init():
+            keys = pygame.key.get_pressed()
+            kb_left = keys[pygame.K_LEFT] or keys[pygame.K_a]
+            kb_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
+            kb_jump = keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]
+            kb_run = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+        
+        # Combine Agent and Keyboard Inputs
+        is_left = agent_left or kb_left
+        is_right = agent_right or kb_right
+        self.jump_pressed = agent_jump or kb_jump
+        self.run_held = agent_run or kb_run
 
-        kb = pygame.key.get_pressed() if pygame.get_init() else None
-        kb_run = bool(kb and (kb[pygame.K_LSHIFT] or kb[pygame.K_RSHIFT]))
-        run_from_action = (a in (5, 7))
-        
         # State Setting
-        self.input_dir = -1 if left else (1 if right else 0)
-        self.run_held = kb_run or run_from_action
-        
+        if is_left and is_right:
+            self.input_dir = 0
+        elif is_left:
+            self.input_dir = -1
+        elif is_right:
+            self.input_dir = 1
+        else:
+            self.input_dir = 0
+            
         # Jump Buffering logic
         if self.jump_pressed:
             self.jump_buffer = JUMP_BUFFER_FRAMES
