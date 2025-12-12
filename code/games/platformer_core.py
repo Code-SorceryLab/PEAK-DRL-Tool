@@ -88,12 +88,12 @@ class PlatformerCore:
         self.dt = 0.0001
 
         self.level_file = kwargs.pop("level_file", None)
-        self.level_list = ["stage_1.txt", "stage_2.txt", "stage_3.txt", "stage_4.txt", "stage_5.txt"]
+        self.level_list = ["stage_1.txt", "stage_2.txt", "stage_3.txt", "stage_4.txt", "stage_5.txt", "stage_6.txt", "stage_7.txt", "stage_8.txt", "stage_9.txt", "stage_10.txt", "stage_11.txt"]
         self.current_level_idx = 0
 
         if self.level_file is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            candidate = os.path.join(base_dir, "levels", "stage_1.txt")
+            candidate = os.path.join(base_dir, "levels", self.level_list[0])
             if os.path.exists(candidate):
                 self.level_file = candidate
 
@@ -241,9 +241,7 @@ class PlatformerCore:
             self.level_file = candidate
 
     def complete_level(self):
-        print ("completed level\n")
         if self.current_level_idx < len(self.level_list) - 1:
-            print("next level\n")
             self.current_level_idx += 1
             self.load_level(self.current_level_idx)
         else:
