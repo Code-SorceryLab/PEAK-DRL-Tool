@@ -486,7 +486,7 @@ class PlatformerCore:
         Called when player hits an enemy, pit, or time runs out.
         """
         self.lives -= 1
-        print(f"Player Died! Lives remaining: {self.lives}")
+        
         
         if self.lives > 0:
             # We have lives left, reset the level state but keep score
