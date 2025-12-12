@@ -6,6 +6,7 @@ import sys
 import platform
 import subprocess
 import time
+import math
 from pathlib import Path
 from threading import Thread
 
@@ -17,8 +18,12 @@ except Exception:
 
 from omegaconf import OmegaConf
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QPalette, QColor
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QRectF, QPointF
+
+from PyQt5.QtGui import (
+    QFont, QPalette, QColor, QPixmap, QIcon, QPainter, 
+    QBrush, QPen, QPolygonF, QLinearGradient
+)
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QTabWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QComboBox, QLineEdit, QTextEdit, QSpinBox, QListWidget,
@@ -37,10 +42,11 @@ GRID_CONFIG_PATH = CONF_ROOT / "grid.yaml"
 CONF_GAME_DIR = CONF_ROOT / "game"
 CONF_REWARD_DIR = CONF_ROOT / "reward"
 CONF_ALGO_DIR = CONF_ROOT / "algo"
+LOGO_PATH = Path("Screenshots/PEAK_LOGO.png")
 
 REQUIRED_PACKAGES = [
     'torch>=1.9.0',
-    'stable-baselines3>=1.6.0',
+    'stable-baselines3[extra]>=1.6.0',
     'sb3-contrib>=1.6.0',
     'gymnasium>=0.26.0',
     'pygame>=2.1.0',
@@ -55,13 +61,6 @@ REQUIRED_PACKAGES = [
 # ============================================================================
 # STYLING (Softer Dark Red & Black Theme)
 # ============================================================================
-
-# Colors:
-# Background: #121212 (Dark Grey)
-# Components: #1e1e1e (Lighter Dark Grey)
-# Accent Text: #ff7f7f (Pastel Red - Lighter/Softer than neon)
-# Button Fill: #802020 (Crimson - Rich but not blinding)
-# Borders: #444444
 
 DARK_RED_STYLESHEET = """
 /* --- Main Window & General --- */
@@ -85,12 +84,12 @@ QGroupBox::title {
     subcontrol-position: top left;
     left: 10px;
     padding: 0 5px;
-    color: #ff7f7f; /* Softer Pastel Red */
+    color: #ff7f7f;
     font-weight: bold;
     font-size: 15px;
 }
 
-/* --- Tabs (Fixed Clipping & Spacing) --- */
+/* --- Tabs --- */
 QTabWidget::pane {
     border: 1px solid #444;
     background-color: #1e1e1e;
@@ -99,15 +98,15 @@ QTabWidget::pane {
 QTabBar::tab {
     background: #2b2b2b;
     color: #bbb;
-    padding: 10px 30px; /* Increased padding to prevent clipping */
-    min-width: 80px;    /* Ensure tabs have a decent width */
+    padding: 10px 30px;
+    min-width: 80px;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     margin-right: 2px;
     font-weight: 600;
 }
 QTabBar::tab:selected {
-    background: #802020; /* Crimson background */
+    background: #802020;
     color: white;
     border-bottom: 2px solid #ff7f7f;
 }
@@ -118,7 +117,7 @@ QTabBar::tab:hover:!selected {
 
 /* --- Buttons --- */
 QPushButton {
-    background-color: #802020; /* Rich Crimson */
+    background-color: #802020;
     color: white;
     border: 1px solid #5a1010;
     padding: 8px 16px;
@@ -126,7 +125,7 @@ QPushButton {
     font-weight: bold;
 }
 QPushButton:hover {
-    background-color: #a03030; /* Lighter on hover */
+    background-color: #a03030;
     border: 1px solid #ff7f7f;
 }
 QPushButton:pressed {
@@ -150,9 +149,7 @@ QLineEdit, QComboBox, QSpinBox {
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
     border: 1px solid #ff7f7f;
 }
-QComboBox::drop-down {
-    border: none;
-}
+QComboBox::drop-down { border: none; }
 QComboBox::down-arrow {
     image: none;
     border-left: 5px solid transparent;
@@ -161,95 +158,53 @@ QComboBox::down-arrow {
     margin-right: 8px;
 }
 
-/* --- Checkboxes (High Visibility) --- */
-QCheckBox {
-    spacing: 8px;
-    color: #e0e0e0;
-}
+/* --- Checkboxes --- */
+QCheckBox { spacing: 8px; color: #e0e0e0; }
 QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    background: #222;
-    border: 2px solid #888; /* Light grey border to be visible on black */
-    border-radius: 3px;
+    width: 18px; height: 18px; background: #222;
+    border: 2px solid #888; border-radius: 3px;
 }
-QCheckBox::indicator:hover {
-    border: 2px solid #ff7f7f;
-}
+QCheckBox::indicator:hover { border: 2px solid #ff7f7f; }
 QCheckBox::indicator:checked {
-    background: #ff7f7f;
-    border: 2px solid #ff7f7f;
-    image: none; /* Can add custom check icon if needed, but color fill is usually enough */
-}
-/* Tiny inner box to show checked state if image is missing */
-QCheckBox::indicator:checked::content {
-    background-color: #333; 
-    margin: 3px;
+    background: #ff7f7f; border: 2px solid #ff7f7f; image: none;
 }
 
 /* --- Progress Bar --- */
 QProgressBar {
-    border: 1px solid #444;
-    border-radius: 4px;
-    text-align: center;
-    background-color: #2c2c2c;
-    color: white;
-    font-weight: bold;
+    border: 1px solid #444; border-radius: 4px;
+    text-align: center; background-color: #2c2c2c;
+    color: white; font-weight: bold;
 }
 QProgressBar::chunk {
     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #802020, stop:1 #ff7f7f);
     border-radius: 3px;
 }
 
-/* --- Text Edit (Log) --- */
+/* --- Text Edit --- */
 QTextEdit {
-    background-color: #0d0d0d;
-    border: 1px solid #444;
-    color: #ccc;
-    font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 13px;
-    border-radius: 4px;
+    background-color: #0d0d0d; border: 1px solid #444;
+    color: #ccc; font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px; border-radius: 4px;
 }
 
 /* --- Tables --- */
 QTableWidget {
-    background-color: #1e1e1e;
-    gridline-color: #444;
-    border: 1px solid #444;
+    background-color: #1e1e1e; gridline-color: #444; border: 1px solid #444;
 }
-QTableWidget::item {
-    padding: 5px;
-}
-QTableWidget::item:selected {
-    background-color: #802020;
-    color: white;
-}
+QTableWidget::item { padding: 5px; }
+QTableWidget::item:selected { background-color: #802020; color: white; }
 QHeaderView::section {
-    background-color: #2c2c2c;
-    color: #ff7f7f;
-    padding: 6px;
-    border: 1px solid #444;
-    font-weight: bold;
+    background-color: #2c2c2c; color: #ff7f7f;
+    padding: 6px; border: 1px solid #444; font-weight: bold;
 }
 
 /* --- Scrollbars --- */
-QScrollBar:vertical {
-    border: none;
-    background: #121212;
-    width: 12px;
-}
+QScrollBar:vertical { border: none; background: #121212; width: 12px; }
 QScrollBar::handle:vertical {
-    background: #444;
-    min-height: 20px;
-    border-radius: 6px;
-    margin: 2px;
+    background: #444; min-height: 20px; border-radius: 6px; margin: 2px;
 }
-QScrollBar::handle:vertical:hover {
-    background: #ff7f7f;
-}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    height: 0px;
-}
+QScrollBar::handle:vertical:hover { background: #ff7f7f; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
 """
 
 # ============================================================================
@@ -333,6 +288,170 @@ def get_trained_games_from_models_flat():
             games.add(parts[0])
     return sorted(games)
 
+# ============================================================================
+# CUSTOM WIDGET: Animated Mountain Climb
+# ============================================================================
+class AnimatedMountainWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # CHANGED: Reduced height to 200px for a more compact view
+        self.setMinimumHeight(200)
+        
+        self._progress = 0.0
+        self._step_counter = 0
+        
+        # Victory Animation State
+        self._victory_active = False
+        self._victory_frame = 0
+        
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._advance_frame)
+        self._anim_timer.start(100) # 10 FPS
+
+    def setProgress(self, value_0_to_100):
+        prev = self._progress
+        self._progress = max(0.0, min(100.0, float(value_0_to_100))) / 100.0
+        
+        # Trigger victory if we just hit 100%
+        if self._progress >= 0.99 and prev < 0.99:
+            self._victory_active = True
+            self._victory_frame = 0
+        # Reset victory if we reset progress
+        elif self._progress < 0.1:
+            self._victory_active = False
+            self._victory_frame = 0
+            
+        self.update()
+
+    def _advance_frame(self):
+        # Animate running legs if climbing
+        if 0 < self._progress < 1.0:
+            self._step_counter += 1
+            self.update()
+        # Animate victory jump if finished (runs for ~3 seconds)
+        elif self._victory_active:
+            self._victory_frame += 1
+            if self._victory_frame > 30: # Stop jumping after 3s
+                self._victory_active = False
+            self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        w = self.width()
+        h = self.height()
+
+        # 1. Background
+        gradient = QLinearGradient(0, 0, 0, h)
+        gradient.setColorAt(0.0, QColor("#080808")) 
+        gradient.setColorAt(1.0, QColor("#1c1c1c")) 
+        painter.fillRect(0, 0, w, h, QBrush(gradient))
+
+        # 2. Mountain
+        peak_x = w * 0.85
+        peak_y = h * 0.15
+        base_y = h * 0.9
+        
+        path = QPolygonF()
+        path.append(QPointF(0, base_y))
+        path.append(QPointF(peak_x, peak_y))
+        path.append(QPointF(w, base_y))
+        
+        painter.setBrush(QBrush(QColor("#2a2a2a")))
+        painter.setPen(QPen(QColor("#621414"), 3))
+        painter.drawPolygon(path)
+
+        # 3. Snow
+        painter.setBrush(QBrush(QColor("#e0e0e0")))
+        painter.setPen(Qt.NoPen)
+        snow_path = QPolygonF()
+        snow_path.append(QPointF(peak_x, peak_y))
+        snow_path.append(QPointF(peak_x - (peak_x * 0.15), peak_y + (base_y - peak_y) * 0.15))
+        snow_path.append(QPointF(peak_x + ((w - peak_x) * 0.15), peak_y + (base_y - peak_y) * 0.15))
+        painter.drawPolygon(snow_path)
+
+        # 4. Man Position
+        start_x = 20.0
+        start_y = base_y
+        current_x = start_x + (peak_x - start_x) * self._progress
+        current_y = start_y + (peak_y - start_y) * self._progress
+        
+        # 5. Victory Jump Calculation
+        jump_offset = 0
+        if self._victory_active:
+            # Physics: Bounce 3 times
+            cycle = self._victory_frame % 8
+            # Simple parabola: y = 4 - (x-2)^2
+            hop = max(0, 4 - (cycle - 2)**2) * 4
+            jump_offset = hop
+
+        man_h = 24
+        man_w = 12
+        man_x = current_x - man_w/2
+        man_y = current_y - man_h - jump_offset # Apply jump
+
+        # Animation frame
+        leg_offset = 0
+        if 0 < self._progress < 1.0:
+            leg_offset = 2 if (self._step_counter % 2) == 0 else -2
+        elif self._victory_active:
+            # Spread legs during jump
+            leg_offset = 3 if jump_offset > 2 else 0
+
+        # --- DRAW MAN ---
+        painter.setPen(Qt.NoPen)
+        
+        # Body (Blue)
+        painter.setBrush(QColor("#ff7f7f"))
+        painter.drawRect(int(man_x), int(man_y + 8), int(man_w), 10)
+        
+        # Head (Flesh)
+        painter.setBrush(QColor("#ffccaa"))
+        painter.drawRect(int(man_x + 2), int(man_y), 8, 8)
+        
+        # Hair (Retro Brown)
+        painter.setBrush(QColor("#4e342e")) 
+        painter.drawRect(int(man_x + 1), int(man_y - 2), 10, 4) # Top hair
+        painter.drawRect(int(man_x + 1), int(man_y), 2, 6)      # Sideburn L
+        painter.drawRect(int(man_x + 9), int(man_y), 2, 6)      # Sideburn R
+
+        # Legs (Dark Grey)
+        painter.setBrush(QColor("#555"))
+        painter.drawRect(int(man_x + 2 + leg_offset), int(man_y + 18), 3, 6)
+        painter.drawRect(int(man_x + 7 - leg_offset), int(man_y + 18), 3, 6)
+
+        # 6. Flag
+        if self._progress >= 0.99:
+            painter.setBrush(QColor("#888"))
+            painter.drawRect(int(peak_x + 2), int(peak_y - 30), 2, 30)
+            painter.setBrush(QColor("#ff0000"))
+            flag_poly = QPolygonF()
+            flag_poly.append(QPointF(peak_x + 4, peak_y - 30))
+            flag_poly.append(QPointF(peak_x + 24, peak_y - 22))
+            flag_poly.append(QPointF(peak_x + 4, peak_y - 14))
+            painter.drawPolygon(flag_poly)
+
+        # 7. Text
+        pct_text = f"{int(self._progress * 100)}%"
+        painter.setPen(QColor("white"))
+        painter.setFont(QFont("Consolas", 10, QFont.Bold))
+        
+        # Position text above head (accounting for jump height)
+        text_w, text_h = 40, 20
+        text_x = man_x + (man_w / 2) - (text_w / 2)
+        text_y = man_y - text_h - 5
+        
+        painter.drawText(QRectF(text_x, text_y, text_w, text_h), Qt.AlignCenter, pct_text)
+
+# ============================================================================
+# WORKER THREAD
+# ============================================================================
+
+# ============================================================================
+# WORKER THREAD
+# ============================================================================
+
 class ProcWorker(QThread):
     line = pyqtSignal(str)
     finished = pyqtSignal(int)
@@ -359,7 +478,7 @@ class ProcWorker(QThread):
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                creationflags=creation_flags # Apply flags
+                creationflags=creation_flags
             )
             for line in self._proc.stdout:
                 self.line.emit(line.rstrip())
@@ -382,19 +501,23 @@ class ProcWorker(QThread):
                     self._proc.terminate()
         except Exception:
             pass
-
+        
+        
 # ============================================================================
 # MAIN GUI CLASS
 # ============================================================================
-
 class RLManagerGUI(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PEAK Agents — Control Center")
-        self.resize(1300, 950)
+        self.resize(1600, 900)  # Made window wider for side-by-side layout
         
         # Apply the Refined Dark Red theme
         self.setStyleSheet(DARK_RED_STYLESHEET)
+
+        # Set Window Icon if exists
+        if LOGO_PATH.exists():
+            self.setWindowIcon(QIcon(str(LOGO_PATH)))
 
         self.proc = None
         self._progress_mode = None
@@ -433,6 +556,23 @@ class RLManagerGUI(QWidget):
 
         # --- Top Control Bar ---
         top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 5)
+
+        # 1. Logo & Title on Left
+        if LOGO_PATH.exists():
+            logo_lbl = QLabel()
+            pixmap = QPixmap(str(LOGO_PATH))
+            scaled = pixmap.scaledToHeight(50, Qt.SmoothTransformation) # Scale nicely
+            logo_lbl.setPixmap(scaled)
+            top_row.addWidget(logo_lbl)
+            top_row.addSpacing(10)
+
+        title_lbl = QLabel("CONTROL CENTER")
+        title_lbl.setStyleSheet("font-size: 20px; font-weight: 900; color: #ff7f7f; letter-spacing: 2px;")
+        top_row.addWidget(title_lbl)
+        top_row.addSpacing(30)
+
+        # 2. Control Buttons
         refresh_btn = QPushButton("↺ Refresh Configs"); refresh_btn.clicked.connect(self._refresh_all)
         req_btn = QPushButton("📝 Write Requirements"); req_btn.clicked.connect(lambda: write_requirements(self.log, overwrite=True))
         req_install_btn = QPushButton("⬇ Install Deps"); req_install_btn.clicked.connect(lambda: self._install_requirements_safe())
@@ -445,7 +585,11 @@ class RLManagerGUI(QWidget):
         top_row.addWidget(refresh_btn)
         top_row.addWidget(req_btn)
         top_row.addWidget(req_install_btn)
+        
+        # Spacer
         top_row.addStretch(1)
+        
+        # Right side buttons
         top_row.addWidget(self.clear_log_btn)
         top_row.addWidget(self.stop_btn)
 
@@ -454,19 +598,19 @@ class RLManagerGUI(QWidget):
         self.log.setReadOnly(True)
         self.log.setPlaceholderText("System logs will appear here...")
 
-        # --- Layout Assembly ---
-        splitter = QSplitter(Qt.Vertical)
+        # --- Layout Assembly (Side-by-Side) ---
+        splitter = QSplitter(Qt.Horizontal) # CHANGED: Horizontal split
         
-        # Upper section (Tabs)
+        # Left section (Tabs)
         tabs_wrap = QWidget()
         tl = QVBoxLayout(tabs_wrap)
         tl.setContentsMargins(0, 0, 0, 0)
         tl.addWidget(self.tabs)
         
-        # Lower section (Logs)
+        # Right section (Logs)
         log_wrap = QWidget()
         ll = QVBoxLayout(log_wrap)
-        ll.setContentsMargins(0, 10, 0, 0)
+        ll.setContentsMargins(10, 0, 0, 0) # Left margin for spacing
         
         log_header = QLabel("SYSTEM OUTPUT LOG:")
         log_header.setStyleSheet("color: #ff7f7f; font-weight: bold; letter-spacing: 1px;")
@@ -475,8 +619,10 @@ class RLManagerGUI(QWidget):
 
         splitter.addWidget(tabs_wrap)
         splitter.addWidget(log_wrap)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 1)
+        
+        # Set initial sizes (70% Tabs, 30% Log)
+        splitter.setStretchFactor(0, 7)
+        splitter.setStretchFactor(1, 3)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
@@ -512,10 +658,8 @@ class RLManagerGUI(QWidget):
         return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
     def _selected_total_steps(self) -> int | None:
-        """Return total steps if the Steps selector is used; else None."""
         s = self.train_step_choice.currentText().strip()
-        if not s:
-            return None
+        if not s: return None
         if s.lower() == "custom":
             return int(self.train_steps.value())
         try:
@@ -524,16 +668,12 @@ class RLManagerGUI(QWidget):
             return None
 
     def _on_proc_line_received(self, s: str):
-        """Worker thread signal slot: buffers log line and checks for progress update."""
         self._log_buffer.append(s)
-
-        if self._progress_mode != 'train':
-            return
+        if self._progress_mode != 'train': return
 
         line = s.strip()
         cur = None
 
-        # Check for explicit progress marker from scripts
         if 'PROGRESS:' in line and '/' in line:
             try:
                 after = line.split('PROGRESS:')[1].strip()
@@ -542,12 +682,9 @@ class RLManagerGUI(QWidget):
                 tot = int(''.join(ch for ch in right if ch.isdigit()))
                 if self._progress_total is None:
                     self._progress_total = tot
-                    self.train_prog.setRange(0, tot)
             except Exception:
                 cur = None
-        # Check for typical RL training output lines (e.g., from stable-baselines3)
         elif any(k in line for k in ['total_timesteps', 'num_timesteps', 'timesteps', 'steps']):
-            # Aggressive parsing to find the max number, which is usually the step count
             ints, token = [], ''
             for ch in line:
                 if ch.isdigit():
@@ -555,48 +692,40 @@ class RLManagerGUI(QWidget):
                 else:
                     if token:
                         ints.append(int(token)); token = ''
-            if token:
-                ints.append(int(token))
-            if ints:
-                cur = max(ints)
+            if token: ints.append(int(token))
+            if ints: cur = max(ints)
 
         if cur is not None:
             self._latest_progress_value = cur
 
     def _update_log_and_progress_from_buffer(self):
-        """Timer slot: Safely updates GUI elements from the buffer."""
-        
         # 1. Update Log
         if self._log_buffer:
             temp_buffer = self._log_buffer.copy()
             self._log_buffer.clear()
-            
             for s in temp_buffer:
-                # Coloring specific keywords for readability
                 formatted = s
                 if "ERROR" in s or "Error" in s or "Exception" in s:
                     formatted = f"<span style='color:#ff5555;'>{s}</span>"
                 elif "SUCCESS" in s or "Completed" in s:
                     formatted = f"<span style='color:#55ff55;'>{s}</span>"
-                
                 self.log.append(formatted)
         
-        # 2. Update Progress Bar/Label
-        if self._progress_mode == 'train' and hasattr(self, 'train_prog'):
+        # 2. Update Progress Bar/Mountain
+        if self._progress_mode == 'train' and hasattr(self, 'train_mountain'):
             cur = self._latest_progress_value
-
             if self._progress_total:
-                # Only update if the value has actually changed
-                if cur == self._progress_value:
-                    return
-
+                if cur == self._progress_value: return
                 self._progress_value = cur
+                
+                # Calculate percentage 0-100
                 val = max(0, min(cur, int(self._progress_total)))
-                self.train_prog.setValue(val)
+                pct = (val / float(self._progress_total)) * 100.0
+                
+                # Update mountain widget
+                self.train_mountain.setProgress(pct)
 
-                done_pct = int(100.0 * val / float(self._progress_total))
-
-                # ETA / speed like tqdm
+                done_pct = int(pct)
                 if self._train_start_time:
                     elapsed = time.time() - self._train_start_time
                 else:
@@ -604,21 +733,16 @@ class RLManagerGUI(QWidget):
                 speed = (val / elapsed) if elapsed > 0 else 0.0
                 remain = (self._progress_total - val) / speed if speed > 0 else 0.0
 
-                self.train_prog.setFormat("%p%")              # show percent overlay
-                self.train_prog.setTextVisible(True)
-
                 self.train_prog_label.setText(
                     f"Training… {val:,}/{self._progress_total:,} "
                     f"({done_pct}% done)  "
                     f"[ {self._fmt_hms(elapsed)} < {self._fmt_hms(remain)} ]"
                 )
             elif cur > 0:
-                 # Non-fixed step training (e.g., Novice/Expert)
-                self.train_prog.setRange(0, 0) # Indeterminate mode
+                # Indeterminate
                 self.train_prog_label.setText(f"Training… ~{cur:,} steps")
             
-            self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum()) # Auto-scroll
-
+            self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
 
     def _run_cmd(self, cmd, env=None, purpose=None, progress_total=None):
         if self.proc and self.proc.isRunning():
@@ -634,12 +758,12 @@ class RLManagerGUI(QWidget):
         
         if purpose == 'train':
             self._train_start_time = time.time()
+            if hasattr(self, 'train_mountain'):
+                self.train_mountain.setProgress(0)
         else:
             self._train_start_time = None
         
-        # Start the GUI update timer
         self._timer.start() 
-
         self.proc = ProcWorker(cmd, env=env)
         self.proc.line.connect(self._on_proc_line_received)
         self.proc.finished.connect(self._on_proc_finished)
@@ -649,29 +773,46 @@ class RLManagerGUI(QWidget):
 
     def _stop_proc(self):
         if self.proc:
-            # Stop the timer immediately to prevent further UI updates
             self._timer.stop() 
             self.proc.stop()
             self.log.append("[!] Termination requested.")
+            
+            # --- RESET ANIMATION HERE ---
+            if hasattr(self, 'train_mountain'):
+                self.train_mountain.setProgress(0)
+            if hasattr(self, 'train_prog_label'):
+                self.train_prog_label.setText("Training stopped (Reset)")
 
     def _on_proc_finished(self, code: int):
-        self._timer.stop() # Ensure the timer is stopped
-        # Process any remaining log lines in the buffer
+        self._timer.stop() 
         self._update_log_and_progress_from_buffer() 
-        
         self.stop_btn.setEnabled(False)
         self.stop_btn.setStyleSheet("background-color: #501010; border: 1px solid #802020; color: #ff9999;")
         
+        # --- SOUND LOGIC ---
         if HAS_WINSOUND and code == 0:
             try:
-                winsound.MessageBeep()
+                if Path("chime.wav").exists():
+                    winsound.PlaySound("chime.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
+                else:
+                    winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS)
             except Exception:
                 pass
         
-        if self._progress_mode == 'train' and hasattr(self, 'train_prog'):
-            self.train_prog.setRange(0, 100)
-            self.train_prog.setValue(100 if code == 0 else 0)
-            self.train_prog_label.setText('Training complete' if code == 0 else 'Training stopped')
+        if self._progress_mode == 'train' and hasattr(self, 'train_mountain'):
+            if code == 0:
+                self.train_mountain.setProgress(100) # Finish visuals
+                self.train_prog_label.setText('Training complete')
+                
+                # --- NEW: Refresh lists so the new model shows up immediately ---
+                self._refresh_status()
+                self._populate_eval_games()
+                self._populate_watch_list()
+                self.log.append("[✓] Model lists refreshed.")
+                # ---------------------------------------------------------------
+            else:
+                self.train_prog_label.setText('Training stopped')
+            
             self._progress_mode = None
             self._progress_total = None
             self._progress_value = 0
@@ -760,15 +901,19 @@ class RLManagerGUI(QWidget):
         self.train_prog_label = QLabel("Ready to train")
         self.train_prog_label.setStyleSheet("color: #888; font-style: italic;")
         
-        self.train_prog = QProgressBar(); self.train_prog.setValue(0); self.train_prog.setTextVisible(True); self.train_prog.setFormat("%p%")
+        # --- REPLACED PROGRESS BAR WITH MOUNTAIN WIDGET ---
+        self.train_mountain = AnimatedMountainWidget()
+        # --------------------------------------------------
         
         btn_train = QPushButton("INITIATE TRAINING SEQUENCE"); 
-        btn_train.setFixedHeight(40)
-        btn_train.setStyleSheet("font-size: 16px; letter-spacing: 1px;")
+        # CHANGED: Reduced button height for better layout
+        btn_train.setFixedHeight(30)
+        # CHANGED: Reduced font size slightly
+        btn_train.setStyleSheet("font-size: 13px; letter-spacing: 1px;")
         btn_train.clicked.connect(self._on_train_clicked)
 
         v.addWidget(self.train_prog_label)
-        v.addWidget(self.train_prog)
+        v.addWidget(self.train_mountain) # Added mountain
         v.addSpacing(10)
         v.addWidget(btn_train)
         grp3.setLayout(v)
@@ -795,13 +940,12 @@ class RLManagerGUI(QWidget):
             QMessageBox.warning(self, "Missing Data", "Please select Game, Algo, Persona, and Skill.")
             return
 
-        self.train_prog.setValue(0)
+        self.train_mountain.setProgress(0)
         self.train_prog_label.setText('Initializing...')
 
         total_steps = self._selected_total_steps()
 
         if total_steps:
-            self.train_prog.setRange(0, total_steps)
             self.train_prog_label.setText(f"Training... 0/{total_steps:,}")
             cmd = [
                 sys.executable, "-m", "code.scripts.train",
@@ -816,31 +960,22 @@ class RLManagerGUI(QWidget):
             return
 
         if skill == "Novice & Expert":
-            # Running multiple subprocesses sequentially is fine to do on a separate thread 
-            # as it won't block the GUI's main thread (unlike a single subprocess with rapid output)
-            
             def run_both():
-                self._timer.stop() # Stop the timer for bulk sequential runs
-                self.train_prog.setRange(0, 0)
+                self._timer.stop() 
+                self.train_mountain.setProgress(0)
                 self.train_prog_label.setText("Training sequence: Novice -> Expert")
                 
                 for sk in ("Novice", "Expert"):
-                    # Use a standard subprocess.run() here to block the loop until one run finishes
                     cmd2 = [
                         sys.executable, "-m", "code.scripts.train",
                         f"game={game}", f"model={algo}", f"persona={persona}",
                         f"skill={sk}", f"tb_root={tb_root}",
                     ]
-                    
                     self.log.append(f"<span style='color:#ff7f7f;'>>>></span> {' '.join(cmd2)}")
-                    
-                    # Add a windows-specific flag to prevent the console window flash
                     creation_flags = 0
                     if platform.system() == "Windows":
                         creation_flags = subprocess.CREATE_NO_WINDOW
-                        
                     p = subprocess.run(cmd2, creationflags=creation_flags)
-                    
                     self.log.append(f"[run {sk}] exit {p.returncode}")
                     self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
 
@@ -848,10 +983,8 @@ class RLManagerGUI(QWidget):
                     try: winsound.MessageBeep()
                     except Exception: pass
                 
-                # Signal completion to the main thread for final GUI update
                 self.log.append("[✓] Completed Novice & Expert runs.")
-                self.train_prog.setRange(0, 100)
-                self.train_prog.setValue(100)
+                self.train_mountain.setProgress(100)
                 self.train_prog_label.setText("Sequence Complete")
                 
             Thread(target=run_both, daemon=True).start()
@@ -862,7 +995,7 @@ class RLManagerGUI(QWidget):
             f"game={game}", f"model={algo}", f"persona={persona}",
             f"skill={skill}", f"tb_root={tb_root}",
         ]
-        self.train_prog.setRange(0, 0)
+        self.train_mountain.setProgress(0)
         self.train_prog_label.setText(f"Training... {skill}")
         self._run_cmd(cmd, purpose='train')
 
@@ -911,9 +1044,8 @@ class RLManagerGUI(QWidget):
             return
         self.log.append(f"Found {len(subfolders)} model(s) for '{game}'. Running eval...")
         
-        # Use a separate thread for sequential evaluations to prevent GUI lock
         def run_eval_sequence():
-            self._timer.stop() # Stop the timer
+            self._timer.stop() 
             for model_dir in subfolders:
                 model_zip = model_dir / "best_model.zip"
                 model_name = model_dir.name
@@ -927,23 +1059,16 @@ class RLManagerGUI(QWidget):
                     "--episodes", str(self.eval_eps.value()), "--render", "none",
                     "--out", str(out_json), "--metrics", metrics_class,
                 ]
-                
                 self.log.append(f"<span style='color:#ff7f7f;'>>>></span> {' '.join(cmd)}")
-                
                 creation_flags = 0
                 if platform.system() == "Windows":
                     creation_flags = subprocess.CREATE_NO_WINDOW
-                    
                 p = subprocess.run(cmd, creationflags=creation_flags)
                 self.log.append(f"[eval {model_name}] exit {p.returncode}")
                 self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
-            
             self.log.append(f"[✓] Evaluation sequence complete for {game}.")
 
         Thread(target=run_eval_sequence, daemon=True).start()
-        # Note: For non-rapid output commands like this sequence, running them in a non-GUI thread
-        # using subprocess.run() is better than using ProcWorker/QThread, as it simplifies cleanup
-        # and avoids the potential for rapid signal emissions. We do not need the timer here.
 
     # ---------------- TensorBoard Tab ----------------
     def _build_tb_tab(self) -> QWidget:
@@ -1006,7 +1131,6 @@ class RLManagerGUI(QWidget):
         env = os.environ.copy()
         if "SDL_VIDEODRIVER" in env:
             env.pop("SDL_VIDEODRIVER")
-        # Manual play typically doesn't spam output, so ProcWorker is safe.
         cmd = [sys.executable, "-m", "code.scripts.manual_play", "--game", game, "--fps", str(self.manual_fps.value())]
         self._run_cmd(cmd, env=env)
 
@@ -1105,40 +1229,31 @@ class RLManagerGUI(QWidget):
 
         def run_all():
             total = 0
-            # Stop timer for this bulk operation
             self._timer.stop()
-            
             for algo in selected_algos:
                 for sk in skills:
                     cmd = [
                         sys.executable, "-m", "code.scripts.train",
                         f"game={game}", f"model={algo}", f"persona={persona}", f"skill={sk}", f"tb_root={DEFAULT_TB_ROOT}",
                     ]
-                    
                     self.log.append(f"<span style='color:#ff7f7f;'>>>></span> {' '.join(cmd)}")
-                    
                     creation_flags = 0
                     if platform.system() == "Windows":
                         creation_flags = subprocess.CREATE_NO_WINDOW
-                        
                     p = subprocess.run(cmd, creationflags=creation_flags)
                     self.log.append(f"[{algo}/{sk}] exit {p.returncode}")
                     self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
                     total += 1
-                    
             if HAS_WINSOUND:
                 try: winsound.MessageBeep()
                 except Exception: pass
-            
             self.log.append(f"[✓] Completed training for {total} run(s) in game '{game}'.")
-            
         Thread(target=run_all, daemon=True).start()
 
     # ---------------- Status Tab ----------------
     def _build_status_tab(self) -> QWidget:
         w = QWidget(); root = QVBoxLayout(w)
         
-        # Overview Box
         overview = QGroupBox("Project Overview")
         og = QGridLayoutLike()
         self.ov_games = QLabel(""); self._bold_label_left(og, "Games Configured", self.ov_games)
@@ -1146,7 +1261,6 @@ class RLManagerGUI(QWidget):
         self.ov_trained = QLabel(""); self._bold_label_left(og, "Models Trained", self.ov_trained)
         overview.setLayout(og.layout)
 
-        # Tables
         games_box = QGroupBox("Games Status")
         self.games_table = QTableWidget(0, 2)
         self.games_table.setHorizontalHeaderLabels(["Game", "Status"])
@@ -1274,3 +1388,5 @@ if __name__ == '__main__':
     gui = RLManagerGUI()
     gui.show()
     sys.exit(app.exec_())
+
+
