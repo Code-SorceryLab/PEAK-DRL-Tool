@@ -97,13 +97,13 @@ def _wrap_with_tracker(core_fn) -> Callable:
 # ---- Personas ----------------------------------------------------------
 
 @_wrap_with_tracker
-def platformer_baseline(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def baseline(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """Random baseline for sanity checks."""
     return random.random() - 0.5
 
 
 @_wrap_with_tracker
-def platformer_simple(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """
     SIMPLE: Gentle forward shaping + coins/kills; tiny time tax.
     """
@@ -124,7 +124,7 @@ def platformer_simple(score_inc: bool, terminated: bool, info: Info, score: int)
 
 
 @_wrap_with_tracker
-def platformer_speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """
     SPEEDRUNNER: Strong progress pressure, light time tax.
     """
@@ -140,7 +140,7 @@ def platformer_speedrunner(score_inc: bool, terminated: bool, info: Info, score:
 
 
 @_wrap_with_tracker
-def platformer_coin_collector(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def coin_collector(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """
     COIN COLLECTOR: Prioritizes grabbing coins.
     """
@@ -154,7 +154,7 @@ def platformer_coin_collector(score_inc: bool, terminated: bool, info: Info, sco
 
 
 @_wrap_with_tracker
-def platformer_master(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def master(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """
     MASTER: Balanced—progress, coins, and kills.
     """
@@ -178,7 +178,7 @@ def platformer_master(score_inc: bool, terminated: bool, info: Info, score: int)
 
 
 @_wrap_with_tracker
-def platformer_explorer(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
+def explorer(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
     """
     EXPLORER: Solves "Stuck at Pit".
     Rewards only NEW territory (frontier_dx).
