@@ -75,7 +75,8 @@ class MarioCore:
         self.camera_lock = True
         
         # Anti-stall knobs
-        self.anti_stall = bool(kwargs.pop("anti_stall", True if self.render_mode != "human" else False))
+        #self.anti_stall = bool(kwargs.pop("anti_stall", True if self.render_mode != "human" else False))
+        self.anti_stall = bool(kwargs.pop("anti_stall", True))
         self.stall_window = int(kwargs.pop("stall_window", 1.5))
         self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 6))
         self.stall_eps = float(kwargs.pop("stall_eps", 6.0))
@@ -88,7 +89,7 @@ class MarioCore:
         self.dt = 0.0001
 
         self.level_file = kwargs.pop("level_file", None)
-        self.level_list = ["world1_1.txt", "world1_2.txt"]
+        self.level_list = ["stage_1.txt", "stage_2.txt", "stage_3.txt", "stage_4.txt", "stage_5.txt", "stage_6.txt", "stage_7.txt", "stage_8.txt", "stage_9.txt", "stage_10.txt", "stage_11.txt"]
         self.current_level_idx = 0
 
         if self.level_file is None:
@@ -543,28 +544,32 @@ class MarioCore:
 
     def _update_stall_metrics(self):
         if not self.anti_stall or not self.player: return
+        
         prog_x, prog_y = self._progress_components()
         progressed = False
 
-        if prog_x > self.progress_x_best + (TILE_SIZE / 2 ):
+        # FIX: Require meaningful progress (> 8 pixels) to reset timer
+        if prog_x > self.progress_x_best + 8.0:
             self.progress_x_best = prog_x
             progressed = True
             
-            
-        if prog_y > self.progress_y_best + (TILE_SIZE / 2 ):
-            self.progress_y_best = prog_y 
+        # For vertical MARIOs, Y progress matters too!
+        if prog_y > self.progress_y_best + 8.0:
+            self.progress_y_best = prog_y
             progressed = True
 
         if progressed:
-            self.stall_timer = 0  
+            self.stall_timer = 0
             self.stalled_this_frame = False
             return
 
+        # Increment timer if no significant progress
         self.stall_timer += self.dt
         
+        # Check if we exceeded the window
         if self.stall_timer >= self.stall_window:
             self.stalled_this_frame = True
-            self.stall_timer = 0
+            self.stall_timer = 0  # Reset to trigger another stall count
             self.stall_windows_count += 1
 
     def _check_termination(self) -> bool:
