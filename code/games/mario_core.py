@@ -242,9 +242,9 @@ class MarioCore:
             self.level_file = candidate
 
     def complete_level(self):
-        print ("completed level\n")
+        #print ("completed level\n")
         if self.current_level_idx < len(self.level_list) - 1:
-            print("next level\n")
+            #print("next level\n")
             self.current_level_idx += 1
             self.load_level(self.current_level_idx)
         else:
@@ -486,7 +486,7 @@ class MarioCore:
         Called when player hits an enemy, pit, or time runs out.
         """
         self.lives -= 1
-        print(f"Player Died! Lives remaining: {self.lives}")
+        #print(f"Player Died! Lives remaining: {self.lives}")
         
         if self.lives > 0:
             # We have lives left, reset the level state but keep score
