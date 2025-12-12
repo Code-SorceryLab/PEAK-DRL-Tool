@@ -448,10 +448,6 @@ class AnimatedMountainWidget(QWidget):
 # WORKER THREAD
 # ============================================================================
 
-# ============================================================================
-# WORKER THREAD
-# ============================================================================
-
 class ProcWorker(QThread):
     line = pyqtSignal(str)
     finished = pyqtSignal(int)
@@ -764,7 +760,20 @@ class RLManagerGUI(QWidget):
             self._train_start_time = None
         
         self._timer.start() 
-        self.proc = ProcWorker(cmd, env=env)
+
+        # --- FIX: Sanitize Environment for Windows ---
+        # 1. Start with provided env or copy of system env
+        run_env = env if env is not None else os.environ.copy()
+        
+        # 2. Force UTF-8 to fix the arrow character crash
+        run_env["PYTHONIOENCODING"] = "utf-8"
+
+        # 3. Clean "Illegal" keys (Windows hidden vars like '=C:' or empty keys)
+        # These keys exist in os.environ but crash subprocess.Popen if passed explicitly
+        safe_env = {k: v for k, v in run_env.items() if k and "=" not in k}
+        # ---------------------------------------------
+
+        self.proc = ProcWorker(cmd, env=safe_env)
         self.proc.line.connect(self._on_proc_line_received)
         self.proc.finished.connect(self._on_proc_finished)
         self.stop_btn.setEnabled(True)
