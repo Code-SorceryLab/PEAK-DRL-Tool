@@ -1,5 +1,5 @@
 -----
-# PEAK: Platformer Engine for AI Knowledge
+# PEAK: Platformer Engine by Al & Kevin
 
 **PEAK** is a specialized Deep Reinforcement Learning (DRL) framework designed to benchmark agent adaptability in 2D platforming environments. Built on a custom-engineered Pygame engine, PEAK provides a high-performance, deterministic environment for training agents using Stable-Baselines3.
 
