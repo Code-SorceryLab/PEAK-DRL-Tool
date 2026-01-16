@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import os
 import math
@@ -19,6 +18,9 @@ from .modules.Powerup import Powerup
 from .modules.Coin import Coin
 from .modules.QuestionBlock import QuestionBlock
 from .modules.SpatialHash import SpatialHash
+
+# Debug Module
+from .modules.debugging_mods.manager import DebugManager
 
 from .modules.Movement_parameters import(RUN_ACCEL, WALK_ACCEL, MAX_WALK_SPEED, MAX_RUN_SPEED,
     GROUND_FRICTION, AIR_FRICTION, AIR_CONTROL, SKID_DECEL,
@@ -72,7 +74,7 @@ class MarioCore:
         self.camera_x = 0.0
         self.camera_y = 0.0
         self.camera_smoothing = 0.15
-        self.camera_lock = True
+        self.camera_lock = True # Default state
         
         # Anti-stall knobs
         self.anti_stall = bool(kwargs.pop("anti_stall", True if self.render_mode != "human" else False))
@@ -137,12 +139,8 @@ class MarioCore:
         pygame.init()
         self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
-        self.db_hitboxes = self.debug_default
-        self.db_agentview = self.debug_default
-        self.db_sensors = self.debug_default
-        self.db_obs_panel = self.debug_default
-        self.db_tile_grid = False
-        self._prev_keys = pygame.key.get_pressed()
+        # --- Debug Manager (Composition) ---
+        self.debug_manager = DebugManager(default_active=self.debug_default)
 
         # --- Fonts ---
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
@@ -201,6 +199,10 @@ class MarioCore:
             
         self.frame += 1
         if self.use_timer: self.timer -= self.dt
+
+        # Debug Input Update (if render mode is human)
+        if self.render_mode == "human":
+            self.debug_manager.update_input()
 
         self._last_action = int(action)
         self.last_x = self.player.gObj.x
@@ -317,6 +319,14 @@ class MarioCore:
         self.player = Player(gObj=GameObject(float(x), float(y), MARIO_WIDTH, MARIO_HEIGHT, True))
 
     def _handle_action(self, a: int):
+        # Prevent player movement processing if free cam is active
+        # This forcefully ignores any key presses the Player class might be reading internally
+        if self.debug_manager.free_cam_active:
+            self.player.vx = 0.0
+            self.player.jump_hold = 0
+            # Do NOT call self.player.handle_input(a)
+            return
+
         self.player.handle_input(a = a)
 
     def _update_physics(self, dt: float):
@@ -525,6 +535,17 @@ class MarioCore:
         self.progress_x_best = self.player.gObj.x
 
     def _update_camera(self):
+        # 1. Check Free Cam Mode
+        if self.debug_manager.free_cam_active:
+             mx, my = self.debug_manager.current_cam_move
+             self.camera_x += mx * self.dt
+             self.camera_y += my * self.dt
+             
+             # Removed clamping in Free Cam mode so you can fly Up/Down 
+             # outside the normal level boundaries.
+             return
+
+        # 2. Else Follow Player
         if not self.camera_lock or not self.player: return
         
         target_x = max(0, min(self.player.gObj.x - self.WIDTH // 3, self.level_w - self.WIDTH))
@@ -716,9 +737,9 @@ class MarioCore:
         self._draw_entities_from_hash(surface)
         self._draw_player(surface) 
         
-        self._update_debug_key_toggles()
-        if self.db_hitboxes or self.db_sensors or self.db_agentview or self.db_obs_panel or self.db_tile_grid:
-            self._draw_debug(surface)
+        # --- DELEGATE DEBUG TO MANAGER ---
+        self.debug_manager.render_overlays(surface, self)
+        
         self._draw_ui(surface)
 
     def _draw_world_from_hash(self, surface: pygame.Surface):
@@ -774,7 +795,8 @@ class MarioCore:
         col = COLOR_POWERUP_STAR if (p.invincible_timer > 0 and (self.frame // 5) % 2) else \
               ((255, 100, 0) if p.powered_up else (255, 0, 0))
         p.color = col
-        p.render(surface, sx, sy, self.db_sensors)
+        # Pass the sensor flag from debug manager
+        p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
         if p.run_pressed and abs(p.vx) > self.max_walk * 0.6:
             n = 3; spacing = 6; length = 10
@@ -784,93 +806,6 @@ class MarioCore:
                 else: x1 = sx + p.gObj.width + offset; x2 = x1 + length
                 y = sy + 10 + (i % 2) * 4
                 pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
-
-    def _draw_debug(self, surface: pygame.Surface):
-        p = self.player
-        px, py, _ = self._world_to_screen(p.gObj)
-        
-        if self.db_hitboxes:
-            px, py, _ = self._world_to_screen(p.gObj)
-            pygame.draw.rect(surface, COLOR_HITBOX, (px, py, p.gObj.width, p.gObj.height), 2)
-            visible = self.dynamic_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)
-            for o in visible:
-                sx, sy, _ = self._world_to_screen(o.gObj)
-                pygame.draw.rect(surface, (255, 255, 255), (sx, sy, o.gObj.width, o.gObj.height), 1)
-                
-                
-        if self.db_agentview:
-            # Settings for the mini-window
-            cell_w, cell_h = 16, 16  # Size of each "pixel" in the agent view
-            grid_w, grid_h = 11, 9   # Dimensions of the agent's observation grid
-            panel_x, panel_y = 10, 50 # Position on screen
-            
-            # Draw Background for the panel
-            pygame.draw.rect(surface, (20, 20, 30), 
-                           (panel_x - 5, panel_y - 5, grid_w * cell_w + 10, grid_h * cell_h + 10))
-            pygame.draw.rect(surface, (255, 255, 255), 
-                           (panel_x - 5, panel_y - 5, grid_w * cell_w + 10, grid_h * cell_h + 10), 2)
-
-            # Calculate Player Grid Coordinates
-            p_cx = int((p.gObj.x + p.gObj.width / 2) // TILE_SIZE)
-            p_cy = int((p.gObj.y + p.gObj.height / 2) // TILE_SIZE)
-
-            # Cache entity locations for fast lookup
-            enemy_locs = {(int(e.gObj.x // TILE_SIZE), int(e.gObj.y // TILE_SIZE)) 
-                          for e in self.enemies if e.gObj.active}
-            coin_locs = {(int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE)) 
-                         for c in self.coins if c.gObj.active and not c.collected}
-
-            # Draw the 11x9 Observation Grid
-            # The agent sees: dx=[-5, 5], dy=[-4, 4]
-            for dy_i, dy in enumerate(range(-4, 5)):
-                for dx_i, dx in enumerate(range(-5, 6)):
-                    tx, ty = p_cx + dx, p_cy + dy
-                    
-                    draw_x = panel_x + dx_i * cell_w
-                    draw_y = panel_y + dy_i * cell_h
-                    
-                    color = (50, 50, 50) # Default: Empty Air (Dark Grey)
-
-                    # 1. Check Level Geometry
-                    if 0 <= ty < self.level_rows and 0 <= tx < self.level_cols:
-                        tile_type = self.level_data[ty][tx]
-                        if tile_type != TILE_AIR:
-                            color = (180, 180, 180) # Solid Wall (Light Grey)
-                            if tile_type == TILE_SPIKE: color = (255, 0, 255) # Spike (Purple)
-                            elif tile_type == TILE_GOAL: color = (0, 255, 0)  # Goal (Green)
-                    else:
-                        color = (0, 0, 0) # Out of bounds (Black)
-
-                    # 2. Check Entities (Overlay)
-                    if (tx, ty) in enemy_locs:
-                        color = (255, 50, 50) # Enemy (Red)
-                    elif (tx, ty) in coin_locs:
-                        color = (255, 215, 0) # Coin (Gold)
-                    
-                    # 3. Draw The Player (Center)
-                    if dx == 0 and dy == 0:
-                        color = (50, 150, 255) # Player (Blue)
-
-                    pygame.draw.rect(surface, color, (draw_x, draw_y, cell_w - 1, cell_h - 1))
-
-            # Label
-            surface.blit(self.ui_font.render("Agent View", True, (255, 255, 255)), (panel_x, panel_y - 25))
-            
-        
-        if self.db_obs_panel:
-            obs = self._obs()
-            lines = [
-                f"Pos: {int(p.gObj.x)}, {int(p.gObj.y)}",
-                f"Vel: {p.vx:.1f}, {p.vy:.1f}",
-                f"Stall Timer: {self.stall_timer:.2f}s",
-                f"Stall Count: {self.stall_windows_count}",
-                f"Best X: {int(self.progress_x_best)}"
-            ]
-            
-            panel_y_start = 220 if self.db_agentview else 50
-            for i, ln in enumerate(lines):
-                surface.blit(self.ui_font.render(ln, True, (200, 200, 200)), (10, panel_y_start + i * 20))
-            
 
     def _draw_ui(self, surface: pygame.Surface):
         p = self.player
@@ -883,7 +818,8 @@ class MarioCore:
         )
         
         x = 5; y = 5
-        if self.db_obs_panel: y = self.HEIGHT - ts.get_height() - 10
+        # Check DebugManager state to offset UI
+        if self.debug_manager.show_obs_panel: y = self.HEIGHT - ts.get_height() - 10
         
         bg = pygame.Surface((ts.get_width() + 10, ts.get_height() + 6), pygame.SRCALPHA)
         bg.fill((0, 0, 0, 170))
@@ -900,24 +836,6 @@ class MarioCore:
             tbg.fill((0, 0, 0, 170))
             surface.blit(tbg, (tx - 5, 5 - 3))
             surface.blit(ttext, (tx, 5))
-
-    def _update_debug_key_toggles(self):
-        keys = pygame.key.get_pressed()
-        toggles = [
-            (pygame.K_1, pygame.K_F1, "db_hitboxes"),
-            (pygame.K_2, pygame.K_F2, "db_agentview"),
-            (pygame.K_3, pygame.K_F3, "db_sensors"),
-            (pygame.K_4, pygame.K_F4, "db_obs_panel"),
-            (pygame.K_5, pygame.K_F5, "camera_lock"),
-            (pygame.K_6, pygame.K_F6, "db_tile_grid"),
-        ]
-        for k_num, k_fn, attr in toggles:
-            if (not self._prev_keys[k_num] and keys[k_num]) or (not self._prev_keys[k_fn] and keys[k_fn]):
-                if attr == "camera_lock":
-                    self.camera_lock = not self.camera_lock
-                else:
-                    setattr(self, attr, not getattr(self, attr))
-        self._prev_keys = keys
 
     def _world_to_screen(self, gObj:GameObject) -> Tuple[float, float, bool]:
         sx = gObj.x - self.camera_x

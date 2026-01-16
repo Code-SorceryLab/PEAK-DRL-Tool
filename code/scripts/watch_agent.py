@@ -94,6 +94,17 @@ def create_env(game: str, **kwargs):
     except AttributeError as e:
         raise AttributeError(f"Game core class not found for '{game}': {e}")
 
+# Helper to find the actual game core instance through wrappers
+def find_core_game(env_instance):
+    curr = env_instance
+    while hasattr(curr, 'env'):
+        if hasattr(curr, 'game'):
+            return curr.game
+        curr = curr.env
+    if hasattr(curr, 'game'):
+        return curr.game
+    return None
+
 def watch_agent_play(
     model_path: str, 
     episodes: int = 5,
@@ -129,6 +140,7 @@ def watch_agent_play(
     # Create environment
     print(f"Creating {game} environment...")
     env = create_env(game, fps=fps)
+    core_game = find_core_game(env)
     
     print(f"Watching agent play {episodes} episode(s) at {fps} FPS...")
     print("Press ESC or close window to stop early")
@@ -142,6 +154,9 @@ def watch_agent_play(
             print(f"\n--- Episode {episode + 1}/{episodes} ---")
             
             obs, info = env.reset()
+            # Re-fetch core in case reset changed instance
+            core_game = find_core_game(env)
+            
             done = truncated = False
             episode_score = 0
             step_count = 0
@@ -154,9 +169,24 @@ def watch_agent_play(
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                         raise KeyboardInterrupt("ESC pressed")
                 
+                # IMPORTANT: Pump events so the game core receives debug key presses (F1, F5, etc)
+                pygame.event.pump()
+
+                # --- DEBUG UPDATE ---
+                # Explicitly update the debug manager to process toggles (like Free Cam F5)
+                # This fixes the issue where the menu wouldn't appear or keys wouldn't work
+                if core_game and hasattr(core_game, 'debug_manager'):
+                    core_game.debug_manager.update_input()
+
                 # Get AI action
                 action, _states = model.predict(obs, deterministic=deterministic)
                 
+                # --- FREE CAM OVERRIDE ---
+                # If Free Cam is active, force action 0 (Idle) so agent stops moving
+                if core_game and hasattr(core_game, 'debug_manager'):
+                    if core_game.debug_manager.free_cam_active:
+                        action = 0
+
                 # Step environment
                 obs, reward, done, truncated, info = env.step(action)
                 
