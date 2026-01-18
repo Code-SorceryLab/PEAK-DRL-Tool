@@ -961,131 +961,178 @@ def watch_trained_agent():
     max_episodes = int(max_ep_input) if max_ep_input.isdigit() and int(max_ep_input) >= 0 else 10
     # Note: 0 = no auto-stop (ESC/close only)
 
-    # Recording?
-    record = False
-    frames = []
-    mpy = None
-
+    # Prompt for recording
     rec_choice = input("Record this session to videos/ as MP4 + GIF? [y/N]: ").strip().lower()
+    
     if rec_choice in ("y", "yes"):
+        # INLINE MODE (Visual + Record)
+        # Keeps the user request "see the agent play while its recording"
+        # Warning: Might freeze if run repeatedly due to Pygame process limitations.
         mpy = get_moviepy_editor()
         if mpy is None:
             print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
-        else:
-            import numpy as np
-            record = True
+            return
 
-    # --- Env + model setup
-    try:
-        from code.wrappers.generic_env import GameEnv
-    except ImportError as e:
-        print(f"Could not import GameEnv: {e}")
-        return
+        import numpy as np
+        # --- Env + model setup
+        try:
+            from code.wrappers.generic_env import GameEnv
+        except ImportError as e:
+            print(f"Could not import GameEnv: {e}")
+            return
 
-    try:
-        game_mod = importlib.import_module(f"code.games.{game}_core")
-    except ImportError as e:
-        print(f"Could not import game core for '{game}': {e}")
-        return
+        try:
+            game_mod = importlib.import_module(f"code.games.{game}_core")
+        except ImportError as e:
+            print(f"Could not import game core for '{game}': {e}")
+            return
 
-    GameCls = None
-    for attr in dir(game_mod):
-        if attr.endswith("Core"):
-            GameCls = getattr(game_mod, attr)
-            break
-    if GameCls is None:
-        print(f"No *Core class found in code.games.{game}_core.")
-        return
+        GameCls = None
+        for attr in dir(game_mod):
+            if attr.endswith("Core"):
+                GameCls = getattr(game_mod, attr)
+                break
+        if GameCls is None:
+            print(f"No *Core class found in code.games.{game}_core.")
+            return
 
-    import pygame
-    pygame.init()
+        import pygame
+        pygame.init()
 
-    # IMPORTANT: use human mode for visible window
-    env = GameEnv(GameCls, render_mode="human", fps=fps)
+        # IMPORTANT: use human mode for visible window
+        # Fix: Pass persona to core for correct reward calculation
+        env = GameEnv(GameCls, render_mode="human", fps=fps, persona=persona)
 
-    # Load model WITHOUT passing env (avoid SB3 auto-wrapping spam)
-    try:
-        model = algo_cls.load(str(model_path))
-    except Exception as e:
-        env.close()
-        pygame.quit()
-        print(f"Failed to load model: {e}")
-        return
+        try:
+            model = algo_cls.load(str(model_path))
+        except Exception as e:
+            env.close()
+            pygame.quit()
+            print(f"Failed to load model: {e}")
+            return
 
-    reset_out = env.reset()
-    obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
+        reset_out = env.reset()
+        obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
 
-    clock = pygame.time.Clock()
-    running = True
-    episodes = 0
+        clock = pygame.time.Clock()
+        running = True
+        episodes = 0
+        frames = []
 
-    print("Press ESC or close the window to end the session.")
+        print("Press ESC or close the window to end the session.")
 
-    while running and (max_episodes == 0 or episodes < max_episodes):
-        clock.tick(fps)
+        while running and (max_episodes == 0 or episodes < max_episodes):
+            clock.tick(fps)
 
-        # Handle quit
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT or (
-                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
-            ):
-                running = False
+            # Handle quit
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (
+                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                ):
+                    running = False
 
-        if not running:
-            break
+            if not running:
+                break
+            
+            # --- DEBUG UPDATE ---
+            # Ensure debug manager processes inputs (like Free Cam)
+            if hasattr(env, 'game') and hasattr(env.game, 'debug_manager'):
+                 env.game.debug_manager.update_input()
 
-        # Model action
-        action, _ = model.predict(obs, deterministic=True)
-        step_result = env.step(action)
+            # Model action
+            action, _ = model.predict(obs, deterministic=True)
+            
+            # --- FREE CAM OVERRIDE ---
+            if hasattr(env, 'game') and hasattr(env.game, 'debug_manager'):
+                if env.game.debug_manager.free_cam_active:
+                    action = 0
+            
+            step_result = env.step(action)
 
-        # SB3/gymnasium compatibility: 4-tuple or 5-tuple
-        if len(step_result) == 5:
-            obs, reward, terminated, truncated, info = step_result
-            done = terminated or truncated
-        else:
-            obs, reward, done, info = step_result
+            if len(step_result) == 5:
+                obs, reward, terminated, truncated, info = step_result
+                done = terminated or truncated
+            else:
+                obs, reward, done, info = step_result
 
-        # Render to window
-        env.render()
+            # Render to window
+            env.render()
 
-        # If recording, grab what is actually on screen
-        if record:
+            # Record what is actually on screen
             surface = pygame.display.get_surface()
             if surface:
                 frame = pygame.surfarray.array3d(surface).swapaxes(0, 1)
                 frames.append(frame)
 
-        if done or info.get("episode_end", False):
-            episodes += 1
-            reset_out = env.reset()
-            obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
+            if done or info.get("episode_end", False):
+                episodes += 1
+                reset_out = env.reset()
+                obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
 
-    env.close()
-    pygame.quit()
-    print("Session ended.")
+        env.close()
+        pygame.quit()
+        print("Session ended.")
 
-    # --- Finalize recording based on actual session
-    if record and frames:
-        videos_root = Path("videos")
-        game_dir = videos_root / game
-        game_dir.mkdir(parents=True, exist_ok=True)
+        # --- Finalize recording
+        if frames:
+            videos_root = Path("videos")
+            game_dir = videos_root / game
+            game_dir.mkdir(parents=True, exist_ok=True)
 
-        name_parts = [game, algo_name, persona if persona else None, skill if skill else None]
-        base_name = "_".join(p for p in name_parts if p)
+            name_parts = [game, algo_name, persona if persona else None, skill if skill else None]
+            base_name = "_".join(p for p in name_parts if p)
 
-        mp4_path = game_dir / f"{base_name}.mp4"
-        gif_path = game_dir / f"{base_name}.gif"
+            # Unique filename generator to avoid permission errors or overwrites
+            counter = 0
+            while True:
+                suffix = f"_{counter:02d}" if counter > 0 else ""
+                mp4_path = game_dir / f"{base_name}{suffix}.mp4"
+                gif_path = game_dir / f"{base_name}{suffix}.gif"
+                if not mp4_path.exists() and not gif_path.exists():
+                    break
+                counter += 1
 
-        clip = mpy.ImageSequenceClip(frames, fps=fps)
-        clip.write_videofile(str(mp4_path), codec="libx264")
-        clip.write_gif(str(gif_path), fps=fps)
-        clip.close()
+            print(f"Saving video ({len(frames)} frames) to {mp4_path}...")
+            try:
+                clip = mpy.ImageSequenceClip(frames, fps=fps)
+                clip.write_videofile(str(mp4_path), codec="libx264")
+                clip.write_gif(str(gif_path), fps=fps)
+                clip.close()
 
-        print(f"\nSaved MP4: {mp4_path}")
-        print(f"Saved GIF: {gif_path}\n")
+                print(f"\nSaved MP4: {mp4_path}")
+                print(f"Saved GIF: {gif_path}\n")
+            except Exception as e:
+                print(f"Failed to save video: {e}")
+                print("Tip: Ensure the file is not open in another player.")
 
-    print("Visualization completed.\n")
+    else:
+        # SUBPROCESS MODE (Visual Only - Fixes Freeze)
+        # Use this for standard viewing when recording is not required.
+        
+        env_vars = os.environ.copy()
+        if "SDL_VIDEODRIVER" in env_vars:
+            del env_vars["SDL_VIDEODRIVER"]
 
+        cmd = [
+            sys.executable, "-m", "code.scripts.watch_agent",
+            str(model_path),
+            "--episodes", str(max_episodes),
+            "--fps", str(fps),
+            "--game", game,
+            "--algo", algo_name
+        ]
+        
+        print("\nLaunching viewer in separate process...")
+        print(">>>", " ".join(cmd), "\n")
+        
+        try:
+            subprocess.run(cmd, check=True, env=env_vars)
+        except subprocess.CalledProcessError as e:
+            print(f"\nViewer exited with error code {e.returncode}")
+        except KeyboardInterrupt:
+            print("\nViewer stopped by user.")
+
+    print("\nVisualization completed.\n")
 
 def run_tensorboard():
     """Launch TensorBoard with auto-open browser"""
@@ -1490,7 +1537,7 @@ def main():
         print("12. Exit")
         print("=" * 60)
 
-        choice = input("Select option (1-11): ").strip()
+        choice = input("Select option (1-12): ").strip()
         
         if choice == "1":
             run_training()
@@ -1518,7 +1565,7 @@ def main():
             print("Exiting. Happy training!")
             break
         else:
-            print("Invalid selection. Please choose 1-11.\n")
+            print("Invalid selection. Please choose 1-12.\n")
 
 if __name__ == "__main__":
     main()

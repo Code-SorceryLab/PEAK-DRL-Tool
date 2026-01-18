@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import math
+import importlib
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any
 import numpy as np
@@ -43,6 +44,12 @@ LEVEL_ROWS, LEVEL_COLS = 0, 0
 
 PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 20, 32
 
+# Action Map for Debug Display
+ACTION_NAMES = {
+    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
+    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP"
+}
+
 class PlatformerCore:
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
 
@@ -59,8 +66,15 @@ class PlatformerCore:
         # -------- Config knobs ----------------------------
         self.world = str(kwargs.pop("world", "1-1")).lower()
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
-        self.debug_default = bool(kwargs.pop("debug_default", True))
+        # Ensure debug defaults to False if not in human mode to prevent popups during training
+        debug_def = bool(kwargs.pop("debug_default", True))
+        self.debug_default = debug_def if render_mode == "human" else False
+        
         self.max_steps = kwargs.pop("max_steps", None)
+        
+        # Reward Persona - Load from external file
+        self.persona = str(kwargs.pop("persona", "Default")).lower()
+        self.reward_fn = self._load_reward_fn(self.persona)
 
         # --- Timer knobs ------------------------------------
         self.use_timer = bool(kwargs.pop("use_timer", True))
@@ -74,9 +88,11 @@ class PlatformerCore:
         self.camera_x = 0.0
         self.camera_y = 0.0
         self.camera_smoothing = 0.15
+        self.camera_lock = True
         
         # Anti-stall knobs
-        self.anti_stall = bool(kwargs.pop("anti_stall", True if self.render_mode != "human" else False))
+        #self.anti_stall = bool(kwargs.pop("anti_stall", True if self.render_mode != "human" else True))
+        self.anti_stall = bool(kwargs.pop("anti_stall", True))
         self.stall_window = int(kwargs.pop("stall_window", 1.5))
         self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 6))
         self.stall_eps = float(kwargs.pop("stall_eps", 6.0))
@@ -139,13 +155,21 @@ class PlatformerCore:
         self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
         # --- Debug Manager (Composition) ---
-        self.debug_manager = DebugManager(default_active=self.debug_default)
+        self.debug_manager = DebugManager(default_active=self.debug_default, print_help=(self.render_mode == "human"))
 
         # --- Fonts ---
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
 
         self.reset()
+
+    def _load_reward_fn(self, persona_name):
+        """Dynamically load reward function from code.rewards.platformer"""
+        try:
+            mod = importlib.import_module("code.rewards.platformer")
+            return getattr(mod, persona_name, None)
+        except ImportError:
+            return None
 
     def get_action_space(self): 
         return self._act_space
@@ -196,10 +220,14 @@ class PlatformerCore:
             self.time_last_step = time_curr_step
             self.dt = min(raw_dt, 0.05)
             
+        # SLOW MOTION DEBUG
+        if self.debug_manager.slow_motion:
+            self.dt *= 0.5
+
         self.frame += 1
         if self.use_timer: self.timer -= self.dt
 
-        # Debug Input Update (if render mode is human)
+        # Debug Input Update (only in human mode to avoid interfering with training)
         if self.render_mode == "human":
             self.debug_manager.update_input()
 
@@ -221,9 +249,17 @@ class PlatformerCore:
         terminated = self._check_termination()
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
+        
+        # CALCULATE REWARD
+        reward = float(self._reward())
+        
+        # LOG FOR DEBUG
+        action_name = ACTION_NAMES.get(int(action), f"ACT_{action}")
+        self.debug_manager.log_step(reward, action_name)
+
         info = self._info()
         if terminated: info["episode_end"] = True
-        return self._obs(), float(self._reward()), bool(terminated), info
+        return self._obs(), reward, bool(terminated), info
 
     def _rebuild_dynamic_hash(self):
         self.dynamic_hash.clear()
@@ -318,6 +354,14 @@ class PlatformerCore:
         self.player = Player(gObj=GameObject(float(x), float(y), PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
 
     def _handle_action(self, a: int):
+        # Prevent player movement processing if free cam is active
+        # This forcefully ignores any key presses the Player class might be reading internally
+        if self.debug_manager.free_cam_active:
+            self.player.vx = 0.0
+            self.player.jump_hold = 0
+            # Do NOT call self.player.handle_input(a)
+            return
+
         self.player.handle_input(a = a)
 
     def _update_physics(self, dt: float):
@@ -537,7 +581,7 @@ class PlatformerCore:
              return
 
         # 2. Else Follow Player
-        if not self.player: return
+        if not self.camera_lock or not self.player: return
         
         target_x = max(0, min(self.player.gObj.x - self.WIDTH // 3, self.level_w - self.WIDTH))
         self.camera_x += (target_x - self.camera_x) * self.camera_smoothing
@@ -607,13 +651,29 @@ class PlatformerCore:
             return not self.alive
 
         # 5. ANTI-STALL (Optional: decide if stall kills a life or ends game)
+        # Fixed: now triggers death instead of immediate termination
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
-            self.alive = False; self.reached_goal = False
-            return True
+            self._handle_death()
+            return not self.alive
 
         return False
 
     def _reward(self) -> float:
+        # Use external persona reward function if loaded
+        if hasattr(self, 'reward_fn') and self.reward_fn:
+            info = {
+                "score": self.score,
+                "x_position": self.player.gObj.x,
+                "coins_collected": self.coins_total,
+                "enemies_killed_step": self.kills_step, # Explicit step count for tracker
+                "won": self.reached_goal,
+                "velocity_x": self.player.vx, 
+                "max_x_seen": self.max_x_seen 
+            }
+            # The wrapped function handles state tracking internally
+            return self.reward_fn(None, 0.0, not self.alive, info)
+
+        # Default internal reward logic if no persona is loaded
         r = 0.0
         dx = self.player.gObj.x - self.last_x
         r += dx / 8.0
@@ -710,6 +770,7 @@ class PlatformerCore:
             "time_left": math.ceil(self.timer),
             "max_x_seen": self.max_x_seen, "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
+            "persona": self.persona # Expose current persona for debug tools
         }
 
     def _tile_at(self, x: float, y: float) -> int:
@@ -728,9 +789,14 @@ class PlatformerCore:
         self._draw_entities_from_hash(surface)
         self._draw_player(surface) 
         
-        # --- DELEGATE DEBUG TO MANAGER ---
-        self.debug_manager.render_overlays(surface, self)
-        
+        self._update_debug_key_toggles()
+        # DELEGATE DEBUG RENDERING TO THE MANAGER
+        # This fixes the AttributeError: 'PlatformerCore' object has no attribute 'db_sensors'
+        if self.debug_manager.show_hitboxes or self.debug_manager.show_sensors or \
+           self.debug_manager.show_agent_view or self.debug_manager.show_obs_panel or \
+           self.debug_manager.show_grid:
+            self.debug_manager.render_overlays(surface, self)
+            
         self._draw_ui(surface)
 
     def _draw_world_from_hash(self, surface: pygame.Surface):
@@ -786,7 +852,7 @@ class PlatformerCore:
         col = COLOR_POWERUP_STAR if (p.invincible_timer > 0 and (self.frame // 5) % 2) else \
               ((255, 100, 0) if p.powered_up else (255, 0, 0))
         p.color = col
-        # Pass the sensor flag from debug manager
+        # Fix: use debug_manager flag instead of self.db_sensors
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
         if p.run_pressed and abs(p.vx) > self.max_walk * 0.6:
@@ -797,6 +863,8 @@ class PlatformerCore:
                 else: x1 = sx + p.gObj.width + offset; x2 = x1 + length
                 y = sy + 10 + (i % 2) * 4
                 pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
+    
+    # Removed _draw_debug since it's now handled by DebugManager
 
     def _draw_ui(self, surface: pygame.Surface):
         p = self.player
@@ -809,7 +877,7 @@ class PlatformerCore:
         )
         
         x = 5; y = 5
-        # Check DebugManager state to offset UI
+        # Fix: use debug_manager flag
         if self.debug_manager.show_obs_panel: y = self.HEIGHT - ts.get_height() - 10
         
         bg = pygame.Surface((ts.get_width() + 10, ts.get_height() + 6), pygame.SRCALPHA)
@@ -827,6 +895,13 @@ class PlatformerCore:
             tbg.fill((0, 0, 0, 170))
             surface.blit(tbg, (tx - 5, 5 - 3))
             surface.blit(ttext, (tx, 5))
+
+    def _update_debug_key_toggles(self):
+        # Fix: Delegate input updates to debug manager entirely if not handled elsewhere
+        # But manual play loop might not call it. Core.step calls it in human mode.
+        # This method is legacy and can be replaced or made to call manager.
+        if self.render_mode == "human":
+             self.debug_manager.update_input()
 
     def _world_to_screen(self, gObj:GameObject) -> Tuple[float, float, bool]:
         sx = gObj.x - self.camera_x

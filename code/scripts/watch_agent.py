@@ -22,11 +22,6 @@ if "SDL_VIDEODRIVER" in os.environ:
 def parse_model_info(model_path: str) -> tuple[str, str, str, str]:
     """
     Parse model path to extract game, algorithm, persona, skill.
-    Expected formats:
-    - models/best/flappy_ppo_flappy_speedrunner_expert/best_model.zip
-    - models/flappy_ppo_flappy_speedrunner_expert.zip  
-    - models/best_model.zip (manual specification required)
-    
     Returns: (game, algo, persona, skill)
     """
     path = Path(model_path)
@@ -40,16 +35,28 @@ def parse_model_info(model_path: str) -> tuple[str, str, str, str]:
         stem = path.stem.replace("_model", "").replace("best", "")
         parts = stem.split("_")
     
+    # Heuristic parsing based on naming convention: game_algo_persona_skill
     if len(parts) >= 4:
         game = parts[0]
         algo = parts[1] 
-        persona = "_".join(parts[2:-1])  # Handle multi-word personas
+        # Persona can be multi-word (e.g. mario_baseline), so join everything between algo and skill
+        # Skill is usually the last part (novice, expert, custom)
         skill = parts[-1]
+        raw_persona = "_".join(parts[2:-1])
+        
+        # Clean persona name: remove game prefix if present (e.g. platformer_explorer -> explorer)
+        # This matches the function names in code/rewards/<game>.py
+        if raw_persona.startswith(f"{game}_"):
+            persona = raw_persona[len(game)+1:]
+        elif raw_persona.startswith(game):
+             persona = raw_persona[len(game):]
+        else:
+            persona = raw_persona
+            
         return game, algo, persona, skill
     elif len(parts) >= 1:
-        # Minimal parsing - game only
         game = parts[0]
-        return game, "ppo", "unknown", "unknown"
+        return game, "ppo", "default", "unknown"
     else:
         raise ValueError(f"Cannot parse model info from path: {model_path}")
 
@@ -75,7 +82,9 @@ def create_env(game: str, **kwargs):
     try:
         # Import the game core class
         game_module = importlib.import_module(f"code.games.{game}_core")
-        GameCoreClass = getattr(game_module, f"{game.capitalize()}Core")
+        # Handle naming conventions (PlatformerCore, MarioCore, etc.)
+        class_name = f"{game.capitalize()}Core"
+        GameCoreClass = getattr(game_module, class_name)
         
         # Force visual rendering by removing headless settings
         if "SDL_VIDEODRIVER" in os.environ:
@@ -121,11 +130,20 @@ def watch_agent_play(
         print("Removed headless SDL driver - forcing visual mode")
     
     # Parse model information
-    if game is None or algo is None:
-        parsed_game, parsed_algo, persona, skill = parse_model_info(model_path)
-        game = game or parsed_game
-        algo = algo or parsed_algo
-        print(f"Detected: {game} | {algo.upper()} | {persona} | {skill}")
+    persona = "default" # Default fallback
+    skill = "unknown"
+
+    # Always try to parse persona/skill from the path, even if game/algo are provided
+    try:
+        parsed_game, parsed_algo, parsed_persona, parsed_skill = parse_model_info(model_path)
+        if game is None: game = parsed_game
+        if algo is None: algo = parsed_algo
+        persona = parsed_persona
+        skill = parsed_skill
+    except Exception as e:
+        print(f"Warning: Could not parse model info from path: {e}")
+        
+    print(f"Detected: {game} | {algo.upper()} | {persona} | {skill}")
     
     # Load the trained model
     print(f"Loading model from: {model_path}")
@@ -133,18 +151,19 @@ def watch_agent_play(
     
     # Initialize pygame FIRST to ensure display works
     pygame.init()
-    pygame.display.set_mode((800, 600))  # Create a dummy window to test
-    pygame.display.set_caption("AI Agent Viewer - Loading...")
+    pygame.display.set_mode((800, 600))
+    pygame.display.set_caption(f"AI Agent Viewer - {game} ({persona})")
     print("Pygame initialized successfully")
     
     # Create environment
-    print(f"Creating {game} environment...")
-    env = create_env(game, fps=fps)
+    # FIX: Pass the persona to the environment!
+    print(f"Creating {game} environment with persona='{persona}'...")
+    env = create_env(game, fps=fps, persona=persona)
+    
     core_game = find_core_game(env)
     
     print(f"Watching agent play {episodes} episode(s) at {fps} FPS...")
     print("Press ESC or close window to stop early")
-    print("Window should appear now...")
     
     total_score = 0
     completed_episodes = 0
@@ -173,8 +192,6 @@ def watch_agent_play(
                 pygame.event.pump()
 
                 # --- DEBUG UPDATE ---
-                # Explicitly update the debug manager to process toggles (like Free Cam F5)
-                # This fixes the issue where the menu wouldn't appear or keys wouldn't work
                 if core_game and hasattr(core_game, 'debug_manager'):
                     core_game.debug_manager.update_input()
 
@@ -182,7 +199,6 @@ def watch_agent_play(
                 action, _states = model.predict(obs, deterministic=deterministic)
                 
                 # --- FREE CAM OVERRIDE ---
-                # If Free Cam is active, force action 0 (Idle) so agent stops moving
                 if core_game and hasattr(core_game, 'debug_manager'):
                     if core_game.debug_manager.free_cam_active:
                         action = 0
@@ -226,37 +242,16 @@ def watch_agent_play(
             print(f"   Total score: {total_score}")
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Watch a trained AI agent play its game",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Auto-detect everything from path
-  python watch_agent.py models/best/flappy_ppo_flappy_speedrunner_expert/best_model.zip
-  
-  # Manual specification
-  python watch_agent.py --game asteroids --algo ppo models/my_model.zip
-  
-  # Watch 10 episodes at 60 FPS
-  python watch_agent.py --episodes 10 --fps 60 models/best/tetris_ppo_tetris_master_expert/best_model.zip
-        """)
-    
-    parser.add_argument("model_path", 
-                       help="Path to the trained model (.zip file)")
-    parser.add_argument("--episodes", type=int, default=5,
-                       help="Number of episodes to watch (default: 5)")
-    parser.add_argument("--fps", type=int, default=30,
-                       help="Rendering FPS (default: 30)")
-    parser.add_argument("--game", type=str, default=None,
-                       help="Game name (auto-detected if not provided)")
-    parser.add_argument("--algo", type=str, default=None,
-                       help="Algorithm (ppo/a2c/dqn, auto-detected if not provided)")
-    parser.add_argument("--stochastic", action="store_true",
-                       help="Use stochastic actions instead of deterministic")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model_path", help="Path to the trained model (.zip file)")
+    parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--game", type=str, default=None)
+    parser.add_argument("--algo", type=str, default=None)
+    parser.add_argument("--stochastic", action="store_true")
     
     args = parser.parse_args()
     
-    # Validate model path exists
     if not Path(args.model_path).exists():
         print(f"Error: Model file not found: {args.model_path}")
         sys.exit(1)
@@ -272,8 +267,6 @@ Examples:
         )
     except Exception as e:
         print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

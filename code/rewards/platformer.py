@@ -1,8 +1,10 @@
-# code/rewards/mario.py
 from __future__ import annotations
 import random
 import math
 from typing import Callable, Tuple, Dict, Any
+
+# Fix: Remove unused/broken imports that cause ModuleNotFoundError
+# from .modules.GameObject import GameObject  <-- REMOVED
 
 Info = Dict[str, Any]
 

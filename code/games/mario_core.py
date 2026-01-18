@@ -43,6 +43,12 @@ LEVEL_ROWS, LEVEL_COLS = 0, 0
 
 MARIO_WIDTH, MARIO_HEIGHT = 20, 32
 
+# Action Map for Debug Display
+ACTION_NAMES = {
+    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
+    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP"
+}
+
 class MarioCore:
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
 
@@ -140,7 +146,8 @@ class MarioCore:
         self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
         # --- Debug Manager (Composition) ---
-        self.debug_manager = DebugManager(default_active=self.debug_default)
+        # Pass print_help=False if not in human mode
+        self.debug_manager = DebugManager(default_active=self.debug_default, print_help=(self.render_mode == "human"))
 
         # --- Fonts ---
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
@@ -197,6 +204,10 @@ class MarioCore:
             self.time_last_step = time_curr_step
             self.dt = min(raw_dt, 0.05)
             
+        # SLOW MOTION DEBUG
+        if self.debug_manager.slow_motion:
+            self.dt *= 0.5
+
         self.frame += 1
         if self.use_timer: self.timer -= self.dt
 
@@ -222,9 +233,17 @@ class MarioCore:
         terminated = self._check_termination()
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
+        
+        # CALCULATE REWARD
+        reward = float(self._reward())
+        
+        # LOG FOR DEBUG
+        action_name = ACTION_NAMES.get(int(action), f"ACT_{action}")
+        self.debug_manager.log_step(reward, action_name)
+
         info = self._info()
         if terminated: info["episode_end"] = True
-        return self._obs(), float(self._reward()), bool(terminated), info
+        return self._obs(), reward, bool(terminated), info
 
     def _rebuild_dynamic_hash(self):
         self.dynamic_hash.clear()
