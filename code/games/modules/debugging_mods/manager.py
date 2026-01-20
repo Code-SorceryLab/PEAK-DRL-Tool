@@ -1,11 +1,11 @@
 import pygame
 import collections
+from code.wrappers.RewardHub import RewardHub
 from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay
 
 class DebugManager:
     def __init__(self, default_active=True, print_help=True):
         self.active = True
-        
         # Toggles
         self.show_hitboxes = default_active
         self.show_agent_view = default_active
@@ -23,7 +23,7 @@ class DebugManager:
         self.current_cam_move = [0.0, 0.0]
 
         # Metric tracking
-        self.reward_history = collections.deque(maxlen=60) # Store last 60 frames of rewards
+        #self.reward_history = collections.deque(maxlen=60) # Store last 60 frames of rewards
         self.last_action_name = "None"
 
         # Input tracking
@@ -100,7 +100,7 @@ class DebugManager:
 
     def log_step(self, reward, action_name):
         """Called by core every step to log metrics"""
-        self.reward_history.append(reward)
+        #self.reward_history.append(reward)
         self.last_action_name = action_name
 
     def render_overlays(self, surface: pygame.Surface, core):
@@ -175,18 +175,19 @@ class DebugManager:
         graph_rect = pygame.Rect(x + 5, y + 60, panel_w - 10, panel_h - 65)
         #pygame.draw.rect(surface, (50,50,50), graph_rect, 1) # inner border
 
-        if len(self.reward_history) < 2: return
+        reward_history = RewardHub.get_instance().reward_history
+        if len(reward_history) < 2: return
 
         # Normalize metrics for graph
-        max_r = max(max(self.reward_history), 0.1)
-        min_r = min(min(self.reward_history), -0.1)
+        max_r = max(max(reward_history), 0.1)
+        min_r = min(min(reward_history), -0.1)
         r_range = max_r - min_r
         
         if r_range == 0: r_range = 1.0
         
         points = []
-        for i, r in enumerate(self.reward_history):
-            px = graph_rect.left + (i / (len(self.reward_history) - 1)) * graph_rect.width
+        for i, r in enumerate(reward_history):
+            px = graph_rect.left + (i / (len(reward_history) - 1)) * graph_rect.width
             # Map r to 0..h (inverted because y is down)
             # relative height in graph area
             rel_h = (r - min_r) / r_range
@@ -197,7 +198,7 @@ class DebugManager:
             pygame.draw.lines(surface, (0, 255, 0), False, points, 2)
             
         # Current Value
-        curr = self.reward_history[-1]
+        curr = reward_history[-1]
         col = (0, 255, 0) if curr > 0 else ((255, 0, 0) if curr < 0 else (200, 200, 200))
         val_t = self.small_font.render(f"R: {curr:.4f}", True, col)
         surface.blit(val_t, (x + panel_w - val_t.get_width() - 5, y + 60))

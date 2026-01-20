@@ -3,6 +3,8 @@ from __future__ import annotations
 import os, pygame, gymnasium as gym
 import numpy as np
 from typing import Callable, Any
+import importlib
+from .RewardHub import RewardHub
 
 Obs = Any
 Info = dict
@@ -72,6 +74,8 @@ class GameEnv(gym.Env):
 
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
         reward = self.reward_fn(obs, base, terminated, info)
+        hub = RewardHub.get_instance()
+        hub.update_reward(reward=reward, action_name=action, is_episode_end=terminated)
         return obs, reward, terminated, truncated, info
 
 

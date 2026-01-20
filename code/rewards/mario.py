@@ -82,7 +82,6 @@ def _wrap_with_tracker(core_fn) -> Callable:
         if terminated or (info and info.get("terminated", False)):
             tracker.reset()
         return r
-
     return reward
 
 
