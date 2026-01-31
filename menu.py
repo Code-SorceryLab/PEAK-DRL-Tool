@@ -1,6 +1,7 @@
 # menu.py — unified CLI for training, eval, TensorBoard, and manual play
 # Compatible with: Hydra overrides, TB logs under mylogs/, flat model files in models/
 
+# Imports 
 import subprocess 
 import webbrowser
 import os
@@ -14,12 +15,15 @@ import importlib
 import random
 
 
-# Stable-Baselines3 video helpers
+# Stable-Baselines3 Algo Imports
 try:
     from stable_baselines3 import PPO, A2C, DQN, SAC, TD3
     from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
+    
+    # Import Monitor for recording purposes
     from stable_baselines3.common.monitor import Monitor
 
+    # Algo mapping
     HAS_SB3 = True
     ALGO_CLASS_MAP = {
         "ppo": PPO,
@@ -28,11 +32,10 @@ try:
         "sac": SAC,
         "td3": TD3,
     }
+    
 except ImportError:
     HAS_SB3 = False
     ALGO_CLASS_MAP = {}
-
-
 
 
 # Add winsound for Windows only
@@ -43,7 +46,7 @@ except ImportError:
     HAS_WINSOUND = False
 
 
-
+# root folder setup
 DEFAULT_TB_ROOT = "mylogs"
 MODELS_DIR = Path("models/")
 CONF_ROOT = Path("code/conf")
@@ -72,7 +75,8 @@ REQUIRED_PACKAGES = [
 # ============================================================================
 # HELPER FUNCTIONS - Configuration & Setup
 # ============================================================================
-# Optional video deps (lazy-loaded to avoid import issues)
+
+# video deps (lazy-loaded to avoid import issues)
 def get_moviepy_editor():
     """
     Try to obtain a MoviePy editor-like module in a version-agnostic way.
@@ -103,10 +107,11 @@ def get_moviepy_editor():
 
     return None
 
+# MOVE START UP 
 MPY = get_moviepy_editor()
 HAS_MOVIEPY = MPY is not None
 
-
+# check dependencies if missing install requirements
 def check_and_install_dependencies():
     """Check if required packages are installed and install missing ones"""
     print("Checking dependencies...")
@@ -156,12 +161,17 @@ def check_and_install_dependencies():
         print("Please install manually using: pip install -r requirements.txt")
         return False
 
+# if requirements don't exists makes requirements.txt
 def setup_project():
     """Initial project setup"""
+    
+    # Check and create requirements.txt if missing
     requirements_path = Path("requirements.txt")
     if not requirements_path.exists():
         requirements_content = "\n".join(REQUIRED_PACKAGES) + "\n"
         requirements_path.write_text(requirements_content)
+
+# checking
 
 def load_grid_config():
     """Load grid.yaml configuration"""
