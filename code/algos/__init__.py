@@ -1,4 +1,5 @@
 """Very thin registry so `hydra` configs can request an algo by name."""
+
 from stable_baselines3 import PPO, A2C, DQN, SAC, TD3, DDPG
 from sb3_contrib import RecurrentPPO, TRPO
 

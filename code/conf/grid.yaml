@@ -4,16 +4,9 @@ defaults:
   - _self_
 
 # lists of experiment dimensions
-games: [mario, platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
+games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
 personas: [
-  
-  mario_baseline,
-  mario_simple,
-  mario_speedrunner,
-  mario_coin_collector,
-  mario_master,
-
   platformer_baseline,
   platformer_simple,
   platformer_speedrunner,
@@ -25,7 +18,7 @@ personas: [
 # skill -> training steps
 skills:
   Novice: 1_000_000
-  Expert: 5_000_000
+  Expert: 2_000_000
 
 # generic env params
 seed: 1234
@@ -38,9 +31,7 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 10      # 1 for cpu or 16 gpu , or whatever you want
-
-
+n_envs: 8      # 1 for cpu or 16 gpu , or whatever you want
 
 # null values mean "no override"
 model: null     # optional single selection

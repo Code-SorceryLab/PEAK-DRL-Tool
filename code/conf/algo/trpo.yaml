@@ -8,6 +8,7 @@ learning_rate: 3e-4          # Reduced learning rate for stability
 gamma: 0.99                  # Standard discount factor
 gae_lambda: 0.95             # GAE parameter
 verbose: 1
+
 # Critic updates
 n_critic_updates: 10         # Number of critic updates per rollout
 
@@ -30,4 +31,4 @@ policy_kwargs:
   net_arch: 
     - 256
     - 256
-  activation_fn: ReLU         # Use ReLU activations for better learning
+  activation_fn: ReLU # Use ReLU activations for better learning

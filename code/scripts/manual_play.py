@@ -19,7 +19,7 @@ args = parser.parse_args()
 if args.game == "mario":
     args.game = "platformer"
 
-# ✅ Enable manual play mode for mario/platformer
+# Enable manual play mode for mario/platformer
 if args.game == "platformer":
     os.environ["MARIO_MANUAL_PLAY"] = "1"
 

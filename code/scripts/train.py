@@ -34,6 +34,7 @@ class RecurrentEvalCallback(EventCallback):
     """
     
     def __init__(
+        # RPPO requires VecEnv for eval_env
         self,
         eval_env: Union[VecEnv, object],
         callback_on_new_best: Optional[BaseCallback] = None,
@@ -67,7 +68,7 @@ class RecurrentEvalCallback(EventCallback):
             os.makedirs(log_path, exist_ok=True)
     
     def _init_callback(self) -> None:
-        # CRITICAL: Call parent's _init_callback to set up the callback properly
+        # Calling the super class to insure callback is initialized
         super()._init_callback()
         
         if self.best_model_save_path is not None:
@@ -88,7 +89,7 @@ class RecurrentEvalCallback(EventCallback):
                 episode_reward = 0.0
                 episode_length = 0
                 
-                # Initialize LSTM states for RecurrentPPO
+                # Initialize LSTM (Long Short Term Memory) states for RecurrentPPO
                 if is_recurrent:
                     lstm_states = None
                     episode_starts = np.ones((self.eval_env.num_envs,), dtype=bool)
@@ -150,7 +151,6 @@ class RecurrentEvalCallback(EventCallback):
                 
                 self.best_mean_reward = mean_reward
                 
-                # FIXED: Use self.callback instead of self.callback_on_new_best
                 # EventCallback stores the callback as self.callback, not self.callback_on_new_best
                 if self.callback is not None:
                     continue_training = self.callback.on_step()
@@ -189,6 +189,7 @@ class AnnealCallback(BaseCallback):
 
 
 def _pretty_steps(n: int) -> str:
+    """Convert large step counts to human-readable format."""
     if n >= 1_000_000:
         return f"{n // 1_000_000}M"
     return f"{n // 1_000}k"
@@ -240,6 +241,7 @@ def main(cfg: DictConfig):
     models_dir = repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
+    # Device configuration for training (CPU/GPU)
     device = cfg.get("device", "cpu")
     if device == "cuda" and not torch.cuda.is_available():
         print("[WARNING] CUDA is not available on this system, falling back to CPU.")
@@ -248,11 +250,13 @@ def main(cfg: DictConfig):
     print(f"[INFO] Training device: {device}")
 
     # Logging/callback configuration
+    # Default frequencies if not specified in grid.yaml
     tb_root  = str(cfg.get("tb_root", "runs"))
     eval_freq = int(cfg.get("eval_freq", 20_000))
     save_freq = int(cfg.get("save_freq", 50_000))
 
     # Build game CLASS (not instance)
+    # Checks if the game has a game config dict
     if isinstance(cfg.game, (DictConfig, dict)):
         game_conf = OmegaConf.to_container(cfg.game, resolve=True)
         if "_target_" in game_conf:
@@ -308,7 +312,7 @@ def main(cfg: DictConfig):
 
         # Add policy_kwargs if present
         if policy_kwargs:
-            # ✅ Convert activation_fn string to callable for SB3 compatibility
+            # Convert activation_fn string to callable for SB3 compatibility
             activation_fn_map = {
                 "ReLU": torch.nn.ReLU,
                 "Tanh": torch.nn.Tanh,
@@ -342,8 +346,10 @@ def main(cfg: DictConfig):
                 return _init
 
             n_envs = int(cfg.get("n_envs", 1))
+            
             if n_envs > 1:
-                env = SubprocVecEnv([make_env() for _ in range(n_envs)])
+                # subroutine for multiple envs
+                env = SubprocVecEnv([make_env() for env in range(n_envs)])
             else:
                 env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
             
@@ -360,6 +366,7 @@ def main(cfg: DictConfig):
                 # Check if this is a recurrent model
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
                 eval_cb = None
+                
                 if is_recurrent_model:
                     # Use custom RecurrentEvalCallback for LSTM models
                     eval_cb = RecurrentEvalCallback(

@@ -1,8 +1,10 @@
-# code/rewards/mario.py
 from __future__ import annotations
 import random
 import math
 from typing import Callable, Tuple, Dict, Any
+
+# Fix: Remove unused/broken imports that cause ModuleNotFoundError
+# from .modules.GameObject import GameObject  <-- REMOVED
 
 Info = Dict[str, Any]
 
@@ -111,6 +113,7 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
         return -0.5
 
     dx = float(info.get("dx", 0.0))
+    print(dx)
     coins = int(info.get("coins_delta", 0))
     kills = int(info.get("kills_step", 0))
 
