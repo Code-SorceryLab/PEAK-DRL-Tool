@@ -3,7 +3,9 @@ from stable_baselines3.common.callbacks import BaseCallback
 import pygame, time
 
 class NoOp(BaseCallback):
-    """Does nothing – keeps head-less run fast."""
+    """ 
+    Keeps head-less run fast.
+    """
     def _on_step(self) -> bool:
         return True
 
@@ -17,6 +19,9 @@ class RenderCallback(BaseCallback):
         self.every = every
 
     def _on_step(self) -> bool:
+        """
+        Render the environment every `every` calls.
+        """
         if self.n_calls % self.every == 0:
             env = self.training_env.envs[0]        # unwrap VecEnv
             env.render()

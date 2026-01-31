@@ -1,5 +1,4 @@
-# conf/game/mario.yaml
-
+# conf/game/platformer.yaml
 _target_: code.games.platformer_core.PlatformerCore
 
 name: platformer
@@ -20,7 +19,7 @@ observation_space:
   high: 500.0
 
 action_space:
-  type: Discrete
+  type: Discrete # NOTE: Can be Discrete or MultiBinary or MultiDiscrete
   n: 8
 
 reward:
@@ -34,12 +33,12 @@ episode:
   max_steps: 1000
 
 init:
-  seed: 42
-  level: easy
+  seed: 42 # Optional: for reproducibility
+  level: easy # Options: easy, medium, hard | not adapted yet
 
-persona: null
+persona: null 
 
-metrics:
+metrics: 
   - episode_reward
   - episode_length
 

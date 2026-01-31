@@ -13,6 +13,8 @@ import time
 from omegaconf import OmegaConf
 import importlib
 import random
+import pygame
+import numpy as np
 
 
 # Stable-Baselines3 Algo Imports
@@ -111,9 +113,9 @@ def get_moviepy_editor():
 MPY = get_moviepy_editor()
 HAS_MOVIEPY = MPY is not None
 
-# check dependencies if missing install requirements
 def check_and_install_dependencies():
     """Check if required packages are installed and install missing ones"""
+    # check dependencies if missing install requirements
     print("Checking dependencies...")
     
     missing_packages = []
@@ -161,9 +163,9 @@ def check_and_install_dependencies():
         print("Please install manually using: pip install -r requirements.txt")
         return False
 
-# if requirements don't exists makes requirements.txt
 def setup_project():
     """Initial project setup"""
+    # if requirements don't exists makes requirements.txt
     
     # Check and create requirements.txt if missing
     requirements_path = Path("requirements.txt")
@@ -171,8 +173,7 @@ def setup_project():
         requirements_content = "\n".join(REQUIRED_PACKAGES) + "\n"
         requirements_path.write_text(requirements_content)
 
-# checking
-
+# checking if grid yaml 
 def load_grid_config():
     """Load grid.yaml configuration"""
     if not GRID_CONFIG_PATH.exists():
@@ -185,6 +186,7 @@ def load_grid_config():
 
 def get_available_games():
     """Get games from grid.yaml if available, else all games with YAML files"""
+    # laods games from grid yaml so it is available in the menu options
     cfg = load_grid_config()
     
     # If grid has games section, use that (with YAML validation)
@@ -334,14 +336,14 @@ def ask_index(prompt, options, add_back=True, default=None):
     print("Invalid selection.")
     return None
 
-def ensure_current_algo():
-    """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
-    global CURRENT_ALGO
+# def ensure_current_algo():
+#     """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
+#     global CURRENT_ALGO
     
-    if CURRENT_ALGO is None:
-        algos = get_available_algos_from_grid()
-        if algos:
-            CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
+#     if CURRENT_ALGO is None:
+#         algos = get_available_algos_from_grid()
+#         if algos:
+#             CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
 
 # ============================================================================
 # TRAINING EXECUTION - Core Logic (DRY refactor)
@@ -360,6 +362,7 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT):
     
     print(">>> " + " ".join(cmd) + "\n")
     
+    # Runs the hydra CMD training script with specified parameters
     try:
         subprocess.run(cmd, check=True)
         return True
@@ -377,8 +380,8 @@ def print_training_summary(total, successful, failed):
     print(f"✓ Successful: {successful}/{total}")
     if failed > 0:
         print(f"❌ Failed: {failed}/{total}")
-    print(f"📁 Logs saved to: {DEFAULT_TB_ROOT}/")
-    print(f"💾 Models saved to: {MODELS_DIR}/best/")
+    print(f"Logs saved to: {DEFAULT_TB_ROOT}/")
+    print(f"Models saved to: {MODELS_DIR}/best/")
     
     if HAS_WINSOUND and failed == 0:
         winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
@@ -403,12 +406,13 @@ def run_training():
     if game is None:
         return
 
+
     algos = get_available_algos_from_grid()
     if not algos:
         print("No algorithm configurations found in grid.yaml with matching YAML files")
         return
     
-    ensure_current_algo()
+    #ensure_current_algo() - URGENT
     default_algo = CURRENT_ALGO if CURRENT_ALGO in algos else ("ppo" if "ppo" in algos else algos[0])
     
     algo_choice = ask_index("Available algorithms:", algos, default=default_algo)
@@ -497,6 +501,7 @@ def train_all_models_for_game():
     # Algorithm selection
     print("\nSelect algorithms to train:")
     print("  1. All algorithms")
+    
     for i, algo in enumerate(algos, 2):
         default_flag = " (current)" if algo == CURRENT_ALGO else ""
         print(f"  {i}. {algo} only{default_flag}")
@@ -556,7 +561,7 @@ def train_all_models_for_game():
                     if not success:
                         failed += 1
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user.")
+        print("\n\n Training interrupted by user.")
         print(f"Completed: {completed - 1}/{total_runs}")
         print(f"Failed: {failed}")
         return
@@ -606,7 +611,7 @@ def train_complete_grid():
     for line in breakdown:
         print(line)
     
-    print(f"📁 Logs will be saved to: {DEFAULT_TB_ROOT}/")
+    print(f"Logs will be saved to: {DEFAULT_TB_ROOT}/")
     
     confirm = input(f"\nProceed with {total_runs} training runs? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
@@ -637,13 +642,15 @@ def train_complete_grid():
                         if not success:
                             failed += 1
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user.")
+        print("\n\nTraining interrupted by user.")
         print(f"Completed: {completed - 1}/{total_runs}")
         print(f"Failed: {failed}")
         return
     
     print_training_summary(total_runs, completed - failed, failed)
 
+
+# Currently NOT IN USE - needs adaptation
 def run_evaluation():
     """Evaluate all trained models for a selected game"""
     print("\n===== Evaluation =====")
@@ -698,9 +705,8 @@ def run_evaluation():
 
 def parse_model_metadata(model_path: Path):
     """
-    Infer game, algo, persona, skill from the model folder name.
-    Expected pattern (at least): game_algo_..._persona_skill
-    Falls back gracefully if not all parts exist.
+    Take folder name and parse out game, algo, persona, skill.
+    Returns a dict with keys: game, algo, persona, skill (values or None).
     """
     folder = model_path.parent.name
     parts = folder.split("_")
@@ -725,9 +731,10 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
         print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         return
 
-    import numpy as np
+    #import numpy as np - lazy import
 
     meta = parse_model_metadata(model_path)
+    
     game = meta["game"]
     algo_name = (meta["algo"] or "").lower()
     persona = (meta["persona"] or "default").lower()
@@ -742,18 +749,21 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
         print(f"Unsupported/unknown algo '{algo_name}' for recording.")
         return
 
+    # Error handling for game env + model load
     try:
         from code.wrappers.generic_env import GameEnv
     except ImportError as e:
         print(f"Could not import GameEnv for recording: {e}")
         return
 
+    # Check if game exists
     try:
         game_mod = importlib.import_module(f"code.games.{game}_core")
     except ImportError as e:
         print(f"Could not import game core for '{game}': {e}")
         return
 
+    # Find the *Core - URGENT
     GameCls = None
     for attr in dir(game_mod):
         if attr.endswith("Core"):
@@ -766,6 +776,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
     # Use rgb_array for capture
     env = GameEnv(GameCls, render_mode="rgb_array", fps=fps)
 
+    # Load model path
     try:
         model = algo_cls.load(str(model_path), env=env)
     except Exception as e:
@@ -776,7 +787,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
     frames = []
     max_steps_per_ep = 2000
 
-    for _ in range(episodes):
+    for ep in range(episodes):
         reset_out = env.reset()
         obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
 
@@ -784,9 +795,10 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
         steps = 0
 
         while not done and steps < max_steps_per_ep:
-            action, _ = model.predict(obs, deterministic=True)
+            action, ep = model.predict(obs, deterministic=True)
             step_result = env.step(action)
 
+            # Ensure's 5 variables are handled
             if len(step_result) == 5:
                 obs, reward, terminated, truncated, info = step_result
                 done = terminated or truncated
@@ -794,6 +806,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
                 obs, reward, done, info = step_result
 
             frame = env.render(mode="rgb_array")
+            
             if frame is not None:
                 frames.append(np.asarray(frame))
 
@@ -808,6 +821,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
         print("No frames captured; nothing to save.")
         return
 
+    # Save MP4 + GIF
     videos_root = Path("videos")
     game_dir = videos_root / game
     game_dir.mkdir(parents=True, exist_ok=True)
@@ -838,7 +852,7 @@ def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
         print("Recording random agent requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         return
 
-    import numpy as np
+    #import numpy as np # Lazy import
 
     try:
         from code.wrappers.generic_env import GameEnv
@@ -926,20 +940,25 @@ def watch_trained_agent():
     # Build display list
     display_options = []
     paths = []
+    
     for folder in model_folders:
         parts = folder.name.split("_")
+        
         if len(parts) >= 5:
             game, algo, _, persona, skill = parts[:5]
             display = f"{game:<8} | {algo:<4} | {persona:<12} | {skill:<8}"
         else:
             display = folder.name
+        
         display_options.append(display)
         paths.append(folder / "best_model.zip")
 
     selected = ask_index("Select a trained model to visualize:", display_options)
+    
     if selected is None:
         return
 
+    # Error handling for selection
     try:
         model_idx = display_options.index(selected)
         model_path = paths[model_idx]
@@ -959,6 +978,7 @@ def watch_trained_agent():
         return
 
     algo_cls = ALGO_CLASS_MAP.get(algo_name)
+    
     if algo_cls is None:
         print(f"Unsupported/unknown algo '{algo_name}'.")
         return
@@ -983,7 +1003,8 @@ def watch_trained_agent():
             print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
             return
 
-        import numpy as np
+        #import numpy as np - Lazy import
+        
         # --- Env + model setup
         try:
             from code.wrappers.generic_env import GameEnv
@@ -1006,11 +1027,10 @@ def watch_trained_agent():
             print(f"No *Core class found in code.games.{game}_core.")
             return
 
-        import pygame
         pygame.init()
 
         # IMPORTANT: use human mode for visible window
-        # Fix: Pass persona to core for correct reward calculation
+        # Pass persona to core for correct reward calculation
         env = GameEnv(GameCls, render_mode="human", fps=fps, persona=persona)
 
         try:
@@ -1043,8 +1063,7 @@ def watch_trained_agent():
 
             if not running:
                 break
-            
-            # --- DEBUG UPDATE ---
+
             # Ensure debug manager processes inputs (like Free Cam)
             if hasattr(env, 'game') and hasattr(env.game, 'debug_manager'):
                  env.game.debug_manager.update_input()
@@ -1070,6 +1089,7 @@ def watch_trained_agent():
 
             # Record what is actually on screen
             surface = pygame.display.get_surface()
+            
             if surface:
                 frame = pygame.surfarray.array3d(surface).swapaxes(0, 1)
                 frames.append(frame)
@@ -1264,6 +1284,8 @@ def run_manual_play():
     selected_game = available_games[idx - 1]
 
     env = os.environ.copy()
+    
+    # Remove SDL_VIDEODRIVER to ensure proper window display
     if "SDL_VIDEODRIVER" in env:
         env.pop("SDL_VIDEODRIVER")
 
@@ -1279,7 +1301,10 @@ def run_manual_play():
 
 
 def show_project_status():
-    """Display comprehensive project status"""
+    """
+    Display comprehensive project status
+        - Shows how many models of each combination of games_algo_persona
+    """
     print("\n=== Project Status ===")
     games = get_available_games()
     algos = get_available_algos_from_grid()
@@ -1324,39 +1349,40 @@ def show_project_status():
         print("\n✗ Configuration directory not found")
     print()
 
-def change_algorithm():
-    """Manually change the currently selected algorithm"""
-    global CURRENT_ALGO
+# # depretiatied
+# def change_algorithm():
+#     """Manually change the currently selected algorithm"""
+#     global CURRENT_ALGO
     
-    print("\n=== Change Current Algorithm ===")
-    algos = get_available_algos_from_grid()
-    if not algos:
-        print("No algorithm configurations found in grid.yaml with matching YAML files")
-        return
+#     print("\n=== Change Current Algorithm ===")
+#     algos = get_available_algos_from_grid()
+#     if not algos:
+#         print("No algorithm configurations found in grid.yaml with matching YAML files")
+#         return
     
-    ensure_current_algo()
+#     ensure_current_algo()
     
-    print(f"\nCurrent algorithm: {CURRENT_ALGO}")
-    print("\nAvailable algorithms:")
-    for i, algo in enumerate(algos, 1):
-        current_flag = " (current)" if algo == CURRENT_ALGO else ""
-        print(f"  {i}. {algo}{current_flag}")
-    print(f"  {len(algos) + 1}. Back")
+#     print(f"\nCurrent algorithm: {CURRENT_ALGO}")
+#     print("\nAvailable algorithms:")
+#     for i, algo in enumerate(algos, 1):
+#         current_flag = " (current)" if algo == CURRENT_ALGO else ""
+#         print(f"  {i}. {algo}{current_flag}")
+#     print(f"  {len(algos) + 1}. Back")
     
-    choice = input(f"Select new algorithm (1-{len(algos) + 1}): ").strip()
+#     choice = input(f"Select new algorithm (1-{len(algos) + 1}): ").strip()
     
-    try:
-        num = int(choice)
-        if num == len(algos) + 1:
-            return
-        if 1 <= num <= len(algos):
-            new_algo = algos[num - 1]
-            CURRENT_ALGO = new_algo
-            print(f"\n✓ Algorithm changed to: {CURRENT_ALGO}\n")
-        else:
-            print("Invalid selection.")
-    except ValueError:
-        print("Invalid selection.")
+#     try:
+#         num = int(choice)
+#         if num == len(algos) + 1:
+#             return
+#         if 1 <= num <= len(algos):
+#             new_algo = algos[num - 1]
+#             CURRENT_ALGO = new_algo
+#             print(f"\n✓ Algorithm changed to: {CURRENT_ALGO}\n")
+#         else:
+#             print("Invalid selection.")
+#     except ValueError:
+#         print("Invalid selection.")
 
 def watch_random_agent():
     """Watch a random agent; optionally record the actual interactive session."""
@@ -1405,7 +1431,7 @@ def watch_random_agent():
         if mpy is None:
             print("Recording random agent requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         else:
-            import numpy as np
+            #import numpy as np - Lazy import
             record = True
 
     # --- Setup env
@@ -1429,8 +1455,7 @@ def watch_random_agent():
     if GameCls is None:
         print(f"No *Core class found in code.games.{selected_game}_core.")
         return
-
-    import pygame
+    
     pygame.init()
 
     # IMPORTANT: human mode so you see it
@@ -1526,56 +1551,51 @@ def main():
         trained_games = get_trained_games_from_models_flat()
         trained_models = get_trained_models_count()
         
-        ensure_current_algo()
+
         
-        current_algo_display = f" | Current algo: {CURRENT_ALGO}" if CURRENT_ALGO else ""
-        
-        print(f"Games: {len(games)} | Algorithms: {len(algos)} | Trained games: {len(trained_games)} | Trained models: {trained_models}{current_algo_display}")
+        print(f"Games: {len(games)} | Algorithms: {len(algos)} | Trained games: {len(trained_games)} | Trained models: {trained_models}")
 
         print("\nOptions:")
-        print("1. Run Training (pick Game, Algorithm, Persona, Skill)")
-        print("2. Run Evaluation (per-game, scans models/*.zip)")
-        print("3. View TensorBoard Logs (mylogs/)")
-        print("4. Play Game Manually (keyboard)")
-        print("5. Show Detailed Project Status")
+        print("1. Show Detailed Project Status")
+        print("2. Run Training (pick Game, Algorithm, Persona, Skill)")
+        #print("2. Run Evaluation (per-game, scans models/*.zip)") - Not Adapted Yet
+        print("3. Train All Models for One Game")
+        print("4. Train Complete Grid (all games × algos × personas)")
+        print("5. Play Game Manually (keyboard)")
         print("6. Watch Trained Agent Play (visualize AI performance)")
-        print("7. Train All Models for One Game")
-        print("8. Train Complete Grid (all games × algos × personas)")
-        print("9. Change Current Algorithm")
-        print("10. Delete TensorBoard Logs & Models")
-        print("11. Watch Random Agent Play (random actions)")
-        print("12. Exit")
+        print("7. Watch Random Agent Play (random actions)")
+        print("8. View TensorBoard Logs (mylogs/)")
+        print("9. Delete TensorBoard Logs & Models")
+        print("10. Exit")
         print("=" * 60)
 
-        choice = input("Select option (1-12): ").strip()
+        choice = input("Select option (1-10): ").strip()
         
         if choice == "1":
-            run_training()
-        elif choice == "2":
-            run_evaluation()
-        elif choice == "3":
-            run_tensorboard()
-        elif choice == "4":
-            run_manual_play()
-        elif choice == "5":
             show_project_status()
+        # elif choice == "2":
+        #     run_evaluation() -> Not Adapted Yet
+        elif choice == "2":
+            run_training()
+        elif choice == "3":
+            train_all_models_for_game()
+        elif choice == "4":
+            train_complete_grid()
+        elif choice == "5":
+            run_manual_play()
         elif choice == "6":
             watch_trained_agent()
         elif choice == "7":
-            train_all_models_for_game()
-        elif choice == "8":
-            train_complete_grid()
-        elif choice == "9":
-            change_algorithm()
-        elif choice == "10":
-            delete_logs_and_models()
-        elif choice == "11":
             watch_random_agent()
-        elif choice == "12":
+        elif choice == "8":
+            run_tensorboard()
+        elif choice == "9":
+            delete_logs_and_models()
+        elif choice == "10":
             print("Exiting. Happy training!")
             break
         else:
-            print("Invalid selection. Please choose 1-12.\n")
+            print("Invalid selection. Please choose 1-10.\n")
 
 if __name__ == "__main__":
     main()

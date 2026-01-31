@@ -25,7 +25,6 @@ class GameEnv(gym.Env):
     ):
         assert render_mode in self.metadata["render_modes"]
         self.game = game_cls(render_mode = render_mode, **game_kwargs)
-        # self.game = game_cls  # not game_cls(**game_kwargs)
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps
@@ -44,7 +43,7 @@ class GameEnv(gym.Env):
         self.clock = None
         self.font = None
 
-    # -------------------------------- default reward
+    # -------------------------------- Default reward
     @staticmethod
     def _default_reward(obs, base, terminated, info):
         return 0.0 if base is None else base
@@ -59,7 +58,7 @@ class GameEnv(gym.Env):
     def step(self, action):
         self._step_count += 1
 
-        # --- NEW: normalize action once, do NOT cast to bool unconditionally
+        # --- normalize action once, do NOT cast to bool unconditionally
         if hasattr(self.action_space, "n"):
             if self.render_mode == "random":
                 action = self.action_space.sample()
@@ -69,7 +68,6 @@ class GameEnv(gym.Env):
         # For Binary(1)/MultiBinary just pass through
         # For Box actions (not used here), pass as-is
 
-        # OLD (remove): obs, base, terminated, info = self.game.step(bool(action))
         obs, base, terminated, info = self.game.step(action)
 
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
@@ -78,9 +76,7 @@ class GameEnv(gym.Env):
         hub.update_reward(reward=reward, action_name=action, is_episode_end=terminated)
         return obs, reward, terminated, truncated, info
 
-
-    # -------------------------------- rendering
-    # -------------------------------- rendering
+    # -------------------------------- Rendering
     def render(self, mode=None):
         """
         Modes:
@@ -109,8 +105,8 @@ class GameEnv(gym.Env):
             self.clock = pygame.time.Clock()
             self.font = pygame.font.SysFont(None, 20)
 
-        # Ask game to draw onto our surface
-        # (game.render must support blit_only=True in your cores)
+        # Ask game nicely to draw onto our surface
+        # NOTE: (game.render must support blit_only=True in your cores)
         self.game.render(self.screen, blit_only=True)
 
         # Optional HUD
@@ -126,7 +122,6 @@ class GameEnv(gym.Env):
 
         if render_mode == "rgb_array":
             # Return pixels for VecVideoRecorder (H, W, 3)
-            import numpy as np
             arr = pygame.surfarray.array3d(self.screen)  # (W, H, 3)
             arr = np.transpose(arr, (1, 0, 2))          # (H, W, 3)
             return arr

@@ -62,6 +62,8 @@ def parse_model_info(model_path: str) -> tuple[str, str, str, str]:
 
 def load_model(model_path: str, algo: str = "ppo"):
     """Load model based on algorithm type"""
+    
+    # Insert more algorithms as needed
     algo_classes = {
         "ppo": PPO,
         "a2c": A2C, 
@@ -156,7 +158,7 @@ def watch_agent_play(
     print("Pygame initialized successfully")
     
     # Create environment
-    # FIX: Pass the persona to the environment!
+    # Pass the persona to the environment!
     print(f"Creating {game} environment with persona='{persona}'...")
     env = create_env(game, fps=fps, persona=persona)
     
@@ -188,7 +190,9 @@ def watch_agent_play(
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                         raise KeyboardInterrupt("ESC pressed")
                 
-                # IMPORTANT: Pump events so the game core receives debug key presses (F1, F5, etc)
+                # Pump events so the game core receives debug key presses (F1, F5, etc)
+                # The pump() function is used to process the event queue internally, 
+                # ensuring that the program can interact with the operating system and respond to event
                 pygame.event.pump()
 
                 # --- DEBUG UPDATE ---
@@ -242,6 +246,7 @@ def watch_agent_play(
             print(f"   Total score: {total_score}")
 
 def main():
+    # Command-line argument parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", help="Path to the trained model (.zip file)")
     parser.add_argument("--episodes", type=int, default=5)
