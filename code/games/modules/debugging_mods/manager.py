@@ -1,7 +1,7 @@
 import pygame
 import collections
 from code.wrappers.RewardHub import RewardHub
-from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay
+from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay
 
 class DebugManager:
     def __init__(self, default_active=True, print_help=True):
@@ -17,6 +17,8 @@ class DebugManager:
         self.show_reward_log = False
         self.slow_motion = False
         
+        self.show_obs_values = False 
+        
         # Free Cam Tools
         self.free_cam_active = False 
         self.cam_move_speed = 600.0  
@@ -30,15 +32,18 @@ class DebugManager:
         self._prev_keys = pygame.key.get_pressed()
         self.font = pygame.font.SysFont("arial", 16, bold=True)
         self.small_font = pygame.font.SysFont("arial", 12)
-
+        
         # Composited Visualizers
         self.hitbox_overlay = HitboxOverlay()
         self.grid_overlay = GridOverlay()
         self.agent_view_overlay = AgentViewOverlay()
         self.info_overlay = InfoPanelOverlay()
+        self.obs_values_overlay = ObsValuesOverlay()
 
         if print_help:
             self._print_help_to_terminal()
+        
+    
 
     def _print_help_to_terminal(self):
         print("\n" + "="*40)
@@ -52,6 +57,7 @@ class DebugManager:
         print(" [6] / [F6] : Toggle Tile Grid")
         print(" [7] / [F7] : Toggle Reward Trace")
         print(" [8] / [F8] : Toggle Slow Motion (0.5x Speed)")
+        print(" [9] / [F9] : Toggle Semantic OBS Values") # NEW
         print("="*40 + "\n")
 
     def update_input(self):
@@ -77,6 +83,7 @@ class DebugManager:
         if check_toggle(pygame.K_4, pygame.K_F4): self.show_obs_panel = not self.show_obs_panel
         if check_toggle(pygame.K_5, pygame.K_F5): self.free_cam_active = not self.free_cam_active
         if check_toggle(pygame.K_6, pygame.K_F6): self.show_grid = not self.show_grid
+
         
         # New Toggles
         if check_toggle(pygame.K_7, pygame.K_F7): 
@@ -87,6 +94,11 @@ class DebugManager:
             self.slow_motion = not self.slow_motion
             print(f"[Debug] Slow Motion: {self.slow_motion}")
 
+        if check_toggle(pygame.K_9, pygame.K_F9):
+            self.show_obs_values = not self.show_obs_values
+            print(f"[Debug] Obs Values: {self.show_obs_values}")
+        
+            
         # --- Free Cam Movement ---
         # Changed to I-J-K-L to avoid ANY conflict with WASD or Arrows
         self.current_cam_move = [0.0, 0.0]
@@ -118,7 +130,7 @@ class DebugManager:
             
         if self.show_obs_panel:
             self.info_overlay.render(surface, core)
-        
+            
         if self.show_reward_log:
             self._render_reward_graph(surface, core)
 
@@ -128,6 +140,10 @@ class DebugManager:
         
         if self.slow_motion:
             self._draw_badge(surface, core, "SLOW MOTION ACTIVE", (255, 165, 0), y_offset=40)
+        
+        if self.show_obs_values:
+            self.obs_values_overlay.render(surface, core)
+        
 
     def _render_reward_graph(self, surface, core):
         # Draw a mini graph of recent rewards on UPPER RIGHT

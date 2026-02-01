@@ -731,7 +731,6 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
         print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         return
 
-    #import numpy as np - lazy import
 
     meta = parse_model_metadata(model_path)
     
@@ -851,8 +850,6 @@ def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
     if mpy is None:
         print("Recording random agent requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         return
-
-    #import numpy as np # Lazy import
 
     try:
         from code.wrappers.generic_env import GameEnv
@@ -1003,7 +1000,6 @@ def watch_trained_agent():
             print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
             return
 
-        #import numpy as np - Lazy import
         
         # --- Env + model setup
         try:
@@ -1431,7 +1427,6 @@ def watch_random_agent():
         if mpy is None:
             print("Recording random agent requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
         else:
-            #import numpy as np - Lazy import
             record = True
 
     # --- Setup env

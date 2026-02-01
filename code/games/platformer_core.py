@@ -62,7 +62,8 @@ class PlatformerCore:
         self.level_tiles: List[List[Tile | None]] = []
         self.level_w = 0
         self.level_h = 0
-
+        self.goal_x = 0.0
+        
         # -------- Config knobs ----------------------------
         
         # Default world and speed multiplier
@@ -161,7 +162,7 @@ class PlatformerCore:
         self.progress_y_best = 0.0
 
         # Gym spaces
-        obs_len = 5 + (11 * 9 * 3) + 10
+        obs_len = 5 + (11 * 9 * 3) + 11
         self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
         self._act_space = spaces.Discrete(8)
 
@@ -196,6 +197,14 @@ class PlatformerCore:
     def get_observation_space(self): 
         return self._obs_space
 
+    def _find_goal_x(self):
+        self.goal_x = float(self.level_w)
+        for row in range(self.level_rows):
+            for col in range(self.level_cols):
+                if self.level_data[row][col] == TILE_GOAL:
+                    self.goal_x = float(col * TILE_SIZE)
+                    return
+
     def reset(self) -> np.ndarray:
 
         self.lives = self.max_lives # Reset lives to 3
@@ -221,6 +230,7 @@ class PlatformerCore:
         
         # Post level load resize
         self._post_level_resize()
+        self._find_goal_x()
         self._create_player()
 
         # Reset stall metrics
@@ -780,46 +790,6 @@ class PlatformerCore:
 
         return False
 
-    # NOT NEEDED 
-    # def _reward(self) -> float:
-    #     """
-    #     Calculates reward for the current step.
-    #     Combines external persona reward function if loaded,
-    #     otherwise uses default internal reward logic.
-    #     """
-    #     # Use external persona reward function if loaded
-    #     if hasattr(self, 'reward_fn') and self.reward_fn:
-    #         info = {
-    #             "score": self.score,
-    #             "x_position": self.player.gObj.x,
-    #             "coins_collected": self.coins_total,
-    #             "enemies_killed_step": self.kills_step, # Explicit step count for tracker
-    #             "won": self.reached_goal,
-    #             "velocity_x": self.player.vx, 
-    #             "max_x_seen": self.max_x_seen 
-    #         }
-    #         # The wrapped function handles state tracking internally
-    #         return self.reward_fn(None, 0.0, not self.alive, info)
-
-    #     # Default internal reward logic if no persona is loaded
-    #     reward = 0.0
-    #     dx = self.player.gObj.x - self.last_x
-    #     reward += dx / 8.0
-    #     reward -= 0.005
-    #     reward += self.kills_step * 1.0 + self.coins_step * 0.5 + self.powerups_step * 1.0
-    #     reward += self.score_delta / 100.0
-    #     if self.anti_stall:
-    #         if self.stalled_this_frame:
-    #             reward += self.stall_penalty 
-            
-    #         prog_x, prog_y = self._progress_components()
-    #         back_x = max(0.0, self.progress_x_best - prog_x)
-    #         back_y = max(0.0, self.progress_y_best - prog_y)
-    #         back = max(back_x, back_y)
-                
-    #         if back > 0:
-    #             reward -= self.backtrack_penalty * min(back, TILE_SIZE * 8)
-    #     return reward
 
     def _obs(self) -> np.ndarray:
         """"
@@ -922,8 +892,21 @@ class PlatformerCore:
 
         min_enemy = nearest([enemy.gObj for enemy in self.enemies if enemy.gObj.active])
         min_coin  = nearest([coin.gObj for coin in self.coins if coin.gObj.active and not coin.collected])
-        return [
-            min_enemy, min_coin,
+        
+        # LOGIC: (Player X - Goal X) / Normalization Factor
+        # We divide by level_width so the value is usually between -1.0 and 0.0
+        level_w = max(1.0, float(self.level_w))
+        goal_x = getattr(self, "goal_x", level_w)
+        dist_to_goal = (self.level_w - player.gObj.x) / max(1.0, float(self.level_w))
+        
+        # This gives:
+        # -0.9 = Far left
+        # -0.1 = Close
+        #  0.0 = On Goal
+        # +0.1 = Oversho
+        
+        return [ 
+            min_enemy, min_coin, dist_to_goal,
             1.0 if player.powered_up else 0.0,
             player.invincible_timer / 300.0,
             len([enemy for enemy in self.enemies if enemy.gObj.active]) / 10.0,
@@ -931,8 +914,8 @@ class PlatformerCore:
             len([powerup for powerup in self.powerups if powerup.gObj.active]) / 5.0,
             self.coins_total / 10.0,
             self.score / 1000.0,
-            self.frame / float(self.max_steps if self.max_steps else 1e9),
-        ]
+            self.frame / float(self.max_steps if self.max_steps else 1e9), ]
+
 
     def _info(self) -> Dict:
         p = self.player

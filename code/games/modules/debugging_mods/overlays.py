@@ -10,15 +10,15 @@ class DebugOverlay:
 class HitboxOverlay(DebugOverlay):
     def render(self, surface: pygame.Surface, core):
         # Draw Player Hitbox
-        p = core.player
-        px, py, _ = core._world_to_screen(p.gObj)
-        pygame.draw.rect(surface, COLOR_HITBOX, (px, py, p.gObj.width, p.gObj.height), 2)
+        player = core.player
+        player_x, player_y, _ = core._world_to_screen(player.gObj)
+        pygame.draw.rect(surface, COLOR_HITBOX, (player_x, player_y, player.gObj.width, player.gObj.height), 2)
         
         # Draw Entity Hitboxes (only visible ones)
         visible = core.dynamic_hash.query_rect(core.camera_x, core.camera_y, core.WIDTH, core.HEIGHT)
-        for o in visible:
-            sx, sy, _ = core._world_to_screen(o.gObj)
-            pygame.draw.rect(surface, (255, 255, 255), (sx, sy, o.gObj.width, o.gObj.height), 1)
+        for object in visible:
+            screen_x, screen_y, _ = core._world_to_screen(object.gObj)
+            pygame.draw.rect(surface, (255, 255, 255), (screen_x, screen_y, object.gObj.width, object.gObj.height), 1)
 
 class GridOverlay(DebugOverlay):
     def render(self, surface: pygame.Surface, core):
@@ -29,12 +29,12 @@ class GridOverlay(DebugOverlay):
         start_row = int(core.camera_y // TILE_SIZE)
         end_row = int((core.camera_y + core.HEIGHT) // TILE_SIZE) + 1
 
-        for c in range(start_col, end_col):
-            x = c * TILE_SIZE - core.camera_x
+        for col in range(start_col, end_col):
+            x = col * TILE_SIZE - core.camera_x
             pygame.draw.line(surface, (50, 50, 50), (x, 0), (x, core.HEIGHT))
         
-        for r in range(start_row, end_row):
-            y = r * TILE_SIZE - core.camera_y
+        for row in range(start_row, end_row):
+            y = row * TILE_SIZE - core.camera_y
             pygame.draw.line(surface, (50, 50, 50), (0, y), (core.WIDTH, y))
 
 class AgentViewOverlay(DebugOverlay):
@@ -50,9 +50,9 @@ class AgentViewOverlay(DebugOverlay):
         pygame.draw.rect(surface, (255, 255, 255), 
                         (panel_x - 5, panel_y - 5, grid_w * cell_w + 10, grid_h * cell_h + 10), 2)
 
-        p = core.player
-        p_cx = int((p.gObj.x + p.gObj.width / 2) // TILE_SIZE)
-        p_cy = int((p.gObj.y + p.gObj.height / 2) // TILE_SIZE)
+        player = core.player
+        p_cx = int((player.gObj.x + player.gObj.width / 2) // TILE_SIZE)
+        p_cy = int((player.gObj.y + player.gObj.height / 2) // TILE_SIZE)
 
         enemy_locs = {(int(e.gObj.x // TILE_SIZE), int(e.gObj.y // TILE_SIZE)) 
                       for e in core.enemies if e.gObj.active}
@@ -97,10 +97,10 @@ class InfoPanelOverlay(DebugOverlay):
         # For debug, recalculating is fine.
         # Note: We aren't displaying the full vector, just specific stats.
         
-        p = core.player
+        player = core.player
         lines = [
-            f"Pos: {int(p.gObj.x)}, {int(p.gObj.y)}",
-            f"Vel: {p.vx:.1f}, {p.vy:.1f}",
+            f"Pos: {int(player.gObj.x)}, {int(player.gObj.y)}",
+            f"Vel: {player.vx:.1f}, {player.vy:.1f}",
             f"Stall Timer: {core.stall_timer:.2f}s",
             f"Stall Count: {core.stall_windows_count}",
             f"Best X: {int(core.progress_x_best)}"
@@ -111,3 +111,60 @@ class InfoPanelOverlay(DebugOverlay):
         
         for i, ln in enumerate(lines):
             surface.blit(core.ui_font.render(ln, True, (200, 200, 200)), (10, panel_y_start + i * 20))
+            
+
+class ObsValuesOverlay(DebugOverlay):
+    def render(self, surface: pygame.Surface, core):
+        # 1. Fetch specific semantic vectors (skipping tile window)
+        # We access protected methods because this is a debug tool coupled to the core
+        p_vals = core._player_obs()
+        o_vals = core._object_obs()
+        
+        # 2. Define labels matching platformer_core.py logic
+        p_labels = [
+            "Plyr X (norm)", "Plyr Y (norm)", 
+            "Vel X (norm)", "Vel Y (norm)", 
+            "On Ground"
+        ]
+        o_labels = [
+            "Enm Dist (rel)", "Coin Dist (rel)", 
+            "Goal Dist (sgn)", 
+            "Powered Up", "Invinc Tmr", 
+            "Act Enemies", "Act Coins", 
+            "Act P-Ups", "Tot Coins", 
+            "Score (scl)", "Frame (scl)"
+        ]
+        
+        # Combine
+        data = list(zip(p_labels, p_vals)) + list(zip(o_labels, o_vals))
+
+        # 3. Draw Panel
+        # Position to the right of Agent View (which is ~190px wide)
+        panel_x = 220 
+        panel_y = 50
+        line_h = 16
+        w, h = 200, len(data) * line_h + 10
+        
+        # Background
+        bg = pygame.Surface((w, h))
+        bg.set_alpha(200)
+        bg.fill((10, 10, 10))
+        surface.blit(bg, (panel_x, panel_y))
+        pygame.draw.rect(surface, (100, 100, 100), (panel_x, panel_y, w, h), 1)
+
+        # Text
+        font = getattr(core, "small_font", None) or pygame.font.SysFont("arial", 12)
+        
+        for i, (label, val) in enumerate(data):
+            # Color code: Zero/Low = Gray, High/Active = White/Green
+            color = (150, 150, 150)
+            if val > 0: color = (255, 255, 255)
+            if "Dist" in label and val < 0.1: color = (255, 100, 100) # Close danger/coin
+            
+            txt_str = f"{label}: {val:.3f}"
+            txt = font.render(txt_str, True, color)
+            surface.blit(txt, (panel_x + 8, panel_y + 5 + i * line_h))
+
+        # Header
+        head_font = getattr(core, "ui_font", None) or pygame.font.SysFont("arial", 14, bold=True)
+        surface.blit(head_font.render("Semantic OBS", True, (0, 255, 255)), (panel_x, panel_y - 20))
