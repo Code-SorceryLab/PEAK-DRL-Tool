@@ -72,6 +72,10 @@ class _ScoreTracker:
         self.last_x = current_x
         self.last_coins = coins
         self.last_kills = kills_now
+        
+        # keep everything as-is, but ensure defaults:
+        info.setdefault("dist_to_goal", 0.0)
+        info.setdefault("dist_to_goal_norm", 0.0)
 
         return score, inc
 
