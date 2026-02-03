@@ -920,7 +920,7 @@ class PlatformerCore:
 
     def _info(self) -> Dict:
         p = self.player
-        info = {
+        return {
             "score": self.score, 
             "score_delta": self.score_delta, 
             "frame_count": self.frame,
@@ -937,25 +937,10 @@ class PlatformerCore:
             "max_x_seen": self.max_x_seen, 
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
-            "persona": self.persona # Expose current persona for debug tools
+            "persona": self.persona, # Expose current persona for debug tools
+            "Dist_to_Goal": (self.level_w - p.gObj.x) / max(1.0, float(self.level_w)),
         }
-        # get object-based distances (this is already computed elsewhere)
-        # minenemy, mincoin, disttogoal, powered_norm, invinc_norm, ...
-        minenemy, mincoin, disttogoal, powered_norm, invinc_norm, enemies_norm, coins_norm, powerups_norm, coins_total_norm, score_norm, frame_norm = self.objectobs()  # or reuse your helper that returns these values [file:1]
-
-        levelw = max(1.0, float(self.levelw))
-        # distance to goal in world units (x)
-        # goalx is set by findgoalx during reset [file:1]
-        raw_dist_to_goal = max(0.0, self.goalx - p.gObj.x)
-        # normalized 0..1, 1.0 when at start, 0.0 when at goal
-        dist_to_goal_norm = raw_dist_to_goal / levelw
-
-        info["dist_to_goal"] = raw_dist_to_goal
-        info["dist_to_goal_norm"] = dist_to_goal_norm
-        info["nearest_enemy_dist"] = minenemy
-        info["nearest_coin_dist"] = mincoin
-
-        return info
+        
         
 
     #depretiated?
