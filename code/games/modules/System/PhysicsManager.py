@@ -15,6 +15,9 @@ from ..Parameters.Movement_parameters import *
 from ..Parameters.Jump_parameters import *
 from ..Parameters.Map_parameters import TILE_SIZE, TILE_QBLOCK
 from .SpatialHash import SpatialHash
+from ..Objects.Coin import Coin
+from ..Objects.Powerup import Powerup
+from ..Objects.GameObject import GameObject
 
 @dataclass
 class PhysicsContext:
@@ -358,15 +361,6 @@ class PhysicsManager:
             if b_col == col and b_row == row and not block.hit:
                 block.hit = True
                 spawn_x, spawn_y = col * TILE_SIZE, row * TILE_SIZE - 22
-                
-                try:
-                    from ..Objects.Coin import Coin
-                    from ..Objects.Powerup import Powerup
-                    from ..Objects.GameObject import GameObject
-                except ImportError:
-                    from .Coin import Coin
-                    from .Powerup import Powerup
-                    from .GameObject import GameObject
                 
                 if block.contains == "coin":
                     c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True), flyup=True, vy=-280.0, life=0.3, auto_collect=True)

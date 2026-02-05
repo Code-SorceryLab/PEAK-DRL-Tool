@@ -74,3 +74,9 @@ class ConfigManager:
             else:
                 d[k] = v
         return d
+    
+    def get_level_order(self):
+        """Returns a list of level IDs in the order they appear in YAML."""
+        if 'levels' in self.yaml_data:
+            return list(self.yaml_data['levels'].keys())
+        return []

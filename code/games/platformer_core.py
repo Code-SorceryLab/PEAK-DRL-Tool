@@ -63,6 +63,8 @@ class PlatformerCore:
         self.player: Player | None = None
         
         # Default world and speed multiplier
+        self.level_order = self.config_manager.get_level_order()
+        self.current_index_world = 0
         self.world = str(kwargs.pop("world", "1-1")).lower()
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult 
@@ -107,8 +109,14 @@ class PlatformerCore:
         self.progress_x_best = 0.0
         self.progress_y_best = 0.0
 
-        # Gym spaces
-        obs_len = 5 + (11 * 9 * 3) + 11
+        # --- NEW OBSERVATION SPACE CALCULATION ---
+        # 1. Player Data (5)
+        # 2. Solid Array (11x9 = 99)
+        # 3. Hazard Array (11x9 = 99)
+        # 4. Collectable Array (11x9 = 99)
+        # 5. Tracking Data (8)
+        # Total: 5 + 99 + 99 + 99 + 8 = 310
+        obs_len = 310
         self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
         self._act_space = spaces.Discrete(8)
 
@@ -138,12 +146,27 @@ class PlatformerCore:
 
         # 1. LOAD CONFIG & LEVEL
         config = self.config_manager.get_level_config(self.world)
-        
-        # Load Level Data via LevelLoader (Handles parsing and spawning)
         self.level_data = self.loader.load_level(config)
         
+        # --- OPTIMIZATION: Prepare Numpy Grid for Observation Slicing ---
+        # Create a binary grid (1.0 for Solid, 0.0 for Air)
+        # We assume TILE_AIR is 0 or distinct from solid blocks
+        raw_grid = np.array(self.level_data.grid, dtype=np.int32)
+        self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
+        
+        # Pad the grid so we can slice the 11x9 window without boundary checks
+        # Window is 11 wide (5 left, 5 right) and 9 high (4 up, 4 down)
+        pad_y = 4 
+        pad_x = 5
+        self.padded_solid = np.pad(
+            self.solid_grid_np, 
+            ((pad_y, pad_y), (pad_x, pad_x)), 
+            mode='constant', 
+            constant_values=0.0
+        )
+        # ---------------------------------------------------------------
+        
         # 2. CREATE PLAYER
-        # Config override spawn -> Level Data default -> Hardcoded fallback
         px, py = self.level_data.player_start
         if 'spawn' in config:
             px = float(config['spawn'].get('x', px))
@@ -153,10 +176,9 @@ class PlatformerCore:
 
         # 3. CONFIGURE PHYSICS
         self.physics_manager.reset_to_defaults()
-        self.physics_manager.apply_config_dict(config) # Apply gravity/speed configs
+        self.physics_manager.apply_config_dict(config)
         
         # 4. INITIALIZE HASHES
-        # Ensure hashes are populated for the very first render() call before step() runs
         self.physics_manager.rebuild_dynamic_hashes(self.level_data)
 
         # 5. RESET METRICS
@@ -206,13 +228,13 @@ class PlatformerCore:
         else:
             self.player.vx = 0; self.player.jump_hold = 0
 
-        # 3. Physics System Update (Movement)
+        # 3. Physics System Update
         self.physics_manager.update_system(self.dt, self)
         
         # 4. Collision Resolution
         self.physics_manager.resolve_collisions(self)
 
-        # 5. Logic Updates (Camera, Stall)
+        # 5. Logic Updates
         self._update_camera()
         if self.anti_stall: self._update_stall_metrics()
 
@@ -225,13 +247,19 @@ class PlatformerCore:
         return self._obs(), 0, bool(terminated), info
 
     def load_level(self, idx):
-        # Used for manual level switching
         if idx < 12: 
             self.world = f"1-{idx + 1}"
             self.reset()
 
     def complete_level(self):
         print(f"Level Complete! Current World: {self.world}")
+        # --- Logic to Advance Level --
+        self.current_index_world += 1
+        if self.current_index_world >= len(self.level_order):
+            print("all levels done") # As requested
+            self.current_index_world = 0
+        self.world = self.level_order[self.current_index_world]
+        next_config = self.config_manager.get_level_config(self.world)
     
     def _handle_death(self):
         self.lives -= 1
@@ -321,72 +349,148 @@ class PlatformerCore:
 
         return False
 
+    # =========================================================================
+    # NEW OBSERVATION LOGIC
+    # =========================================================================
     def _obs(self) -> np.ndarray:
-        out: List[float] = []
-        out.extend(self._player_obs())
-        out.extend(self._tile_window_obs())
-        out.extend(self._object_obs())
-        return np.array(out, dtype=np.float32)
+        """
+        Constructs the vector observation:
+        [Player(5), Solid(99), Hazard(99), Collectable(99), Tracking(8)]
+        """
+        # 1. Player Data (5)
+        p_obs = self._player_obs()
+        
+        # 2. Grids (99 * 3)
+        # We compute these together to save tile coord calcs
+        solid_grid, hazard_grid, collect_grid = self._grid_obs_window_11x9()
+        
+        # 3. Tracking Data (8)
+        track_obs = self._tracking_obs()
+        
+        # Concatenate all
+        return np.concatenate([
+            p_obs,
+            solid_grid, 
+            hazard_grid,
+            collect_grid,
+            track_obs
+        ]).astype(np.float32)
 
-    def _player_obs(self) -> List[float]:
+    def _player_obs(self) -> np.ndarray:
         p = self.player
         w = max(1.0, float(self.level_data.width))
         h = max(1.0, float(self.level_data.height))
-        return [
-            p.gObj.x / w, p.gObj.y / h,
+        # 5 Values
+        return np.array([
+            p.gObj.x / w, 
+            p.gObj.y / h,
             p.vx / max(1e-6, self.physics_manager.context.MAX_RUN_SPEED),
             p.vy / self.physics_manager.context.MAX_FALL_SPEED,
             1.0 if p.on_ground else 0.0,
-        ]
+        ], dtype=np.float32)
         
-    def _tile_window_obs(self) -> List[float]:
+    def _grid_obs_window_11x9(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Returns flattened arrays for Solid, Hazard, and Collectable windows (11x9).
+        Window: 5 left, 5 right, 4 up, 4 down relative to player tile.
+        """
         p = self.player
-        px = int(p.gObj.x // TILE_SIZE); py = int(p.gObj.y // TILE_SIZE)
-        tiles = []; coins_map = []; enemies_map = []
+        px = int(p.gObj.x // TILE_SIZE)
+        py = int(p.gObj.y // TILE_SIZE)
+        
+        # --- A. SOLID ARRAY (Optimized Numpy Slice) ---
+        # Map player (px, py) to padded grid coordinates
+        # Padded has 4 top, 5 left.
+        # Window Start in Padded: (py - 4) + 4 = py
+        # Window End in Padded:   (py + 4) + 4 + 1 = py + 9
+        # X logic similarly: px, px + 11
+        
+        # Clamp slicing just in case, though padding should cover typical map bounds
+        # (Assuming player doesn't go waaaay out of bounds)
+        try:
+            solid_window = self.padded_solid[py : py + 9, px : px + 11].flatten()
+        except IndexError:
+            # Fallback for extreme out of bounds
+            solid_window = np.zeros(99, dtype=np.float32)
 
-        # Optimization: Use sets for O(1) lookup
-        coin_cells = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE)) for c in self.level_data.coins if c.gObj.active and not c.collected}
-        enemy_cells = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE)) for e in self.level_data.enemies if e.gObj.active}
+        # --- B. DYNAMIC ARRAYS (Hazard/Collectable) ---
+        # Optimization: Use Spatial Hash to find only relevant entities
+        hazard_grid = np.zeros((9, 11), dtype=np.float32)
+        collect_grid = np.zeros((9, 11), dtype=np.float32)
+        
+        # Define world rect for query (11 tiles wide, 9 tiles high)
+        window_rect = pygame.Rect(
+            (px - 5) * TILE_SIZE, 
+            (py - 4) * TILE_SIZE, 
+            11 * TILE_SIZE, 
+            9 * TILE_SIZE
+        )
+        
+        # Hazards
+        nearby_hazards = self.physics_manager.hazard_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
+        for h in nearby_hazards:
+            if not h.gObj.active: continue
+            hx, hy = int(h.gObj.x // TILE_SIZE), int(h.gObj.y // TILE_SIZE)
+            local_x = hx - (px - 5)
+            local_y = hy - (py - 4)
+            if 0 <= local_x < 11 and 0 <= local_y < 9:
+                hazard_grid[local_y, local_x] = 1.0
 
-        for dy in range(-4, 5):
-            for dx in range(-5, 6):
-                tx, ty = px + dx, py + dy
-                if 0 <= ty < self.level_data.rows and 0 <= tx < self.level_data.cols:
-                    tiles.append(float(self.level_data.grid[ty][tx]))
-                    coins_map.append(1.0 if (tx, ty) in coin_cells else 0.0)
-                    enemies_map.append(1.0 if (tx, ty) in enemy_cells else 0.0)
-                else:
-                    tiles.append(0.0); coins_map.append(0.0); enemies_map.append(0.0)
-        return tiles + coins_map + enemies_map
+        # Collectables
+        nearby_items = self.physics_manager.collectible_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
+        for c in nearby_items:
+            # Check active status. Coins have 'collected' flag too.
+            if not c.gObj.active: continue
+            if hasattr(c, 'collected') and c.collected: continue
+            
+            cx, cy = int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE)
+            local_x = cx - (px - 5)
+            local_y = cy - (py - 4)
+            if 0 <= local_x < 11 and 0 <= local_y < 9:
+                collect_grid[local_y, local_x] = 1.0
 
-    def _object_obs(self) -> List[float]:
+        return solid_window, hazard_grid.flatten(), collect_grid.flatten()
+
+    def _tracking_obs(self) -> np.ndarray:
         p = self.player
         
-        def nearest(objs):
-            min_dis = 1000.0
-            for obj in objs:
-                if getattr(obj, "active", True):
-                    distance = abs(p.gObj.x - obj.x) + abs(p.gObj.y - obj.y)
-                    min_dis = min(min_dis, distance)
-            return min_dis / 1000.0
+        # Helpers for "Nearest" logic
+        def get_dist(obj_list):
+            min_d = 9999.0
+            count = 0
+            for obj in obj_list:
+                if not obj.gObj.active: continue
+                if hasattr(obj, 'collected') and obj.collected: continue
+                
+                # Euclidean distance
+                d = math.sqrt((p.gObj.x - obj.gObj.x)**2 + (p.gObj.y - obj.gObj.y)**2)
+                if d < min_d: min_d = d
+                count += 1
+            return min_d, count
 
-        min_enemy = nearest([e.gObj for e in self.level_data.enemies if e.gObj.active])
-        min_coin  = nearest([c.gObj for c in self.level_data.coins if c.gObj.active and not c.collected])
+        # 1. Enemies
+        e_dist, e_count = get_dist(self.level_data.enemies)
         
+        # 2. Coins
+        c_dist, c_count = get_dist(self.level_data.coins)
+        
+        # 3. Goal Dist
         w = max(1.0, float(self.level_data.width))
-        dist_to_goal = (w - p.gObj.x) / w
-        
-        return [ 
-            min_enemy, min_coin, dist_to_goal,
-            1.0 if p.powered_up else 0.0,
-            p.invincible_timer / 300.0,
-            len([e for e in self.level_data.enemies if e.gObj.active]) / 10.0,
-            len([c for c in self.level_data.coins if c.gObj.active and not c.collected]) / 10.0,
-            len([pu for pu in self.level_data.powerups if pu.gObj.active]) / 5.0,
-            self.coins_total / 10.0,
-            self.score / 1000.0,
-            self.frame / float(self.max_steps if self.max_steps else 1e9), 
-        ]
+        goal_dist = (w - p.gObj.x) / w
+
+        # Normalization constants (approximate level diagonal or screen size)
+        norm_dist = 1000.0 
+
+        return np.array([
+            min(1.0, e_dist / norm_dist), # Nearest Enemy Dist
+            min(1.0, c_dist / norm_dist), # Nearest Coin Dist
+            goal_dist,                    # Goal Distance
+            min(1.0, e_count / 20.0),     # Active Enemies (Normalized cap 20)
+            min(1.0, c_count / 50.0),     # Active Coins (Normalized cap 50)
+            self.score / 5000.0,          # Score
+            self.timer / 400.0,           # Time Left
+            self.lives / 5.0              # Lives Left
+        ], dtype=np.float32)
 
     def _info(self) -> Dict:
         p = self.player
@@ -417,36 +521,19 @@ class PlatformerCore:
         self._draw_entities(surface)
         self._draw_player(surface) 
         
-        # if self.render_mode == "human": self.debug_manager.update_input()
-        
-        # if self.debug_manager.show_hitboxes or self.debug_manager.show_sensors or \
-        #    self.debug_manager.show_agent_view or self.debug_manager.show_obs_panel or \
-        #    self.debug_manager.show_grid:
-        #     self.debug_manager.render_overlays(surface, self)
-            
         self._draw_ui(surface)
 
     def _draw_world(self, surface: pygame.Surface):
-        # Draw Tiles via Static Hash (LevelData)
-        # Query the static hash for tiles near the camera
         visible_tiles = self.level_data.static_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)
-        
         for tile in visible_tiles:
-            # Basic frustum culling (SpatialHash gives broad phase, this is exact)
             if tile.x + tile.width < self.camera_x or tile.x > self.camera_x + self.WIDTH: continue
             
-            # Tile.render expects (surface, cam_x, cam_y)
-            # QuestionBlock.render expects (surface, screen_x, screen_y)
             if isinstance(tile, Tile):
-                # Avoid double rendering QBlocks (The dedicated QuestionBlock object handles the visuals)
                 if tile.color == COLOR_QBLOCK: continue
                 tile.render(surface, self.camera_x, self.camera_y)
-            
             elif isinstance(tile, QuestionBlock):
                 tile.render(surface, tile.x - self.camera_x, tile.y - self.camera_y)
-            
             elif hasattr(tile, 'render'):
-                # Fallback for any other object in static hash
                 try:
                     tile.render(surface, self.camera_x, self.camera_y)
                 except TypeError:
