@@ -9,35 +9,31 @@ import pygame
 import time
 from gymnasium import spaces
 
-# --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
-# Objects
-from .modules.Objects.GameObject import GameObject
-from .modules.Objects.Tile import Tile, create_tile
-from .modules.Objects.Player import Player
-from .modules.Objects.Enemy import Enemy
-from .modules.Objects.Powerup import Powerup
-from .modules.Objects.Coin import Coin
-from .modules.Objects.QuestionBlock import QuestionBlock
+# Modules 
+from .modules.GameObject import GameObject
+from .modules.Tile import Tile, create_tile
+from .modules.Player import Player
+from .modules.Enemy import Enemy
+from .modules.Powerup import Powerup
+from .modules.Coin import Coin
+from .modules.QuestionBlock import QuestionBlock
+from .Systems.SpatialHash import SpatialHash
 
-# System
-from .modules.System.SpatialHash import SpatialHash
-from .modules.System.config_manager import ConfigManager 
-from .modules.System.debugging_mods.manager import DebugManager
+# Debug Module
+from .modules.debugging_mods.manager import DebugManager
 
-# Parameters
-from .modules.Parameters.Movement_parameters import(RUN_ACCEL, WALK_ACCEL, MAX_WALK_SPEED, MAX_RUN_SPEED,
+from .modules.Movement_parameters import(RUN_ACCEL, WALK_ACCEL, MAX_WALK_SPEED, MAX_RUN_SPEED,
     GROUND_FRICTION, AIR_FRICTION, AIR_CONTROL, SKID_DECEL,
     GRAVITY, FAST_FALL_GRAV, MAX_FALL_SPEED)
 
-from .modules.Parameters.Jump_parameters import(JUMP_VEL_MIN, JUMP_VEL_MAX, JUMP_HOLD_FRAMES,
+from .modules.Jump_parameters import(JUMP_VEL_MIN, JUMP_VEL_MAX, JUMP_HOLD_FRAMES,
     SPEED_JUMP_BONUS, COYOTE_FRAMES, JUMP_BUFFER_FRAMES)
 
-from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
+from .modules.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
     COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE,
     COLOR_WHITE, COLOR_BLACK, COLOR_QBLOCK, COLOR_EMPTY, COLOR_ENEMY,
     COLOR_POWERUP_MUSH, COLOR_POWERUP_STAR, COLOR_COIN, COLOR_HITBOX,
     COLOR_SENSOR, COLOR_AGENT_PANEL, COLOR_STREAK, TILE_SIZE)
-
 
 # =============================================================================
 # Screen / Tile geometry
@@ -71,12 +67,10 @@ class PlatformerCore:
         
         # -------- Config knobs ----------------------------
         
-        # 1. Initialize Config Manager
-        self.config_manager = ConfigManager("game_config.yaml")
-
         # Default world and speed multiplier
         self.world = str(kwargs.pop("world", "1-1")).lower()
-        self.speed_mult = float(kwargs.pop("speed_mult", 2.0)) 
+        
+        self.speed_mult = float(kwargs.pop("speed_mult", 2.0)) # URGENT - SPEED LINES 
         
         # Ensure debug defaults to False if not in human mode to prevent popups during training
         debug_def = bool(kwargs.pop("debug_default", True))
@@ -103,6 +97,11 @@ class PlatformerCore:
         self.camera_lock = True
         
         # Anti-stall knobs
+        """
+        This implements a simple anti-stall mechanism that tracks player progress and increments
+        a stall timer when no progress is made. If the player fails to make progress within a 
+        defined number of stall windows, a life is lost.
+        """
         self.anti_stall = bool(kwargs.pop("anti_stall", True))
         self.stall_window = int(kwargs.pop("stall_window", 1.5))
         self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 6))
@@ -119,11 +118,15 @@ class PlatformerCore:
         self.level_list = ["stage_1.txt", "stage_2.txt", "stage_3.txt", "stage_4.txt", "stage_5.txt", "stage_6.txt", "stage_7.txt", "stage_8.txt", "stage_9.txt", "stage_10.txt", "stage_11.txt"]
         self.current_level_idx = 0
 
-        # Note: Logic to determine level file is moved to reset() to respect Config
+        if self.level_file is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            candidate = os.path.join(base_dir, "levels", self.level_list[0])
+            if os.path.exists(candidate):
+                self.level_file = candidate
 
         self.player_start = (100.0, 350.0)
 
-        # Apply speed multiplier (These are now used as fallbacks or overrides)
+        # Apply speed multiplier - URGENT - SPEED LINES
         self.run_accel = RUN_ACCEL * self.speed_mult
         self.walk_accel = WALK_ACCEL * self.speed_mult
         self.max_walk = MAX_WALK_SPEED * self.speed_mult
@@ -137,6 +140,11 @@ class PlatformerCore:
         self.qblocks: List[QuestionBlock] = []
         
         # --- DUAL HASHING Setup ---
+        """
+        Spatial hashing for efficient collision detection. 
+        Works by dividing the game world into a grid of cells and 
+        assigning objects to cells based on their positions.
+        """
         self.static_hash = SpatialHash(cell_size=64)
         self.dynamic_hash = SpatialHash(cell_size=64)
         
@@ -159,8 +167,9 @@ class PlatformerCore:
         self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
         self._act_space = spaces.Discrete(8)
 
-        # Video and Audio setup 
+        # Video and Audio setup (for human rendering) | (Bug) ON LINUX 
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        #os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
         pygame.init()
         
         # Set up the Canvas / Surface for rendering
@@ -198,143 +207,50 @@ class PlatformerCore:
                     return
 
     def reset(self) -> np.ndarray:
-        self.lives = self.max_lives 
+
+        self.lives = self.max_lives # Reset lives to 3
+
         self.enemies.clear(); self.powerups.clear(); self.coins.clear(); self.qblocks.clear()
+        
+        # Clear spatial hashes
         self.dynamic_hash.clear(); self.static_hash.clear()
         
-        self.score = 0; self.coins_total = 0; self.alive = True
-        self.frame = 0; self.game_over = False; self.reached_goal = False
-
-        # ==========================================================
-        # CONFIGURATION LOADING
-        # ==========================================================
-        
-        # 1. Get Merged Config (Level Specific > Defaults > Python Constants)
-        # Note: self.world is updated in complete_level() now
-        level_cfg = self.config_manager.get_level_config(self.world)
-
-        # 2. Determine Level File (YAML overrides automatic list selection)
-        if 'file' in level_cfg:
-            # FIX: os is globally imported, no local import needed
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            self.level_file = os.path.join(base_dir, "levels", level_cfg['file'])
-        else:
-            # Fallback to list index if YAML doesn't specify
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            if self.current_level_idx < len(self.level_list):
-                 self.level_file = os.path.join(base_dir, "levels", self.level_list[self.current_level_idx])
+        # Reset game specific var
+        self.score = 0
+        self.coins_total = 0
+        self.alive = True
+        self.frame = 0
+        self.game_over = False
+        self.reached_goal = False
 
         if self.level_file:
             self.level_data = self._build_level_from_txt(self.level_file)
         else:
             print("ERROR WITH LEVEL_FILE")
-            
-        # 3. Post Level Resize
+            exit
+        
+        # Post level load resize
         self._post_level_resize()
         self._find_goal_x()
-
-        # 4. Determine Player Spawn (YAML Override)
-        if 'spawn' in level_cfg:
-            s_data = level_cfg['spawn']
-            self.player_start = (float(s_data['x']), float(s_data['y']))
-
         self._create_player()
 
-        # 5. Apply Physics Overrides to Player
-        self._apply_config_to_player(level_cfg)
-        
-        # 6. Spawn Dynamic Entities (from YAML)
-        if 'dynamics' in level_cfg:
-            self._spawn_from_config(level_cfg['dynamics'])
-
-        # ==========================================================
-        # RESET METRICS
-        # ==========================================================
+        # Reset stall metrics
         self.progress_x_best = self.player.gObj.x
         self.progress_y_best = self.level_h - self.player.gObj.y
         self.stall_timer = 0
         self.stall_windows_count = 0
         self.stalled_this_frame = False
         
+        # Reset camera
         self.camera_x = 0.0; self.camera_y = 0.0
         self.last_score = 0; self.last_x = self.player.gObj.x
 
-        # Fallback: Spawn default enemies for world 1-1 if no file/dynamics provided
-        if not self.level_file and self.world == "1-1" and 'dynamics' not in level_cfg:
+        # Spawn default enemies and coins for world 1-1 if no level file is provided
+        if not self.level_file and self.world == "1-1":
             self._spawn_static_actors_for_world()
 
-        # Set Timer from Config or Default
-        self.timer = level_cfg.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
-        
+        self.timer = self.timer_seconds if self.use_timer else math.inf
         return self._obs()
-
-    def _apply_config_to_player(self, cfg):
-        """
-        Injects physics settings from the merged config into the Player object.
-        Includes defensive checks to handle 'None' values from config merge.
-        """
-        if not self.player: return
-        
-        # Physics
-        # FIX: Added 'or {}' to all .get() calls to prevent NoneType errors 
-        phys = cfg.get('physics') or {}
-        
-        self.player.gravity = phys.get('gravity', self.player.gravity)
-        self.player.fast_fall_gravity = phys.get('fast_fall_gravity', self.player.fast_fall_gravity)
-        
-        fric = phys.get('friction') or {}
-        self.player.ground_friction = fric.get('ground', self.player.ground_friction)
-        self.player.air_friction = fric.get('air', self.player.air_friction)
-
-        # Player Stats
-        p_cfg = cfg.get('player') or {}
-        
-        # Movement
-        mov = p_cfg.get('movement') or {}
-        self.player.max_run = mov.get('max_run_speed', self.player.max_run) * self.speed_mult
-        self.player.max_walk = mov.get('max_walk_speed', self.player.max_walk) * self.speed_mult
-        self.player.run_accel = mov.get('run_accel', self.player.run_accel) * self.speed_mult
-        self.player.walk_accel = mov.get('walk_accel', self.player.walk_accel) * self.speed_mult
-        self.player.air_control = mov.get('air_control', self.player.air_control)
-        
-        # Jump
-        jmp = p_cfg.get('jump') or {}
-        self.player.jump_vel_max = jmp.get('max_velocity', self.player.jump_vel_max)
-        self.player.jump_vel_min = jmp.get('min_velocity', self.player.jump_vel_min)
-
-    def _spawn_from_config(self, dynamics: dict):
-        """
-        Parses YAML dynamics and spawns entities.
-        """
-        # 1. Enemies
-        if 'enemies' in dynamics:
-            for e in dynamics['enemies']:
-                x = e.get('x', 0)
-                y = e.get('y', 0)
-                vx = e.get('vx', -60.0)
-                enemy = Enemy(GameObject(x, y, 25, 20, True), vx=vx)
-                self.enemies.append(enemy)
-                self.dynamic_hash.insert(enemy)
-        
-        # 2. Coins
-        if 'coins' in dynamics:
-            for c in dynamics['coins']:
-                x = c.get('x', 0)
-                y = c.get('y', 0)
-                coin = Coin(gObj=GameObject(x, y, 16, 16, True))
-                self.coins.append(coin)
-                if not coin.collected:
-                    self.dynamic_hash.insert(coin)
-
-        # 3. Powerups
-        if 'powerups' in dynamics:
-            for p in dynamics['powerups']:
-                x = p.get('x', 0)
-                y = p.get('y', 0)
-                kind = p.get('type', 'mushroom')
-                pup = Powerup(gObj=GameObject(x, y, 20, 20, True), kind=kind)
-                self.powerups.append(pup)
-                self.dynamic_hash.insert(pup)
 
     def step(self, action: int):
         # CHECK ALIVE
@@ -354,11 +270,11 @@ class PlatformerCore:
         if self.debug_manager.slow_motion:
             self.dt *= 0.5
 
-        # FRAME & TIMER UPDATE
+        # FRAME & TIMER UPDATE -> for stall logic
         self.frame += 1
         if self.use_timer: self.timer -= self.dt
 
-        # Debug Input Update
+        # Debug Input Update (only in human mode to avoid interfering with training)
         if self.render_mode == "human":
             self.debug_manager.update_input()
 
@@ -378,6 +294,7 @@ class PlatformerCore:
         self._handle_object_collisions()
         self._update_camera()
         
+        # UPDATE STALL METRICS
         if self.anti_stall:
             self._update_stall_metrics()
 
@@ -385,6 +302,14 @@ class PlatformerCore:
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
         
+        # CALCULATE REWARD
+        #reward = float(self._reward())
+        
+        # LOG FOR DEBUG
+        action_name = ACTION_NAMES.get(int(action), f"ACT_{action}")
+        #self.debug_manager.log_step(reward, action_name)
+        
+        # Build dicts for reward and agent
         info = self._info()
         if terminated: info["episode_end"] = True
         return self._obs(), 0, bool(terminated), info
@@ -403,13 +328,15 @@ class PlatformerCore:
 
     def load_level(self, idx):
         """
-        Manual level switching logic.
+        Check if level file exists and targets it
         """
-        if idx < len(self.level_list):
-            self.current_level_idx = idx
-            # Update world string for manual loads as well
-            self.world = f"1-{self.current_level_idx + 1}"
-            self.reset()
+        level_name = self.level_list[idx]
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        candidate = os.path.join(base_dir, "levels", level_name)
+        
+        if os.path.exists(candidate):
+            self.level_file = candidate
+        # else  <  error messare? or Assert
 
     def complete_level(self):
         """
@@ -417,20 +344,14 @@ class PlatformerCore:
         """
         if self.current_level_idx < len(self.level_list) - 1:
             self.current_level_idx += 1
-            
-            # FIX: Update the 'world' string (e.g., "1-1" -> "1-2")
-            # This ensures that when reset() is called by the main loop,
-            # ConfigManager loads the correct YAML configuration.
-            self.world = f"1-{self.current_level_idx + 1}"
-            
-            print(f"Level Complete! Advancing to World {self.world}")
-            # Note: We do NOT call self.reset() here.
-            # step() returns terminated=True immediately after this function.
-            # The agent/game loop is responsible for calling env.reset().
+            self.load_level(self.current_level_idx)
         else:
             print("Congratulations! All levels complete.")
 
     def _post_level_resize(self):
+        """"
+        Updates level dimensions after loading level data.
+        """
         self.level_rows = len(self.level_data) if self.level_data else 0
         self.level_cols = len(self.level_data[0]) if self.level_rows > 0 else 0
         
@@ -450,16 +371,18 @@ class PlatformerCore:
         rows = len(lines)
         cols = max(len(ln) for ln in lines) if rows else 0
         
+        # Initialize level data structures
         lvl = [[TILE_AIR for col in range(cols)] for row in range(rows)]
         self.level_tiles = [[None for col in range(cols)] for row in range(rows)]
         
+        # Clear existing spatial hash entries
         self.static_hash.clear()
         self.qblocks.clear()
         self.coins.clear()
         self.enemies.clear()
         self.powerups.clear()
         
-        # Default player start (Overridden by YAML later if exists)
+        # Default player start
         self.player_start = (100.0, 350.0)
 
         for row in range(rows):
@@ -479,6 +402,7 @@ class PlatformerCore:
                     qblock = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="coin")
                     self.qblocks.append(qblock)
                     
+                # Don't insert logic object into hash:
                 elif ascii == 'C':
                     self.coins.append(Coin(gObj=GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 16, 16, True)))
                 elif ascii == 'E':
@@ -495,32 +419,53 @@ class PlatformerCore:
                         self.static_hash.insert(new_tile)
         return lvl
 
-    def _spawn_static_actors_for_world(self):
-        for col in (26, 32, 60, 110, 140):
-            self.enemies.append(Enemy(GameObject(col * TILE_SIZE, (14-1)*TILE_SIZE, 20, 18, True), vx=-60.0))
+    # MAY NOT NEED ? 
+    # def _spawn_static_actors_for_world(self):
+    #     """
+    #     Spawns default enemies and coins for world 1-1.
+    #     """
+    #     # Spawn Enemies and Coins at hardcoded positions
+    #     for col in (26, 32, 60, 110, 140):
+    #         self.enemies.append(Enemy(GameObject(col * TILE_SIZE, (14-1)*TILE_SIZE, 20, 18, True), vx=-60.0))
         
-        for (cx, ry) in [(21, 10), (22, 10)]:
-            self.coins.append(Coin(gObj=GameObject(cx*TILE_SIZE+8, ry*TILE_SIZE+8, 16, 16, True)))
+    #     for (cx, ry) in [(21, 10), (22, 10)]:
+    #         self.coins.append(Coin(gObj=GameObject(cx*TILE_SIZE+8, ry*TILE_SIZE+8, 16, 16, True)))
 
     def _create_player(self):
+        """
+        Initializes the player at the starting position.
+        """
         x, y = self.player_start
         self.player = Player(gObj=GameObject(float(x), float(y), PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
 
     def _handle_action(self, a: int):
+        # Prevent player movement processing if free cam is active
+        # This forcefully ignores any key presses the Player class might be reading internally
         if self.debug_manager.free_cam_active:
             self.player.vx = 0.0
             self.player.jump_hold = 0
+            
             return 
+        
         self.player.handle_input(a = a)
 
+    #
     def _update_physics(self, dt: float):
+        """
+        Updates player physics and resolves tile collisions.
+        """
         self.player.update(dt)
         self._resolve_player_tiles()
 
+    # don't think nessessary remove in refactor
     def _is_solid(self, t: int) -> bool:
         return t in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK)
 
     def _tile_rects_near(self, obj: GameObject):
+        """"
+        Returns list of solid tile rects near the given object.
+        """
+        # Optimized grid lookup for Player physics
         tx0 = max(0, int(obj.x // TILE_SIZE) - 1)
         tx1 = min(self.level_cols, int((obj.x + obj.width) // TILE_SIZE) + 2)
         ty0 = max(0, int(obj.y // TILE_SIZE) - 1)
@@ -534,11 +479,17 @@ class PlatformerCore:
         return out
 
     def _resolve_player_tiles(self):
+        """
+        gets tiles near player and check and resolve collisions with all them
+        """
         player = self.player  
         prect = player.gObj.get_rect()
         for (row, col, trect, type_tile) in self._tile_rects_near(player.gObj):
+        #for (r, c, trect, tt) in self.static_hash.query(prect):  URGENT SWITCH TO DYNAMIC FOR QUERY
             if not prect.colliderect(trect): continue
-            
+            """
+            Check where the player is compared to the collision tile
+            """
             obj_x = min(prect.right - trect.left, trect.right - prect.left)
             obj_y = min(prect.bottom - trect.top, trect.bottom - prect.top)
             
@@ -559,8 +510,11 @@ class PlatformerCore:
             prect = player.gObj.get_rect()
 
     def _hit_qblock(self, col: int, row: int):
+        """
+        Resolve if player hit question block hit to spawn coins or power up
+        """
         for block in self.qblocks:
-            block_col, block_row = block.tc()
+            block_col, block_row = b.tc()
             if block_col == col and block_row == row and not block.hit:
                 block.hit = True
                 spawn_x, spawn_y = col * TILE_SIZE, row * TILE_SIZE - 22
@@ -574,6 +528,9 @@ class PlatformerCore:
                 break
 
     def _update_objects(self, dt: float):
+        """
+        Calls updates for all game objects
+        """
         for enemy in self.enemies:
             if enemy.gObj.active:
                 nearby = self.static_hash.query(enemy)
@@ -593,27 +550,34 @@ class PlatformerCore:
                     self.coins_total += 1; self.coins_step += 1; self.score += 10
     
     def _resolve_enemy_tiles(self, enemy: Enemy):
+        """
+        resolve collisions for enemies
+        """
         rect = enemy.gObj.get_rect()
         nearby_objects = self.dynamic_hash.query(enemy)
         
         for other in nearby_objects:
+            # Only process Enemy objects (skip coins, powerups, etc.)
             if not isinstance(other, Enemy):
                 continue
+            # Skip self-collision
             if other is enemy or not other.gObj.active:
                 continue
             other_rect = other.gObj.get_rect()
             if not rect.colliderect(other_rect):
                 continue
-            
+            # Calculate overlap amounts
             obj_x = min(rect.right - other_rect.left, other_rect.right - rect.left)
             obj_y = min(rect.bottom - other_rect.top, other_rect.bottom - rect.top)
             if obj_x < obj_y:
+                # Horizontal collision - push apart and bounce
                 if rect.centerx < other_rect.centerx:
                     enemy.gObj.x = other_rect.left - enemy.gObj.width
                 else:
                     enemy.gObj.x = other_rect.right
                 enemy.vx *= -1.0
             else:
+                # Vertical collision - stack or separate vertically
                 if rect.centery < other_rect.centery:
                     enemy.gObj.y = other_rect.top - enemy.gObj.height
                 else:
@@ -622,6 +586,9 @@ class PlatformerCore:
             rect = enemy.gObj.get_rect()
             
     def _handle_object_collisions(self):
+        """
+        Resolve player & enemy collisions
+        """
         player = self.player
         moving_down = player.vy > 0
         
@@ -636,17 +603,22 @@ class PlatformerCore:
                     enemy_center = enemy.gObj.y + enemy.gObj.height/2
                     
                     if player_bottom < enemy_center + 10 and moving_down:
+                        # Platformer jumped on enemy
                         enemy.gObj.active = False
-                        player.vy = player.jump_vel_min * 0.6 
+                        player.vy = JUMP_VEL_MIN * 0.6
                         self.score += 100; self.kills_step += 1
                     elif player.invincible_timer > 0:
+                        # Star power
                         enemy.gObj.active = False
                         self.score += 100; self.kills_step += 1
                     else:
+                        # Lost powerup
                         if player.powered_up:
                             player.powered_up = False; player.invincible_timer = 60
                         else:
-                            self._handle_death() 
+                            # DIED TO ENEMY
+                            self._handle_death() # If lives > 0, we just respawned. 
+                            # We return immediately to prevent physics glitches this frame.
                             return
 
             elif isinstance(obj, Coin):
@@ -666,46 +638,67 @@ class PlatformerCore:
                         player.invincible_timer = 300; self.score += 100
 
     def _handle_death(self):
+        """
+        Called when player hits an enemy, pit, or time runs out.
+        """
         self.lives -= 1
         
+        
         if self.lives > 0:
+            # We have lives left, reset the level state but keep score
             self._soft_reset()
         else:
+            # No lives left, actual Game Over
             self.alive = False
             self.game_over = True
 
     def _soft_reset(self):
+        """
+        Resets player, enemies, and timer for a respawn.
+        Keeps score and collected coin count.
+        """
+        # 1. Clear dynamic entities
         self.enemies.clear(); self.powerups.clear(); self.coins.clear(); self.qblocks.clear()
         self.dynamic_hash.clear(); self.static_hash.clear()
         
+        # 2. Re-read level data (to respawn enemies and blocks)
         if self.level_file:
             self.level_data = self._build_level_from_txt(self.level_file)
-        
-        level_cfg = self.config_manager.get_level_config(self.world)
-        if 'dynamics' in level_cfg:
-            self._spawn_from_config(level_cfg['dynamics'])
+        elif self.world == "1-1":
+            self._spawn_static_actors_for_world()
 
+        # 3. Reset Player Position
         self._create_player()
-        self._apply_config_to_player(level_cfg)
-        
-        self._post_level_resize() 
+        self._post_level_resize() # Ensure grids are ready
 
-        self.timer = level_cfg.get('time_limit', self.timer_seconds)
+        # 4. Reset Timer & Camera
+        self.timer = self.timer_seconds
         self.camera_x = 0.0
         self.camera_y = 0.0
         
+        # 5. Reset stalling logic
         self.stall_timer = 0
         self.stall_windows_count = 0
         self.stalled_this_frame = False
         self.progress_x_best = self.player.gObj.x
 
     def _update_camera(self):
+        """
+        Resolve Camera Movement Mode:
+            - Default player follow
+            - Free Cam Debug Mode
+        """
+        # 1. Check Free Cam Mode
         if self.debug_manager.free_cam_active:
              movement_x, movement_y = self.debug_manager.current_cam_move
              self.camera_x += movement_x * self.dt
              self.camera_y += movement_y * self.dt
+             
+             # Removed clamping in Free Cam mode so you can fly Up/Down 
+             # outside the normal level boundaries.
              return
 
+        # 2. Else Follow Player
         if not self.camera_lock or not self.player: 
             return
         
@@ -721,11 +714,20 @@ class PlatformerCore:
         self.camera_y = max(0, min(self.camera_y, max(0, self.level_h - self.HEIGHT)))
 
     def _progress_components(self):
+        """"
+        Returns the player's progress in X and Y directions.
+        """
         if not self.player: 
             return 0.0, 0.0
         return self.player.gObj.x, self.level_h - self.player.gObj.y
 
     def _update_stall_metrics(self):
+        ''''
+        Updates stall timer and progress metrics.
+        1. Checks if player has made progress in X or Y direction.
+        2. If progress made, reset stall timer.
+        3. If no progress, increment stall timer.
+        '''
         if not self.anti_stall or not self.player: 
             return
         prog_x, prog_y = self._progress_components()
@@ -752,11 +754,15 @@ class PlatformerCore:
             self.stall_windows_count += 1
 
     def _check_termination(self) -> bool:
+        """
+        Checks for various end states (Timer, Player death, Goal reached etc)
+        """
         player = self.player
         
         # 1. TIME LIMIT CHECK
         if self.use_timer and self.timer <= 0:
             self._handle_death()
+            # If we still have lives, we are NOT terminated yet
             return not self.alive 
 
         # 2. PIT CHECK
@@ -777,14 +783,24 @@ class PlatformerCore:
             self._handle_death()
             return not self.alive
 
-        # 5. ANTI-STALL
+        # 5. ANTI-STALL (Optional: decide if stall kills a life or ends game)
+        # now triggers death instead of immediate termination
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
             self._handle_death()
             return not self.alive
 
         return False
 
+
     def _obs(self) -> np.ndarray:
+        """"
+        Constructs the observation vector for the current game state.
+        Combines player state, tile window, and object proximities.
+        1. Player State: position, velocity, on_ground
+        2. Tile Window: 11x9 grid of tiles around player + coin/enemy maps
+        3. Object Proximities: nearest enemy/coin distances + player status
+        4. Additional Info: score, coins, frame ratio
+        """
         out: List[float] = []
         out.extend(self._player_obs())
         out.extend(self._tile_window_obs())
@@ -792,6 +808,15 @@ class PlatformerCore:
         return np.array(out, dtype=np.float32)
 
     def _player_obs(self) -> List[float]:
+        """
+        Returns normalized player state observations.
+        1. X Position / Level Width
+        2. Y Position / Level Height
+        3. X Velocity / Max Run Speed
+        4. Y Velocity / Max Fall Speed
+        5. On Ground (1.0 or 0.0)
+        5 total values
+        """
         player = self.player
         level_width = max(1.0, float(self.level_w))
         level_height = max(1.0, float(self.level_h))
@@ -805,6 +830,16 @@ class PlatformerCore:
         ]
         
     def _tile_window_obs(self) -> List[float]:
+        """
+        Returns tile window observations around the player.
+        1. 11x9 Tile Types (121 values)
+        2. 11x9 Coin Presence Map (121 values)
+        3. 11x9 Enemy Presence Map (121 values)
+        Total: 363 values
+        
+        Normalized as floats:
+        0.0 for empty/out-of-bounds, 1.0 for presence
+        """
         player = self.player
         player_x = int(player.gObj.x // TILE_SIZE)
         player_y = int(player.gObj.y // TILE_SIZE)
@@ -827,9 +862,28 @@ class PlatformerCore:
         return tiles + coins_map + enemies_map
 
     def _object_obs(self) -> List[float]:
+        """
+        Returns object proximity and player status observations.
+        1. Nearest Enemy Distance (normalized)
+        2. Nearest Coin Distance (normalized)
+        3. Powered Up (1.0 or 0.0)
+        4. Invincible Timer / Max Invincible Time
+        5. Active Enemies Count / 10.0
+        6. Active Coins Count / 10.0
+        7. Active Powerups Count / 5.0
+        8. Total Coins Collected / 10.0
+        9. Score / 1000.0
+        10. Frame / Max Steps (or large number if unlimited)
+        """
+        
+        
         player = self.player
         
         def nearest(objs):
+            """
+            Returns nearest distance to any object in objs from player.
+            Normalized by dividing by 1000.0
+            """
             min_dis = 1000.0
             for obj in objs:
                 if getattr(obj, "active", True):
@@ -840,7 +894,17 @@ class PlatformerCore:
         min_enemy = nearest([enemy.gObj for enemy in self.enemies if enemy.gObj.active])
         min_coin  = nearest([coin.gObj for coin in self.coins if coin.gObj.active and not coin.collected])
         
+        # LOGIC: (Player X - Goal X) / Normalization Factor
+        # We divide by level_width so the value is usually between -1.0 and 0.0
+        level_w = max(1.0, float(self.level_w))
+        goal_x = getattr(self, "goal_x", level_w)
         dist_to_goal = (self.level_w - player.gObj.x) / max(1.0, float(self.level_w))
+        
+        # This gives:
+        # -0.9 = Far left
+        # -0.1 = Close
+        #  0.0 = On Goal
+        # +0.1 = Oversho
         
         return [ 
             min_enemy, min_coin, dist_to_goal,
@@ -873,10 +937,28 @@ class PlatformerCore:
             "max_x_seen": self.max_x_seen, 
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
-            "persona": self.persona
+            "persona": self.persona # Expose current persona for debug tools
         }
+        # get object-based distances (this is already computed elsewhere)
+        # minenemy, mincoin, disttogoal, powered_norm, invinc_norm, ...
+        minenemy, mincoin, disttogoal, powered_norm, invinc_norm, enemies_norm, coins_norm, powerups_norm, coins_total_norm, score_norm, frame_norm = self.objectobs()  # or reuse your helper that returns these values [file:1]
+
+        levelw = max(1.0, float(self.levelw))
+        # distance to goal in world units (x)
+        # goalx is set by findgoalx during reset [file:1]
+        raw_dist_to_goal = max(0.0, self.goalx - p.gObj.x)
+        # normalized 0..1, 1.0 when at start, 0.0 when at goal
+        dist_to_goal_norm = raw_dist_to_goal / levelw
+
+        info["dist_to_goal"] = raw_dist_to_goal
+        info["dist_to_goal_norm"] = dist_to_goal_norm
+        info["nearest_enemy_dist"] = minenemy
+        info["nearest_coin_dist"] = mincoin
+
         return info
         
+
+    #depretiated?
     def _tile_at(self, x: float, y: float) -> int:
         col = int(x // TILE_SIZE)
         row = int(y // TILE_SIZE)
@@ -884,7 +966,13 @@ class PlatformerCore:
             return self.level_data[row][col]
         return TILE_AIR
 
+    # ---------------------------------------------------------------------
+    # Rendering
+    # ---------------------------------------------------------------------
     def render(self, surface: pygame.Surface, blit_only: bool = True):
+        """
+        Render all entities and overlays
+        """
         surface.fill(COLOR_SKY)
         
         self._draw_world_from_hash(surface)
@@ -893,6 +981,7 @@ class PlatformerCore:
         
         self._update_debug_key_toggles()
         # DELEGATE DEBUG RENDERING TO THE MANAGER
+        # This fixes the AttributeError: 'PlatformerCore' object has no attribute 'db_sensors'
         if self.debug_manager.show_hitboxes or self.debug_manager.show_sensors or \
            self.debug_manager.show_agent_view or self.debug_manager.show_obs_panel or \
            self.debug_manager.show_grid:
@@ -901,10 +990,17 @@ class PlatformerCore:
         self._draw_ui(surface)
 
     def _draw_world_from_hash(self, surface: pygame.Surface):
+        """
+        Helper function for render() draws static hash block within window rect
+        """
         visible_tiles = self.static_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)
+        
         for tile in visible_tiles:
-            if tile.x + tile.width < self.camera_x or tile.x > self.camera_x + self.WIDTH: continue
-            if not hasattr(tile, "type_id"): continue
+            if tile.x + tile.width < self.camera_x or tile.x > self.camera_x + self.WIDTH: 
+                continue
+            
+            if not hasattr(tile, "type_id"): 
+                continue
             
             if tile.type_id == TILE_QBLOCK:
                 self._draw_qblock(surface, tile)
@@ -912,6 +1008,9 @@ class PlatformerCore:
                 tile.render(surface, self.camera_x, self.camera_y)
 
     def _draw_qblock(self, surface: pygame.Surface, tile: Tile):
+        """
+        Helper function for q block render << move to q block module
+        """
         col, row = int(tile.x // TILE_SIZE), int(tile.y // TILE_SIZE)
         hit = False
         for qb in self.qblocks:
@@ -930,6 +1029,9 @@ class PlatformerCore:
             surface.blit(q, q.get_rect(center=(sx + TILE_SIZE // 2, sy + TILE_SIZE // 2)))
 
     def _draw_entities_from_hash(self, surface: pygame.Surface):
+        """
+        Helper function for render() - Draws all entities within dynamic hash within camera rect 
+        """
         visible_objs = self.dynamic_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)
         for obj in visible_objs:
             if obj.x + obj.width < self.camera_x or obj.x > self.camera_x + self.WIDTH: continue
@@ -950,9 +1052,28 @@ class PlatformerCore:
         colour = COLOR_POWERUP_STAR if (player.invincible_timer > 0 and (self.frame // 5) % 2) else \
               ((255, 100, 0) if player.powered_up else (255, 0, 0))
         player.color = colour
+        # Fix: use debug_manager flag instead of self.db_sensors
         player.render(surface, screen_x, screen_y, self.debug_manager.show_sensors)
 
+        # speed line - Urgent move to render in player
+        # if p.run_pressed and abs(p.vx) > self.max_walk * 0.6:
+        #     n = 3; spacing = 6; length = 10
+        #     for i in range(n):
+        #         offset = (i + 1) * spacing
+        #         if p.facing_right: x1 = sx - offset; x2 = x1 - length
+        #         else: x1 = sx + p.gObj.width + offset; x2 = x1 + length
+        #         y = sy + 10 + (i % 2) * 4
+        #         pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
+    
+    # Removed _draw_debug since it's now handled by DebugManager
+
     def _draw_ui(self, surface: pygame.Surface):
+        """"
+        Helper function for Render() - Draws UI elements
+        1. Lives, Score, Coins, Powerup Status, Time
+        2. Timer with warning color if low    
+        """
+        # Helper function for Render() - Draws UI elements
         player = self.player
         font = self.ui_font
         
@@ -964,6 +1085,7 @@ class PlatformerCore:
         
         x = 5
         y = 5
+        # Fix: use debug_manager flag
         if self.debug_manager.show_obs_panel: y = self.HEIGHT - text_stats.get_height() - 10
         
         ui_background = pygame.Surface((text_stats.get_width() + 10, text_stats.get_height() + 6), pygame.SRCALPHA)
@@ -974,7 +1096,7 @@ class PlatformerCore:
         if self.use_timer:
             timer_s = math.ceil(self.timer)
             text_color = (255, 80, 80) if timer_s <= self.timer_warn_threshold else COLOR_WHITE
-            text_font = self.ui_font 
+            text_font = self.ui_font # Use the unified font
             timer_text = text_font.render(f"TIME {timer_s:03d}", True, text_color)
             text_pos_x = self.WIDTH - timer_text.get_width() - 5
             text_background = pygame.Surface((timer_text.get_width() + 10, timer_text.get_height() + 6), pygame.SRCALPHA)
@@ -994,4 +1116,5 @@ class PlatformerCore:
                 screen_x + gObj.width > 0 and
                 screen_y < SCREEN_HEIGHT and
                 screen_y + gObj.height > 0)
+        
         return screen_x, screen_y, on_screen

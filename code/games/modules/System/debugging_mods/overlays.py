@@ -1,6 +1,6 @@
 import pygame
-from ..Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL,COLOR_HITBOX, COLOR_STREAK)
-# Assuming these imports exist based on your provided code structure
+from code.games.modules.Parameters.Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL,COLOR_HITBOX, COLOR_STREAK)
+
 # If not, ensure TILE_SIZE etc are available.
 
 class DebugOverlay:

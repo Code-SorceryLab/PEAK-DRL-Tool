@@ -24,12 +24,15 @@ if args.game == "platformer":
     os.environ["MARIO_MANUAL_PLAY"] = "1"
 
 # --- Load game core class dynamically
-try:
-    game_mod = importlib.import_module(f"code.games.{args.game}_core")
-    GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
-except ImportError:
-    print(f"Error: Could not load game module 'code.games.{args.game}_core'.")
-    exit(1)
+game_mod = importlib.import_module(f"code.games.{args.game}_core")
+GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
+
+# try:
+#     game_mod = importlib.import_module(f"code.games.{args.game}_core")
+#     GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
+# except ImportError:
+#     print(f"Error: Could not load game module 'code.games.{args.game}_core'.")
+#     exit(1)
 
 # --- Init pygame BEFORE key handling
 pygame.init()
