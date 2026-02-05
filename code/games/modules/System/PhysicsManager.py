@@ -149,14 +149,22 @@ class PhysicsManager:
 
     def resolve_collisions(self, core):
         level_data = core.level_data
+        player = core.player
         
-        # 1. Resolve Static World Collisions (Walls/Floors)
+        # 1. FIX: Capture falling state BEFORE world collision resets vy to 0.
+        # This ensures that even if we hit the ground in this frame, we know
+        # we were coming down, allowing stomps to register.
+        player_was_falling = False
+        if player:
+            player_was_falling = player.vy > 0
+
+        # 2. Resolve Static World Collisions (Walls/Floors)
         self._resolve_player_world(core, level_data)
         self._resolve_enemy_world(core, level_data)
         self._resolve_powerup_world(core, level_data)
 
-        # 2. Resolve Dynamic Entity Interactions
-        self._resolve_dynamic_interactions(core)
+        # 3. Resolve Dynamic Entity Interactions
+        self._resolve_dynamic_interactions(core, player_was_falling)
 
     # --- WORLD COLLISION IMPLEMENTATION ---
 
@@ -182,6 +190,15 @@ class PhysicsManager:
         ent_rect = entity.gObj.get_rect()
         for (_, _, tile_rect, _) in nearby_tiles:
             if ent_rect.colliderect(tile_rect):
+                # Calculate overlaps to determine if this is actually a wall hit
+                ox = min(ent_rect.right - tile_rect.left, tile_rect.right - ent_rect.left)
+                oy = min(ent_rect.bottom - tile_rect.top, tile_rect.bottom - ent_rect.top)
+                
+                # If X overlap is smaller than Y, it's a wall. 
+                # Don't resolve Y here, let the X-pass handle it.
+                if ox < oy: 
+                    continue
+
                 # Calculate Y overlap
                 if entity.vy >= 0: # Falling/Ground
                     if ent_rect.bottom >= tile_rect.top:
@@ -205,12 +222,16 @@ class PhysicsManager:
                 if ox < oy:
                     if entity.vx > 0: # Moving Right
                         entity.gObj.x = tile_rect.left - entity.gObj.width
-                        if bounce_x: entity.vx *= -1
-                        else: entity.vx = 0
+                        if bounce_x: 
+                            entity.vx *= -1
+                        else: 
+                            entity.vx = 0
                     elif entity.vx < 0: # Moving Left
                         entity.gObj.x = tile_rect.right
-                        if bounce_x: entity.vx *= -1
-                        else: entity.vx = 0
+                        if bounce_x: 
+                            entity.vx *= -1
+                        else: 
+                            entity.vx = 0
                     ent_rect = entity.gObj.get_rect()
 
     def _resolve_player_world(self, core, level_data):
@@ -247,19 +268,22 @@ class PhysicsManager:
 
     # --- DYNAMIC COLLISIONS ---
 
-    def _resolve_dynamic_interactions(self, core):
+    def _resolve_dynamic_interactions(self, core, player_was_falling):
         player = core.player
         if not player: return
 
+        # Use the passed 'player_was_falling' boolean which represents
+        # the physics state BEFORE wall/floor resolution.
+        
         nearby_hazards = self.hazard_hash.query(player)
         for obj in nearby_hazards:
             if player.gObj.collides_with(obj.gObj):
-                self._dispatch_collision(core, player, obj)
+                self._dispatch_collision(core, player, obj, player_was_falling)
         
         nearby_items = self.collectible_hash.query(player)
         for obj in nearby_items:
             if player.gObj.collides_with(obj.gObj):
-                self._dispatch_collision(core, player, obj)
+                self._dispatch_collision(core, player, obj, player_was_falling)
 
         for enemy in core.level_data.enemies:
             if not enemy.gObj.active: continue
@@ -270,7 +294,7 @@ class PhysicsManager:
                         if enemy.gObj.collides_with(other.gObj):
                             self._dispatch_collision(core, enemy, other)
 
-    def _dispatch_collision(self, core, source, target):
+    def _dispatch_collision(self, core, source, target, player_was_falling=False):
         s_type = source.gObj.type_id if hasattr(source.gObj, 'type_id') else EntityType.NONE
         t_type = target.gObj.type_id if hasattr(target.gObj, 'type_id') else EntityType.NONE
         
@@ -280,7 +304,7 @@ class PhysicsManager:
         match s_type:
             case EntityType.PLAYER:
                 if t_type == EntityType.ENEMY:
-                    self._handle_player_enemy(core, source, target)
+                    self._handle_player_enemy(core, source, target, player_was_falling)
                 elif t_type == EntityType.COIN:
                     self._handle_player_coin(core, source, target)
                 elif t_type == EntityType.POWERUP:
@@ -300,28 +324,39 @@ class PhysicsManager:
 
     # --- SPECIFIC HANDLERS ---
 
-    def _handle_player_enemy(self, core, player, enemy):
+    def _handle_player_enemy(self, core, player, enemy, player_was_falling):
+        if not enemy.gObj.active: 
+            return
+        
+        moving_down = player_was_falling 
+        
         player_bottom = player.gObj.y + player.gObj.height
         enemy_center = enemy.gObj.y + enemy.gObj.height/2
-        moving_down = player.vy > 0
         
-        jump_bounce = self.context.JUMP_VEL_MIN * 0.6
-
+        # Check if we are above the enemy center and moving down (stomping)
         if player_bottom < enemy_center + 10 and moving_down:
+            # Platformer jumped on enemy
             enemy.gObj.active = False
-            player.vy = jump_bounce
+            # Bounce player
+            player.vy = JUMP_VEL_MIN * 0.6 
+            self.context.score = getattr(core, 'score', 0) + 100 # Safety attr check
             core.score += 100
-            core.kills_step += 1
+            
+            if hasattr(core, 'kills_step'): core.kills_step += 1
+            
         elif player.invincible_timer > 0:
+            # Star power
             enemy.gObj.active = False
             core.score += 100
-            core.kills_step += 1
+            if hasattr(core, 'kills_step'): core.kills_step += 1
         else:
+            # Lost powerup or Died
             if player.powered_up:
                 player.powered_up = False
                 player.invincible_timer = 60
             else:
                 core._handle_death()
+                return
 
     def _handle_player_coin(self, core, player, coin):
         if not coin.collected:
@@ -342,14 +377,36 @@ class PhysicsManager:
             core.score += 100
 
     def _handle_enemy_enemy(self, core, e1, e2):
-        r1 = e1.gObj.get_rect()
-        r2 = e2.gObj.get_rect()
+        enemy = e1
+        other = e2        
+        rect = enemy.gObj.get_rect()
+        other_rect = other.gObj.get_rect()
         
-        if r1.centerx < r2.centerx:
-            e1.gObj.x = r2.left - e1.gObj.width
+        # Calculate overlap amounts
+        obj_x = min(rect.right - other_rect.left, other_rect.right - rect.left)
+        obj_y = min(rect.bottom - other_rect.top, other_rect.bottom - rect.top)
+        
+        if obj_x < obj_y:
+            # Horizontal collision - push apart and bounce
+            if rect.centerx < other_rect.centerx:
+                enemy.gObj.x = other_rect.left - enemy.gObj.width
+            else:
+                enemy.gObj.x = other_rect.right
+            
+            # Bounce both to prevent sticking and ghosting
+            enemy.vx *= -1.0
+            other.vx *= -1.0
+            
         else:
-            e1.gObj.x = r2.right
-        e1.vx *= -1.0
+            # Vertical collision - STACKING
+            if rect.centery < other_rect.centery:
+                # 'enemy' is on top of 'other'
+                enemy.gObj.y = other_rect.top - enemy.gObj.height
+                enemy.vy = 0 # Land on top
+            else:
+                # 'enemy' hit 'other' from below
+                enemy.gObj.y = other_rect.bottom
+                enemy.vy = 0
 
     # --- HELPERS ---
 
@@ -386,8 +443,6 @@ class PhysicsManager:
         nearby_objects = level_data.static_hash.query(obj)
         out = []
         for item in nearby_objects:
-            # FIX: Check 'solid' on the wrapper (Tile), NOT the inner gObj (GameObject)
-            # GameObject does not have 'solid' attribute, so it always defaulted to False.
             if not getattr(item, 'solid', False): continue
             
             rect = item.gObj.get_rect()

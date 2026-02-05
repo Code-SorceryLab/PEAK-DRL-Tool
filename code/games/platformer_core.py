@@ -215,14 +215,14 @@ class PlatformerCore:
             self.lives = self.max_lives 
             self.score = 0
             self.coins_total = 0
+        self.load_level()
+        return self._obs()
+
+    def load_level(self):
         self.alive = True
         self.frame = 0
         self.game_over = False
         self.reached_goal = False
-        self.load_level(self.current_index_world)
-        return self._obs()
-
-    def load_level(self, idx):
         # 1. LOAD CONFIG & LEVEL
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
@@ -281,6 +281,7 @@ class PlatformerCore:
             print("all levels done") # As requested
             self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
+        self.load_level()
     
     def _handle_death(self):
         self.lives -= 1
@@ -292,7 +293,7 @@ class PlatformerCore:
 
     def _soft_reset(self):
         current_lives = self.lives
-        self.reset()
+        self.load_level()
         self.lives = current_lives
 
     def _update_camera(self):
@@ -357,9 +358,10 @@ class PlatformerCore:
             tile_val = self.level_data.grid[row][col]
             if tile_val == TILE_GOAL:
                 self.score += 1000 + (int(self.timer) * 10)
-                self.alive = False; self.reached_goal = True
+                self.alive = False
+                self.reached_goal = True
                 self.complete_level()
-                return True
+                return False
             if tile_val == TILE_SPIKE:
                 self._handle_death()
                 return not self.alive
