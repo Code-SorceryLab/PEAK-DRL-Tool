@@ -24,6 +24,7 @@ from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager 
 from .modules.System.debugging_mods.manager import DebugManager
+from .modules.System.SpriteManager import SpriteManager
 
 # Parameters
 from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
@@ -121,12 +122,27 @@ class PlatformerCore:
         self._act_space = spaces.Discrete(8)
 
         # Pygame Init
-        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-        pygame.init()
-        self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
+        if self.render_mode == "human":
+            pygame.init()
+            # We initiate the window here if human
+            pygame.display.set_caption("PEAK Platformer")
+            self._surf = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        else:
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            pygame.init()
+            self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
+
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
-
+        
+        # SPRITE MANAGER
+        core_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_dir = os.path.join(core_dir, "assets")
+    
+        print(f"[DEBUG] Loading Assets from: {assets_dir}") 
+        self.sprite_manager = SpriteManager(assets_dir, sprite_width=32, sprite_height=32, scale=1.5)
+        
+        
         self.reset()
 
     def _load_reward_fn(self, persona_name):
@@ -152,7 +168,8 @@ class PlatformerCore:
             self.time_last_step = time_curr_step
             self.dt = min(raw_dt, 0.05)
             
-        if self.debug_manager.slow_motion: self.dt *= 0.5
+        if self.debug_manager.slow_motion: 
+            self.dt *= 0.5
 
         # Frame Updates
         self.frame += 1
@@ -234,7 +251,7 @@ class PlatformerCore:
             px = float(config['spawn'].get('x', px))
             py = float(config['spawn'].get('y', py))
             
-        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
+        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True), sprite_manager=self.sprite_manager)
 
         # 3. CONFIGURE PHYSICS
         self.physics_manager.reset_to_defaults()
