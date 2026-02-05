@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .GameObject import GameObject
 import pygame
 
@@ -7,9 +7,7 @@ import pygame
 from ..Parameters import Movement_parameters as MP
 from ..Parameters import Jump_parameters as JP
 from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR
-
-# FIX: HelperFunctions is in System, not Objects
-from ..System.HelperFunctions import _world_to_screen
+from ..System.PhysicsManager import PhysicsContext
 
 @dataclass
 class Player():
@@ -35,38 +33,23 @@ class Player():
     run_held: bool = False
     jump_pressed: bool = False
     
-    # --- DYNAMIC PHYSICS PARAMETERS ---
-    gravity: float = MP.GRAVITY
-    fast_fall_gravity: float = MP.FAST_FALL_GRAV
-    max_fall_speed: float = MP.MAX_FALL_SPEED
+    # NOTE: Physics parameters removed. 
+    # They are now accessed directly from the PhysicsContext passed to update()
     
-    run_accel: float = MP.RUN_ACCEL
-    walk_accel: float = MP.WALK_ACCEL
-    max_run: float = MP.MAX_RUN_SPEED
-    max_walk: float = MP.MAX_WALK_SPEED
-    air_control: float = MP.AIR_CONTROL
-    
-    ground_friction: float = MP.GROUND_FRICTION
-    air_friction: float = MP.AIR_FRICTION
-    
-    jump_vel_max: float = JP.JUMP_VEL_MAX
-    jump_vel_min: float = JP.JUMP_VEL_MIN
-    jump_hold_frames: int = JP.JUMP_HOLD_FRAMES
-    coyote_frames: int = JP.COYOTE_FRAMES
-    jump_buffer_frames: int = JP.JUMP_BUFFER_FRAMES
-    
-    def update(self, dt: float):
+    def update(self, dt: float, context: PhysicsContext):
         self.dt = dt
+        
         # 1. Handle Timers
         if self.invincible_timer > 0:
             self.invincible_timer -= dt
         
         # 2. Apply Input-based Physics
-        self.apply_physics(dt)
+        self.apply_physics(dt, context)
 
         # 3. Apply Gravity
-        grav = self.fast_fall_gravity if self.vy > 0 else self.gravity
-        self.vy = min(self.vy + (grav * dt), self.max_fall_speed)
+        # Retrieve gravity values directly from context
+        grav = context.FAST_FALL_GRAV if self.vy > 0 else context.GRAVITY
+        self.vy = min(self.vy + (grav * dt), context.MAX_FALL_SPEED)
 
         # 4. Apply Velocity to Position
         self.gObj.x += self.vx * dt
@@ -99,51 +82,62 @@ class Player():
         else: self.input_dir = 0
             
         if self.jump_pressed:
-            self.jump_buffer = self.jump_buffer_frames
+            # We assume context values for buffering might be needed, 
+            # but usually buffer length is static or context-derived in update.
+            # For simplicity, we just set the counter here, logic handles it in physics.
+            self.jump_buffer = 6 # Default fallback, overwritten in apply_physics logic if needed
 
-    def apply_physics(self, dt: float):
+    def apply_physics(self, dt: float, ctx: PhysicsContext):
+        # 1. Movement params from Context
         if self.run_held:
-            target_max = self.max_run
-            accel_rate = self.run_accel
+            target_max = ctx.MAX_RUN_SPEED
+            accel_rate = ctx.RUN_ACCEL
         else:
-            target_max = self.max_walk
-            accel_rate = self.walk_accel
+            target_max = ctx.MAX_WALK_SPEED
+            accel_rate = ctx.WALK_ACCEL
 
         if not self.on_ground:
-            accel_rate *= self.air_control
+            accel_rate *= ctx.AIR_CONTROL
 
+        # 2. Horizontal Movement Logic
         if self.input_dir != 0:
             target_vx = self.input_dir * target_max
             skidding = (self.vx > 0 and self.input_dir < 0) or (self.vx < 0 and self.input_dir > 0)
             
             if self.on_ground and skidding:
-                self.vx += (self.input_dir * MP.SKID_DECEL * dt)
+                self.vx += (self.input_dir * ctx.SKID_DECEL * dt)
             else:
                 if self.input_dir > 0: self.vx = min(self.vx + (accel_rate * dt), target_max)
                 else: self.vx = max(self.vx - (accel_rate * dt), -target_max)
             self.facing_right = (self.input_dir > 0)
         else:
-            friction = (self.ground_friction if self.on_ground else self.air_friction) * dt
+            friction = (ctx.GROUND_FRICTION if self.on_ground else ctx.AIR_FRICTION) * dt
             if self.vx > 0: self.vx = max(0, self.vx - friction)
             elif self.vx < 0: self.vx = min(0, self.vx + friction)
 
-        self.handle_jump(dt)
+        # 3. Jump Logic
+        self.handle_jump(dt, ctx)
 
-    def handle_jump(self, dt: float):
-        self.coyote = self.coyote_frames if self.on_ground else max(0, self.coyote - 1)
+    def handle_jump(self, dt: float, ctx: PhysicsContext):
+        # Update buffer using Context frames if needed, otherwise use local counter
+        if self.jump_pressed:
+            self.jump_buffer = ctx.JUMP_BUFFER_FRAMES
+
+        self.coyote = ctx.COYOTE_FRAMES if self.on_ground else max(0, self.coyote - 1)
         if self.jump_buffer > 0: self.jump_buffer -= 1
 
         if (self.coyote > 0) and (self.jump_hold == 0) and (self.jump_buffer > 0):
-            base = self.jump_vel_min
-            bonus = min(2.2, abs(self.vx) * JP.SPEED_JUMP_BONUS)
+            base = ctx.JUMP_VEL_MIN
+            bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
             self.vy = base - bonus 
             self.on_ground = False
             self.coyote = 0
-            self.jump_hold = self.jump_hold_frames
+            self.jump_hold = ctx.JUMP_HOLD_FRAMES
             self.jump_buffer = 0
 
         if self.jump_hold > 0:
             if self.jump_pressed:
+                # Variable jump height logic
                 self.vy -= 0.30 * (dt * 60) 
             self.jump_hold -= 1
                 
@@ -152,7 +146,7 @@ class Player():
         pygame.draw.circle(surface, COLOR_WHITE, (int(sx + (14 if self.facing_right else 6)), int(sy + 8)), self.eye_radius)
         if debug:
             self._debug(surface, sx, sy)
-        if self.run_pressed and abs(self.vx) > self.max_walk * 0.6:
+        if self.run_pressed and abs(self.vx) > 100: # Simple threshold
             n = 3; spacing = 6; length = 10
             for i in range(n):
                 offset = (i + 1) * spacing
@@ -164,11 +158,5 @@ class Player():
                 pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
 
     def _debug(self, surface: pygame.Surface, sx: float, sy: float):
-        rays = [((sx + self.gObj.width // 2, sy + self.gObj.height), (sx + self.gObj.width // 2, sy + self.gObj.height + 10)),
-                ((sx + self.gObj.width // 2, sy), (sx + self.gObj.width // 2, sy - 10)),
-                ((sx, sy + self.gObj.height // 2), (sx - 10, sy + self.gObj.height // 2)),
-                ((sx + self.gObj.width, sy + self.gObj.height // 2), (sx + self.gObj.width + 10, sy + self.gObj.height // 2))]
-        for a, b in rays:
-            pygame.draw.line(surface, COLOR_SENSOR, a, b, 2)
         v_end = (int(sx + (self.vx * 5* self.dt)), int(sy + (self.vy * 5 *self.dt)))
         pygame.draw.line(surface, (100, 255, 255), (int(sx + self.gObj.width / 2), int(sy + self.gObj.height / 2)), v_end, 2)

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from .GameObject import GameObject
 import pygame
 from ..Parameters import Map_parameters as MapP
+from ..Parameters import Movement_parameters as MP
 
 @dataclass
 class Coin():
@@ -27,11 +28,14 @@ class Coin():
     @property
     def active(self): return self.gObj.active
 
-    def update(self, dt: float = 0.016):
+    def update(self, dt: float = 0.016, context=None):
         if self.flyup:
+            grav = context.GRAVITY if context else MP.GRAVITY
+            
             self.gObj.y += self.vy * dt
-            self.vy += 900.0 * dt 
+            self.vy += grav * dt 
             self.life -= dt
+        
         self.animation = (self.animation + 1) % 60
 
     def render(self, surface:pygame.Surface, sx:float, sy:float, debug:bool = False):
