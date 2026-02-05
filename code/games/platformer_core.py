@@ -521,6 +521,9 @@ class PlatformerCore:
         self._draw_entities(surface)
         self._draw_player(surface) 
         
+        if self.debug_manager:
+            self.debug_manager.render_overlays(surface, self)
+        
         self._draw_ui(surface)
 
     def _draw_world(self, surface: pygame.Surface):
