@@ -139,59 +139,6 @@ class PlatformerCore:
     def get_action_space(self): return self._act_space
     def get_observation_space(self): return self._obs_space
 
-    def reset(self) -> np.ndarray:
-        self.lives = self.max_lives 
-        self.score = 0; self.coins_total = 0; self.alive = True
-        self.frame = 0; self.game_over = False; self.reached_goal = False
-
-        # 1. LOAD CONFIG & LEVEL
-        config = self.config_manager.get_level_config(self.world)
-        self.level_data = self.loader.load_level(config)
-        
-        # --- OPTIMIZATION: Prepare Numpy Grid for Observation Slicing ---
-        # Create a binary grid (1.0 for Solid, 0.0 for Air)
-        # We assume TILE_AIR is 0 or distinct from solid blocks
-        raw_grid = np.array(self.level_data.grid, dtype=np.int32)
-        self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
-        
-        # Pad the grid so we can slice the 11x9 window without boundary checks
-        # Window is 11 wide (5 left, 5 right) and 9 high (4 up, 4 down)
-        pad_y = 4 
-        pad_x = 5
-        self.padded_solid = np.pad(
-            self.solid_grid_np, 
-            ((pad_y, pad_y), (pad_x, pad_x)), 
-            mode='constant', 
-            constant_values=0.0
-        )
-        # ---------------------------------------------------------------
-        
-        # 2. CREATE PLAYER
-        px, py = self.level_data.player_start
-        if 'spawn' in config:
-            px = float(config['spawn'].get('x', px))
-            py = float(config['spawn'].get('y', py))
-            
-        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
-
-        # 3. CONFIGURE PHYSICS
-        self.physics_manager.reset_to_defaults()
-        self.physics_manager.apply_config_dict(config)
-        
-        # 4. INITIALIZE HASHES
-        self.physics_manager.rebuild_dynamic_hashes(self.level_data)
-
-        # 5. RESET METRICS
-        self.progress_x_best = self.player.gObj.x
-        self.progress_y_best = self.level_data.height - self.player.gObj.y
-        self.stall_timer = 0; self.stall_windows_count = 0; self.stalled_this_frame = False
-        self.camera_x = 0.0; self.camera_y = 0.0
-        self.last_score = 0; self.last_x = self.player.gObj.x
-
-        self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
-        
-        return self._obs()
-
     def step(self, action: int):
         if not self.alive:
             return self._obs(), 0.0, True, {"episode_end": True, "won": self.reached_goal}
@@ -246,11 +193,69 @@ class PlatformerCore:
         if terminated: info["episode_end"] = True
         return self._obs(), 0, bool(terminated), info
 
-    def load_level(self, idx):
-        if idx < 12: 
-            self.world = f"1-{idx + 1}"
-            self.reset()
+    def reset(self) -> np.ndarray:
+        if not self.reached_goal:   
+            self.lives = self.max_lives 
+            self.score = 0
+            self.coins_total = 0
+        self.alive = True
+        self.frame = 0
+        self.game_over = False
+        self.reached_goal = False
+        self.load_level(self.current_index_world)
+        return self._obs()
 
+    def load_level(self, idx):
+        # 1. LOAD CONFIG & LEVEL
+        config = self.config_manager.get_level_config(self.world)
+        self.level_data = self.loader.load_level(config)
+        
+        # --- OPTIMIZATION: Prepare Numpy Grid for Observation Slicing ---
+        # Create a binary grid (1.0 for Solid, 0.0 for Air)
+        # We assume TILE_AIR is 0 or distinct from solid blocks
+        raw_grid = np.array(self.level_data.grid, dtype=np.int32)
+        self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
+        
+        # Pad the grid so we can slice the 11x9 window without boundary checks
+        # Window is 11 wide (5 left, 5 right) and 9 high (4 up, 4 down)
+        pad_y = 4 
+        pad_x = 5
+        self.padded_solid = np.pad(
+            self.solid_grid_np, 
+            ((pad_y, pad_y), (pad_x, pad_x)), 
+            mode='constant', 
+            constant_values=0.0
+        )
+        # ---------------------------------------------------------------
+        
+        # 2. CREATE PLAYER
+        px, py = self.level_data.player_start
+        if 'spawn' in config:
+            px = float(config['spawn'].get('x', px))
+            py = float(config['spawn'].get('y', py))
+            
+        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
+
+        # 3. CONFIGURE PHYSICS
+        self.physics_manager.reset_to_defaults()
+        self.physics_manager.apply_config_dict(config)
+        
+        # 4. INITIALIZE HASHES
+        self.physics_manager.rebuild_dynamic_hashes(self.level_data)
+
+        # 5. RESET METRICS
+        self.progress_x_best = self.player.gObj.x
+        self.progress_y_best = self.level_data.height - self.player.gObj.y
+        self.stall_timer = 0
+        self.stall_windows_count = 0
+        self.stalled_this_frame = False
+        self.camera_x = 0.0
+        self.camera_y = 0.0
+        self.last_score = 0
+        self.last_x = self.player.gObj.x
+
+        self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
+        
     def complete_level(self):
         print(f"Level Complete! Current World: {self.world}")
         # --- Logic to Advance Level --
@@ -259,7 +264,6 @@ class PlatformerCore:
             print("all levels done") # As requested
             self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
-        next_config = self.config_manager.get_level_config(self.world)
     
     def _handle_death(self):
         self.lives -= 1
