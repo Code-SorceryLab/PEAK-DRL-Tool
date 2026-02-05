@@ -24,7 +24,7 @@ from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager 
 from .modules.System.debugging_mods.manager import DebugManager
-from .modules.System.SpriteManager import SpriteManager
+# from .modules.System.SpriteManager import SpriteManager
 
 # Parameters
 from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
@@ -139,8 +139,8 @@ class PlatformerCore:
         core_dir = os.path.dirname(os.path.abspath(__file__))
         assets_dir = os.path.join(core_dir, "assets")
     
-        print(f"[DEBUG] Loading Assets from: {assets_dir}") 
-        self.sprite_manager = SpriteManager(assets_dir, sprite_width=32, sprite_height=32, scale=1.5)
+#        print(f"[DEBUG] Loading Assets from: {assets_dir}") 
+#        self.sprite_manager = SpriteManager(assets_dir, sprite_width=32, sprite_height=32, scale=1.5)
         
         
         self.reset()
@@ -251,8 +251,8 @@ class PlatformerCore:
             px = float(config['spawn'].get('x', px))
             py = float(config['spawn'].get('y', py))
             
-        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True), sprite_manager=self.sprite_manager)
-
+        # self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True), sprite_manager=self.sprite_manager)
+        self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
         # 3. CONFIGURE PHYSICS
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
