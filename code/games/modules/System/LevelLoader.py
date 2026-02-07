@@ -17,6 +17,7 @@ from ..Objects.Enemy import Enemy
 from ..Objects.Coin import Coin
 from ..Objects.QuestionBlock import QuestionBlock
 from ..Objects.Powerup import Powerup
+from ..Objects.Goal import Goal
 from .SpatialHash import SpatialHash
 
 @dataclass
@@ -30,6 +31,7 @@ class LevelData:
     coins: List[Coin] = field(default_factory=list)
     qblocks: List[QuestionBlock] = field(default_factory=list)
     powerups: List[Powerup] = field(default_factory=list)
+    goals: List[Goal] = field(default_factory=list)
     player_start: Tuple[float, float] = (100.0, 350.0)
     rows: int = 0
     cols: int = 0
@@ -56,7 +58,6 @@ class LevelLoader:
         self.TILE_MAP = {
             '#': (TILE_GROUND, COLOR_GROUND, True, EntityType.TILE),
             '=': (TILE_PLATFORM, COLOR_PLATFORM, True, EntityType.TILE),
-            'G': (TILE_GOAL, COLOR_GOAL, False, EntityType.GOAL),
             '^': (TILE_SPIKE, COLOR_SPIKE, False, EntityType.SPIKE),
         }
 
@@ -77,7 +78,6 @@ class LevelLoader:
         # 1. Determine input type
         if isinstance(source, dict):
             config = source
-            # If coming from YAML, it might be "levels/stage_1.txt" or "stage_1.txt"
             raw_file = config.get('file', '') 
             filename = os.path.basename(raw_file)
         elif isinstance(source, str):
@@ -101,7 +101,7 @@ class LevelLoader:
     def _parse_ascii_map(self, path: str, data: LevelData):
         """
         Parses a text file character by character to build the level.
-        
+                
         1. Reads lines from the file to determine dimensions (rows/cols).
         2. Initializes the grid, tile arrays, and static spatial hash.
         3. Iterates through every character in the file:
@@ -132,11 +132,17 @@ class LevelLoader:
                     
                     data.grid[row][col] = t_type
                     new_tile = create_tile(t_type, col * TILE_SIZE, row * TILE_SIZE, solid, color)
+                    
                     new_tile.type_id = e_type
+                    new_tile.gObj.type_id = e_type
+                    
                     data.tiles[row][col] = new_tile
                     
-                    if solid or t_type in (TILE_SPIKE, TILE_GOAL):
+                    # Add Solids and Spikes to static hash
+                    if solid:
                         data.static_hash.insert(new_tile)
+                    if t_type == EntityType.SPIKE:
+                        data.enemies.append(new_tile)
 
                 # 2. Handle Complex Entities (QBlocks, Enemies, Start Pos)
                 elif ascii_char == '?': 
@@ -146,8 +152,21 @@ class LevelLoader:
                     qb.gObj.type_id = EntityType.QBLOCK
                     data.qblocks.append(qb)
                     data.static_hash.insert(qb)
-                    # We don't add it to data.tiles[] usually if it's treated as a pure object, 
-                    # but if physics checks grid, we set grid val above.
+
+                elif ascii_char == '>': 
+                    # QBlock is both an entity and a solid tile
+                    data.grid[row][col] = TILE_QBLOCK
+                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="star")
+                    qb.gObj.type_id = EntityType.QBLOCK
+                    data.qblocks.append(qb)
+                    data.static_hash.insert(qb)
+                elif ascii_char == '<': 
+                    # QBlock is both an entity and a solid tile
+                    data.grid[row][col] = TILE_QBLOCK
+                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="mushroom")
+                    qb.gObj.type_id = EntityType.QBLOCK
+                    data.qblocks.append(qb)
+                    data.static_hash.insert(qb)
 
                 elif ascii_char == 'C':
                     c = Coin(gObj=GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 16, 16, True))
@@ -162,11 +181,13 @@ class LevelLoader:
                 elif ascii_char == 'P':
                     data.player_start = (float(col * TILE_SIZE), float(row * TILE_SIZE))
 
+                elif ascii_char == 'G':
+                    g = Goal(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True))
+                    data.goals.append(g)
+
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """
         Parses the 'dynamics' section of the YAML config.
-        Allows adding entities (Enemies, Coins, Powerups) at specific coordinates
-        defined in the YAML, supplemental to the ASCII map.
         """
         if 'enemies' in dynamics:
             for e in dynamics['enemies']:

@@ -115,10 +115,18 @@ class PlatformerCore(gymnasium.Env):
         self.dt = 0.0001
         
         # Track previous state
-        self.score = 0; self.coins_total = 0; self.alive = True; self.frame = 0
-        self.game_over = False; self.reached_goal = False
-        self.last_x = 0.0; self.last_score = 0; self.score_delta = 0
-        self.kills_step = 0; self.coins_step = 0; self.powerups_step = 0; self._last_action = 0
+        self.score = 0; self.coins_total = 0
+        self.alive = True
+        self.frame = 0
+        self.game_over = False
+        self.reached_goal = False
+        self.last_x = 0.0
+        self.last_score = 0
+        self.score_delta = 0
+        self.kills_step = 0
+        self.coins_step = 0
+        self.powerups_step = 0
+        self._last_action = 0
         
         self.max_x_seen = 0.0
         self.stall_timer = 0
@@ -387,21 +395,20 @@ class PlatformerCore(gymnasium.Env):
             self._handle_death()
             return not self.alive
         
-        # 3. GOAL & SPIKES
-        cx, cy = player.gObj.x + player.gObj.width/2, player.gObj.y + player.gObj.height/2
-        row, col = int(cy // TILE_SIZE), int(cx // TILE_SIZE)
-        
-        if 0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols:
-            tile_val = self.level_data.grid[row][col]
-            if tile_val == TILE_GOAL:
-                self.score += 1000 + (int(self.timer) * 10)
-                self.alive = False
-                self.reached_goal = True
-                self.complete_level()
-                return False
-            if tile_val == TILE_SPIKE:
-                self._handle_death()
-                return not self.alive
+        # # 3. GOAL & SPIKES
+        # cx, cy = player.gObj.x + player.gObj.width/2, player.gObj.y + player.gObj.height/2
+        # row, col = int(cy // TILE_SIZE), int(cx // TILE_SIZE)
+        # if 0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols:
+        #     tile_val = self.level_data.grid[row][col]
+        #     if tile_val == TILE_GOAL:
+        #         self.score += 1000 + (int(self.timer) * 10)
+        #         self.alive = True
+        #         self.reached_goal = True
+        #         self.complete_level()
+        #         return False
+        #     if tile_val == TILE_SPIKE:
+        #         self._handle_death()
+        #         return not self.alive
 
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
             self._handle_death()

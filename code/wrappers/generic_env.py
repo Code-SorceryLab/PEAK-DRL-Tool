@@ -37,6 +37,14 @@ class GameEnv(gym.Env):
 
         # episode counters
         self._step_count = 0
+        
+        # --- FIX: Create a dedicated RewardHub for THIS environment instance ---
+        self.hub = RewardHub() 
+        
+        # --- FIX: Inject Hub into Game's Debug Manager ---
+        # This connects the wrapper's reward tracking to the inner game's visualizer
+        if hasattr(self.game, "debug_manager"):
+            self.game.debug_manager.hub = self.hub
 
         # GUI lazy data
         self.screen = None
@@ -72,21 +80,19 @@ class GameEnv(gym.Env):
         
 
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
-        reward = self.reward_fn(obs, base, terminated, info)
         
-        hub = RewardHub.get_instance()
-        
+        # FIX: Use self.hub instance instead of static get_instance()
         if self.reward_fn:
             reward = self.reward_fn(obs, base, terminated, info)
         else:
-            reward = hub.compute_default_reward(info)
+            reward = self.hub.compute_default_reward(info)
         
         act_name = action
         if hasattr(self.game, "ACTION_NAMES"):
             # .get(key, default) - if key isn't found, returns the number
             act_name = self.game.ACTION_NAMES.get(int(action), action)
         
-        hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
+        self.hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
         return obs, reward, terminated, truncated, info
 
     # -------------------------------- Rendering

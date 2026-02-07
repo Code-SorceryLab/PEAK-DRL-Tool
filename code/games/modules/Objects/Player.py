@@ -32,10 +32,7 @@ class Player():
     input_dir: int = 0
     run_held: bool = False
     jump_pressed: bool = False
-    
-    # NOTE: Physics parameters removed. 
-    # They are now accessed directly from the PhysicsContext passed to update()
-    
+        
     def update(self, dt: float, context: PhysicsContext):
         self.dt = dt
         

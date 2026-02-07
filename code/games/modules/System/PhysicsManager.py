@@ -127,6 +127,10 @@ class PhysicsManager:
             if coin.gObj.active and not coin.collected: self.collectible_hash.insert(coin)
         for pup in level_data.powerups:
             if pup.gObj.active: self.collectible_hash.insert(pup)
+        
+        # Add goals to collectible hash (since they are 'collected' to win)
+        for goal in level_data.goals:
+            self.collectible_hash.insert(goal)
     
     def get_dynamic_hash(self) -> SpatialHash:
         return self.hazard_hash
@@ -327,6 +331,11 @@ class PhysicsManager:
         for (row, col, trect, tile_type) in nearby:
             if not rect.colliderect(trect): continue
             
+            # --- Handle Spikes (Static Tiles but Deadly) ---
+            if tile_type == EntityType.SPIKE:
+                core._handle_death()
+                return
+
             overlap_x = min(rect.right - trect.left, trect.right - rect.left)
             overlap_y = min(rect.bottom - trect.top, trect.bottom - rect.top)
             
@@ -422,6 +431,10 @@ class PhysicsManager:
                     self._handle_player_coin(core, source, target)
                 elif t_type == EntityType.POWERUP:
                     self._handle_player_powerup(core, source, target)
+                elif t_type == EntityType.GOAL:
+                    core.complete_level()
+                elif t_type == EntityType.SPIKE:
+                    core.handle_death()
             
             case EntityType.ENEMY:
                 if t_type == EntityType.ENEMY:
@@ -433,6 +446,7 @@ class PhysicsManager:
         if name == "Enemy": return EntityType.ENEMY
         if name == "Coin": return EntityType.COIN
         if name == "Powerup": return EntityType.POWERUP
+        if name == "Goal": return EntityType.GOAL
         return EntityType.NONE
 
     # --- SPECIFIC HANDLERS ---
@@ -577,13 +591,20 @@ class PhysicsManager:
         nearby_objects = level_data.static_hash.query(obj)
         out = []
         for item in nearby_objects:
-            if not getattr(item, 'solid', False): continue
+            # FIX: Allow Solids AND Special Triggers (Spikes)
+            # GameObject does not have 'solid' attribute, so it always defaulted to False.
+            is_solid = getattr(item, 'solid', False)
+            
+            tid = item.gObj.type_id if hasattr(item.gObj, 'type_id') else EntityType.TILE
+            
+            # CHANGED: Allow solids OR spikes
+            if not is_solid and tid != EntityType.SPIKE: 
+                continue
             
             rect = item.gObj.get_rect()
             col = int(item.gObj.x // TILE_SIZE)
             row = int(item.gObj.y // TILE_SIZE)
             
-            tid = item.gObj.type_id if hasattr(item.gObj, 'type_id') else EntityType.TILE
             if hasattr(item, 'type_id') and item.type_id == EntityType.QBLOCK:
                 tid = TILE_QBLOCK 
                 

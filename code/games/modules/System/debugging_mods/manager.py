@@ -6,6 +6,8 @@ from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOve
 class DebugManager:
     def __init__(self, default_active=True, print_help=True):
         self.active = True
+        self.hub = None # <--- Will be injected by GameEnv wrapper
+        
         # Toggles
         self.show_hitboxes = default_active
         self.show_agent_view = default_active
@@ -182,8 +184,8 @@ class DebugManager:
         # Border
         pygame.draw.rect(surface, (100, 100, 100), (x, y, panel_w, panel_h), 1)
         
-        # Setup
-        hub = RewardHub.get_instance()
+        # Setup - use injected self.hub
+        hub = self.hub if self.hub else RewardHub.get_instance()
         last_action = hub.last_action_name
         
         
@@ -218,7 +220,7 @@ class DebugManager:
         graph_rect = pygame.Rect(x + 5, y + 60, panel_w - 10, panel_h - 65)
         #pygame.draw.rect(surface, (50,50,50), graph_rect, 1) # inner border
 
-        reward_history = RewardHub.get_instance().reward_history
+        reward_history = hub.reward_history
         if len(reward_history) < 2: return
 
         # Normalize metrics for graph

@@ -253,7 +253,7 @@ def main(cfg: DictConfig):
                 if use_dashboard:
                 # If we have many parallel envs, updating every step is chaotic.
                 # Update every 5 steps for smoothness.
-                    dash_cb = DashboardCallback(update_freq=1)
+                    dash_cb = DashboardCallback(update_freq=10)
                     current_callbacks.append(dash_cb)
                     
                 # Build model (SB3-compatible Algo expected)
