@@ -10,6 +10,8 @@ import time
 import gymnasium
 from gymnasium import spaces
 import psutil
+
+from code.games.modules.System import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
 # Objects
 from .modules.Objects.GameObject import GameObject
@@ -335,10 +337,12 @@ class PlatformerCore(gymnasium.Env):
 
     def _update_camera(self):
         if self.debug_manager.free_cam_active:
-             movement_x, movement_y = self.debug_manager.current_cam_move
-             self.camera_x += movement_x * self.dt
-             self.camera_y += movement_y * self.dt
-             return
+            
+            movement_x, movement_y = self.debug_manager.current_cam_move
+            self.camera_x += movement_x * self.dt
+            self.camera_y += movement_y * self.dt
+            
+            return
 
         if not self.camera_lock or not self.player: return
         
@@ -357,58 +361,99 @@ class PlatformerCore(gymnasium.Env):
         self.camera_y = max(0, min(self.camera_y, max(0, level_h - self.HEIGHT)))
 
     def _update_stall_metrics(self):
+        """
+        Updates stall timer based on ACTIVITY, not just forward progress.
+        Prevents punishing the agent for backtracking to get coins.
+        """
         if not self.player: return
-        prog_x = self.player.gObj.x
-        prog_y = self.level_data.height - self.player.gObj.y
-        progressed = False
+        
+        # Initialize anchor point if missing
+        if not hasattr(self, 'stall_start_x'):
+            self.stall_start_x = self.player.gObj.x
+            self.stall_start_y = self.player.gObj.y
 
-        if prog_x > self.progress_x_best + (TILE_SIZE / 2):
-            self.progress_x_best = prog_x; progressed = True
-        if prog_y > self.progress_y_best + (TILE_SIZE / 2):
-            self.progress_y_best = prog_y; progressed = True
-
-        if progressed:
-            self.stall_timer = 0; self.stalled_this_frame = False
+        # Calculate distance from the anchor point (Pythagoras)
+        dx = self.player.gObj.x - self.stall_start_x
+        dy = self.player.gObj.y - self.stall_start_y
+        dist_sq = dx*dx + dy*dy
+    
+        
+        
+        if dist_sq > (TILE_SIZE * TILE_SIZE):
+            # MOVEMENT DETECTED: Reset timer and set new anchor
+            self.stall_timer = 0
+            self.stalled_this_frame = False
+            self.stall_start_x = self.player.gObj.x
+            self.stall_start_y = self.player.gObj.y
         else:
+            # NO MOVEMENT: Tick tock...
             self.stall_timer += self.dt
             if self.stall_timer >= self.stall_window:
-                self.stalled_this_frame = True; self.stall_timer = 0; self.stall_windows_count += 1
+                self.stalled_this_frame = True
+                self.stall_windows_count += 1
+                # Pulse the timer so we don't kill instantly, but record the "strike"
+                self.stall_timer = 0
+        
 
     def _check_termination(self) -> bool:
+        """
+        Checks if the episode should end (Death, Win, Time).
+        Returns True IMMEDIATELY on events to prevent 'Zombie Frames'.
+        """
         player = self.player
+        if not player: 
+            return True
         
-        # 1. TIME
+        # 1. TIME LIMIT
         if self.use_timer and self.timer <= 0:
             self._handle_death()
-            return not self.alive 
+            return True 
 
-        # 2. PIT
+        # 2. PIT DEATH (Y-limit)
         if player.gObj.y > self.level_data.height:
             self._handle_death()
-            return not self.alive
+            return True
         
-        # 3. GOAL & SPIKES
-        cx, cy = player.gObj.x + player.gObj.width/2, player.gObj.y + player.gObj.height/2
-        row, col = int(cy // TILE_SIZE), int(cx // TILE_SIZE)
+        # 3. GOAL & SPIKES (Hitbox Precision)
+        # Use the PhysicsManager's hash for pixel-perfect checks
+        # instead of the old grid-center approximation.
+        p_rect = player.gObj.get_rect()
         
-        if 0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols:
-            tile_val = self.level_data.grid[row][col]
-            if tile_val == TILE_GOAL:
-                self.score += 1000 + (int(self.timer) * 10)
-                self.alive = False
-                self.reached_goal = True
-                self.complete_level()
-                return False
-            if tile_val == TILE_SPIKE:
-                self._handle_death()
-                return not self.alive
+        # Query static objects near player
+        nearby = self.level_data.static_hash.query(player.gObj)
+        
+        for tile in nearby:
+            # We only care about entities with IDs (Spikes/Goals)
+            if not hasattr(tile, 'gObj') or not hasattr(tile.gObj, 'type_id'):
+                continue
+                
+            tid = tile.gObj.type_id
+            
+            # Check intersection
+            if p_rect.colliderect(tile.gObj.get_rect()):
+                if tid == EntityType.SPIKE:
+                    self._handle_death()
+                    return True
+                
+                elif tid == EntityType.GOAL:
+                    # Double-check: Anti-Cheese (Left Wall Glitch)
+                    # Even if physics is fixed, this is a safety net.
+                    if player.gObj.x < 200: 
+                        self.score += 1000 + (int(self.timer) * 10)
+                        self.reached_goal = True
+                        # We return True so the Episode Ends and PPO gets the terminal reward.
+                        # The wrapper will call reset(), which loads the next level.
+                        self.complete_level() 
+                        return True
 
+        # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
+            # print("Agent killed for stalling (camping).")
             self._handle_death()
-            return not self.alive
+            return True
 
         return False
-
+    
     # =========================================================================
     # NEW OBSERVATION LOGIC
     # =========================================================================

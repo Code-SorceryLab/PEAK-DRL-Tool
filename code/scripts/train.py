@@ -29,6 +29,8 @@ from sb3_contrib import RecurrentPPO
 from code.wrappers.generic_env import GameEnv
 from code.algos import get_algo
 
+from code.callbacks.dashboard import DashboardCallback
+
 
 #### Helper functions START ####
 
@@ -241,6 +243,19 @@ def main(cfg: DictConfig):
                     name_prefix=f"{game_name}_{model_name}_{persona}"
                 )
 
+                use_dashboard = bool(cfg.get("dashboard", True))
+                
+                # Start with standard callbacks
+                current_callbacks = [eval_cb, ckpt_cb]
+                
+                if use_dashboard:
+                    # Update freq 1 = Smoothest, but slows training slightly
+                    dash_cb = DashboardCallback(update_freq=1)
+                    current_callbacks.append(dash_cb)
+                
+                
+                
+                
                 # Inject TensorBoard path into algo kwargs
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir

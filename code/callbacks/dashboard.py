@@ -22,8 +22,19 @@ class DashboardCallback(BaseCallback):
         # 1. Input State (Indices 0-7 from obs vector)
         self.obs_labels = ["Enm Dist", "Coin Dist", "Goal Dist", "Enm Count", 
                            "Coin Count", "Score", "Time", "Lives"]
-        # 2. Reward Breakdown (From info['reward_components'])
-        self.rew_labels = ["R:Move", "R:Coin", "R:Kill", "R:Win"]
+        
+        # 2. Reward Breakdown Configuration
+        # Keys match the dictionary in platformer.py
+        self.rew_map = {
+            "movement": "R:Move",
+            "coins":    "R:Coin",
+            "kills":    "R:Kill", 
+            "win":      "R:Win",
+            "time":     "R:Time",
+            "death":    "R:Death"
+        }
+        self.rew_keys = list(self.rew_map.keys())
+        self.rew_labels = list(self.rew_map.values())
         
         self.all_labels = self.obs_labels + self.rew_labels
 
@@ -41,7 +52,7 @@ class DashboardCallback(BaseCallback):
             plt.ion() # Interactive mode ON
             
             # Setup Window
-            self.fig, self.axs = plt.subplots(2, 1, figsize=(7, 9))
+            self.fig, self.axs = plt.subplots(2, 1, figsize=(8, 9))
             self.fig.canvas.manager.set_window_title("PEAK Training Inspector")
             
             # --- Plot 1: Reward History (The Pulse) ---
@@ -68,8 +79,15 @@ class DashboardCallback(BaseCallback):
             # Inputs = Cyan
             # Rewards = Custom
             colors = ['cyan'] * len(self.obs_labels)
-            colors += ['#3498db', '#f1c40f', '#e74c3c', '#2ecc71'] 
-            #          Blue(Move) Gold(Coin) Red(Kill) Green(Win)
+            # Order matches self.rew_keys: movement, coins, kills, win, time, death
+            colors += [
+                '#3498db', # Blue (Move)
+                '#f1c40f', # Gold (Coin)
+                '#e74c3c', # Red (Kill)
+                '#2ecc71', # Green (Win)
+                '#9b59b6', # Purple (Time)
+                '#34495e'  # Dark Blue (Death)
+            ]
             
             for bar, c in zip(self.bar_container, colors):
                 bar.set_color(c)
@@ -94,14 +112,14 @@ class DashboardCallback(BaseCallback):
         # 1. Fetch Data
         obs = self.locals.get("new_obs")      
         rewards = self.locals.get("rewards") 
-        infos = self.locals.get("infos")     # <--- Need this for breakdown!
+        infos = self.locals.get("infos")
         
         if obs is None or rewards is None: return True
 
         # Use first env data
         current_obs = obs[0] 
         current_reward = float(rewards[0])
-        current_info = infos[0]
+        current_info = infos[0] if infos else {}
 
         # 2. Prepare Bar Data
         # A. Obs Data (Last 8)
@@ -110,9 +128,10 @@ class DashboardCallback(BaseCallback):
         else:
             obs_vals = [0]*8
             
-        # B. Reward Components (From our new platformer.py logic)
-        # Default to 0 if not present
-        rew_vals = current_info.get("reward_components", [0.0, 0.0, 0.0, 0.0])
+        # B. Reward Components (From our dictionary)
+        rew_dict = current_info.get("reward_components", {})
+        # Extract based on keys order
+        rew_vals = [float(rew_dict.get(k, 0.0)) for k in self.rew_keys]
         
         # Combine
         all_vals = obs_vals + rew_vals
@@ -133,12 +152,14 @@ class DashboardCallback(BaseCallback):
 
             # B. Update Bars
             max_val = 1.0
+            min_val = 0.0
             for rect, val in zip(self.bar_container, all_vals):
                 rect.set_height(val)
                 if val > max_val: max_val = val
+                if val < min_val: min_val = val
             
-            # Auto-scale Y axis so we can see the +10 Win Spike
-            self.axs[1].set_ylim(min(0, min(all_vals)), max_val * 1.1)
+            # Auto-scale Y axis (handle negative death penalties)
+            self.axs[1].set_ylim(min_val * 1.1, max_val * 1.1)
 
             # C. Render
             self.fig.canvas.flush_events()
