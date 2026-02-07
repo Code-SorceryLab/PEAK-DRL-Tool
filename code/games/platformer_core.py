@@ -311,7 +311,7 @@ class PlatformerCore(gymnasium.Env):
         self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
         
     def complete_level(self):
-        print(f"Level Complete! Current World: {self.world}")
+        #print(f"Level Complete! Current World: {self.world}")
         # --- Logic to Advance Level --
         self.current_index_world += 1
         if self.current_index_world >= len(self.level_order):
@@ -460,25 +460,53 @@ class PlatformerCore(gymnasium.Env):
         
         # --- A. SOLID ARRAY (Optimized Numpy Slice) ---
         # Map player (px, py) to padded grid coordinates
-        # Padded has 4 top, 5 left.
         # Window Start in Padded: (py - 4) + 4 = py
         # Window End in Padded:   (py + 4) + 4 + 1 = py + 9
-        # X logic similarly: px, px + 11
         
-        # Clamp slicing just in case, though padding should cover typical map bounds
-        # (Assuming player doesn't go waaaay out of bounds)
-        try:
-            solid_window = self.padded_solid[py : py + 9, px : px + 11].flatten()
-        except IndexError:
-            # Fallback for extreme out of bounds
-            solid_window = np.zeros(99, dtype=np.float32)
+        # 1. Define target slice indices
+        r_start, r_end = py, py + 9
+        c_start, c_end = px, px + 11
+        
+        # 2. Get the valid slice from the array (might be smaller than requested)
+        # We clamp start indices to be at least 0 to avoid wrapping issues with negative numbers
+        r_start_clamped = max(0, r_start)
+        c_start_clamped = max(0, c_start)
+        
+        raw_slice = self.padded_solid[r_start_clamped:r_end, c_start_clamped:c_end]
+        
+        # 3. Check if we got the full 9x11 (99 elements)
+        if raw_slice.shape == (9, 11):
+            solid_window = raw_slice.flatten()
+        else:
+            # 4. If truncated (out of bounds), pad it back to 9x11
+            # Create a canvas of zeros (Air)
+            padded_slice = np.zeros((9, 11), dtype=np.float32)
+            
+            # Calculate where to paste the raw_slice onto the canvas
+            # (If we went off the bottom/right, paste into top-left)
+            # (If we went off top/left, slice logic handles it, but safety check:)
+            h, w = raw_slice.shape
+            
+            # Offset logic: 
+            # If r_start < 0, we clipped top rows. Paste at offset. 
+            # If r_end > array_h, we clipped bottom rows. Paste at 0.
+            dest_y = 0 if r_start >= 0 else abs(r_start)
+            dest_x = 0 if c_start >= 0 else abs(c_start)
+            
+            # Ensure we don't overflow the canvas
+            paste_h = min(h, 9 - dest_y)
+            paste_w = min(w, 11 - dest_x)
+            
+            if paste_h > 0 and paste_w > 0:
+                padded_slice[dest_y : dest_y + paste_h, dest_x : dest_x + paste_w] = raw_slice[:paste_h, :paste_w]
+            
+            solid_window = padded_slice.flatten()
 
         # --- B. DYNAMIC ARRAYS (Hazard/Collectable) ---
-        # Optimization: Use Spatial Hash to find only relevant entities
+        # (This part remains unchanged as it calculates relative coordinates safely)
         hazard_grid = np.zeros((9, 11), dtype=np.float32)
         collect_grid = np.zeros((9, 11), dtype=np.float32)
         
-        # Define world rect for query (11 tiles wide, 9 tiles high)
         window_rect = pygame.Rect(
             (px - 5) * TILE_SIZE, 
             (py - 4) * TILE_SIZE, 
@@ -486,7 +514,6 @@ class PlatformerCore(gymnasium.Env):
             9 * TILE_SIZE
         )
         
-        # Hazards
         nearby_hazards = self.physics_manager.hazard_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
         for h in nearby_hazards:
             if not h.gObj.active: continue
@@ -496,10 +523,8 @@ class PlatformerCore(gymnasium.Env):
             if 0 <= local_x < 11 and 0 <= local_y < 9:
                 hazard_grid[local_y, local_x] = 1.0
 
-        # Collectables
         nearby_items = self.physics_manager.collectible_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
         for c in nearby_items:
-            # Check active status. Coins have 'collected' flag too.
             if not c.gObj.active: continue
             if hasattr(c, 'collected') and c.collected: continue
             
