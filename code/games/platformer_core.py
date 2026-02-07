@@ -10,6 +10,8 @@ import time
 import gymnasium
 from gymnasium import spaces
 import psutil
+
+from code.games.modules.System import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
 # Objects
 from .modules.Objects.GameObject import GameObject
@@ -383,36 +385,61 @@ class PlatformerCore(gymnasium.Env):
                 self.stalled_this_frame = True; self.stall_timer = 0; self.stall_windows_count += 1
 
     def _check_termination(self) -> bool:
+        """
+        Checks if the episode should end (Death, Win, Time).
+        Returns True IMMEDIATELY on events to prevent 'Zombie Frames'.
+        """
         player = self.player
+        if not player: 
+            return True
         
-        # 1. TIME
+        # 1. TIME LIMIT
         if self.use_timer and self.timer <= 0:
             self._handle_death()
-            return not self.alive 
+            return True 
 
-        # 2. PIT
+        # 2. PIT DEATH (Y-limit)
         if player.gObj.y > self.level_data.height:
             self._handle_death()
-            return not self.alive
+            return True
         
-        # # 3. GOAL & SPIKES
-        # cx, cy = player.gObj.x + player.gObj.width/2, player.gObj.y + player.gObj.height/2
-        # row, col = int(cy // TILE_SIZE), int(cx // TILE_SIZE)
-        # if 0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols:
-        #     tile_val = self.level_data.grid[row][col]
-        #     if tile_val == TILE_GOAL:
-        #         self.score += 1000 + (int(self.timer) * 10)
-        #         self.alive = True
-        #         self.reached_goal = True
-        #         self.complete_level()
-        #         return False
-        #     if tile_val == TILE_SPIKE:
-        #         self._handle_death()
-        #         return not self.alive
+        # 3. GOAL & SPIKES (Hitbox Precision)
+        # Use the PhysicsManager's hash for pixel-perfect checks
+        # instead of the old grid-center approximation.
+        p_rect = player.gObj.get_rect()
+        
+        # Query static objects near player
+        nearby = self.level_data.static_hash.query(player.gObj)
+        
+        for tile in nearby:
+            # We only care about entities with IDs (Spikes/Goals)
+            if not hasattr(tile, 'gObj') or not hasattr(tile.gObj, 'type_id'):
+                continue
+                
+            tid = tile.gObj.type_id
+            
+            # Check intersection
+            if p_rect.colliderect(tile.gObj.get_rect()):
+                if tid == EntityType.SPIKE:
+                    self._handle_death()
+                    return True
+                
+                elif tid == EntityType.GOAL:
+                    # Double-check: Anti-Cheese (Left Wall Glitch)
+                    # Even if physics is fixed, this is a safety net.
+                    if player.gObj.x < 200: 
+                        self.score += 1000 + (int(self.timer) * 10)
+                        self.reached_goal = True
+                        # We return True so the Episode Ends and PPO gets the terminal reward.
+                        # The wrapper will call reset(), which loads the next level.
+                        self.complete_level() 
+                        return True
 
+        # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
+            # print("Agent killed for stalling (camping).")
             self._handle_death()
-            return not self.alive
+            return True
 
         return False
 
