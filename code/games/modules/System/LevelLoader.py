@@ -38,6 +38,10 @@ class LevelData:
     static_hash: SpatialHash = field(default_factory=lambda: SpatialHash(64))
 
 class LevelLoader:
+    """
+    Responsible for parsing level files (TXT and YAML) and creating the corresponding
+    game objects, tiles, and initial state data.
+    """
     def __init__(self, base_dir=None):
         if base_dir is None:
             # Current file: .../games/modules/System/LevelLoader.py
@@ -59,6 +63,12 @@ class LevelLoader:
     def load_level(self, source: Union[Dict[str, Any], str]) -> LevelData:
         """
         Orchestrates loading using either a YAML config dictionary OR a direct filename string.
+        
+        1. Determines if the source is a Dictionary (YAML config) or String (file path).
+        2. Constructs the full file path to the ASCII map file.
+        3. Calls _parse_ascii_map to generate the grid and static geometry.
+        4. If a YAML config was provided, calls _spawn_entities_from_yaml to add extra dynamic objects.
+        5. Returns the fully populated LevelData object.
         """
         data = LevelData()
         filename = ""
@@ -89,6 +99,16 @@ class LevelLoader:
         return data
 
     def _parse_ascii_map(self, path: str, data: LevelData):
+        """
+        Parses a text file character by character to build the level.
+        
+        1. Reads lines from the file to determine dimensions (rows/cols).
+        2. Initializes the grid, tile arrays, and static spatial hash.
+        3. Iterates through every character in the file:
+           - Uses TILE_MAP to create static tiles (#, =, G, ^).
+           - Checks for special characters (?, C, E, P) to spawn Entities (Question blocks, Coins, Enemies, Player).
+        4. Inserts static objects into the SpatialHash for collision detection.
+        """
         with open(path, "r") as file:
             lines = [ln.rstrip("\n") for ln in file.readlines()]
 
@@ -145,6 +165,8 @@ class LevelLoader:
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """
         Parses the 'dynamics' section of the YAML config.
+        Allows adding entities (Enemies, Coins, Powerups) at specific coordinates
+        defined in the YAML, supplemental to the ASCII map.
         """
         if 'enemies' in dynamics:
             for e in dynamics['enemies']:

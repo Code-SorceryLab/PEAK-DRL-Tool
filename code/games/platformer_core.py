@@ -8,7 +8,7 @@ import numpy as np
 import pygame
 import time
 from gymnasium import spaces
-
+import psutil
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
 # Objects
 from .modules.Objects.GameObject import GameObject
@@ -173,6 +173,19 @@ class PlatformerCore:
 
         # Frame Updates
         self.frame += 1
+        
+        # memory leak check
+        # if self.frame % 30 == 0 and self.render_mode == "human":
+        #      process = psutil.Process(os.getpid())
+        #      mem = process.memory_info().rss / 1024 / 1024
+        #      print(f"[System] Frame: {self.frame} | Memory: {mem:.2f} MB")
+        
+        # Runs once per second (60 frames) to keep the enemy list short
+        if self.frame % 300 == 0:
+            self.level_data.enemies = [e for e in self.level_data.enemies if e.gObj.active]
+            self.level_data.coins = [c for c in self.level_data.coins if c.gObj.active]
+            self.level_data.powerups = [p for p in self.level_data.powerups if p.gObj.active]
+            
         if self.use_timer: self.timer -= self.dt
         if self.render_mode == "human": self.debug_manager.update_input()
 

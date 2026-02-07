@@ -4,13 +4,8 @@ import os
 import sys
 from typing import List, Any, Dict
 import pygame
-
-# Helper to ensure we don't crash on imports if structure varies
-try:
-    from .EntityType import EntityType
-except ImportError:
-    from ..EntityType import EntityType
-
+import math
+from .EntityType import EntityType
 from ..Parameters.Movement_parameters import *
 from ..Parameters.Jump_parameters import *
 from ..Parameters.Map_parameters import TILE_SIZE, TILE_QBLOCK
@@ -46,6 +41,10 @@ class PhysicsContext:
     JUMP_BUFFER_FRAMES: int = JUMP_BUFFER_FRAMES
 
 class PhysicsManager:
+    """
+    Manages the physics simulation for the game, including movement updates, 
+    collision detection, and resolution for all entities.
+    """
     def __init__(self, config_file: str = None, speed_mult: float = 1.0):
         self.context = PhysicsContext()
         self.speed_mult = speed_mult
@@ -64,12 +63,20 @@ class PhysicsManager:
     # =========================================================================
 
     def reset_to_defaults(self):
+        """
+        Resets the physics context to the default hardcoded parameters 
+        and reapplies the current speed multiplier.
+        """
         self.context = PhysicsContext()
         self._apply_multiplier(self.speed_mult)
 
     def apply_config_dict(self, config: Dict[str, Any]):
         """
         Safely applies configuration. Uses 'or {}' to handle NoneType from YAML.
+        
+        1. Reads 'physics' section for gravity and friction.
+        2. Reads 'player' section for movement and jump parameters.
+        3. Re-applies the speed multiplier to the new values.
         """
         # 1. Physics Section
         phys = config.get("physics") or {}
@@ -99,12 +106,19 @@ class PhysicsManager:
         self._apply_multiplier(self.speed_mult)
 
     def _apply_multiplier(self, mult: float):
+        """
+        Scales movement speeds and accelerations by a global multiplier.
+        """
         self.context.RUN_ACCEL *= mult
         self.context.WALK_ACCEL *= mult
         self.context.MAX_WALK_SPEED *= mult
         self.context.MAX_RUN_SPEED *= mult
 
     def rebuild_dynamic_hashes(self, level_data):
+        """
+        Clears and repopulates the spatial hashes with active entities 
+        (enemies, coins, powerups) for optimized collision queries.
+        """
         self.hazard_hash.clear()
         self.collectible_hash.clear()
         for enemy in level_data.enemies:
@@ -122,18 +136,49 @@ class PhysicsManager:
     # =========================================================================
 
     def update_system(self, dt: float, core):
+        """
+        Updates the physics state (position, velocity) for all entities.
+        Includes Continuous Collision Detection (CCD) for the player to prevent tunneling.
+
+        1. Checks how far the player intends to move this frame.
+        2. If the distance > 0.5 tiles, splits the frame into multiple smaller sub-steps.
+        3. Executes each sub-step for the player, resolving wall collisions immediately after each step.
+        4. Updates enemies, coins, and powerups normally (single step).
+        """
         ctx = self.context
         player = core.player
         level_data = core.level_data
 
         if player:
-            player.update(dt, ctx)
+            # --- ANTI-TUNNELING (Continuous Collision Detection) ---
+            # 1. Calculate how far the player WANTS to move this frame
+            predicted_dist = max(abs(player.vx), abs(player.vy)) * dt
+            
+            # 2. If moving more than 1/2 a tile, break it into smaller steps
+            #    (We use 0.5 tile size to be safe)
+            step_count = 1
+            if predicted_dist > TILE_SIZE * 0.5:
+                step_count = int(math.ceil(predicted_dist / (TILE_SIZE * 0.5)))
+            
+            step_dt = dt / step_count
 
+            # 3. Execute the steps
+            for _ in range(step_count):
+                player.update(step_dt, ctx)
+                # Resolve ONLY player world collisions immediately
+                # This stops them from entering a wall during a sub-step
+                self._resolve_player_world(core, level_data)
+
+        # Update everything else normally (Enemies usually don't move fast enough to tunnel)
         self.update_list(dt, level_data.enemies)
         self.update_list(dt, level_data.coins)
         self.update_list(dt, level_data.powerups)
 
     def update_list(self, dt: float, objects: List[Any]):
+        """
+        Helper to iterate through a list of objects and call their update method 
+        if they are active.
+        """
         ctx = self.context
         for obj in objects:
             if hasattr(obj, 'gObj') and not obj.gObj.active: continue
@@ -148,6 +193,15 @@ class PhysicsManager:
     # =========================================================================
 
     def resolve_collisions(self, core):
+        """
+        Main entry point for resolving all collisions in the game world.
+
+        1. Captures the player's falling state (vy > 0) before any velocity modifications. 
+           This is crucial for "stomp" logic, as hitting the ground later resets vy to 0.
+        2. Resolves static world collisions (walls/floors) for the Player, Enemies, and Powerups.
+        3. Resolves dynamic interactions (Player vs Enemy, Enemy vs Enemy, etc.) using the 
+           previously captured falling state.
+        """
         level_data = core.level_data
         player = core.player
         
@@ -169,6 +223,10 @@ class PhysicsManager:
     # --- WORLD COLLISION IMPLEMENTATION ---
 
     def _resolve_enemy_world(self, core, level_data):
+        """
+        Handles collisions between enemies and the static map.
+        Sets 'bounce_x=True' so enemies reverse direction when hitting walls.
+        """
         for enemy in level_data.enemies:
             if not enemy.gObj.active: continue
             nearby = self._get_tile_rects_near(level_data, enemy.gObj)
@@ -176,6 +234,9 @@ class PhysicsManager:
             self._solve_aabb_collision(enemy, nearby, bounce_x=True)
 
     def _resolve_powerup_world(self, core, level_data):
+        """
+        Handles collisions between powerups (mushroom/star) and the static map.
+        """
         for pup in level_data.powerups:
             if not pup.gObj.active: continue
             nearby = self._get_tile_rects_near(level_data, pup.gObj)
@@ -183,8 +244,18 @@ class PhysicsManager:
 
     def _solve_aabb_collision(self, entity, nearby_tiles, bounce_x=False):
         """
-        Generic AABB resolution against static tiles.
-        Resolves Y first (Floor/Ceiling), then X (Walls).
+        Generic Axis-Aligned Bounding Box (AABB) resolution against static tiles.
+        Used for non-player entities (Enemies, Powerups).
+
+        1. Resolves Y-Axis (Vertical):
+           - Checks overlaps.
+           - If moving down, snaps to top of tile (Floor).
+           - If moving up, snaps to bottom of tile (Ceiling).
+        2. Resolves X-Axis (Horizontal):
+           - Checks overlaps again (post-Y adjustment).
+           - If X overlap is smaller than Y overlap, it treats it as a wall.
+           - Snaps entity to the side of the tile.
+           - If 'bounce_x' is True, inverts X velocity; otherwise zeroes it.
         """
         # Resolve Y
         ent_rect = entity.gObj.get_rect()
@@ -235,6 +306,18 @@ class PhysicsManager:
                     ent_rect = entity.gObj.get_rect()
 
     def _resolve_player_world(self, core, level_data):
+        """
+        Specialized collision resolution for the Player against static tiles.
+        
+        1. Identifies nearby tiles using spatial hashing.
+        2. Iterates through tiles and calculates overlap depth in X and Y.
+        3. Prioritizes the shallowest axis of penetration (Separating Axis Theorem principle).
+        4. If X collision (Wall): Pushes player out and zeroes X velocity.
+        5. If Y collision (Floor/Ceiling):
+           - Floor: Pushes player up. Sets 'on_ground' = True ONLY if player was falling (vy >= 0).
+           - Ceiling: Pushes player down. Zeroes upward velocity (Bonk).
+           - Checks for QBlock interactions on ceiling hits.
+        """
         player = core.player
         if not player: return
         
@@ -247,28 +330,54 @@ class PhysicsManager:
             overlap_x = min(rect.right - trect.left, trect.right - rect.left)
             overlap_y = min(rect.bottom - trect.top, trect.bottom - rect.top)
             
+            # Prioritize the shallowest axis
             if overlap_x < overlap_y:
-                if rect.centerx < trect.centerx: player.gObj.x = trect.left - player.gObj.width
-                else: player.gObj.x = trect.right
-                player.vx *= 0.5
+                # --- Resolve X (Wall Hit) ---
+                if rect.centerx < trect.centerx: 
+                    player.gObj.x = trect.left - player.gObj.width
+                else: 
+                    player.gObj.x = trect.right
+                
+                # Zero X velocity on wall hit (stops sticking)
+                player.vx = 0 
+                
             else:
+                # --- Resolve Y (Floor/Ceiling Hit) ---
                 if rect.centery < trect.centery:
-                    # NOTE: 'max(2, player.vy + 1)' logic handles fast falling tunnel prevention
-                    if abs(rect.bottom - trect.top) < max(2, player.vy + 1):
-                        player.gObj.y = trect.top - player.gObj.height
+                    # Player is ABOVE the tile (Floor Hit)
+                    player.gObj.y = trect.top - player.gObj.height
+                    
+                    # Only trigger "landing" logic if we were actually falling
+                    # This prevents "snapping" to the floor while jumping up
+                    if player.vy >= 0:
                         player.vy = 0
                         player.on_ground = True
                         player.jump_hold = 0
                 else:
+                    # Player is BELOW the tile (Ceiling Hit)
                     player.gObj.y = trect.bottom
-                    player.vy = max(0.0, player.vy)
-                    if tile_type == TILE_QBLOCK and player.vy <= 0:
+                    
+                    # Bonk head: kill upward velocity
+                    if player.vy < 0:
+                        player.vy = 0
+                    
+                    if tile_type == TILE_QBLOCK:
                         self._hit_qblock(core, col, row)
+            
+            # Update rect for the next tile check in the loop
             rect = player.gObj.get_rect()
 
     # --- DYNAMIC COLLISIONS ---
 
     def _resolve_dynamic_interactions(self, core, player_was_falling):
+        """
+        Handles interactions between moving entities (Player, Enemies, Coins).
+        
+        1. Queries the spatial hash for hazards (Enemies) near the player.
+        2. Dispatches collision events if overlaps occur.
+        3. Queries for collectibles (Coins/Powerups) and dispatches events.
+        4. Checks Enemy-vs-Enemy collisions (to prevent stacking/overlap).
+        """
         player = core.player
         if not player: return
 
@@ -295,6 +404,10 @@ class PhysicsManager:
                             self._dispatch_collision(core, enemy, other)
 
     def _dispatch_collision(self, core, source, target, player_was_falling=False):
+        """
+        Routes the collision to the specific handler based on the entity types involved
+        (e.g., Player vs Enemy, Player vs Coin, Enemy vs Enemy).
+        """
         s_type = source.gObj.type_id if hasattr(source.gObj, 'type_id') else EntityType.NONE
         t_type = target.gObj.type_id if hasattr(target.gObj, 'type_id') else EntityType.NONE
         
@@ -325,6 +438,12 @@ class PhysicsManager:
     # --- SPECIFIC HANDLERS ---
 
     def _handle_player_enemy(self, core, player, enemy, player_was_falling):
+        """
+        Handles logic when Player hits an Enemy.
+        - If player was falling and hits the top of the enemy: KILL ENEMY (Stomp) & BOUNCE PLAYER.
+        - If player has Star power: KILL ENEMY.
+        - Otherwise: KILL PLAYER (or remove powerup).
+        """
         if not enemy.gObj.active: 
             return
         
@@ -359,6 +478,9 @@ class PhysicsManager:
                 return
 
     def _handle_player_coin(self, core, player, coin):
+        """
+        Collects coin, increments score and coin counters.
+        """
         if not coin.collected:
             coin.gObj.active = False
             coin.collected = True
@@ -367,6 +489,9 @@ class PhysicsManager:
             core.coins_total += 1
 
     def _handle_player_powerup(self, core, player, powerup):
+        """
+        Applies powerup effect (Super Mushroom or Star) and removes the item.
+        """
         powerup.gObj.active = False
         core.powerups_step += 1
         if powerup.kind == "mushroom":
@@ -377,6 +502,11 @@ class PhysicsManager:
             core.score += 100
 
     def _handle_enemy_enemy(self, core, e1, e2):
+        """
+        Resolves collisions between two enemies to prevent them from walking through each other.
+        - Horizontal: Bounces both enemies away from each other.
+        - Vertical: Stacks them (sets velocity to 0).
+        """
         enemy = e1
         other = e2        
         rect = enemy.gObj.get_rect()
@@ -411,6 +541,10 @@ class PhysicsManager:
     # --- HELPERS ---
 
     def _hit_qblock(self, core, col: int, row: int):
+        """
+        Triggered when a player hits a Question Block from below.
+        Spawns the contained item (Coin, Mushroom, Star) and changes the block state.
+        """
         for block in core.level_data.qblocks:
             b_col = int(block.gObj.x // TILE_SIZE)
             b_row = int(block.gObj.y // TILE_SIZE)
