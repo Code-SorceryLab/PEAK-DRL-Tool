@@ -113,7 +113,6 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
         return -0.5
 
     dx = float(info.get("dx", 0.0))
-    print(dx)
     coins = int(info.get("coins_delta", 0))
     kills = int(info.get("kills_step", 0))
 

@@ -1,6 +1,6 @@
 import pygame
 import collections
-from code.wrappers.RewardHub import RewardHub
+from .....wrappers.RewardHub import RewardHub
 from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay
 
 class DebugManager:
@@ -27,11 +27,28 @@ class DebugManager:
         # Metric tracking
         #self.reward_history = collections.deque(maxlen=60) # Store last 60 frames of rewards
         self.last_action_name = "None"
-
-        # Input tracking
-        self._prev_keys = pygame.key.get_pressed()
         self.font = pygame.font.SysFont("arial", 16, bold=True)
         self.small_font = pygame.font.SysFont("arial", 12)
+        
+        
+        # Input tracking
+        self._prev_keys = None
+        
+        if pygame.display.get_init():
+            try:
+                self._prev_keys = pygame.key.get_pressed()
+                # Only load fonts if display is up, otherwise we might crash on some systems
+                self.font = pygame.font.SysFont("arial", 16, bold=True)
+                self.small_font = pygame.font.SysFont("arial", 12)
+            except pygame.error:
+                print("[DebugManager] Warning: Video system not initialized. Input disabled.")
+                self._prev_keys = None
+        else:
+            # Headless Mode Defaults (No fonts needed usually, but safe to init if possible)
+            if pygame.font.get_init():
+                self.font = pygame.font.SysFont("arial", 16, bold=True)
+                self.small_font = pygame.font.SysFont("arial", 12)
+        # --- FIX ENDS HERE ---
         
         # Composited Visualizers
         self.hitbox_overlay = HitboxOverlay()
@@ -65,6 +82,10 @@ class DebugManager:
         Polls keys and updates toggle states. 
         Must be called once per frame.
         """
+        
+        if self._prev_keys is None:
+            return
+        
         # CRITICAL: Pump events to ensure key states are fresh
         pygame.event.pump()
         
@@ -144,6 +165,7 @@ class DebugManager:
         if self.show_obs_values:
             self.obs_values_overlay.render(surface, core)
         
+        pass
 
     def _render_reward_graph(self, surface, core):
         # Draw a mini graph of recent rewards on UPPER RIGHT
@@ -160,9 +182,14 @@ class DebugManager:
         # Border
         pygame.draw.rect(surface, (100, 100, 100), (x, y, panel_w, panel_h), 1)
         
+        # Setup
+        hub = RewardHub.get_instance()
+        last_action = hub.last_action_name
+        
+        
         # --- Info Text ---
         # 1. Action
-        t_action = self.font.render(f"Last Action: {self.last_action_name}", True, (255, 255, 255))
+        t_action = self.font.render(f"Last Action: {last_action}", True, (255, 255, 255))
         surface.blit(t_action, (x + 5, y + 5))
         
         # 2. Persona

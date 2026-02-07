@@ -52,8 +52,8 @@ class GameEnv(gym.Env):
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         self._step_count = 0
-        obs = self.game.reset()
-        return obs, {}
+        obs, info = self.game.reset()
+        return obs, info
 
     def step(self, action):
         self._step_count += 1
@@ -68,12 +68,25 @@ class GameEnv(gym.Env):
         # For Binary(1)/MultiBinary just pass through
         # For Box actions (not used here), pass as-is
 
-        obs, base, terminated, info = self.game.step(action)
+        obs, base, terminated, truncated, info = self.game.step(action)
+        
 
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
         reward = self.reward_fn(obs, base, terminated, info)
+        
         hub = RewardHub.get_instance()
-        hub.update_reward(reward=reward, action_name=action, is_episode_end=terminated)
+        
+        if self.reward_fn:
+            reward = self.reward_fn(obs, base, terminated, info)
+        else:
+            reward = hub.compute_default_reward(info)
+        
+        act_name = action
+        if hasattr(self.game, "ACTION_NAMES"):
+            # .get(key, default) - if key isn't found, returns the number
+            act_name = self.game.ACTION_NAMES.get(int(action), action)
+        
+        hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
         return obs, reward, terminated, truncated, info
 
     # -------------------------------- Rendering

@@ -7,6 +7,7 @@ from typing import List, Tuple, Dict, Any
 import numpy as np
 import pygame
 import time
+import gymnasium
 from gymnasium import spaces
 import psutil
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
@@ -47,11 +48,22 @@ ACTION_NAMES = {
     8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
 }
 
-class PlatformerCore:
+class PlatformerCore(gymnasium.Env):
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
 
     def __init__(self, render_mode: str = "none", **kwargs):
         self.render_mode = render_mode
+        
+        if self.render_mode == "human":
+            pygame.init()
+            pygame.display.set_caption("PEAK Platformer")
+            self._surf = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        else:
+            # Headless / Training mode
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            pygame.init()
+            self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
+        
         
         # 1. Initialize Managers
         self.config_manager = ConfigManager("game_config.yaml")
@@ -71,9 +83,14 @@ class PlatformerCore:
         self.physics_manager.speed_mult = self.speed_mult 
         
         self.max_steps = kwargs.pop("max_steps", None)
-        self.persona = str(kwargs.pop("persona", "Default")).lower()
+        
+        
+        self.persona = str(kwargs.pop("persona", "simple")).lower()
+        if self.persona == "default": 
+            self.persona = "simple"  
         self.reward_fn = self._load_reward_fn(self.persona)
-
+        self.ACTION_NAMES = ACTION_NAMES
+        
         # Timer knobs
         self.use_timer = bool(kwargs.pop("use_timer", True))
         self.timer_seconds = int(kwargs.pop("timer_seconds", 400))
@@ -121,16 +138,6 @@ class PlatformerCore:
         self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
         self._act_space = spaces.Discrete(8)
 
-        # Pygame Init
-        if self.render_mode == "human":
-            pygame.init()
-            # We initiate the window here if human
-            pygame.display.set_caption("PEAK Platformer")
-            self._surf = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
-        else:
-            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-            pygame.init()
-            self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
@@ -157,7 +164,7 @@ class PlatformerCore:
 
     def step(self, action: int):
         if not self.alive:
-            return self._obs(), 0.0, True, {"episode_end": True, "won": self.reached_goal}
+            return self._obs(), 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
         if self.render_mode != "human":
@@ -215,20 +222,37 @@ class PlatformerCore:
         if self.anti_stall: self._update_stall_metrics()
 
         terminated = self._check_termination()
+        
+        # Handle Truncation (Time limit logic moves here)
+        truncated = False
+        if self.use_timer and self.timer <= 0:
+            truncated = True
+        
+        # but for death-by-time, your logic treats it as death.
+        # If you want pure truncation (timeout isn't death):
+        # terminated = False
+        # truncated = True
+        
+        
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
         
         info = self._info()
         if terminated: info["episode_end"] = True
-        return self._obs(), 0, bool(terminated), info
+        return self._obs(), 0.0, bool(terminated), bool(truncated), info
 
-    def reset(self) -> np.ndarray:
+    def reset(self, seed=None, options=None) -> np.ndarray:
+        
+        super().reset(seed=seed)
+        
         if not self.reached_goal:   
             self.lives = self.max_lives 
             self.score = 0
             self.coins_total = 0
         self.load_level()
-        return self._obs()
+        
+        
+        return self._obs(), self._info()
 
     def load_level(self):
         self.alive = True
@@ -537,7 +561,7 @@ class PlatformerCore:
             "y_position": p.gObj.y, 
             "velocity_x": p.vx,
             "coins_collected": self.coins_total, 
-            "enemies_killed": self.kills_step,
+            "enemies_killed_step": self.kills_step,
             "powered_up": p.powered_up, 
             "terminated": not self.alive,
             "won": (self.reached_goal and not self.game_over),
