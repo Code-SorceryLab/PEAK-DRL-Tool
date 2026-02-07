@@ -89,7 +89,7 @@ print(f"{controls}")
 print("=================================")
 
 # --- Build env
-env = GameEnv(GameCls, render_mode="human", fps=args.fps)
+env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps)
 
 # Helper to find the actual game core instance through wrappers
 def find_core_game(env_instance):

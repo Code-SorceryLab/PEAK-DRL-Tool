@@ -1,6 +1,6 @@
 import pygame
 import collections
-from code.wrappers.RewardHub import RewardHub
+from .....wrappers.RewardHub import RewardHub
 from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay
 
 class DebugManager:
@@ -160,9 +160,14 @@ class DebugManager:
         # Border
         pygame.draw.rect(surface, (100, 100, 100), (x, y, panel_w, panel_h), 1)
         
+        # Setup
+        hub = RewardHub.get_instance()
+        last_action = hub.last_action_name
+        
+        
         # --- Info Text ---
         # 1. Action
-        t_action = self.font.render(f"Last Action: {self.last_action_name}", True, (255, 255, 255))
+        t_action = self.font.render(f"Last Action: {last_action}", True, (255, 255, 255))
         surface.blit(t_action, (x + 5, y + 5))
         
         # 2. Persona
