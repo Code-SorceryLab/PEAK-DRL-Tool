@@ -1,5 +1,7 @@
 # code/scripts/train.py
 import os
+from code.callbacks.dashboard import DashboardCallback
+
 
 try:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -402,6 +404,16 @@ def main(cfg: DictConfig):
                 train_kwargs["tensorboard_log"] = tb_dir
                 train_kwargs["device"] = device
                 
+                # Default to True unless user passes 'dashboard=False'
+                use_dashboard = bool(cfg.get("dashboard", True))
+                current_callbacks = [eval_cb, ckpt_cb]
+                
+                if use_dashboard:
+                # If we have many parallel envs, updating every step is chaotic.
+                # Update every 5 steps for smoothness.
+                    dash_cb = DashboardCallback(update_freq=1)
+                    current_callbacks.append(dash_cb)
+                    
                 # Build model (SB3-compatible Algo expected)
                 model = Algo(policy, env, **train_kwargs)
 
@@ -411,7 +423,7 @@ def main(cfg: DictConfig):
                 # Learn with callbacks + TB run label
                 model.learn(
                     total_timesteps=int(total_timesteps),
-                    callback=[eval_cb, ckpt_cb],
+                    callback=current_callbacks,
                     tb_log_name=tb_run_name,
                     progress_bar=True
                 )

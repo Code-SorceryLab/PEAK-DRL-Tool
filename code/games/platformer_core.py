@@ -247,6 +247,7 @@ class PlatformerCore(gymnasium.Env):
         self.frame = 0
         self.game_over = False
         self.reached_goal = False
+
         # 1. LOAD CONFIG & LEVEL
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
