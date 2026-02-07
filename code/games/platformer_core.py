@@ -54,6 +54,17 @@ class PlatformerCore(gymnasium.Env):
     def __init__(self, render_mode: str = "none", **kwargs):
         self.render_mode = render_mode
         
+        if self.render_mode == "human":
+            pygame.init()
+            pygame.display.set_caption("PEAK Platformer")
+            self._surf = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        else:
+            # Headless / Training mode
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            pygame.init()
+            self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
+        
+        
         # 1. Initialize Managers
         self.config_manager = ConfigManager("game_config.yaml")
         self.loader = LevelLoader()
@@ -127,16 +138,6 @@ class PlatformerCore(gymnasium.Env):
         self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
         self._act_space = spaces.Discrete(8)
 
-        # Pygame Init
-        if self.render_mode == "human":
-            pygame.init()
-            # We initiate the window here if human
-            pygame.display.set_caption("PEAK Platformer")
-            self._surf = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
-        else:
-            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-            pygame.init()
-            self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)

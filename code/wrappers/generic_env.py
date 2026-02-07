@@ -52,8 +52,8 @@ class GameEnv(gym.Env):
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         self._step_count = 0
-        obs = self.game.reset()
-        return obs, {}
+        obs, info = self.game.reset()
+        return obs, info
 
     def step(self, action):
         self._step_count += 1
