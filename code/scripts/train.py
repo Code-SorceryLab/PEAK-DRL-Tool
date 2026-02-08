@@ -241,21 +241,23 @@ def main(cfg: DictConfig):
                     name_prefix=f"{game_name}_{model_name}_{persona}"
                 )
 
+                
+                use_dashboard = bool(cfg.get("dashboard", True))
+                
+                # Start with standard callbacks
+                current_callbacks = [eval_cb, ckpt_cb]
+                
+                if use_dashboard:
+                    # Update freq 1 = Smoothest, but slows training slightly
+                    dash_cb = DashboardCallback(update_freq=1)
+                    current_callbacks.append(dash_cb)
+                
                 # Inject TensorBoard path into algo kwargs
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir
                 train_kwargs["device"] = device
-                
-                # Default to True unless user passes 'dashboard=False'
-                use_dashboard = bool(cfg.get("dashboard", True))
-                current_callbacks = [eval_cb, ckpt_cb]
-                
-                if use_dashboard:
-                # If we have many parallel envs, updating every step is chaotic.
-                # Update every 5 steps for smoothness.
-                    dash_cb = DashboardCallback(update_freq=10)
-                    current_callbacks.append(dash_cb)
-                    
+
+
                 # Build model (SB3-compatible Algo expected)
                 model = Algo(policy, env, **train_kwargs)
 
