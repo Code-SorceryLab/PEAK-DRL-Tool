@@ -1,6 +1,7 @@
 import pygame
 import traceback
 from ...Parameters.Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL, COLOR_HITBOX)
+from ...Objects.Goal import Goal
 
 class DebugOverlay:
     def render(self, surface: pygame.Surface, core):
@@ -101,6 +102,7 @@ class AgentViewOverlay(DebugOverlay):
         # Optimization: Pre-fetch sets
         enemy_locs = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE)) for e in core.level_data.enemies if e.gObj.active}
         coin_locs = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE)) for c in core.level_data.coins if c.gObj.active and not getattr(c, 'collected', False)}
+        Goal_locs = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE)) for g in core.level_data.goals if g.gObj.active}
 
         for dy_i, dy in enumerate(range(-4, 5)):
             for dx_i, dx in enumerate(range(-5, 6)):
@@ -128,6 +130,9 @@ class AgentViewOverlay(DebugOverlay):
                 elif (tx, ty) in coin_locs: 
                     color = (255, 215, 0)   # Coin Gold
                     border_color = (255, 255, 200)
+                elif (tx, ty) in Goal_locs:
+                    color = (0, 200, 0)     # Goal Green
+                    border_color = (100, 255, 100)
                 
                 # Player (Center)
                 if dx == 0 and dy == 0: 
