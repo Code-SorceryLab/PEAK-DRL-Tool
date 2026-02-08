@@ -249,7 +249,7 @@ def main(cfg: DictConfig):
                 
                 if use_dashboard:
                     # Update freq 1 = Smoothest, but slows training slightly
-                    dash_cb = DashboardCallback(update_freq=1)
+                    dash_cb = DashboardCallback(update_freq=1000, show_event_log=True, show_detailed_stats=True)
                     current_callbacks.append(dash_cb)
                 
                 # Inject TensorBoard path into algo kwargs

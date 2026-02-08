@@ -175,6 +175,9 @@ class PlatformerCore(gymnasium.Env):
     def step(self, action: int):
         if not self.alive:
             return self._obs(), 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
+        
+        
+        
 
         # Time Calculation
         if self.render_mode != "human":
