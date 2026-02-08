@@ -20,6 +20,8 @@ class Player():
     facing_right: bool = True
     powered_up: bool = False
     
+    sprite: pygame.Surface = None
+    facing_right: bool = False
     invincible_timer: int = 0
     coyote: int = 0
     jump_hold: int = 0
@@ -32,7 +34,21 @@ class Player():
     input_dir: int = 0
     run_held: bool = False
     jump_pressed: bool = False
-        
+    
+    def __post_init__(self):
+        # We wrap this in try/except so the game doesn't crash if the image is missing
+        try:
+            # Check if pygame display is initialized to avoid the error you saw earlier
+            if pygame.display.get_surface() is not None:
+                path = 'code/games/assets/player1.png'
+                # Load and convert
+                img = pygame.image.load(path).convert_alpha()
+                # Scale it ONCE here, not every frame
+                self.sprite = pygame.transform.scale(img, (int(self.gObj.width), int(self.gObj.height)))
+        except Exception as e:
+            print(f"Sprite load failed: {e}")
+            self.sprite = None
+    
     def update(self, dt: float, context: PhysicsContext):
         self.dt = dt
         
@@ -77,7 +93,12 @@ class Player():
         elif is_left: self.input_dir = -1
         elif is_right: self.input_dir = 1
         else: self.input_dir = 0
-            
+        
+        if self.input_dir > 0:
+            self.facing_right = True
+        else:
+            self.facing_right = False
+        
         if self.jump_pressed:
             # We assume context values for buffering might be needed, 
             # but usually buffer length is static or context-derived in update.
@@ -138,21 +159,32 @@ class Player():
                 self.vy -= 0.30 * (dt * 60) 
             self.jump_hold -= 1
                 
-    def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):        
-        pygame.draw.rect(surface, self.color, (sx, sy, self.gObj.width, self.gObj.height))
-        pygame.draw.circle(surface, COLOR_WHITE, (int(sx + (14 if self.facing_right else 6)), int(sy + 8)), self.eye_radius)
-        if debug:
-            self._debug(surface, sx, sy)
-        if self.run_pressed and abs(self.vx) > 100: # Simple threshold
-            n = 3; spacing = 6; length = 10
-            for i in range(n):
-                offset = (i + 1) * spacing
-                if self.facing_right:
-                    x1 = sx - offset; x2 = x1 - length
-                else:
-                    x1 = sx + self.gObj.width + offset; x2 = x1 + length
-                y = sy + 10 + (i % 2) * 4
-                pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
+    def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
+        if self.sprite:
+            # Copy the sprite so we can flip it without changing the original
+            draw_img = self.sprite
+            
+            #2. Handle Direction Flipping
+            if not self.facing_right:
+                draw_img = pygame.transform.flip(self.sprite, True, False)
+            
+            # 3. Draw the sprite
+            surface.blit(draw_img, (int(sx), int(sy)))   
+        else:        
+            pygame.draw.rect(surface, self.color, (sx, sy, self.gObj.width, self.gObj.height))
+            pygame.draw.circle(surface, COLOR_WHITE, (int(sx + (14 if self.facing_right else 6)), int(sy + 8)), self.eye_radius)
+            if debug:
+                self._debug(surface, sx, sy)
+            if self.run_pressed and abs(self.vx) > 100: # Simple threshold
+                n = 3; spacing = 6; length = 10
+                for i in range(n):
+                    offset = (i + 1) * spacing
+                    if self.facing_right:
+                        x1 = sx - offset; x2 = x1 - length
+                    else:
+                        x1 = sx + self.gObj.width + offset; x2 = x1 + length
+                    y = sy + 10 + (i % 2) * 4
+                    pygame.draw.line(surface, COLOR_STREAK, (int(x1), int(y)), (int(x2), int(y)), 2)
 
     def _debug(self, surface: pygame.Surface, sx: float, sy: float):
         v_end = (int(sx + (self.vx * 5* self.dt)), int(sy + (self.vy * 5 *self.dt)))

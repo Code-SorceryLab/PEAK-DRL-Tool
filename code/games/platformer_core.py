@@ -41,7 +41,7 @@ from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATF
 # Screen / Tile geometry
 # =============================================================================
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 20, 32
+PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 32, 32
 
 # Action Map for Debug Display
 ACTION_NAMES = {
@@ -300,6 +300,7 @@ class PlatformerCore(gymnasium.Env):
             
         # self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True), sprite_manager=self.sprite_manager)
         self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
+        self.player.__post_init__()
         # 3. CONFIGURE PHYSICS
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
