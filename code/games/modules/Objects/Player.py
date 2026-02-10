@@ -2,12 +2,22 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from .GameObject import GameObject
 import pygame
+from typing import Dict, List, Any, Optional
+from enum import Enum, auto
 
 # Imports from sibling packages
 from ..Parameters import Movement_parameters as MP
 from ..Parameters import Jump_parameters as JP
 from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR
 from ..System.PhysicsManager import PhysicsContext
+from ..System.AnimationHandler import AnimationHandler
+
+# --- PLAYER SPECIFIC ENUM ---
+class PlayerAnim(Enum):
+    IDLE = auto()
+    RUN = auto()
+    JUMP = auto()
+    FALL = auto()
 
 @dataclass
 class Player():
@@ -20,8 +30,10 @@ class Player():
     facing_right: bool = True
     powered_up: bool = False
     
-    sprite: pygame.Surface = None
-    facing_right: bool = False
+    # --- ANIMATION STATE ---
+    # The handler is initialized in __post_init__
+    anim_handler: AnimationHandler = field(init=False, default=None)
+    
     invincible_timer: int = 0
     coyote: int = 0
     jump_hold: int = 0
@@ -34,40 +46,86 @@ class Player():
     input_dir: int = 0
     run_held: bool = False
     jump_pressed: bool = False
-    
+
     def __post_init__(self):
-        # We wrap this in try/except so the game doesn't crash if the image is missing
-        try:
-            # Check if pygame display is initialized to avoid the error you saw earlier
-            if pygame.display.get_surface() is not None:
-                path = 'code/games/assets/player1.png'
-                # Load and convert
-                img = pygame.image.load(path).convert_alpha()
-                # Scale it ONCE here, not every frame
-                self.sprite = pygame.transform.scale(img, (int(self.gObj.width), int(self.gObj.height)))
-        except Exception as e:
-            print(f"Sprite load failed: {e}")
-            self.sprite = None
-    
+        # 1. Define Paths using our LOCAL Enum
+        # Use the same image for all states for now if you lack assets
+        default_asset = 'code/games/assets/player1.png'
+        
+        anim_paths = {
+            PlayerAnim.IDLE: [
+                'code/games/assets/player1.png',
+                'code/games/assets/player2.png',
+                'code/games/assets/player3.png',
+                'code/games/assets/player4.png'
+            ],
+            PlayerAnim.RUN: [default_asset],  # Placeholder
+            PlayerAnim.JUMP: [default_asset], # Placeholder
+            PlayerAnim.FALL: [default_asset]  # Placeholder
+        }
+        
+        # 2. Convert Enum keys to Int for the generic Handler
+        int_keyed_paths = {state.value: paths for state, paths in anim_paths.items()}
+        
+        # 3. Load Images
+        base_size = (int(self.gObj.width), int(self.gObj.height))
+        loaded_anims = AnimationHandler.load_animations(int_keyed_paths, base_size)
+        
+        # 4. Initialize Handler with the integer value of IDLE
+        self.anim_handler = AnimationHandler(
+            loaded_anims, 
+            default_state=PlayerAnim.IDLE.value, 
+            duration=0.1
+        )
+
     def update(self, dt: float, context: PhysicsContext):
         self.dt = dt
         
-        # 1. Handle Timers
+        # 1. Update Facing Direction
+        if self.vx > 1.0:
+            self.facing_right = True
+        elif self.vx < -1.0:
+            self.facing_right = False
+        
+        # 2. Update Animation State & Timer
+        self._update_animation_logic(dt)
+              
+        # 3. Timers
         if self.invincible_timer > 0:
             self.invincible_timer -= dt
         
-        # 2. Apply Input-based Physics
+        # 4. Physics & Gravity
         self.apply_physics(dt, context)
-
-        # 3. Apply Gravity
-        # Retrieve gravity values directly from context
         grav = context.FAST_FALL_GRAV if self.vy > 0 else context.GRAVITY
         self.vy = min(self.vy + (grav * dt), context.MAX_FALL_SPEED)
 
-        # 4. Apply Velocity to Position
         self.gObj.x += self.vx * dt
         self.gObj.y += self.vy * dt
         self.on_ground = False
+        
+    def _update_animation_logic(self, dt: float):
+        """Decides which animation state to use based on physics."""
+        if not self.anim_handler:
+            return
+
+        # Advance frame timer
+        self.anim_handler.update(dt)
+
+        # Logic for state switching
+        target_state = PlayerAnim.IDLE
+        
+        if not self.on_ground:
+            if self.vy < 0:
+                target_state = PlayerAnim.JUMP
+            else:
+                target_state = PlayerAnim.FALL
+        elif abs(self.vx) > 10: # Threshold for moving
+            target_state = PlayerAnim.RUN
+        else:
+            target_state = PlayerAnim.IDLE
+            
+        # Hand the state (int) to the handler
+        self.anim_handler.set_state(target_state.value)
 
     def handle_input(self, a: int):    
         agent_left = (a in (1,6))
@@ -93,20 +151,11 @@ class Player():
         elif is_left: self.input_dir = -1
         elif is_right: self.input_dir = 1
         else: self.input_dir = 0
-        
-        if self.input_dir > 0:
-            self.facing_right = True
-        else:
-            self.facing_right = False
-        
+            
         if self.jump_pressed:
-            # We assume context values for buffering might be needed, 
-            # but usually buffer length is static or context-derived in update.
-            # For simplicity, we just set the counter here, logic handles it in physics.
-            self.jump_buffer = 6 # Default fallback, overwritten in apply_physics logic if needed
+            self.jump_buffer = 6 
 
     def apply_physics(self, dt: float, ctx: PhysicsContext):
-        # 1. Movement params from Context
         if self.run_held:
             target_max = ctx.MAX_RUN_SPEED
             accel_rate = ctx.RUN_ACCEL
@@ -117,7 +166,6 @@ class Player():
         if not self.on_ground:
             accel_rate *= ctx.AIR_CONTROL
 
-        # 2. Horizontal Movement Logic
         if self.input_dir != 0:
             target_vx = self.input_dir * target_max
             skidding = (self.vx > 0 and self.input_dir < 0) or (self.vx < 0 and self.input_dir > 0)
@@ -127,17 +175,14 @@ class Player():
             else:
                 if self.input_dir > 0: self.vx = min(self.vx + (accel_rate * dt), target_max)
                 else: self.vx = max(self.vx - (accel_rate * dt), -target_max)
-            self.facing_right = (self.input_dir > 0)
         else:
             friction = (ctx.GROUND_FRICTION if self.on_ground else ctx.AIR_FRICTION) * dt
             if self.vx > 0: self.vx = max(0, self.vx - friction)
             elif self.vx < 0: self.vx = min(0, self.vx + friction)
 
-        # 3. Jump Logic
         self.handle_jump(dt, ctx)
 
     def handle_jump(self, dt: float, ctx: PhysicsContext):
-        # Update buffer using Context frames if needed, otherwise use local counter
         if self.jump_pressed:
             self.jump_buffer = ctx.JUMP_BUFFER_FRAMES
 
@@ -155,27 +200,29 @@ class Player():
 
         if self.jump_hold > 0:
             if self.jump_pressed:
-                # Variable jump height logic
                 self.vy -= 0.30 * (dt * 60) 
             self.jump_hold -= 1
                 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
-        if self.sprite:
-            # Copy the sprite so we can flip it without changing the original
-            draw_img = self.sprite
+        # 1. Get Sprite from Handler
+        sprite = None
+        if self.anim_handler:
+            sprite = self.anim_handler.get_sprite(not self.facing_right)
             
-            #2. Handle Direction Flipping
-            if not self.facing_right:
-                draw_img = pygame.transform.flip(self.sprite, True, False)
+        if sprite:
+            # Adjust Y pos so we grow UPWARDS (align bottom)
+            y_offset = sprite.get_height() - self.gObj.height
+            surface.blit(sprite, (int(sx), int(sy - y_offset)))
             
-            # 3. Draw the sprite
-            surface.blit(draw_img, (int(sx), int(sy)))   
-        else:        
+            if debug:
+                self._debug(surface, sx, sy)
+        else:
+            # Fallback
             pygame.draw.rect(surface, self.color, (sx, sy, self.gObj.width, self.gObj.height))
             pygame.draw.circle(surface, COLOR_WHITE, (int(sx + (14 if self.facing_right else 6)), int(sy + 8)), self.eye_radius)
             if debug:
                 self._debug(surface, sx, sy)
-            if self.run_pressed and abs(self.vx) > 100: # Simple threshold
+            if self.run_pressed and abs(self.vx) > 100: 
                 n = 3; spacing = 6; length = 10
                 for i in range(n):
                     offset = (i + 1) * spacing
