@@ -2,16 +2,14 @@ import os
 import csv
 import numpy as np
 import collections
-from datetime import datetime
 from stable_baselines3.common.callbacks import BaseCallback
 
 class DashboardCallback(BaseCallback):
     """
-    The 'Sherlock' Dashboard.
-    - Identifies the *CAUSE* of rewards (Kill vs Coin vs Win).
-    - Tracks Gains, Losses, and Trends.
-    - Auto-exports events to 'training_events.csv'.
-    - High-Performance (Lazy Rendering protected).
+    The 'Black Box' Dashboard (Telemetry Edition).
+    - Logs: Step, Event, Reward, Cause, Action, Level, Pos(X,Y), Vel(X,Y), GoalDist.
+    - Features: Stall Detection, Trend Line, Event Log.
+    - Performance: Lazy Rendering (high fps) + Event-driven Updates.
     """
     def __init__(self, update_freq: int = 1000, log_file: str = "training_events.csv", 
                  show_event_log: bool = True, show_detailed_stats: bool = True, verbose: int = 0):
@@ -37,6 +35,13 @@ class DashboardCallback(BaseCallback):
         self.line_trend = None
         self.text_display = None
         
+        # Action Map
+        self.action_map = {
+            0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
+            4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 
+            7: "RUN+RIGHT+JUMP", 8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
+        }
+        
         # Labels
         self.phys_labels = ["Px", "Py", "Vx", "Vy", "Ground"]
         self.obs_labels = ["E-Dist", "C-Dist", "G-Dist", "E-Cnt", "C-Cnt", "Score", "Time", "Lives"]
@@ -49,12 +54,16 @@ class DashboardCallback(BaseCallback):
         self.bar_labels = self.obs_labels + self.rew_labels
 
     def _init_callback(self) -> None:
-        # 1. Initialize CSV (With new 'Cause' column)
+        # 1. Initialize CSV (Clean Format, No Timestamp)
         try:
             with open(self.log_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Timestamp", "Step", "Event", "Reward", "Cause", "Info"])
-            if self.verbose > 0: print(f"[Dashboard] Logging to {self.log_file}")
+                # Exact columns requested
+                writer.writerow([
+                    "Step", "Event", "Reward", "Cause", 
+                    "Action", "Level", "X", "Y", "Vx", "Vy", "Goal_Dist"
+                ])
+            if self.verbose > 0: print(f"[Dashboard] Logging telemetry to {self.log_file}")
         except Exception as e:
             print(f"[Dashboard] CSV Error: {e}")
 
@@ -72,7 +81,7 @@ class DashboardCallback(BaseCallback):
 
             plt.ion()
             self.fig = plt.figure(figsize=(12, 7), constrained_layout=True)
-            self.fig.canvas.manager.set_window_title("PEAK Training Command (Sherlock Mode)")
+            self.fig.canvas.manager.set_window_title("PEAK Training Telemetry")
             
             gs = gridspec.GridSpec(2, 2, width_ratios=[3, 1])
             
@@ -94,13 +103,12 @@ class DashboardCallback(BaseCallback):
             self.ax_bars.set_xticks(x_pos)
             self.ax_bars.set_xticklabels(self.bar_labels, rotation=45, ha='right', fontsize=9)
             
-            # Colors
             colors = ['#00ffff'] * len(self.obs_labels)
             colors += ['#3498db', '#f1c40f', '#e74c3c', '#2ecc71', '#9b59b6', '#c0392b']
             for bar, c in zip(self.bar_container, colors):
                 bar.set_color(c)
 
-            # Text Sidebar
+            # Sidebar
             self.ax_text = self.fig.add_subplot(gs[:, 1])
             self.ax_text.axis('off')
             self.text_display = self.ax_text.text(0.05, 0.98, "SYSTEM ONLINE...", 
@@ -113,34 +121,42 @@ class DashboardCallback(BaseCallback):
             self.fig = None
 
     def _identify_cause(self, rew_dict, total_reward):
-        """
-        Sherlock Logic: Find which component contributed most to the reward.
-        Returns the name of the component (e.g., 'Kill', 'Coin').
-        """
         if not rew_dict: return "Unknown"
-        
-        # Find key with max absolute value
         max_key = max(rew_dict, key=lambda k: abs(rew_dict[k]))
-        max_val = rew_dict[max_key]
-        
-        # If the biggest factor is tiny, it's probably just "Movement" or "Time"
-        if abs(max_val) < 0.1:
-            return "Noise"
-            
-        # Translate to human label
+        if abs(rew_dict[max_key]) < 0.1: return "Noise"
         return self.rew_map.get(max_key, max_key)
 
-    def _log_to_csv(self, event_type, reward, cause, info_str=""):
+    def _log_to_csv(self, event_type, reward, cause, info):
+        """
+        Writes expanded telemetry to CSV.
+        """
         try:
+            # Extract extended info
+            act_idx = info.get("action", 0)
+            action_name = self.action_map.get(act_idx, str(act_idx))
+            
+            # Fetch new metrics from Core
+            level = info.get("level", 0)
+            x_pos = info.get("x_position", 0.0)
+            y_pos = info.get("y_position", 0.0)
+            vx = info.get("velocity_x", 0.0)
+            vy = info.get("velocity_y", 0.0)
+            goal_dist = info.get("goal_dist", 0.0)
+
             with open(self.log_file, 'a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    datetime.now().strftime("%H:%M:%S"),
                     self.n_calls,
                     event_type,
                     f"{reward:.4f}",
                     cause,
-                    info_str
+                    action_name,
+                    level,
+                    f"{x_pos:.1f}",
+                    f"{y_pos:.1f}",
+                    f"{vx:.1f}",
+                    f"{vy:.1f}",
+                    f"{goal_dist:.1f}"
                 ])
         except:
             pass
@@ -148,7 +164,6 @@ class DashboardCallback(BaseCallback):
     def _on_step(self) -> bool:
         if not self.active: return True
 
-        # 1. Fetch Data
         obs = self.locals.get("new_obs")
         rewards = self.locals.get("rewards")
         infos = self.locals.get("infos")
@@ -160,29 +175,32 @@ class DashboardCallback(BaseCallback):
         current_info = infos[0] if infos else {}
         rew_dict = current_info.get("reward_components", {})
         
-        # 2. Update Buffers
+        # Buffer
         self.reward_buffer.append(current_reward)
         recent = list(self.reward_buffer)[-50:]
         trend_val = sum(recent) / len(recent) if recent else 0
         self.trend_buffer.append(trend_val)
 
-        # 3. EVENT DETECTION 🧠
+        # --- EVENT DETECTION ---
         event_str = None
         cause_str = ""
         
         is_win = current_info.get("won", False)
         is_death = current_info.get("terminated", False) and not is_win
+        is_stalled = current_info.get("stalled", False) # <--- NEW CHECK
         
-        # Thresholds
         is_big_gain = (current_reward > 2.0) and not is_win
-        is_big_loss = (current_reward < -2.0) and not is_death
+        is_big_loss = (current_reward < -2.0) and not is_death and not is_stalled
 
         if is_win:
             event_str = "🏆 WIN"
             cause_str = "Goal"
         elif is_death:
             event_str = "💀 DIED"
-            cause_str = "Hazard" 
+            cause_str = "Hazard"
+        elif is_stalled:
+            event_str = "⚠️ STALL" # <--- Explicit Event for Stall
+            cause_str = "Time/Camp"
         elif is_big_gain:
             event_str = "🚀 GAIN"
             cause_str = self._identify_cause(rew_dict, current_reward)
@@ -190,19 +208,16 @@ class DashboardCallback(BaseCallback):
             event_str = "📉 LOSS"
             cause_str = self._identify_cause(rew_dict, current_reward)
 
-        # Log if event happened
+        # Log to CSV
         if event_str:
-            self._log_to_csv(event_str.split()[-1], current_reward, cause_str)
+            self._log_to_csv(event_str.split()[-1], current_reward, cause_str, current_info)
             if self.show_event_log:
                 log_msg = f"{self.n_calls}: {event_str} ({current_reward:+.1f}) [{cause_str}]"
                 self.event_log.append(log_msg)
 
-        # 4. RENDER LOGIC (STRICT PERFORMANCE) 🔒
-        # FIX: Only force render on CRITICAL events (Win/Die).
-        # Regular "Gains/Losses" will just show up on the next periodic update.
-        is_critical = is_win or is_death
+        # --- RENDER LOGIC ---
+        is_critical = is_win or is_death # Stalls don't force render, just log
         is_periodic = (self.n_calls % self.update_freq == 0)
-        
         should_render = is_periodic or is_critical
         
         if self.fig is None or not should_render:
@@ -214,7 +229,7 @@ class DashboardCallback(BaseCallback):
             return True
 
         try:
-            # A. Prepare Data
+            # Prepare Data
             if current_obs.shape[0] >= 310:
                 phys_vals = list(current_obs[:5])
                 obs_vals = list(current_obs[-8:])
@@ -223,18 +238,23 @@ class DashboardCallback(BaseCallback):
                 obs_vals = [0]*8
             rew_vals = [float(rew_dict.get(k, 0.0)) for k in self.rew_keys]
 
-            # B. Update Text
+            # Update Text
             lines = []
             if self.show_event_log:
                 lines.append("== EVENT LOG ==")
-                if not self.event_log: lines.append(" (Waiting for action...)")
+                if not self.event_log: lines.append(" (Waiting...)")
                 lines.extend(list(self.event_log))
             
             if self.show_detailed_stats:
                 lines.append("\n== TRENDS ==")
-                lines.append(f"Current : {current_reward:+.3f}")
-                lines.append(f"Average : {trend_val:+.3f}")
+                lines.append(f"Reward  : {current_reward:+.3f}")
+                lines.append(f"Trend   : {trend_val:+.3f}")
                 
+                act_idx = current_info.get("action", 0)
+                act_name = self.action_map.get(act_idx, "UNK")
+                lines.append(f"Action  : {act_name}")
+                lines.append(f"Level   : {current_info.get('level', '?')}") # Show Level
+
                 lines.append("\n== REWARDS ==")
                 for lbl, val in zip(self.rew_labels, rew_vals):
                     mark = " <<" if abs(val) > 0.001 else ""
@@ -242,7 +262,7 @@ class DashboardCallback(BaseCallback):
 
             self.text_display.set_text("\n".join(lines))
 
-            # C. Update Graphs
+            # Update Graphs
             self.line_reward.set_data(range(len(self.reward_buffer)), self.reward_buffer)
             self.line_trend.set_data(range(len(self.trend_buffer)), self.trend_buffer)
             self.ax_graph.set_xlim(0, max(300, len(self.reward_buffer)))
@@ -253,7 +273,7 @@ class DashboardCallback(BaseCallback):
                 pad = (y_max - y_min) * 0.1 if y_max != y_min else 1.0
                 self.ax_graph.set_ylim(y_min - pad, y_max + pad)
 
-            # D. Update Bars
+            # Update Bars
             all_vals = obs_vals + rew_vals
             for rect, val in zip(self.bar_container, all_vals):
                 rect.set_height(val)
@@ -265,8 +285,7 @@ class DashboardCallback(BaseCallback):
 
             self.fig.canvas.flush_events()
             
-        except Exception as e:
-            # self.fig = None # Don't kill it, just skip this frame
+        except Exception:
             pass
 
         return True

@@ -176,9 +176,6 @@ class PlatformerCore(gymnasium.Env):
         if not self.alive:
             return self._obs(), 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
         
-        
-        
-
         # Time Calculation
         if self.render_mode != "human":
             self.dt = 1 / 60.0
@@ -317,12 +314,17 @@ class PlatformerCore(gymnasium.Env):
         self.stall_timer = 0
         self.stall_windows_count = 0
         self.stalled_this_frame = False
+        self.max_x_seen = px
+        self.best_dist_to_goal = self._get_dist_to_goal()
+        
+        
         self.camera_x = 0.0
         self.camera_y = 0.0
         self.last_score = 0
         self.last_x = self.player.gObj.x
 
         self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
+    
         
     def complete_level(self):
         #print(f"Level Complete! Current World: {self.world}")
@@ -349,10 +351,10 @@ class PlatformerCore(gymnasium.Env):
 
     def _update_camera(self):
         if self.debug_manager.free_cam_active:
-             movement_x, movement_y = self.debug_manager.current_cam_move
-             self.camera_x += movement_x * self.dt
-             self.camera_y += movement_y * self.dt
-             return
+            movement_x, movement_y = self.debug_manager.current_cam_move
+            self.camera_x += movement_x * self.dt
+            self.camera_y += movement_y * self.dt
+            return
 
         if not self.camera_lock or not self.player: return
         
@@ -370,23 +372,52 @@ class PlatformerCore(gymnasium.Env):
         self.camera_y += (target_y - self.camera_y) * self.camera_smoothing
         self.camera_y = max(0, min(self.camera_y, max(0, level_h - self.HEIGHT)))
 
+    def _get_dist_to_goal(self) -> float:
+            """
+            Calculates the minimum Euclidean distance from the player to any goal.
+            """
+            if not self.player: return float('inf')
+            if not self.level_data.goals:
+                # Fallback: Distance to the far right edge of the level
+                return self.level_data.width - self.player.gObj.x
+            
+            px, py = self.player.gObj.x, self.player.gObj.y
+            min_d = float('inf')
+            
+            for g in self.level_data.goals:
+                # Simple Euclidean distance
+                gx, gy = g.gObj.x, g.gObj.y
+                d = math.hypot(gx - px, gy - py)
+                if d < min_d: min_d = d
+                
+            return min_d
+        
+
     def _update_stall_metrics(self):
+        """
+        FIX: Stall logic now uses Euclidean distance to goal.
+        """
         if not self.player: return
-        prog_x = self.player.gObj.x
-        prog_y = self.level_data.height - self.player.gObj.y
-        progressed = False
+        
+        if self.player.gObj.x > self.max_x_seen:
+            self.max_x_seen = self.player.gObj.x
 
-        if prog_x > self.progress_x_best + (TILE_SIZE / 2):
-            self.progress_x_best = prog_x; progressed = True
-        if prog_y > self.progress_y_best + (TILE_SIZE / 2):
-            self.progress_y_best = prog_y; progressed = True
-
-        if progressed:
-            self.stall_timer = 0; self.stalled_this_frame = False
+        current_dist = self._get_dist_to_goal()
+        
+        # Improvement Threshold: half a tile
+        threshold = TILE_SIZE / 2.0
+        
+        # If we got closer than ever before
+        if current_dist < (self.best_dist_to_goal - threshold):
+            self.best_dist_to_goal = current_dist
+            self.stall_timer = 0
+            self.stalled_this_frame = False
         else:
             self.stall_timer += self.dt
             if self.stall_timer >= self.stall_window:
-                self.stalled_this_frame = True; self.stall_timer = 0; self.stall_windows_count += 1
+                self.stalled_this_frame = True
+                self.stall_timer = 0 # Pulse
+                self.stall_windows_count += 1
 
     def _check_termination(self) -> bool:
         """
@@ -476,8 +507,8 @@ class PlatformerCore(gymnasium.Env):
 
     def _player_obs(self) -> np.ndarray:
         p = self.player
-        w = max(1.0, float(self.level_data.width))
-        h = max(1.0, float(self.level_data.height))
+        w = max(1.0, TILE_SIZE)
+        h = max(1.0, TILE_SIZE)
         # 5 Values
         return np.array([
             p.gObj.x / w, 
@@ -598,16 +629,16 @@ class PlatformerCore(gymnasium.Env):
         c_dist, c_count = get_dist(self.level_data.coins)
         
         # 3. Goal Dist
-        w = max(1.0, float(self.level_data.width))
-        goal_dist = (w - p.gObj.x) / w
-
+        raw_goal_dist = self._get_dist_to_goal()
+        norm_dist = 1000.0
+        
         # Normalization constants (approximate level diagonal or screen size)
-        norm_dist = 1000.0 
-
+        
+        
         return np.array([
             min(1.0, e_dist / norm_dist), # Nearest Enemy Dist
             min(1.0, c_dist / norm_dist), # Nearest Coin Dist
-            goal_dist,                    # Goal Distance
+            min(1.0, raw_goal_dist / norm_dist),  # Goal Distance
             min(1.0, e_count / 20.0),     # Active Enemies (Normalized cap 20)
             min(1.0, c_count / 50.0),     # Active Coins (Normalized cap 50)
             self.score / 5000.0,          # Score
@@ -634,7 +665,8 @@ class PlatformerCore(gymnasium.Env):
             "max_x_seen": self.max_x_seen, 
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
-            "persona": self.persona
+            "persona": self.persona,
+            "goal_dist": self._get_dist_to_goal()
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):
