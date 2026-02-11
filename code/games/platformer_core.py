@@ -507,8 +507,8 @@ class PlatformerCore(gymnasium.Env):
 
     def _player_obs(self) -> np.ndarray:
         p = self.player
-        w = max(1.0, TILE_SIZE)
-        h = max(1.0, TILE_SIZE)
+        w = max(1.0, float(self.level_data.width))
+        h = max(1.0, float(self.level_data.height))
         # 5 Values
         return np.array([
             p.gObj.x / w, 
@@ -654,7 +654,7 @@ class PlatformerCore(gymnasium.Env):
             "frame_count": self.frame,
             "x_position": p.gObj.x, 
             "y_position": p.gObj.y, 
-            "velocity_x": p.vx,
+            "velocity_x": p.vx, "velocity_y": p.vy,
             "coins_collected": self.coins_total, 
             "enemies_killed_step": self.kills_step,
             "powered_up": p.powered_up, 
@@ -665,7 +665,7 @@ class PlatformerCore(gymnasium.Env):
             "max_x_seen": self.max_x_seen, 
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
-            "persona": self.persona,
+            "persona": self.persona, "level": self.current_index_world,
             "goal_dist": self._get_dist_to_goal()
         }
 
