@@ -1,6 +1,6 @@
 _target_: algos.get_algo
 name: ppo               # looked up inside get_algo → PPO class
-policy: MlpPolicy
+policy: MultiInputPolicy
 
 # --- Exploration & Memory Settings ---
 n_steps: 4096
@@ -15,9 +15,9 @@ gamma: 0.99
 clip_range: 0.2
 verbose: 1
 
-policy_kwargs:
-  optimizer_kwargs:
-    weight_decay: 1e-4
+# policy_kwargs:
+#   optimizer_kwargs:
+#     weight_decay: 1e-4
 
 
 device: cpu      # cpu / cuda

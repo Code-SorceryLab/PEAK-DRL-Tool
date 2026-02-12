@@ -17,6 +17,8 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
+import torch.nn as nn
+from gymnasium import spaces
 import hydra
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig, OmegaConf
@@ -24,6 +26,7 @@ from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback, EvalCallback, CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sb3_contrib import RecurrentPPO
 
 from code.wrappers.generic_env import GameEnv
@@ -69,6 +72,63 @@ def _resolve_callable_or_instance(node: Dict[str, Any]) -> Any:
         return obj(**kwargs)
     return obj
 #### Helper functions END ####
+
+# =========================================================================
+# Custom Multimodal Extractor (Fixes PyTorch Crash on small grids)
+# =========================================================================
+class CustomCombinedExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict):
+        # We do not know features-dim here before going over all the items,
+        # so put something dummy for now. PyTorch requires int!
+        super().__init__(observation_space, features_dim=1)
+
+        extractors = {}
+        total_concat_size = 0
+
+        for key, subspace in observation_space.spaces.items():
+            if key == "grids":
+                # We will just use a simpler CNN appropriate for 21x21 or 11x9
+                n_input_channels = subspace.shape[0]
+                cnn = nn.Sequential(
+                    nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
+                    nn.ReLU(),
+                    nn.MaxPool2d(2),
+                    nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+                    nn.ReLU(),
+                    nn.Flatten(),
+                )
+
+                # Compute shape by doing one forward pass
+                with torch.no_grad():
+                    sample_tensor = torch.as_tensor(subspace.sample()[None]).float()
+                    n_flatten = cnn(sample_tensor).shape[1]
+
+                linear = nn.Sequential(nn.Linear(n_flatten, 128), nn.ReLU())
+                extractors[key] = nn.Sequential(cnn, linear)
+                total_concat_size += 128
+
+            elif key == "scalars":
+                # Standard MLP for the 1D scalars
+                extractors[key] = nn.Sequential(
+                    nn.Linear(subspace.shape[0], 64),
+                    nn.ReLU()
+                )
+                total_concat_size += 64
+
+        self.extractors = nn.ModuleDict(extractors)
+
+        # Update the features dim manually
+        self._features_dim = total_concat_size
+
+    def forward(self, observations) -> torch.Tensor:
+        encoded_tensor_list = []
+
+        # self.extractors contain nn.Modules that do all the processing.
+        for key, extractor in self.extractors.items():
+            encoded_tensor_list.append(extractor(observations[key]))
+            
+        # Return a (B, features_dim) PyTorch tensor
+        return torch.cat(encoded_tensor_list, dim=1)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="grid")
 def main(cfg: DictConfig):
@@ -155,6 +215,11 @@ def main(cfg: DictConfig):
         algo_kwargs = {k: v for k, v in algo_conf.items() if k not in {"_target_", "name", "policy", "policy_kwargs"}}
 
         # Add policy_kwargs if present
+        if policy == "MultiInputPolicy":
+            if policy_kwargs is None:
+                policy_kwargs = {}
+            policy_kwargs["features_extractor_class"] = CustomCombinedExtractor
+        
         if policy_kwargs:
             # Convert activation_fn string to callable for SB3 compatibility
             activation_fn_map = {
@@ -247,7 +312,7 @@ def main(cfg: DictConfig):
                 # Start with standard callbacks
                 current_callbacks = [eval_cb, ckpt_cb]
                 
-                if use_dashboard:
+                if False:
                     # Update freq 1 = Smoothest, but slows training slightly
                     dash_cb = DashboardCallback(update_freq=1000, show_event_log=True, show_detailed_stats=True)
                     current_callbacks.append(dash_cb)

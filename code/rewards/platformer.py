@@ -206,27 +206,42 @@ def coin_collector(score_inc: bool, terminated: bool, info: Info, score: int) ->
 
 @_wrap_with_tracker
 def master(score_inc: bool, terminated: bool, info: Info, score: int) -> float:
-    progress = float(info.get("progress", 0.0))
+    """
+    MASTER: Hunts for coins and enemies, but STILL needs a breadcrumb trail
+    to know which way to go.
+    """
     coins = int(info.get("coins_delta", 0))
     kills = int(info.get("enemies_killed_step", 0))
     won = info.get("won", False)
+    progress = float(info.get("progress", 0.0))
     current_x = float(info.get("x_position", 0.0))
+    lives_left = int(info.get("lives", 3))
 
-    r_move = progress / 10.0 if progress > 0 else -0.015
-    r_coin = 1.2 * coins
-    r_kill = 2.0 * kills
+    # 1. Rewards
+    r_move = progress / 10.0  # Gives it a reason to walk right!
+    r_coin = coins * 3.0
+    r_kill = kills * 2.0
+    r_win = 100.0 if won else 0.0
     
-    r_win = 0.0
-    if won:
-        r_win = 10.0 if current_x > 200 else -5.0
-
+    # 2. Penalties
+    r_death = 0.0
+    if terminated and not won:
+        if lives_left > 0:
+            r_death = -5.0   # Lost a single life
+        else:
+            r_death = -50.0  # Game over (no lives left)
+    
+    # FIXED: Actually inject r_move into the components dict!
     info["reward_components"] = {
-        "movement": r_move,
-        "coins": r_coin,
-        "kills": r_kill,
-        "win": r_win
+        "r_move": r_move,
+        "r_coins": r_coin, 
+        "r_kills": r_kill, 
+        "r_win": r_win, 
+        "r_death": r_death
     }
-    return r_move + r_coin + r_kill + r_win
+    total_reward = sum(info["reward_components"].values())
+    
+    return total_reward
 
 
 @_wrap_with_tracker

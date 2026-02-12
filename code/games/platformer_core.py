@@ -109,8 +109,8 @@ class PlatformerCore(gymnasium.Env):
         
         # Anti-stall
         self.anti_stall = bool(kwargs.pop("anti_stall", True))
-        self.stall_window = int(kwargs.pop("stall_window", 1.5))
-        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 6))
+        self.stall_window = float(kwargs.pop("stall_window", 10))
+        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 30))
         
         self.timer = self.timer_seconds
         self.time_last_step = time.time()
@@ -144,8 +144,25 @@ class PlatformerCore(gymnasium.Env):
         # 4. Collectable Array (11x9 = 99)
         # 5. Tracking Data (8)
         # Total: 5 + 99 + 99 + 99 + 8 = 310
-        obs_len = 310
-        self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
+        # obs_len = 310
+        # self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
+                # --- NEW: VARIABLE GRID OBSERVATION SIZE ---
+        # Default to the original 11x9 if not provided
+        self.obs_width = 21
+        self.obs_height = 21
+        
+        # Calculate padding needed to center the player in the grid
+        self.obs_pad_x = self.obs_width // 2
+        self.obs_pad_y = self.obs_height // 2
+        
+        self._obs_space = spaces.Dict({
+            # "grids": 3 Channels (Solid, Hazard, Collectable) x Dynamic Height x Dynamic Width
+            # SB3/PyTorch prefers Channel-First (C, H, W)
+            "grids": spaces.Box(low=0.0, high=1.0, shape=(3, self.obs_height, self.obs_width), dtype=np.float32),
+            
+            # "scalars": Player Data (5) + Tracking Data (8) = 13 total values
+            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32)
+        })
         self._act_space = spaces.Discrete(8)
 
 
@@ -259,6 +276,8 @@ class PlatformerCore(gymnasium.Env):
             self.lives = self.max_lives 
             self.score = 0
             self.coins_total = 0
+            self.current_index_world = 0
+            self.world = self.level_order[self.current_index_world]
         self.load_level()
         
         
@@ -336,13 +355,16 @@ class PlatformerCore(gymnasium.Env):
         self.world = self.level_order[self.current_index_world]
         self.load_level()
     
-    def _handle_death(self):
+    def _handle_death(self) -> bool:
         self.lives -= 1
         if self.lives > 0:
             self._soft_reset()
+            return False
         else:
             self.alive = False
             self.game_over = True
+            self.reset()
+            return True
 
     def _soft_reset(self):
         current_lives = self.lives
@@ -430,13 +452,12 @@ class PlatformerCore(gymnasium.Env):
         
         # 1. TIME LIMIT
         if self.use_timer and self.timer <= 0:
-            self._handle_death()
-            return True 
+            return self._handle_death()
 
         # 2. PIT DEATH (Y-limit)
         if player.gObj.y > self.level_data.height:
-            self._handle_death()
-            return True
+            return self._handle_death()
+            
         
         # 3. GOAL & SPIKES (Hitbox Precision)
         # Use the PhysicsManager's hash for pixel-perfect checks
@@ -446,64 +467,70 @@ class PlatformerCore(gymnasium.Env):
         # Query static objects near player
         nearby = self.level_data.static_hash.query(player.gObj)
         
-        for tile in nearby:
-            # We only care about entities with IDs (Spikes/Goals)
-            if not hasattr(tile, 'gObj') or not hasattr(tile.gObj, 'type_id'):
-                continue
+        # for tile in nearby:
+        #     # We only care about entities with IDs (Spikes/Goals)
+        #     if not hasattr(tile, 'gObj') or not hasattr(tile.gObj, 'type_id'):
+        #         continue
                 
-            tid = tile.gObj.type_id
+        #     tid = tile.gObj.type_id
             
-            # Check intersection
-            if p_rect.colliderect(tile.gObj.get_rect()):
-                if tid == EntityType.SPIKE:
-                    self._handle_death()
-                    return True
+        #     # Check intersection
+        #     if p_rect.colliderect(tile.gObj.get_rect()):
+        #         if tid == EntityType.SPIKE:
+        #             self._handle_death()
+        #             return True
                 
-                elif tid == EntityType.GOAL:
-                    # Double-check: Anti-Cheese (Left Wall Glitch)
-                    # Even if physics is fixed, this is a safety net.
-                    if player.gObj.x < 200: 
-                        self.score += 1000 + (int(self.timer) * 10)
-                        self.reached_goal = True
-                        # We return True so the Episode Ends and PPO gets the terminal reward.
-                        # The wrapper will call reset(), which loads the next level.
-                        self.complete_level() 
-                        return True
+        #         elif tid == EntityType.GOAL:
+        #             # Double-check: Anti-Cheese (Left Wall Glitch)
+        #             # Even if physics is fixed, this is a safety net.
+        #             if player.gObj.x < 200: 
+        #                 self.score += 1000 + (int(self.timer) * 10)
+        #                 self.reached_goal = True
+        #                 # We return True so the Episode Ends and PPO gets the terminal reward.
+        #                 # The wrapper will call reset(), which loads the next level.
+        #                 self.complete_level() 
+        #                 return True
 
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
             # print("Agent killed for stalling (camping).")
-            self._handle_death()
-            return True
+            return self._handle_death()
 
         return False
 
     # =========================================================================
     # NEW OBSERVATION LOGIC
     # =========================================================================
-    def _obs(self) -> np.ndarray:
+    def _obs(self) -> Dict[str, np.ndarray]:
         """
-        Constructs the vector observation:
-        [Player(5), Solid(99), Hazard(99), Collectable(99), Tracking(8)]
+        Constructs the dictionary observation for MultiInputPolicy:
+        "scalars": [Player(5), Tracking(8)] -> 1D Array
+        "grids":   [Solid, Hazard, Collectable] -> 3D Array (Channels, Height, Width)
         """
         # 1. Player Data (5)
         p_obs = self._player_obs()
         
-        # 2. Grids (99 * 3)
-        # We compute these together to save tile coord calcs
-        solid_grid, hazard_grid, collect_grid = self._grid_obs_window_11x9()
+        # 2. Grids (dynamic sizes based on kwargs)
+        solid_grid, hazard_grid, collect_grid = self._grid_obs_window()
         
         # 3. Tracking Data (8)
         track_obs = self._tracking_obs()
         
-        # Concatenate all
-        return np.concatenate([
-            p_obs,
-            solid_grid, 
-            hazard_grid,
-            collect_grid,
-            track_obs
-        ]).astype(np.float32)
+        # Stack grids for CNN [Channel, Height, Width]
+        h, w = self.obs_height, self.obs_width
+        g1 = solid_grid.reshape(h, w)
+        g2 = hazard_grid.reshape(h, w)
+        g3 = collect_grid.reshape(h, w)
+        
+        stacked_grids = np.stack([g1, g2, g3], axis=0).astype(np.float32) # Shape: (3, H, W)
+        
+        # Concatenate scalars for MLP
+        scalars = np.concatenate([p_obs, track_obs]).astype(np.float32) # Shape: (13,)
+        
+        return {
+            "grids": stacked_grids,
+            "scalars": scalars
+        }
 
     def _player_obs(self) -> np.ndarray:
         p = self.player
@@ -518,78 +545,53 @@ class PlatformerCore(gymnasium.Env):
             1.0 if p.on_ground else 0.0,
         ], dtype=np.float32)
         
-    def _grid_obs_window_11x9(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Returns flattened arrays for Solid, Hazard, and Collectable windows (11x9).
-        Window: 5 left, 5 right, 4 up, 4 down relative to player tile.
-        """
+    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         p = self.player
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
         
-        # --- A. SOLID ARRAY (Optimized Numpy Slice) ---
-        # Map player (px, py) to padded grid coordinates
-        # Window Start in Padded: (py - 4) + 4 = py
-        # Window End in Padded:   (py + 4) + 4 + 1 = py + 9
+        r_start, r_end = py, py + self.obs_height
+        c_start, c_end = px, px + self.obs_width
         
-        # 1. Define target slice indices
-        r_start, r_end = py, py + 9
-        c_start, c_end = px, px + 11
-        
-        # 2. Get the valid slice from the array (might be smaller than requested)
-        # We clamp start indices to be at least 0 to avoid wrapping issues with negative numbers
         r_start_clamped = max(0, r_start)
         c_start_clamped = max(0, c_start)
         
         raw_slice = self.padded_solid[r_start_clamped:r_end, c_start_clamped:c_end]
         
-        # 3. Check if we got the full 9x11 (99 elements)
-        if raw_slice.shape == (9, 11):
+        if raw_slice.shape == (self.obs_height, self.obs_width):
             solid_window = raw_slice.flatten()
         else:
-            # 4. If truncated (out of bounds), pad it back to 9x11
-            # Create a canvas of zeros (Air)
-            padded_slice = np.zeros((9, 11), dtype=np.float32)
-            
-            # Calculate where to paste the raw_slice onto the canvas
-            # (If we went off the bottom/right, paste into top-left)
-            # (If we went off top/left, slice logic handles it, but safety check:)
+            padded_slice = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
             h, w = raw_slice.shape
             
-            # Offset logic: 
-            # If r_start < 0, we clipped top rows. Paste at offset. 
-            # If r_end > array_h, we clipped bottom rows. Paste at 0.
             dest_y = 0 if r_start >= 0 else abs(r_start)
             dest_x = 0 if c_start >= 0 else abs(c_start)
             
-            # Ensure we don't overflow the canvas
-            paste_h = min(h, 9 - dest_y)
-            paste_w = min(w, 11 - dest_x)
+            paste_h = min(h, self.obs_height - dest_y)
+            paste_w = min(w, self.obs_width - dest_x)
             
             if paste_h > 0 and paste_w > 0:
                 padded_slice[dest_y : dest_y + paste_h, dest_x : dest_x + paste_w] = raw_slice[:paste_h, :paste_w]
             
             solid_window = padded_slice.flatten()
 
-        # --- B. DYNAMIC ARRAYS (Hazard/Collectable) ---
-        # (This part remains unchanged as it calculates relative coordinates safely)
-        hazard_grid = np.zeros((9, 11), dtype=np.float32)
-        collect_grid = np.zeros((9, 11), dtype=np.float32)
+        hazard_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         
         window_rect = pygame.Rect(
-            (px - 5) * TILE_SIZE, 
-            (py - 4) * TILE_SIZE, 
-            11 * TILE_SIZE, 
-            9 * TILE_SIZE
+            (px - self.obs_pad_x) * TILE_SIZE, 
+            (py - self.obs_pad_y) * TILE_SIZE, 
+            self.obs_width * TILE_SIZE, 
+            self.obs_height * TILE_SIZE
         )
         
         nearby_hazards = self.physics_manager.hazard_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
         for h in nearby_hazards:
             if not h.gObj.active: continue
             hx, hy = int(h.gObj.x // TILE_SIZE), int(h.gObj.y // TILE_SIZE)
-            local_x = hx - (px - 5)
-            local_y = hy - (py - 4)
-            if 0 <= local_x < 11 and 0 <= local_y < 9:
+            local_x = hx - (px - self.obs_pad_x)
+            local_y = hy - (py - self.obs_pad_y)
+            if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 hazard_grid[local_y, local_x] = 1.0
 
         nearby_items = self.physics_manager.collectible_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
@@ -598,9 +600,9 @@ class PlatformerCore(gymnasium.Env):
             if hasattr(c, 'collected') and c.collected: continue
             
             cx, cy = int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE)
-            local_x = cx - (px - 5)
-            local_y = cy - (py - 4)
-            if 0 <= local_x < 11 and 0 <= local_y < 9:
+            local_x = cx - (px - self.obs_pad_x)
+            local_y = cy - (py - self.obs_pad_y)
+            if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 collect_grid[local_y, local_x] = 1.0
 
         return solid_window, hazard_grid.flatten(), collect_grid.flatten()
@@ -608,42 +610,32 @@ class PlatformerCore(gymnasium.Env):
     def _tracking_obs(self) -> np.ndarray:
         p = self.player
         
-        # Helpers for "Nearest" logic
         def get_dist(obj_list):
             min_d = 9999.0
             count = 0
             for obj in obj_list:
                 if not obj.gObj.active: continue
                 if hasattr(obj, 'collected') and obj.collected: continue
-                
-                # Euclidean distance
                 d = math.sqrt((p.gObj.x - obj.gObj.x)**2 + (p.gObj.y - obj.gObj.y)**2)
                 if d < min_d: min_d = d
                 count += 1
             return min_d, count
 
-        # 1. Enemies
         e_dist, e_count = get_dist(self.level_data.enemies)
-        
-        # 2. Coins
         c_dist, c_count = get_dist(self.level_data.coins)
         
-        # 3. Goal Dist
         raw_goal_dist = self._get_dist_to_goal()
         norm_dist = 1000.0
         
-        # Normalization constants (approximate level diagonal or screen size)
-        
-        
         return np.array([
-            min(1.0, e_dist / norm_dist), # Nearest Enemy Dist
-            min(1.0, c_dist / norm_dist), # Nearest Coin Dist
-            min(1.0, raw_goal_dist / norm_dist),  # Goal Distance
-            min(1.0, e_count / 20.0),     # Active Enemies (Normalized cap 20)
-            min(1.0, c_count / 50.0),     # Active Coins (Normalized cap 50)
-            self.score / 5000.0,          # Score
-            self.timer / 400.0,           # Time Left
-            self.lives / 5.0              # Lives Left
+            min(1.0, e_dist / norm_dist),
+            min(1.0, c_dist / norm_dist),
+            min(1.0, raw_goal_dist / norm_dist),
+            min(1.0, e_count / 20.0),
+            min(1.0, c_count / 50.0),
+            self.score / 5000.0,
+            self.timer / 400.0,
+            self.lives / 5.0
         ], dtype=np.float32)
 
     def _info(self) -> Dict:
@@ -666,7 +658,8 @@ class PlatformerCore(gymnasium.Env):
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
             "persona": self.persona, "level": self.current_index_world,
-            "goal_dist": self._get_dist_to_goal()
+            "goal_dist": self._get_dist_to_goal(),
+            "lives" : self.lives
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):
