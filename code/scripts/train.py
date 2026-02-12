@@ -1,8 +1,10 @@
 # code/scripts/train.py
 import os
-from code.callbacks.dashboard import DashboardCallback
+import subprocess
 from code.callbacks.AnnealCallback import AnnealCallback
 from code.callbacks.RecurrentEvalCallback import RecurrentEvalCallback
+from code.callbacks.logging_callback import CsvLoggerCallback
+import code.rewards.train_platformer as reward_module
 
 try:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -202,21 +204,21 @@ def main(cfg: DictConfig):
     save_freq = int(cfg.get("save_freq", 50_000))
 
     # Build game CLASS (not instance)
-    # Checks if the game has a game config dict
-    if isinstance(cfg.game, (DictConfig, dict)):
-        game_conf = OmegaConf.to_container(cfg.game, resolve=True)
-        if "_target_" in game_conf:
-            dotted = game_conf["_target_"]
-            game_name = dotted.split(".")[-2].replace("_core", "")
-        else:
-            game_name = "game"
-    else:
-        game_conf = _load_yaml(conf_root, "game", str(cfg.game))
-        game_name = str(cfg.game)
+    game_name = str(cfg.game)
+    if game_name == 'none':
+        print("ERROR: No game specified. Please run with 'game=<game_name>'")
+        sys.exit(1)
 
-    if "_target_" not in game_conf:
-        raise ValueError(f"Game config must have _target_: {game_conf}")
-    game_cls = _import_attr(game_conf["_target_"])
+    try:
+        game_module_name = f"code.games.{game_name}_core"
+        game_class_name = f"{game_name.capitalize()}Core"
+        game_module = importlib.import_module(game_module_name)
+        game_cls = getattr(game_module, game_class_name)
+    except (ImportError, AttributeError) as e:
+        print(f"ERROR: Could not load game class '{game_class_name}' from module '{game_module_name}'.")
+        print(f"Please ensure that the file 'code/games/{game_name}_core.py' exists and contains a class named '{game_class_name}'.")
+        print(f"Original error: {e}")
+        sys.exit(1)
 
     # Shared env params (reward set per persona)
     base_env_kwargs = dict(
@@ -230,6 +232,16 @@ def main(cfg: DictConfig):
     os.makedirs(models_dir / "checkpoints", exist_ok=True)
     os.makedirs(models_dir / "eval_logs", exist_ok=True)
 
+    # This checks if dashboard=True (default) and launches the viewer
+    if cfg.get("dashboard", True):
+        dash_script = repo_root / "dashboard_viewer.py"
+        if dash_script.exists():
+            print(f"[INFO] 🚀 Launching Flight Recorder...")
+            # Popen launches it in the background so training continues!
+            subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(dash_script)])
+        else:
+            print(f"[WARNING] Dashboard script not found at {dash_script}")
+    
     # Optional single-value shortcuts (CLI-friendly)
     selected_models = list(cfg.models)
     if "model" in cfg and cfg.model:
@@ -287,25 +299,37 @@ def main(cfg: DictConfig):
 
 
         for persona in selected_personas:
-            # Reward function from conf/reward/<persona>.yaml
-            reward_conf = _load_yaml(conf_root, "reward", persona)
-            reward_fn = _resolve_callable_or_instance(reward_conf)
+            env_kwargs = base_env_kwargs.copy()
+            env_kwargs['persona'] = persona
+
+            # --- FIX: LOAD THE ACTUAL REWARD FUNCTION ---
+            active_reward_fn = None
+            if hasattr(reward_module, persona):
+                active_reward_fn = getattr(reward_module, persona)
+                print(f"[INFO] Loaded reward persona: {persona}")
+            else:
+                print(f"[WARNING] Persona '{persona}' not found in train_platformer.py! Using default.")
+                active_reward_fn = reward_module.default
 
             def make_env():
                 def _init():
-                    return GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+                    # --- FIX: PASS THE FUNCTION TO THE WRAPPER ---
+                    return GameEnv(game_cls, reward_fn=active_reward_fn, **env_kwargs)
                 return _init
 
             n_envs = int(cfg.get("n_envs", 1))
             
             if n_envs > 1:
                 # subroutine for multiple envs
-                env = SubprocVecEnv([make_env() for env in range(n_envs)])
+                env = SubprocVecEnv([make_env() for _ in range(n_envs)])
             else:
-                env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+                # Wrap in DummyVecEnv for consistency.
+                # This ensures that the environment always behaves like a vectorized environment.
+                env = DummyVecEnv([make_env()])
             
             # Dedicated eval env (no training noise)
-            eval_env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+            # IMPORTANT: Do not wrap eval_env in a VecEnv. Callbacks expect a single environment.
+            eval_env = GameEnv(game_cls, **env_kwargs)
 
             for skill, total_timesteps in selected_skills.items():
                 run_count += 1
@@ -313,6 +337,10 @@ def main(cfg: DictConfig):
                 # TB directory for this (game × algo × persona)
                 tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
                 os.makedirs(tb_dir, exist_ok=True)
+                
+                log_name = f"training_log_{game_name}_{persona}.csv"
+                csv_logger = CsvLoggerCallback(log_dir=str(repo_root), file_name=log_name)
+                
                 
                 # Check if this is a recurrent model
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
@@ -351,13 +379,10 @@ def main(cfg: DictConfig):
                 
                 use_dashboard = bool(cfg.get("dashboard", True))
                 
+
                 # Start with standard callbacks
-                current_callbacks = [eval_cb, ckpt_cb]
-                
-                if False:
-                    # Update freq 1 = Smoothest, but slows training slightly
-                    dash_cb = DashboardCallback(update_freq=1000, show_event_log=True, show_detailed_stats=True)
-                    current_callbacks.append(dash_cb)
+                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
+            
                 
                 # Inject TensorBoard path into algo kwargs
                 train_kwargs = dict(algo_kwargs)

@@ -185,26 +185,13 @@ def load_grid_config():
         return None
 
 def get_available_games():
-    """Get games from grid.yaml if available, else all games with YAML files"""
-    # laods games from grid yaml so it is available in the menu options
+    """Get games from grid.yaml."""
     cfg = load_grid_config()
+    if cfg is not None and 'games' in cfg and cfg.games:
+        return sorted(list(cfg.games))
     
-    # If grid has games section, use that (with YAML validation)
-    if cfg is not None and 'games' in cfg:
-        grid_games = list(cfg.games) if cfg.games else []
-        available = []
-        for game in grid_games:
-            game_file = CONF_GAME_DIR / f"{game}.yaml"
-            if game_file.exists():
-                available.append(game)
-            else:
-                print(f"Warning: Game '{game}' in grid.yaml but no file at {game_file}")
-        return sorted(available) if available else []
-    
-    # Fallback: return all games with YAML files
-    if not CONF_GAME_DIR.exists():
-        return []
-    return sorted([f.stem for f in CONF_GAME_DIR.glob("*.yaml")])
+    print("Warning: No 'games' section found or it is empty in grid.yaml.")
+    return []
 
 def get_available_algos_from_grid():
     """Get algorithms from grid.yaml that have corresponding YAML files"""
@@ -224,21 +211,13 @@ def get_available_algos_from_grid():
     return sorted(available)
 
 def get_available_personas_from_grid():
-    """Get personas from grid.yaml that have corresponding YAML files"""
+    """Get personas from grid.yaml."""
     cfg = load_grid_config()
-    if cfg is None or 'personas' not in cfg:
-        return []
-    
-    grid_personas = list(cfg.personas) if cfg.personas else []
-    available = []
-    for persona in grid_personas:
-        persona_file = CONF_REWARD_DIR / f"{persona}.yaml"
-        if persona_file.exists():
-            available.append(persona)
-        else:
-            print(f"Warning: Persona '{persona}' in grid.yaml but no file at {persona_file}")
-    
-    return sorted(available)
+    if cfg is not None and 'personas' in cfg and cfg.personas:
+        return sorted(list(cfg.personas))
+        
+    print("Warning: No 'personas' section found or it is empty in grid.yaml.")
+    return []
 
 def get_personas_for_game(game: str):
     """Return only personas from grid.yaml whose YAML stem starts with '<game>_'"""
@@ -353,10 +332,10 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT):
     """Execute a single training run with error handling"""
     cmd = [
         sys.executable, "-m", "code.scripts.train",
-        f"game={game}",
-        f"model={algo}",
-        f"persona={persona}",
-        f"skill={skill}",
+        f"+game={game}",
+        f"+model={algo}",
+        f"+persona={persona}",
+        f"+skill={skill}",
         f"tb_root={tb_root}",
     ]
     
@@ -448,7 +427,7 @@ def run_training():
 
         cmd = [
             sys.executable, "-m", "code.scripts.train",
-            f"game={game}", f"model={algo_choice}", f"persona={persona_choice}",
+            f"+game={game}", f"+model={algo_choice}", f"+persona={persona_choice}",
             "skill=Custom", f"+skills.Custom={steps}", f"tb_root={tb_root}",
         ]
         print("\n>>>", " ".join(cmd), "\n")
@@ -1337,7 +1316,7 @@ def show_project_status():
 
     if CONF_ROOT.exists():
         print("\nConfiguration status:")
-        for sub in ["algo", "game", "reward"]:
+        for sub in ["algo"]:
             p = CONF_ROOT / sub
             n = len(list(p.glob("*.yaml"))) if p.exists() else 0
             print(f"   {sub}: {n} configs")

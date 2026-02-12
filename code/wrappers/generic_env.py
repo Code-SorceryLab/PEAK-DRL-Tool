@@ -66,34 +66,53 @@ class GameEnv(gym.Env):
     def step(self, action):
         self._step_count += 1
 
-        # --- normalize action once, do NOT cast to bool unconditionally
+        # --- Normalizing Action (Legacy) ---
         if hasattr(self.action_space, "n"):
             if self.render_mode == "random":
                 action = self.action_space.sample()
-            # Discrete
-            if isinstance(action, (np.generic, np.ndarray)):  # e.g., numpy scalar from SB3
+            if isinstance(action, (np.generic, np.ndarray)):
                 action = int(action)
-        # For Binary(1)/MultiBinary just pass through
-        # For Box actions (not used here), pass as-is
 
         obs, base, terminated, truncated, info = self.game.step(action)
-        
-
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
         
-        # FIX: Use self.hub instance instead of static get_instance()
+        # --- REWARD PROCESSING (THE FIX) ---
+        # 1. Get raw reward from Persona (Could be Float OR Dict)
         if self.reward_fn:
-            reward = self.reward_fn(obs, base, terminated, info)
+            raw_reward = self.reward_fn(obs, base, terminated, info)
         else:
-            reward = self.hub.compute_default_reward(info)
+            raw_reward = self.hub.compute_default_reward(info)
         
+        # 2. Handle both formats safely
+        final_scalar_reward = 0.0
+        reward_breakdown = {}
+
+        if isinstance(raw_reward, dict):
+            # If Dict: SUM it up for the Agent/Hub (so it's a float)
+            final_scalar_reward = sum(raw_reward.values())
+            reward_breakdown = raw_reward
+        else:
+            # If Float: Use as is
+            final_scalar_reward = float(raw_reward)
+            reward_breakdown = {"generic": final_scalar_reward}
+
+        # 3. Inject Breakdown into Info (for CSV Logger)
+        info["reward_breakdown"] = reward_breakdown
+        
+        # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
         act_name = action
         if hasattr(self.game, "ACTION_NAMES"):
-            # .get(key, default) - if key isn't found, returns the number
             act_name = self.game.ACTION_NAMES.get(int(action), action)
         
-        self.hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
-        return obs, reward, terminated, truncated, info
+        
+        info["action_name"] = str(act_name)
+        
+        
+        # <--- THIS WAS CRASHING BEFORE (reward=raw_reward would fail)
+        self.hub.update_reward(reward=final_scalar_reward, action_name=act_name, is_episode_end=terminated)
+        
+        # 5. Return the Float Sum to the Agent
+        return obs, final_scalar_reward, terminated, truncated, info
 
     # -------------------------------- Rendering
     def render(self, mode=None):

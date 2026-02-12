@@ -9,6 +9,64 @@ game:
   render_mode: "human"
 
 # ==========================================
+# MOVED FROM code/conf/game/platformer.yaml
+# ==========================================
+# conf/game/platformer.yaml
+_target_: code.games.platformer_core.PlatformerCore
+
+name: platformer
+env_cls: PlatformerCore
+module: code.games.platformer_core
+
+# Optional: keep your current setting
+render_mode: human
+fps: 30
+
+# Strongly recommended so the env’s built-in step limit is respected:
+max_steps: 10000
+
+observation_space:
+  type: Box
+  shape: [36]
+  low: -500.0
+  high: 500.0
+
+action_space:
+  type: Discrete # NOTE: Can be Discrete or MultiBinary or MultiDiscrete
+  n: 8
+
+reward:
+  type: progress_flag
+  shaping:
+    step: 0.01
+    goal: 1.0
+    fall: -1.0
+
+episode:
+  max_steps: 1000
+
+init:
+  seed: 42 # Optional: for reproducibility
+  level: easy # Options: easy, medium, hard | not adapted yet
+
+persona: null 
+
+metrics: 
+  - episode_reward
+  - episode_length
+
+render:
+  window_size: [640, 480]
+  show_fps: false
+  debug_overlay: false
+
+logging:
+  tensorboard: true
+
+
+
+
+# ==========================================
 # DEFAULTS (Layer 2)
 # ==========================================
 defaults:
@@ -198,4 +256,3 @@ levels:
     #     - type: "Enemy"
     #       x: 400
     #       y: 300
-
