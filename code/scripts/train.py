@@ -77,6 +77,19 @@ def _resolve_callable_or_instance(node: Dict[str, Any]) -> Any:
 # Custom Multimodal Extractor (Fixes PyTorch Crash on small grids)
 # =========================================================================
 class CustomCombinedExtractor(BaseFeaturesExtractor):
+    """
+    ===== FIXED VERSION WITH ADAPTIVE POOLING =====
+    
+    REASON: Old CNN had fixed architecture that broke with different grid sizes.
+            For 21x21 input: Conv->Pool->Conv->Flatten
+            - After Conv2d(3x3, pad=1): still 21x21
+            - After MaxPool2d(2): becomes 10x10 (floor division!)
+            - After Conv2d(3x3, pad=1): still 10x10
+            - Flatten: 10*10*64 = 6400 features
+            
+            But forward pass tried to use shape from sample, which could mismatch.
+            AdaptiveAvgPool2d ensures consistent output regardless of input size.
+    """
     def __init__(self, observation_space: spaces.Dict):
         # We do not know features-dim here before going over all the items,
         # so put something dummy for now. PyTorch requires int!
@@ -89,28 +102,57 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
             if key == "grids":
                 # We will just use a simpler CNN appropriate for 21x21 or 11x9
                 n_input_channels = subspace.shape[0]
+                
+                # ===== FIX #12: ADD ADAPTIVE POOLING FOR VARIABLE GRID SIZES =====
+                # OLD CODE:
+                # cnn = nn.Sequential(
+                #     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
+                #     nn.ReLU(),
+                #     nn.MaxPool2d(2),
+                #     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+                #     nn.ReLU(),
+                #     nn.Flatten(),  # Output size depends on input size!
+                # )
+                # # Compute shape by doing one forward pass
+                # with torch.no_grad():
+                #     sample_tensor = torch.as_tensor(subspace.sample()[None]).float()
+                #     n_flatten = cnn(sample_tensor).shape[1]  # Could mismatch at runtime
+                
+                # NEW CODE: Use adaptive pooling for consistent output
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
+                    nn.BatchNorm2d(32),
                     nn.ReLU(),
                     nn.MaxPool2d(2),
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+                    nn.BatchNorm2d(64),
                     nn.ReLU(),
+                    # ADDED: AdaptiveAvgPool2d ensures output is always 7x7
+                    # This works for ANY input size (11x9, 21x21, etc.)
+                    nn.AdaptiveAvgPool2d((7, 7)),
                     nn.Flatten(),
                 )
 
-                # Compute shape by doing one forward pass
-                with torch.no_grad():
-                    sample_tensor = torch.as_tensor(subspace.sample()[None]).float()
-                    n_flatten = cnn(sample_tensor).shape[1]
+                # Fixed output size: 7 * 7 * 64 = 3136
+                n_flatten = 7 * 7 * 64
+                # =================================================================
 
-                linear = nn.Sequential(nn.Linear(n_flatten, 128), nn.ReLU())
+                # ===== FIX #13: INCREASE FEATURE CAPACITY =====
+                # OLD CODE:
+                # linear = nn.Sequential(nn.Linear(n_flatten, 128), nn.ReLU())
+                # total_concat_size += 128
+                
+                # NEW CODE: Increase to 256 for better capacity with larger grids
+                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 128
+                total_concat_size += 256
+                # ==============================================
 
             elif key == "scalars":
                 # Standard MLP for the 1D scalars
                 extractors[key] = nn.Sequential(
                     nn.Linear(subspace.shape[0], 64),
+                    nn.BatchNorm1d(64),
                     nn.ReLU()
                 )
                 total_concat_size += 64
