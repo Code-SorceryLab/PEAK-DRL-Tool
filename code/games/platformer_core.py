@@ -109,8 +109,8 @@ class PlatformerCore(gymnasium.Env):
         
         # Anti-stall
         self.anti_stall = bool(kwargs.pop("anti_stall", True))
-        self.stall_window = float(kwargs.pop("stall_window", 10))
-        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 30))
+        self.stall_window = float(kwargs.pop("stall_window", 2))
+        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 10))
         
         self.timer = self.timer_seconds
         self.time_last_step = time.time()
@@ -396,20 +396,20 @@ class PlatformerCore(gymnasium.Env):
 
     def _get_dist_to_goal(self) -> float:
             """
-            Calculates the minimum Euclidean distance from the player to any goal.
+            Calculates the minimum X distance from the player to any goal.
+            FIX: Euclidean math is removed so jumping doesn't get punished!
             """
             if not self.player: return float('inf')
             if not self.level_data.goals:
                 # Fallback: Distance to the far right edge of the level
                 return self.level_data.width - self.player.gObj.x
             
-            px, py = self.player.gObj.x, self.player.gObj.y
+            px = self.player.gObj.x
             min_d = float('inf')
             
             for g in self.level_data.goals:
-                # Simple Euclidean distance
-                gx, gy = g.gObj.x, g.gObj.y
-                d = math.hypot(gx - px, gy - py)
+                gx = g.gObj.x
+                d = abs(gx - px) # ONLY X-DISTANCE
                 if d < min_d: min_d = d
                 
             return min_d
