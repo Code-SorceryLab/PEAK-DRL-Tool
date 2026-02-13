@@ -181,7 +181,7 @@ class PlatformerCore(gymnasium.Env):
 
     def _load_reward_fn(self, persona_name):
         try:
-            mod = importlib.import_module("code.rewards.train_platformer")
+            mod = importlib.import_module("code.rewards.platformer")
             return getattr(mod, persona_name, None)
         except ImportError:
             return None
