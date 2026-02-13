@@ -230,7 +230,7 @@ class PlatformerCore(gymnasium.Env):
         
         # 2. Player Input
         if not self.debug_manager.free_cam_active:
-             self.player.handle_input(a = int(action))
+            self.player.handle_input(a = int(action))
         else:
             self.player.vx = 0; self.player.jump_hold = 0
 
@@ -732,7 +732,8 @@ class PlatformerCore(gymnasium.Env):
         #     min(1.0, c_dist / norm_dist),
         #     min(1.0, raw_goal_dist / norm_dist),
         #     min(1.0, e_count / 20.0),
-        #     min(1.0, c_count / 50.0),
+        #     min(1.0, 
+        # c_count / 50.0),
         #     self.score / 5000.0,           # Could exceed 1.0!
         #     self.timer / 400.0,            # Wrong denominator for custom timers
         #     self.lives / 5.0               # Wrong max (should be 3)
@@ -753,6 +754,16 @@ class PlatformerCore(gymnasium.Env):
 
     def _info(self) -> Dict:
         p = self.player
+        
+        event = ""
+        cause = ""
+        if self.reached_goal and not self.game_over:
+            event = "WIN"
+            cause = "Goal"
+        elif not self.alive:
+            event = "DIED"
+            cause = self.death_cause
+        
         return {
             "score": self.score, 
             "score_delta": self.score_delta, 
@@ -815,7 +826,7 @@ class PlatformerCore(gymnasium.Env):
         # 2. Collectibles (Coins, Powerups)
         visible_collectibles = self.physics_manager.collectible_hash.query_rect(cx, cy, cw, ch)
         for entity in visible_collectibles:
-             if hasattr(entity, 'render'):
+            if hasattr(entity, 'render'):
                 entity.render(surface, entity.x - cx, entity.y - cy)
 
     def _draw_player(self, surface: pygame.Surface):
@@ -824,7 +835,7 @@ class PlatformerCore(gymnasium.Env):
         sy = p.gObj.y - self.camera_y
         
         colour = COLOR_POWERUP_STAR if (p.invincible_timer > 0 and (self.frame // 5) % 2) else \
-              ((255, 100, 0) if p.powered_up else (255, 0, 0))
+            ((255, 100, 0) if p.powered_up else (255, 0, 0))
         p.color = colour
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 

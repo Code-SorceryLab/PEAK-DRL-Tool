@@ -72,6 +72,8 @@ REQUIRED_PACKAGES = [
     'omegaconf>=2.1.0',
     'imageio',
     'moviepy',
+    'streamlit',
+    'plotly'
 ]
 
 # ============================================================================

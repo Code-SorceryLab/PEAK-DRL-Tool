@@ -25,36 +25,26 @@ class CsvLoggerCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         infos = self.locals.get('infos', [{}])
-        info = infos[0] # Assume single env for logging
+        info = infos[0] # Log the first environment's info
         
         main_reward = self.locals['rewards'][0]
         reward_breakdown = info.get('reward_breakdown', {})
 
-        # --- EXTRACT CONTEXT METRICS ---
-        # We grab these from the 'info' dict provided by the game core
+        # --- EXTRACT TELEMETRY ---
+        # These are now populated by the refactored PlatformerCore
+        action_name = info.get("action_name", info.get("action", "N/A"))
         
-        # 1. Action Name (Added in generic_env.py)
-        action_name = info.get("action_name", "N/A")
-        
-        # 2. Physics & Position
+        # Telemetry
         level = info.get("level", 0)
         x_pos = info.get("x_position", 0.0)
         y_pos = info.get("y_position", 0.0)
         vx = info.get("velocity_x", 0.0)
         vy = info.get("velocity_y", 0.0)
-        
-        # 3. Goal Distance
         goal_dist = info.get("goal_dist", 0.0)
-
-        # 4. Simple Event Detection (Replaces old dashboard logic)
-        event = ""
-        cause = ""
-        if info.get("won", False):
-            event = "WIN"
-            cause = "Goal"
-        elif info.get("terminated", False):
-            event = "DIED"
-            cause = "Hazard"
+        
+        # Events (Now explicitly passed from Core)
+        event = info.get("event", "")
+        cause = info.get("cause", "")
 
         # --- BUILD ROW ---
         row_data = {
@@ -69,7 +59,7 @@ class CsvLoggerCallback(BaseCallback):
             'goal_dist': goal_dist,
             'event': event,
             'cause': cause,
-            **reward_breakdown # Add dynamic reward keys
+            **reward_breakdown # Flatten dynamic reward keys
         }
 
         # Write Headers (Once)

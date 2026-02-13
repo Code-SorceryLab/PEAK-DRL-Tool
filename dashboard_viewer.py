@@ -36,7 +36,7 @@ st.markdown(f"""
             color: {THEME['accent']} !important;
             font-family: 'Courier New', monospace;
             font-weight: bold;
-            font-size: 1.2rem !important; /* Slightly smaller for compactness */
+            font-size: 1.2rem !important;
         }}
         div[data-testid="stMetricLabel"] {{
             color: {THEME['text']} !important;
@@ -68,6 +68,12 @@ def get_latest_log_file():
 with st.sidebar:
     st.header("🏔️ MISSION CONTROL")
     do_refresh = st.checkbox("LIVE DATA FEED", value=True)
+    
+    st.divider()
+    # --- FIX: VIEW MODE TOGGLE ---
+    st.caption("Graph View Mode")
+    show_full_history = st.checkbox("Show Full History (Start -> Cursor)", value=True)
+    
     st.divider()
     if st.button("🗑️ WIPE LOGS"):
         log_file = get_latest_log_file()
@@ -159,19 +165,17 @@ with col_graph:
         if is_checked:
             selected_lines.append(signal_name)
 
-    # Plot
-    start_viz = max(0, selected_idx - 500)
+    # --- FIX: GRAPH LOGIC ---
+    if show_full_history:
+        start_viz = 0  # Always start from Step 0
+    else:
+        # Default "Zoom" window of 1000 steps
+        start_viz = max(0, selected_idx - 1000)
+        
     subset = df.iloc[start_viz : selected_idx + 1]
 
     if not subset.empty and selected_lines:
-        # --- NEW IMPROVED COLOR PALETTE ---
-        # 1. Total Reward: White (The main signal)
-        # 2. Movement: Neon Cyan (Standard traversal)
-        # 3. Coins: Gold (Loot)
-        # 4. Kills: Neon Red (Combat)
-        # 5. Win: Lime Green (Success)
-        # 6. Time: Magenta (Penalty)
-        # 7. Death: Grey/Dark Red (Failure)
+        # Cyberpunk Palette
         custom_palette = [
             "#FFFFFF", # White
             "#00FFFF", # Cyan
@@ -190,7 +194,7 @@ with col_graph:
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color=THEME['text']),
-            xaxis=dict(showgrid=False),
+            xaxis=dict(showgrid=False, title="Training Steps"),
             yaxis=dict(showgrid=True, gridcolor=THEME['grid']),
             legend=dict(orientation="h", y=1.1, title=None)
         )
@@ -198,10 +202,10 @@ with col_graph:
     else:
         st.caption("No signals selected.")
 
-# --- RIGHT COLUMN: PHYSICS (Condensed) ---
+# --- RIGHT COLUMN: PHYSICS ---
 with col_phys:
     st.subheader("📐 PHYSICS")
-    st.caption("Live Telemetry")
+    st.caption("Live Telemetry (Tiles)")
     
     # Using nested columns to create a tight 2x2 Grid
     pc1, pc2 = st.columns(2)
@@ -215,6 +219,14 @@ with col_phys:
         st.metric("VEL Y", f"{row.get('vy', 0):.2f}")
         
     st.metric("GOAL DIST", f"{row.get('goal_dist', 0):.1f}")
+    
+    st.divider()
+    
+    # Show Event if one happened
+    evt = row.get('event', "")
+    cause = row.get('cause', "")
+    if evt and isinstance(evt, str) and len(evt) > 0:
+        st.error(f"{evt} ({cause})")
 
 if do_refresh:
     time.sleep(1)

@@ -131,12 +131,12 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
         r_win = 0.0
         r_death = -5.0 if terminated else 0.0
 
-    r_time = -0.01
+    r_time = 0
 
     # 3. Return the Breakdown directly
     return {
         "movement": r_move,
-        "coinz":    r_coin,
+        "coins":    r_coin,
         "kills":    r_kill,
         "win":      r_win,
         "time":     r_time,
