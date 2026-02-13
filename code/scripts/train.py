@@ -123,29 +123,26 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(32),
                     nn.ReLU(),
-                    nn.MaxPool2d(2),
+                    
+                    #nn.MaxPool2d(2),
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(64),
                     nn.ReLU(),
-                    # ADDED: AdaptiveAvgPool2d ensures output is always 7x7
-                    # This works for ANY input size (11x9, 21x21, etc.)
-                    nn.AdaptiveAvgPool2d((7, 7)),
+                    
+                    nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+                    nn.BatchNorm2d(64),
+                    nn.ReLU(),
+
+                    nn.AdaptiveMaxPool2d((21, 21)),
                     nn.Flatten(),
                 )
 
-                # Fixed output size: 7 * 7 * 64 = 3136
-                n_flatten = 7 * 7 * 64
+                n_flatten = 21 * 21 * 64
                 # =================================================================
 
-                # ===== FIX #13: INCREASE FEATURE CAPACITY =====
-                # OLD CODE:
-                # linear = nn.Sequential(nn.Linear(n_flatten, 128), nn.ReLU())
-                # total_concat_size += 128
-                
-                # NEW CODE: Increase to 256 for better capacity with larger grids
-                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
+                linear = nn.Sequential(nn.Linear(n_flatten, 512), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 256
+                total_concat_size += 512
                 # ==============================================
 
             elif key == "scalars":
@@ -300,7 +297,7 @@ def main(cfg: DictConfig):
             
             if n_envs > 1:
                 # subroutine for multiple envs
-                env = SubprocVecEnv([make_env() for env in range(n_envs)])
+                env = SubprocVecEnv([make_env() for _env in range(n_envs)])
             else:
                 env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
             
@@ -382,7 +379,7 @@ def main(cfg: DictConfig):
                 # Save each trained variant (SB3 appends .zip)
                 filename = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}.zip"
                 save_path = models_dir / filename
-                
+                model.save(save_path)
                 print(f"[{run_count}] saved --> {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
 
             # Close envs between personas

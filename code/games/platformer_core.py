@@ -148,8 +148,8 @@ class PlatformerCore(gymnasium.Env):
         # self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
                 # --- NEW: VARIABLE GRID OBSERVATION SIZE ---
         # Default to the original 11x9 if not provided
-        self.obs_width = 31
-        self.obs_height = 31
+        self.obs_width = 21
+        self.obs_height = 21
         
         # Calculate padding needed to center the player in the grid
         self.obs_pad_x = self.obs_width // 2
