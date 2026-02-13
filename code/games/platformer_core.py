@@ -163,7 +163,7 @@ class PlatformerCore(gymnasium.Env):
             # "scalars": Player Data (5) + Tracking Data (8) = 13 total values
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32)
         })
-        self._act_space = spaces.Discrete(8)
+        self._act_space = spaces.Discrete(9)
 
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
