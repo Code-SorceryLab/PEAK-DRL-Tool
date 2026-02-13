@@ -78,21 +78,27 @@ class GameEnv(gym.Env):
 
         obs, base, terminated, truncated, info = self.game.step(action)
         
+        # Enforce max_steps at wrapper level as well (safety net)
+        if self.max_steps and self._step_count >= self.max_steps:
+            truncated = True
 
-        truncated = bool(self.max_steps and self._step_count >= self.max_steps)
-        
-        # FIX: Use self.hub instance instead of static get_instance()
+        # --- URGENT FIX: Call self.reward_fn() and return the result ---
+        reward = 0.0
         if self.reward_fn:
+            # Explicitly use the provided reward function
             reward = self.reward_fn(obs, base, terminated, info)
         else:
+            # Fallback to default/Hub calculation
             reward = self.hub.compute_default_reward(info)
         
+        # Update Hub for visualization (Does not affect 'reward' variable returned to agent)
         act_name = action
         if hasattr(self.game, "ACTION_NAMES"):
             # .get(key, default) - if key isn't found, returns the number
             act_name = self.game.ACTION_NAMES.get(int(action), action)
         
         self.hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
+        
         return obs, reward, terminated, truncated, info
 
     # -------------------------------- Rendering
@@ -147,6 +153,12 @@ class GameEnv(gym.Env):
 
 
     def close(self):
+        # 1. Close the inner game logic (if it has cleanup needs)
+        if hasattr(self.game, "close"):
+            self.game.close()
+
+        # 2. Close Pygame resources managed by this wrapper
         if self.screen:
+            pygame.display.quit()
             pygame.quit()
             self.screen = None

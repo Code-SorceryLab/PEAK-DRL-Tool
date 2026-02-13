@@ -133,7 +133,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.BatchNorm2d(64),
                     nn.ReLU(),
 
-                    nn.AdaptiveMaxPool2d((21, 21)),
+                    nn.AdaptiveMaxPool2d((10, 10)),
                     nn.Flatten(),
                 )
 

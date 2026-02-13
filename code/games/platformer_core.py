@@ -11,7 +11,8 @@ import gymnasium
 from gymnasium import spaces
 import psutil
 
-from code.games.modules.System import EntityType
+# FIX: Correctly import EntityType class from the module
+from .modules.System.EntityType import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
 # Objects
 from .modules.Objects.GameObject import GameObject
@@ -138,16 +139,15 @@ class PlatformerCore(gymnasium.Env):
         self.progress_y_best = 0.0
 
         # --- NEW OBSERVATION SPACE CALCULATION ---
-        # 1. Player Data (5)
-        # 2. Solid Array (11x9 = 99)
-        # 3. Hazard Array (11x9 = 99)
-        # 4. Collectable Array (11x9 = 99)
-        # 5. Tracking Data (8)
-        # Total: 5 + 99 + 99 + 99 + 8 = 310
-        # obs_len = 310
-        # self._obs_space = spaces.Box(low=0.0, high=1e9, shape=(obs_len,), dtype=np.float32)
-                # --- NEW: VARIABLE GRID OBSERVATION SIZE ---
-        # Default to the original 11x9 if not provided
+        # 1. Player Data (7)
+        # 2. Semantic Grid (21x21) -> Replaces 3 separate grids
+        # 3. Player Grid (21x21) -> Kept separate to allow overlaps
+        # 4. Tracking Data (9)
+        
+        # Total Scalars: 7 + 9 = 16
+        
+        # --- NEW: VARIABLE GRID OBSERVATION SIZE ---
+        # UPDATED to 21x21 to match user request
         self.obs_width = 21
         self.obs_height = 21
         
@@ -156,12 +156,13 @@ class PlatformerCore(gymnasium.Env):
         self.obs_pad_y = self.obs_height // 2
         
         self._obs_space = spaces.Dict({
-            # "grids": 3 Channels (Solid, Hazard, Collectable) x Dynamic Height x Dynamic Width
-            # SB3/PyTorch prefers Channel-First (C, H, W)
-            "grids": spaces.Box(low=0.0, high=1.0, shape=(3, self.obs_height, self.obs_width), dtype=np.float32),
+            # "grids": 2 Channels (SemanticWorld, PlayerMorphology) x Dynamic Height x Dynamic Width
+            # Channel 0: World Map (-1.0 to 1.0)
+            # Channel 1: Player Body (0.0 or 1.0)
+            "grids": spaces.Box(low=-1.0, high=1.0, shape=(2, self.obs_height, self.obs_width), dtype=np.float32),
             
-            # "scalars": Player Data (5) + Tracking Data (8) = 13 total values
-            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32)
+            # "scalars": Player Data (7) + Tracking Data (9) = 16 total values
+            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32)
         })
         self._act_space = spaces.Discrete(8)
 
@@ -272,12 +273,14 @@ class PlatformerCore(gymnasium.Env):
         
         super().reset(seed=seed)
         
-        if not self.reached_goal:   
-            self.lives = self.max_lives 
-            self.score = 0
-            self.coins_total = 0
-            self.current_index_world = 0
-            self.world = self.level_order[self.current_index_world]
+        # FIX: Always reset lives to max on a true reset to prevent data leakage between episodes
+        # OLD: if not self.reached_goal:
+        self.lives = self.max_lives 
+        
+        self.score = 0
+        self.coins_total = 0
+        self.current_index_world = 0
+        self.world = self.level_order[self.current_index_world]
         self.load_level()
         
         
@@ -294,26 +297,25 @@ class PlatformerCore(gymnasium.Env):
         self.level_data = self.loader.load_level(config)
         
         # --- OPTIMIZATION: Prepare Numpy Grid for Observation Slicing ---
-        # Create a binary grid (1.0 for Solid, 0.0 for Air)
-        # We assume TILE_AIR is 0 or distinct from solid blocks
+        # Create a Semantic grid (Values -1 to 3.0)
+        # TILE_AIR is 0.
+        # 1. Start with static tiles
         raw_grid = np.array(self.level_data.grid, dtype=np.int32)
-        self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
+        
+        # Initialize with Air (0.0)
+        self.semantic_grid_np = np.zeros_like(raw_grid, dtype=np.float32)
+        
+        # Set Solids (0.5)
+        # Note: Spikes are usually EntityType.SPIKE but might be in grid as TILE_SPIKE
+        self.semantic_grid_np[raw_grid != TILE_AIR] = 0.5 
         
         # ===== FIX #1: DYNAMIC PADDING CALCULATION =====
-        # REASON: Old code was hardcoded for 11x9 window, but we're using 21x21
-        #         This caused out-of-bounds array access and crashes
-        # OLD CODE:
-        # pad_y = 4  # Hardcoded for 9-tile height (9//2 = 4)
-        # pad_x = 5  # Hardcoded for 11-tile width (11//2 = 5)
-        
-        # NEW CODE: Calculate padding dynamically based on actual window size
-        # Padding = half the window size to center the player in the observation
-        pad_y = self.obs_height // 2  # For 21x21: pad_y = 10
-        pad_x = self.obs_width // 2   # For 21x21: pad_x = 10
+        pad_y = self.obs_height // 2 
+        pad_x = self.obs_width // 2  
         # ==============================================
         
-        self.padded_solid = np.pad(
-            self.solid_grid_np, 
+        self.padded_semantic = np.pad(
+            self.semantic_grid_np, 
             ((pad_y, pad_y), (pad_x, pad_x)), 
             mode='constant', 
             constant_values=0.0
@@ -423,6 +425,24 @@ class PlatformerCore(gymnasium.Env):
                 
             return min_d
         
+    def _get_goal_direction(self) -> float:
+        """
+        Returns -1.0 if the closest goal is to the left, 1.0 if to the right.
+        """
+        if not self.player: return 1.0
+        if not self.level_data.goals: return 1.0 # Default right
+
+        px = self.player.gObj.x
+        
+        # Find closest goal
+        closest_g = min(self.level_data.goals, key=lambda g: abs(g.gObj.x - px))
+        
+        if closest_g.gObj.x > px:
+            return 1.0
+        elif closest_g.gObj.x < px:
+            return -1.0
+        
+        return 0.0
 
     def _update_stall_metrics(self):
         """
@@ -513,38 +533,26 @@ class PlatformerCore(gymnasium.Env):
     def _obs(self) -> Dict[str, np.ndarray]:
         """
         Constructs the dictionary observation for MultiInputPolicy:
-        "scalars": [Player(5), Tracking(8)] -> 1D Array
-        "grids":   [Solid, Hazard, Collectable] -> 3D Array (Channels, Height, Width)
+        "scalars": [Player(7), Tracking(9)] -> 1D Array (16,)
+        "grids":   [SemanticWorld, PlayerMorph] -> 4D Array (2, Height, Width)
         """
-        # 1. Player Data (5)
+        # 1. Player Data (5 -> 7)
         p_obs = self._player_obs()
         
         # 2. Grids (dynamic sizes based on kwargs)
-        solid_grid, hazard_grid, collect_grid = self._grid_obs_window()
+        # Now returns 2 grids: Semantic and Player
+        semantic_grid, player_grid = self._grid_obs_window()
         
         # 3. Tracking Data (8)
         track_obs = self._tracking_obs()
         
-        # ===== FIX #11: NO NEED TO RESHAPE - GRIDS ARE ALREADY 2D =====
-        # REASON: _grid_obs_window() now returns 2D arrays, not flattened
-        #         Old code would crash if shapes were mismatched
-        # OLD CODE:
-        # h, w = self.obs_height, self.obs_width
-        # g1 = solid_window.reshape(h, w)
-        # g2 = hazard_grid.reshape(h, w)
-        # g3 = collect_grid.reshape(h, w)
-        
-        # NEW CODE: Grids are already 2D, just use them directly
-        g1 = solid_grid
-        g2 = hazard_grid
-        g3 = collect_grid
-        # ===============================================================
-        
         # Stack grids for CNN [Channel, Height, Width]
-        stacked_grids = np.stack([g1, g2, g3], axis=0).astype(np.float32) # Shape: (3, H, W)
+        # Shape: (2, H, W)
+        stacked_grids = np.stack([semantic_grid, player_grid], axis=0).astype(np.float32) 
         
         # Concatenate scalars for MLP
-        scalars = np.concatenate([p_obs, track_obs]).astype(np.float32) # Shape: (13,)
+        # Shape: (16,)
+        scalars = np.concatenate([p_obs, track_obs]).astype(np.float32) 
         
         return {
             "grids": stacked_grids,
@@ -557,30 +565,11 @@ class PlatformerCore(gymnasium.Env):
         h = max(1.0, float(self.level_data.height))
         
         # ===== FIX #2: PROPER VELOCITY NORMALIZATION & SAFETY =====
-        # REASON: Old code had division-by-zero risk and inconsistent safety checks
-        #         vx had protection (max(1e-6, ...)) but vy didn't
-        #         Also, physics context might not be initialized during first reset
-        # OLD CODE:
-        # p.vx / max(1e-6, self.physics_manager.context.MAX_RUN_SPEED),
-        # p.vy / self.physics_manager.context.MAX_FALL_SPEED,  # No safety check!
-        
-        # NEW CODE: Use getattr with fallback values and consistent safety checks
         max_run = max(1.0, getattr(self.physics_manager.context, 'MAX_RUN_SPEED', 240.0))
         max_fall = max(1.0, getattr(self.physics_manager.context, 'MAX_FALL_SPEED', 400.0))
         # =========================================================
         
         # ===== FIX #3: CLIP ALL VALUES TO VALID RANGES =====
-        # REASON: Neural networks train better with normalized, bounded inputs
-        #         Position should be [0, 1], velocity can be negative [-1, 1]
-        # OLD CODE:
-        # return np.array([
-        #     p.gObj.x / w,  # Could exceed 1.0 if player goes off-screen
-        #     p.gObj.y / h,
-        #     p.vx / max(1e-6, self.physics_manager.context.MAX_RUN_SPEED),
-        #     p.vy / self.physics_manager.context.MAX_FALL_SPEED,
-        #     1.0 if p.on_ground else 0.0,
-        # ], dtype=np.float32)
-        
         # NEW CODE: Clip all values to expected ranges
         return np.array([
             np.clip(p.gObj.x / w, 0.0, 1.0),      # Position X: [0, 1]
@@ -588,77 +577,44 @@ class PlatformerCore(gymnasium.Env):
             np.clip(p.vx / max_run, -1.0, 1.0),   # Velocity X: [-1, 1]
             np.clip(p.vy / max_fall, -1.0, 1.0),  # Velocity Y: [-1, 1]
             1.0 if p.on_ground else 0.0,          # On ground: binary
+            # NEW DATA POINTS
+            1.0 if p.facing_right else -1.0,      # Facing Direction
+            1.0 if p.coyote > 0 else 0.0,         # Can Jump (Coyote Time valid)
         ], dtype=np.float32)
         # =================================================
         
-    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray]:
         p = self.player
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
         
-        # ===== FIX #4: CENTER THE OBSERVATION WINDOW ON PLAYER =====
-        # REASON: Old code started window at player position, so player was at
-        #         top-left corner. Agent couldn't see obstacles to left or above!
-        # OLD CODE:
-        # r_start, r_end = py, py + self.obs_height
-        # c_start, c_end = px, px + self.obs_width
-        
-        # NEW CODE: Center window by subtracting padding (half window size)
-        # For 21x21 window: player is at position [10, 10] in the grid (center)
+        # Center window
         r_start = py - self.obs_pad_y
         r_end = r_start + self.obs_height
         c_start = px - self.obs_pad_x
         c_end = c_start + self.obs_width
-        # ===========================================================
         
+        # Slice from Padded Semantic Grid (pre-filled with Solids 0.5)
         r_start_clamped = max(0, r_start)
         c_start_clamped = max(0, c_start)
         
-        raw_slice = self.padded_solid[r_start_clamped:r_end, c_start_clamped:c_end]
+        raw_slice = self.padded_semantic[r_start_clamped:r_end, c_start_clamped:c_end]
         
-        # ===== FIX #5: DON'T FLATTEN - RETURN 2D GRIDS =====
-        # REASON: We were flattening then reshaping, causing potential errors
-        #         Better to keep as 2D throughout the pipeline
-        # OLD CODE:
-        # if raw_slice.shape == (self.obs_height, self.obs_width):
-        #     solid_window = raw_slice.flatten()
-        # else:
-        #     padded_slice = np.zeros(...)
-        #     ...
-        #     solid_window = padded_slice.flatten()
-        
-        # NEW CODE: Keep as 2D arrays
         if raw_slice.shape == (self.obs_height, self.obs_width):
-            solid_grid = raw_slice
+            semantic_grid = raw_slice.copy()
         else:
-            solid_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+            semantic_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
             h, w = raw_slice.shape
-            
             dest_y = 0 if r_start >= 0 else abs(r_start)
             dest_x = 0 if c_start >= 0 else abs(c_start)
-            
             paste_h = min(h, self.obs_height - dest_y)
             paste_w = min(w, self.obs_width - dest_x)
-            
             if paste_h > 0 and paste_w > 0:
-                solid_grid[dest_y : dest_y + paste_h, dest_x : dest_x + paste_w] = raw_slice[:paste_h, :paste_w]
-        # ===================================================
+                semantic_grid[dest_y : dest_y + paste_h, dest_x : dest_x + paste_w] = raw_slice[:paste_h, :paste_w]
 
-        hazard_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        # Prepare Player Grid
+        player_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         
-        # ===== FIX #6: PREVENT NEGATIVE WINDOW COORDINATES =====
-        # REASON: When player is near level edge, window could have negative coords
-        #         This breaks spatial hash queries
-        # OLD CODE:
-        # window_rect = pygame.Rect(
-        #     (px - self.obs_pad_x) * TILE_SIZE, 
-        #     (py - self.obs_pad_y) * TILE_SIZE, 
-        #     self.obs_width * TILE_SIZE, 
-        #     self.obs_height * TILE_SIZE
-        # )
-        
-        # NEW CODE: Clamp to non-negative values
         wx = max(0, (px - self.obs_pad_x) * TILE_SIZE)
         wy = max(0, (py - self.obs_pad_y) * TILE_SIZE)
         window_rect = pygame.Rect(
@@ -666,8 +622,11 @@ class PlatformerCore(gymnasium.Env):
             self.obs_width * TILE_SIZE, 
             self.obs_height * TILE_SIZE
         )
-        # ======================================================
         
+        # --- DYNAMIC OVERLAYS ON SEMANTIC GRID ---
+        
+        # 1. HAZARDS (Enemies & Spikes) -> -1.0
+        # Overwrite existing values (Solids/Air)
         nearby_hazards = self.physics_manager.hazard_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
         for h in nearby_hazards:
             if not h.gObj.active: continue
@@ -675,8 +634,11 @@ class PlatformerCore(gymnasium.Env):
             local_x = hx - (px - self.obs_pad_x)
             local_y = hy - (py - self.obs_pad_y)
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
-                hazard_grid[local_y, local_x] = 1.0
+                semantic_grid[local_y, local_x] = -1.0
 
+        # 2. COLLECTIBLES (Coins, Powerups, Goal)
+        # Coins -> 0.8
+        # Goal -> 1.0
         nearby_items = self.physics_manager.collectible_hash.query_rect(window_rect.x, window_rect.y, window_rect.width, window_rect.height)
         for c in nearby_items:
             if not c.gObj.active: continue
@@ -686,10 +648,31 @@ class PlatformerCore(gymnasium.Env):
             local_x = cx - (px - self.obs_pad_x)
             local_y = cy - (py - self.obs_pad_y)
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
-                collect_grid[local_y, local_x] = 1.0
+                obj_type = c.gObj.type_id if hasattr(c.gObj, 'type_id') else EntityType.NONE
+                if obj_type == EntityType.GOAL:
+                    semantic_grid[local_y, local_x] = 1.0
+                else:
+                    semantic_grid[local_y, local_x] = 0.8
+
+        # --- PLAYER MORPHOLOGY CHANNEL ---
+        # Explicitly map the player's dimensions onto the grid.
+        # This helps the CNN understand that the player is "tall" (2 tiles high).
+        # We use the relative position within the window.
+        p_rect = p.gObj.get_rect()
+        
+        # Convert player screen rect to grid coordinates relative to window
+        p_left_col = int((p_rect.x - window_rect.x) // TILE_SIZE)
+        p_top_row = int((p_rect.y - window_rect.y) // TILE_SIZE)
+        p_w_tiles = max(1, int(p.gObj.width // TILE_SIZE))
+        p_h_tiles = max(1, int(p.gObj.height // TILE_SIZE))
+
+        for r in range(p_top_row, p_top_row + p_h_tiles):
+            for c in range(p_left_col, p_left_col + p_w_tiles):
+                if 0 <= r < self.obs_height and 0 <= c < self.obs_width:
+                    player_grid[r, c] = 1.0
 
         # Return 2D grids (not flattened)
-        return solid_grid, hazard_grid, collect_grid
+        return semantic_grid, player_grid
 
     def _tracking_obs(self) -> np.ndarray:
         p = self.player
@@ -709,36 +692,13 @@ class PlatformerCore(gymnasium.Env):
         c_dist, c_count = get_dist(self.level_data.coins)
         
         raw_goal_dist = self._get_dist_to_goal()
+        goal_dir = self._get_goal_direction() # NEW
         
         # ===== FIX #8: LEVEL-DEPENDENT NORMALIZATION =====
-        # REASON: Old code used arbitrary constant (1000.0) which doesn't scale
-        #         with different level sizes. Use actual level dimensions.
-        # OLD CODE:
-        # norm_dist = 1000.0
-        
-        # NEW CODE: Use level size for proper normalization
         norm_dist = max(self.level_data.width, self.level_data.height, 1.0)
         # =================================================
         
         # ===== FIX #9: CLIP ALL VALUES TO [0, 1] RANGE =====
-        # REASON: Multiple normalization issues:
-        #   - score could exceed 5000 (now using 10000)
-        #   - timer used hardcoded 400 instead of actual max
-        #   - lives divided by 5 when max is 3 (only reached 0.6)
-        #   - No clipping meant values could exceed 1.0
-        # OLD CODE:
-        # return np.array([
-        #     min(1.0, e_dist / norm_dist),
-        #     min(1.0, c_dist / norm_dist),
-        #     min(1.0, raw_goal_dist / norm_dist),
-        #     min(1.0, e_count / 20.0),
-        #     min(1.0, c_count / 50.0),
-        #     self.score / 5000.0,           # Could exceed 1.0!
-        #     self.timer / 400.0,            # Wrong denominator for custom timers
-        #     self.lives / 5.0               # Wrong max (should be 3)
-        # ], dtype=np.float32)
-        
-        # NEW CODE: Proper normalization with clipping
         return np.array([
             np.clip(e_dist / norm_dist, 0.0, 1.0),
             np.clip(c_dist / norm_dist, 0.0, 1.0),
@@ -748,11 +708,13 @@ class PlatformerCore(gymnasium.Env):
             np.clip(self.score / 10000.0, 0.0, 1.0),                          # Increased max
             np.clip(self.timer / max(1.0, self.timer_seconds), 0.0, 1.0),    # Use actual max
             self.lives / float(max(1.0, self.max_lives)),                     # Proper denominator
+            goal_dir # NEW: Range [-1.0, 1.0]
         ], dtype=np.float32)
         # ===================================================
 
     def _info(self) -> Dict:
         p = self.player
+        # User request: "build it so that important data about the game state is put into the _info"
         return {
             "score": self.score, 
             "score_delta": self.score_delta, 
@@ -772,7 +734,12 @@ class PlatformerCore(gymnasium.Env):
             "stalled": self.stalled_this_frame,
             "persona": self.persona, "level": self.current_index_world,
             "goal_dist": self._get_dist_to_goal(),
-            "lives" : self.lives
+            "goal_dir": self._get_goal_direction(), # NEW
+            "lives" : self.lives,
+            # NEW INFO
+            "player_width": p.gObj.width,
+            "player_height": p.gObj.height,
+            "can_jump": 1.0 if p.coyote > 0 else 0.0
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):
