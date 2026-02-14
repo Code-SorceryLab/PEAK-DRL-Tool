@@ -24,13 +24,13 @@ st.markdown(f"""
             color: {THEME['text']};
         }}
         div[data-testid="stStatusWidget"] {{ visibility: hidden; }}
-        
+
         /* Typography */
         h1, h2, h3 {{
             color: {THEME['text']} !important;
             font-family: 'Courier New', monospace;
         }}
-        
+
         /* Metrics */
         div[data-testid="stMetricValue"] {{
             color: {THEME['accent']} !important;
@@ -44,7 +44,7 @@ st.markdown(f"""
             font-family: 'Arial', sans-serif;
             font-size: 0.8rem !important;
         }}
-        
+
         /* Checkboxes */
         label[data-testid="stCheckbox"] {{ color: {THEME['text']} !important; }}
         div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {{
@@ -56,7 +56,7 @@ st.markdown(f"""
 
 # --- HELPER: Find Logs ---
 def get_latest_log_file():
-    search_paths = [".", "mylogs", "runs"] 
+    search_paths = [".", "mylogs", "runs"]
     files = []
     for root_dir in search_paths:
         found = glob.glob(os.path.join(root_dir, "**", "training_log*.csv"), recursive=True)
@@ -68,12 +68,12 @@ def get_latest_log_file():
 with st.sidebar:
     st.header("🏔️ MISSION CONTROL")
     do_refresh = st.checkbox("LIVE DATA FEED", value=True)
-    
+
     st.divider()
     # --- FIX: VIEW MODE TOGGLE ---
     st.caption("Graph View Mode")
     show_full_history = st.checkbox("Show Full History (Start -> Cursor)", value=True)
-    
+
     st.divider()
     if st.button("🗑️ WIPE LOGS"):
         log_file = get_latest_log_file()
@@ -95,7 +95,7 @@ if not log_file:
     st.rerun()
 
 try:
-    df = pd.read_csv(log_file)
+    df = pd.read_csv(log_file,low_memory=False)
 except:
     st.stop()
 
@@ -153,7 +153,7 @@ col_graph, col_phys = st.columns([3, 1]) # 3:1 Ratio
 # --- LEFT COLUMN: GRAPH ---
 with col_graph:
     st.subheader("📈 SIGNAL VISUALIZER")
-    
+
     available_signals = ['total_reward'] + reward_cols
     selected_lines = []
 
@@ -171,7 +171,7 @@ with col_graph:
     else:
         # Default "Zoom" window of 1000 steps
         start_viz = max(0, selected_idx - 1000)
-        
+
     subset = df.iloc[start_viz : selected_idx + 1]
 
     if not subset.empty and selected_lines:
@@ -185,11 +185,11 @@ with col_graph:
             "#BD93F9", # Purple
             "#555555"  # Grey
         ]
-        
-        fig = px.line(subset, x='step', y=selected_lines, 
+
+        fig = px.line(subset, x='step', y=selected_lines,
                       color_discrete_sequence=custom_palette,
                       height=500)
-        
+
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
@@ -206,22 +206,22 @@ with col_graph:
 with col_phys:
     st.subheader("📐 PHYSICS")
     st.caption("Live Telemetry (Tiles)")
-    
+
     # Using nested columns to create a tight 2x2 Grid
     pc1, pc2 = st.columns(2)
-    
+
     with pc1:
         st.metric("X POS", f"{row.get('x', 0):.1f}")
         st.metric("VEL X", f"{row.get('vx', 0):.2f}")
-    
+
     with pc2:
         st.metric("Y POS", f"{row.get('y', 0):.1f}")
         st.metric("VEL Y", f"{row.get('vy', 0):.2f}")
-        
+
     st.metric("GOAL DIST", f"{row.get('goal_dist', 0):.1f}")
-    
+
     st.divider()
-    
+
     # Show Event if one happened
     evt = row.get('event', "")
     cause = row.get('cause', "")
