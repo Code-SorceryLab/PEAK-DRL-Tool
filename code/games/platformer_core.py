@@ -10,7 +10,7 @@ import time
 import gymnasium
 from gymnasium import spaces
 import psutil
-
+import random
 # FIX: Correctly import EntityType class from the module
 from .modules.System.EntityType import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
@@ -359,7 +359,8 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         #print(f"Level Complete! Current World: {self.world}")
         # --- Logic to Advance Level --
-        self.current_index_world += 1
+        # self.current_index_world += 1
+        self.current_index_world = random.randint(0, len(self.level_order) - 1)
         if self.current_index_world >= len(self.level_order):
             print("all levels done") # As requested
             self.current_index_world = 0

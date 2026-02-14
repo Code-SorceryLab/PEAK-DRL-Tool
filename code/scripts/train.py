@@ -137,7 +137,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.Flatten(),
                 )
 
-                n_flatten = 21 * 21 * 64
+                n_flatten = 10 * 10 * 64
                 # =================================================================
 
                 linear = nn.Sequential(nn.Linear(n_flatten, 512), nn.ReLU())
