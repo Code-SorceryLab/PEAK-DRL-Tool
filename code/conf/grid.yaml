@@ -1,5 +1,4 @@
 defaults:
-  - game: none         # pick any file from conf/game/*.yaml
   - callback: none
   - _self_
 
@@ -7,20 +6,14 @@ defaults:
 games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
 personas: [
-#  platformer_baseline,
-#  platformer_simple,
-  platformer_speedrunner,
-#  platformer_coin_collector,
-#  platformer_master,
-#  platformer_explorer,
-  platformer_perfectionist,
-  platformer_adaptive,
+  platformer_simple,
+  platformer_complex,
 ]
 
 # skill -> training steps
 skills:
   Novice: 1_000_000
-  Expert: 2_000_000
+  Expert: 5_000_000
 
 # generic env params
 seed: 1234
@@ -33,9 +26,9 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 8      # 1 for cpu or 16 gpu , or whatever you want
+n_envs: 11      # 1 for cpu or 16 gpu , or whatever you want
 
 # null values mean "no override"
 model: null     # optional single selection
 persona: null   # optional single selection
-skill: null     # optional single selection
+skill: null     # optional single selection2

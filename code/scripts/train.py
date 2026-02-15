@@ -1,8 +1,6 @@
 # code/scripts/train.py
 import os
-from code.callbacks.dashboard import DashboardCallback
-from code.callbacks.AnnealCallback import AnnealCallback
-from code.callbacks.RecurrentEvalCallback import RecurrentEvalCallback
+from code.callbacks.logging_callback import CsvLoggerCallback
 
 try:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -10,6 +8,7 @@ except Exception:
     os.environ["SDL_VIDEODRIVER"] = ""
 
 import sys
+import subprocess
 import importlib
 import inspect
 from pathlib import Path
@@ -25,10 +24,13 @@ from omegaconf import DictConfig, OmegaConf
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback, EvalCallback, CheckpointCallback
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv
+# --- FIX: Import VecNormalize ---
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv, VecNormalize
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sb3_contrib import RecurrentPPO
 
+# Import your Reward Modules to pass to the environment
+import code.rewards.train_platformer as reward_module
 from code.wrappers.generic_env import GameEnv
 from code.algos import get_algo
 
@@ -74,25 +76,10 @@ def _resolve_callable_or_instance(node: Dict[str, Any]) -> Any:
 #### Helper functions END ####
 
 # =========================================================================
-# Custom Multimodal Extractor (Fixes PyTorch Crash on small grids)
+# Custom Multimodal Extractor
 # =========================================================================
 class CustomCombinedExtractor(BaseFeaturesExtractor):
-    """
-    ===== FIXED VERSION WITH ADAPTIVE POOLING =====
-    
-    REASON: Old CNN had fixed architecture that broke with different grid sizes.
-            For 21x21 input: Conv->Pool->Conv->Flatten
-            - After Conv2d(3x3, pad=1): still 21x21
-            - After MaxPool2d(2): becomes 10x10 (floor division!)
-            - After Conv2d(3x3, pad=1): still 10x10
-            - Flatten: 10*10*64 = 6400 features
-            
-            But forward pass tried to use shape from sample, which could mismatch.
-            AdaptiveAvgPool2d ensures consistent output regardless of input size.
-    """
     def __init__(self, observation_space: spaces.Dict):
-        # We do not know features-dim here before going over all the items,
-        # so put something dummy for now. PyTorch requires int!
         super().__init__(observation_space, features_dim=1)
 
         extractors = {}
@@ -100,50 +87,22 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
-                # We will just use a simpler CNN appropriate for 21x21 or 11x9
                 n_input_channels = subspace.shape[0]
-                
-                # ===== FIX #12: ADD ADAPTIVE POOLING FOR VARIABLE GRID SIZES =====
-                # OLD CODE:
-                # cnn = nn.Sequential(
-                #     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                #     nn.ReLU(),
-                #     nn.MaxPool2d(2),
-                #     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                #     nn.ReLU(),
-                #     nn.Flatten(),  # Output size depends on input size!
-                # )
-                # # Compute shape by doing one forward pass
-                # with torch.no_grad():
-                #     sample_tensor = torch.as_tensor(subspace.sample()[None]).float()
-                #     n_flatten = cnn(sample_tensor).shape[1]  # Could mismatch at runtime
-                
-                # NEW CODE: Use adaptive pooling for consistent output
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(32),
                     nn.ReLU(),
-                    
-                    #nn.MaxPool2d(2),
+                    nn.MaxPool2d(2),
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(64),
                     nn.ReLU(),
-                    
-                    nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(64),
-                    nn.ReLU(),
-
-                    nn.AdaptiveMaxPool2d((10, 10)),
+                    nn.AdaptiveMaxPool2d((11, 11)),
                     nn.Flatten(),
                 )
-
-                n_flatten = 10 * 10 * 64
-                # =================================================================
-
-                linear = nn.Sequential(nn.Linear(n_flatten, 512), nn.ReLU())
+                n_flatten = 11 * 11 * 64
+                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 512
-                # ==============================================
+                total_concat_size += 256
 
             elif key == "scalars":
                 # Standard MLP for the 1D scalars
@@ -153,81 +112,79 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.ReLU()
                 )
                 total_concat_size += 64
+            
+            elif key == "raycasts":
+                # MLP for the raycast data (1D array)
+                extractors[key] = nn.Sequential(
+                    nn.Linear(subspace.shape[0], 128),
+                    nn.BatchNorm1d(128),
+                    nn.ReLU()
+                )
+                total_concat_size += 128
 
         self.extractors = nn.ModuleDict(extractors)
-
-        # Update the features dim manually
         self._features_dim = total_concat_size
 
     def forward(self, observations) -> torch.Tensor:
         encoded_tensor_list = []
-
-        # self.extractors contain nn.Modules that do all the processing.
         for key, extractor in self.extractors.items():
             encoded_tensor_list.append(extractor(observations[key]))
-            
-        # Return a (B, features_dim) PyTorch tensor
         return torch.cat(encoded_tensor_list, dim=1)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="grid")
 def main(cfg: DictConfig):
-    """
-    Trains across models × personas × skills for a game.
-
-    Usage:
-        python -m code.scripts.train game=flappy
-        # or edit code/conf/grid.yaml and run without overrides
-    """
     # Stable paths regardless of Hydra's run dir
     repo_root = Path(get_original_cwd())
     conf_root = repo_root / "code" / "conf"
     models_dir = repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    # Device configuration for training (CPU/GPU)
+    # Device configuration
     device = cfg.get("device", "cpu")
     if device == "cuda" and not torch.cuda.is_available():
         print("[WARNING] CUDA is not available on this system, falling back to CPU.")
         device = "cpu"
-    
     print(f"[INFO] Training device: {device}")
 
     # Logging/callback configuration
-    # Default frequencies if not specified in grid.yaml
     tb_root  = str(cfg.get("tb_root", "runs"))
     eval_freq = int(cfg.get("eval_freq", 20_000))
     save_freq = int(cfg.get("save_freq", 50_000))
 
-    # Build game CLASS (not instance)
-    # Checks if the game has a game config dict
-    if isinstance(cfg.game, (DictConfig, dict)):
-        game_conf = OmegaConf.to_container(cfg.game, resolve=True)
-        if "_target_" in game_conf:
-            dotted = game_conf["_target_"]
-            game_name = dotted.split(".")[-2].replace("_core", "")
-        else:
-            game_name = "game"
-    else:
-        game_conf = _load_yaml(conf_root, "game", str(cfg.game))
-        game_name = str(cfg.game)
+    # Build game CLASS
+    game_name = str(cfg.game)
+    if game_name == 'none':
+        print("ERROR: No game specified. Please run with 'game=<game_name>'")
+        sys.exit(1)
 
-    if "_target_" not in game_conf:
-        raise ValueError(f"Game config must have _target_: {game_conf}")
-    game_cls = _import_attr(game_conf["_target_"])
+    try:
+        game_module_name = f"code.games.{game_name}_core"
+        game_class_name = f"{game_name.capitalize()}Core"
+        game_module = importlib.import_module(game_module_name)
+        game_cls = getattr(game_module, game_class_name)
+    except (ImportError, AttributeError) as e:
+        print(f"ERROR: Could not load game class '{game_class_name}' from module '{game_module_name}'.")
+        sys.exit(1)
 
-    # Shared env params (reward set per persona)
+    # Shared env params
     base_env_kwargs = dict(
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
         max_steps=None if str(cfg.max_steps).lower() == "none" else int(cfg.max_steps),
     )
 
-    # Ensure deterministic folders for artifacts
     os.makedirs(models_dir / "best", exist_ok=True)
     os.makedirs(models_dir / "checkpoints", exist_ok=True)
     os.makedirs(models_dir / "eval_logs", exist_ok=True)
 
-    # Optional single-value shortcuts (CLI-friendly)
+    # 🚀 AUTO-LAUNCH DASHBOARD
+    if cfg.get("dashboard", True):
+        dash_script = repo_root / "dashboard_viewer.py"
+        if dash_script.exists():
+            print(f"[INFO] 🚀 Launching Flight Recorder...")
+            subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(dash_script)])
+
+    # Load configuration lists
     selected_models = list(cfg.models)
     if "model" in cfg and cfg.model:
         selected_models = [str(cfg.model)]
@@ -245,7 +202,6 @@ def main(cfg: DictConfig):
 
     run_count = 0
     for model_name in selected_models:
-        # Algo params from conf/algo/<model>.yaml
         algo_conf = _load_yaml(conf_root, "algo", model_name)
         Algo = get_algo(algo_conf.get("name", model_name))
         policy = algo_conf.get("policy", "MlpPolicy")
@@ -253,63 +209,77 @@ def main(cfg: DictConfig):
         policy_kwargs = algo_conf.get("policy_kwargs", None)
         algo_kwargs = {k: v for k, v in algo_conf.items() if k not in {"_target_", "name", "policy", "policy_kwargs"}}
 
-        # Add policy_kwargs if present
         if policy == "MultiInputPolicy":
-            if policy_kwargs is None:
-                policy_kwargs = {}
+            if policy_kwargs is None: policy_kwargs = {}
             policy_kwargs["features_extractor_class"] = CustomCombinedExtractor
         
-        if policy_kwargs:
-            # Convert activation_fn string to callable for SB3 compatibility
-            activation_fn_map = {
-                "ReLU": torch.nn.ReLU,
-                "Tanh": torch.nn.Tanh,
-                "LeakyReLU": torch.nn.LeakyReLU,
-                "ELU": torch.nn.ELU,
-                "GELU": torch.nn.GELU,
-            }
-            
-            if "activation_fn" in policy_kwargs:
-                act_fn = policy_kwargs["activation_fn"]
-                if isinstance(act_fn, str):
-                    if act_fn in activation_fn_map:
-                        policy_kwargs["activation_fn"] = activation_fn_map[act_fn]
-                    else:
-                        raise ValueError(
-                            f"Unknown activation_fn: '{act_fn}'. "
-                            f"Available: {list(activation_fn_map.keys())}"
-                        )
-            
+        if policy_kwargs and "activation_fn" in policy_kwargs:
+            act_fn = policy_kwargs["activation_fn"]
+            if isinstance(act_fn, str):
+                activation_fn_map = {
+                    "ReLU": torch.nn.ReLU, "Tanh": torch.nn.Tanh,
+                    "LeakyReLU": torch.nn.LeakyReLU, "ELU": torch.nn.ELU, "GELU": torch.nn.GELU,
+                }
+                policy_kwargs["activation_fn"] = activation_fn_map.get(act_fn, torch.nn.ReLU)
             algo_kwargs["policy_kwargs"] = policy_kwargs
 
 
         for persona in selected_personas:
-            # Reward function from conf/reward/<persona>.yaml
-            reward_conf = _load_yaml(conf_root, "reward", persona)
-            reward_fn = _resolve_callable_or_instance(reward_conf)
+            env_kwargs = base_env_kwargs.copy()
+            env_kwargs['persona'] = persona
+            
+            # --- LOAD REWARD FUNCTION ---
+            active_reward_fn = None
+            if hasattr(reward_module, persona):
+                active_reward_fn = getattr(reward_module, persona)
+                print(f"[INFO] Loaded reward persona: {persona}")
+            else:
+                print(f"[WARNING] Persona '{persona}' not found! Using default.")
+                active_reward_fn = reward_module.default
 
             def make_env():
                 def _init():
-                    return GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+                    return GameEnv(game_cls, reward_fn=active_reward_fn, **env_kwargs)
                 return _init
 
             n_envs = int(cfg.get("n_envs", 1))
             
             if n_envs > 1:
-                # subroutine for multiple envs
-                env = SubprocVecEnv([make_env() for _env in range(n_envs)])
+                raw_env = SubprocVecEnv([make_env() for _ in range(n_envs)])
             else:
-                env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+                raw_env = DummyVecEnv([make_env()])
             
-            # Dedicated eval env (no training noise)
-            eval_env = GameEnv(game_cls, reward_fn=reward_fn, **base_env_kwargs)
+            # --- FIX: WRAP IN VECNORMALIZE ---
+            # This automatically normalizes observations (800 -> 1.0) and rewards
+            env = VecNormalize(raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+
+            # Dedicated eval env (Also wrapped, but without reward normalization training)
+            # Eval envs must be VecEnvs to use VecNormalize correctly
+            eval_raw_env = DummyVecEnv([make_env()])
+            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+            
+            # Sync normalization stats from train env to eval env
+            eval_env.training = False 
+            eval_env.norm_reward = False
 
             for skill, total_timesteps in selected_skills.items():
                 run_count += 1
-
-                # TB directory for this (game × algo × persona)
                 tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
                 os.makedirs(tb_dir, exist_ok=True)
+                
+                # --- CSV Logger Save to ROOT ---
+                log_name = f"training_log_{game_name}_{persona}.csv"
+                csv_logger = CsvLoggerCallback(log_dir=str(repo_root), file_name=log_name)
+                
+                # Callbacks
+                eval_cb = EvalCallback(
+                    eval_env,
+                    best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                    log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                    eval_freq=eval_freq,
+                    deterministic=True,
+                    render=False,
+                )
                 
                 # Check if this is a recurrent model
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
@@ -345,30 +315,15 @@ def main(cfg: DictConfig):
                     name_prefix=f"{game_name}_{model_name}_{persona}"
                 )
 
-                
-                use_dashboard = bool(cfg.get("dashboard", True))
-                
-                # Start with standard callbacks
-                current_callbacks = [eval_cb, ckpt_cb]
-                
-                if False:
-                    # Update freq 1 = Smoothest, but slows training slightly
-                    dash_cb = DashboardCallback(update_freq=1000, show_event_log=True, show_detailed_stats=True)
-                    current_callbacks.append(dash_cb)
-                
-                # Inject TensorBoard path into algo kwargs
+                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
+
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir
                 train_kwargs["device"] = device
 
-
-                # Build model (SB3-compatible Algo expected)
                 model = Algo(policy, env, **train_kwargs)
-
-                # Label inside TB so runs are grouped by persona/skill
                 tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}"
 
-                # Learn with callbacks + TB run label
                 model.learn(
                     total_timesteps=int(total_timesteps),
                     callback=current_callbacks,
@@ -376,10 +331,15 @@ def main(cfg: DictConfig):
                     progress_bar=True
                 )
 
-                # Save each trained variant (SB3 appends .zip)
+                # Save model + normalization stats
                 filename = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}.zip"
                 save_path = models_dir / filename
                 model.save(save_path)
+                
+                # Save the Normalization Stats too (Critical for loading later!)
+                norm_path = models_dir / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_vecnorm.pkl"
+                env.save(str(norm_path))
+                
                 print(f"[{run_count}] saved --> {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
 
             # Close envs between personas

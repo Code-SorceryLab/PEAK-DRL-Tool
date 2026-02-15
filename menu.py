@@ -1,8 +1,8 @@
 # menu.py — unified CLI for training, eval, TensorBoard, and manual play
 # Compatible with: Hydra overrides, TB logs under mylogs/, flat model files in models/
 
-# Imports 
-import subprocess 
+# Imports
+import subprocess
 import webbrowser
 import os
 import sys
@@ -21,7 +21,7 @@ import numpy as np
 try:
     from stable_baselines3 import PPO, A2C, DQN, SAC, TD3
     from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
-    
+
     # Import Monitor for recording purposes
     from stable_baselines3.common.monitor import Monitor
 
@@ -34,7 +34,7 @@ try:
         "sac": SAC,
         "td3": TD3,
     }
-    
+
 except ImportError:
     HAS_SB3 = False
     ALGO_CLASS_MAP = {}
@@ -62,7 +62,7 @@ CURRENT_ALGO = None
 REQUIRED_PACKAGES = [
     'torch>=1.9.0',
     'stable-baselines3>=1.6.0',
-    'sb3-contrib>=1.6.0', 
+    'sb3-contrib>=1.6.0',
     'gymnasium>=0.26.0',
     'pygame>=2.1.0',
     'numpy>=1.21.0',
@@ -72,6 +72,8 @@ REQUIRED_PACKAGES = [
     'omegaconf>=2.1.0',
     'imageio',
     'moviepy',
+    'streamlit',
+    'plotly'
 ]
 
 # ============================================================================
@@ -109,7 +111,7 @@ def get_moviepy_editor():
 
     return None
 
-# MOVE START UP 
+# MOVE START UP
 MPY = get_moviepy_editor()
 HAS_MOVIEPY = MPY is not None
 
@@ -117,9 +119,9 @@ def check_and_install_dependencies():
     """Check if required packages are installed and install missing ones"""
     # check dependencies if missing install requirements
     print("Checking dependencies...")
-    
+
     missing_packages = []
-    
+
     for package in REQUIRED_PACKAGES:
         package_name = package.split('>=')[0].split('==')[0]
         try:
@@ -140,18 +142,18 @@ def check_and_install_dependencies():
                     raise ImportError()
             except ImportError:
                 missing_packages.append(package)
-    
+
     if not missing_packages:
         print("All dependencies are installed!")
         return True
-    
+
     print(f"Missing packages: {', '.join(missing_packages)}")
-    
+
     response = input("\nWould you like to install missing dependencies? [y/N]: ").strip().lower()
     if response not in ('y', 'yes'):
         print("Cannot proceed without required dependencies.")
         return False
-    
+
     print("Installing missing packages...")
     try:
         cmd = [sys.executable, '-m', 'pip', 'install'] + missing_packages
@@ -166,14 +168,14 @@ def check_and_install_dependencies():
 def setup_project():
     """Initial project setup"""
     # if requirements don't exists makes requirements.txt
-    
+
     # Check and create requirements.txt if missing
     requirements_path = Path("requirements.txt")
     if not requirements_path.exists():
         requirements_content = "\n".join(REQUIRED_PACKAGES) + "\n"
         requirements_path.write_text(requirements_content)
 
-# checking if grid yaml 
+# checking if grid yaml
 def load_grid_config():
     """Load grid.yaml configuration"""
     if not GRID_CONFIG_PATH.exists():
@@ -185,33 +187,20 @@ def load_grid_config():
         return None
 
 def get_available_games():
-    """Get games from grid.yaml if available, else all games with YAML files"""
-    # laods games from grid yaml so it is available in the menu options
+    """Get games from grid.yaml."""
     cfg = load_grid_config()
-    
-    # If grid has games section, use that (with YAML validation)
-    if cfg is not None and 'games' in cfg:
-        grid_games = list(cfg.games) if cfg.games else []
-        available = []
-        for game in grid_games:
-            game_file = CONF_GAME_DIR / f"{game}.yaml"
-            if game_file.exists():
-                available.append(game)
-            else:
-                print(f"Warning: Game '{game}' in grid.yaml but no file at {game_file}")
-        return sorted(available) if available else []
-    
-    # Fallback: return all games with YAML files
-    if not CONF_GAME_DIR.exists():
-        return []
-    return sorted([f.stem for f in CONF_GAME_DIR.glob("*.yaml")])
+    if cfg is not None and 'games' in cfg and cfg.games:
+        return sorted(list(cfg.games))
+
+    print("Warning: No 'games' section found or it is empty in grid.yaml.")
+    return []
 
 def get_available_algos_from_grid():
     """Get algorithms from grid.yaml that have corresponding YAML files"""
     cfg = load_grid_config()
     if cfg is None or 'models' not in cfg:
         return []
-    
+
     grid_algos = list(cfg.models) if cfg.models else []
     available = []
     for algo in grid_algos:
@@ -220,25 +209,17 @@ def get_available_algos_from_grid():
             available.append(algo)
         else:
             print(f"Warning: Algorithm '{algo}' in grid.yaml but no file at {algo_file}")
-    
+
     return sorted(available)
 
 def get_available_personas_from_grid():
-    """Get personas from grid.yaml that have corresponding YAML files"""
+    """Get personas from grid.yaml."""
     cfg = load_grid_config()
-    if cfg is None or 'personas' not in cfg:
-        return []
-    
-    grid_personas = list(cfg.personas) if cfg.personas else []
-    available = []
-    for persona in grid_personas:
-        persona_file = CONF_REWARD_DIR / f"{persona}.yaml"
-        if persona_file.exists():
-            available.append(persona)
-        else:
-            print(f"Warning: Persona '{persona}' in grid.yaml but no file at {persona_file}")
-    
-    return sorted(available)
+    if cfg is not None and 'personas' in cfg and cfg.personas:
+        return sorted(list(cfg.personas))
+
+    print("Warning: No 'personas' section found or it is empty in grid.yaml.")
+    return []
 
 def get_personas_for_game(game: str):
     """Return only personas from grid.yaml whose YAML stem starts with '<game>_'"""
@@ -259,17 +240,17 @@ def get_trained_games_from_models_flat():
     BEST_DIR = MODELS_DIR / "best"
     if not BEST_DIR.exists():
         return []
-    
+
     model_folders = [f for f in BEST_DIR.iterdir() if f.is_dir() and (f / "best_model.zip").exists()]
     if not model_folders:
         return []
-    
+
     games = set()
     for folder in model_folders:
         parts = folder.name.split("_")
         if len(parts) >= 5:
             games.add(parts[0])
-    
+
     return sorted(games)
 
 def get_model_folders():
@@ -304,26 +285,26 @@ def ask_index(prompt, options, add_back=True, default=None):
     if not options:
         print("No options available.")
         return None
-    
+
     print(prompt)
     for i, opt in enumerate(options, 1):
         default_flag = " (default)" if opt == default else ""
         print(f"  {i}. {opt}{default_flag}")
-    
+
     back_idx = len(options) + 1
     if add_back:
         print(f"  {back_idx}. Back")
-    
+
     prompt_text = f"Select (1-{back_idx if add_back else len(options)})"
     if default:
         prompt_text += f" or Enter for [{default}]"
     prompt_text += ": "
-    
+
     choice = input(prompt_text).strip()
-    
+
     if choice == "" and default:
         return default
-    
+
     try:
         num = int(choice)
         if add_back and num == back_idx:
@@ -332,14 +313,14 @@ def ask_index(prompt, options, add_back=True, default=None):
             return options[num - 1]
     except ValueError:
         pass
-    
+
     print("Invalid selection.")
     return None
 
 # def ensure_current_algo():
 #     """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
 #     global CURRENT_ALGO
-    
+
 #     if CURRENT_ALGO is None:
 #         algos = get_available_algos_from_grid()
 #         if algos:
@@ -353,15 +334,15 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT):
     """Execute a single training run with error handling"""
     cmd = [
         sys.executable, "-m", "code.scripts.train",
-        f"game={game}",
-        f"model={algo}",
-        f"persona={persona}",
-        f"skill={skill}",
+        f"+game={game}",
+        f"+model={algo}",
+        f"+persona={persona}",
+        f"+skill={skill}",
         f"tb_root={tb_root}",
     ]
-    
+
     print(">>> " + " ".join(cmd) + "\n")
-    
+
     # Runs the hydra CMD training script with specified parameters
     try:
         subprocess.run(cmd, check=True)
@@ -382,10 +363,10 @@ def print_training_summary(total, successful, failed):
         print(f"❌ Failed: {failed}/{total}")
     print(f"Logs saved to: {DEFAULT_TB_ROOT}/")
     print(f"Models saved to: {MODELS_DIR}/best/")
-    
+
     if HAS_WINSOUND and failed == 0:
         winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
-    
+
     print()
 
 # ============================================================================
@@ -395,7 +376,7 @@ def print_training_summary(total, successful, failed):
 def run_training():
     """Single training run with user-selected parameters"""
     global CURRENT_ALGO
-    
+
     print("\n=== Training ===")
     games = get_available_games()
     if not games:
@@ -411,14 +392,14 @@ def run_training():
     if not algos:
         print("No algorithm configurations found in grid.yaml with matching YAML files")
         return
-    
+
     #ensure_current_algo() - URGENT
     default_algo = CURRENT_ALGO if CURRENT_ALGO in algos else ("ppo" if "ppo" in algos else algos[0])
-    
+
     algo_choice = ask_index("Available algorithms:", algos, default=default_algo)
     if algo_choice is None:
         return
-    
+
     CURRENT_ALGO = algo_choice
 
     personas = get_personas_for_game(game)
@@ -448,7 +429,7 @@ def run_training():
 
         cmd = [
             sys.executable, "-m", "code.scripts.train",
-            f"game={game}", f"model={algo_choice}", f"persona={persona_choice}",
+            f"+game={game}", f"+model={algo_choice}", f"+persona={persona_choice}",
             "skill=Custom", f"+skills.Custom={steps}", f"tb_root={tb_root}",
         ]
         print("\n>>>", " ".join(cmd), "\n")
@@ -477,11 +458,11 @@ def run_training():
 def train_all_models_for_game():
     """Train all (algo x persona x skill) models for ONE user-selected game"""
     global CURRENT_ALGO
-    
+
     print("\n" + "=" * 60)
     print("TRAIN ALL MODELS FOR ONE GAME")
     print("=" * 60)
-    
+
     games = get_available_games()
     if not games:
         print("No game configurations found in grid.yaml or code/conf/game/")
@@ -495,18 +476,18 @@ def train_all_models_for_game():
     if not algos:
         print("No algorithm configurations found in grid.yaml")
         return
-    
+
     ensure_current_algo()
-    
+
     # Algorithm selection
     print("\nSelect algorithms to train:")
     print("  1. All algorithms")
-    
+
     for i, algo in enumerate(algos, 2):
         default_flag = " (current)" if algo == CURRENT_ALGO else ""
         print(f"  {i}. {algo} only{default_flag}")
     print(f"  {len(algos) + 2}. Back")
-    
+
     choice = input(f"Select (1-{len(algos) + 2}): ").strip()
     try:
         num = int(choice)
@@ -531,22 +512,22 @@ def train_all_models_for_game():
 
     skills = ["Novice", "Expert"]
     total_runs = len(selected_algos) * len(personas) * len(skills)
-    
+
     # Show summary
     print(f"\nTraining {total_runs} model(s) for '{game}':")
     print(f"  Algorithms: {len(selected_algos)}")
     print(f"  Personas: {len(personas)}")
     print(f"  Skills: {len(skills)}")
-    
+
     confirm = input(f"\nProceed with {total_runs} training runs? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
-    
+
     # Execute training
     completed = 0
     failed = 0
-    
+
     try:
         for algo in selected_algos:
             for persona in personas:
@@ -556,7 +537,7 @@ def train_all_models_for_game():
                     print(f"Progress: {completed}/{total_runs}")
                     print(f"Training: {game} | {algo} | {persona} | {skill}")
                     print("=" * 60)
-                    
+
                     success = execute_training_run(game, algo, persona, skill)
                     if not success:
                         failed += 1
@@ -565,7 +546,7 @@ def train_all_models_for_game():
         print(f"Completed: {completed - 1}/{total_runs}")
         print(f"Failed: {failed}")
         return
-    
+
     print_training_summary(total_runs, completed - failed, failed)
 
 def train_complete_grid():
@@ -573,35 +554,35 @@ def train_complete_grid():
     print("\n" + "=" * 60)
     print("TRAIN COMPLETE GRID (All Games × Algos × Personas)")
     print("=" * 60)
-    
+
     games = get_available_games()
     algos = get_available_algos_from_grid()
-    
+
     if not games:
         print("No game configurations found in grid.yaml or code/conf/game/")
         return
-    
+
     if not algos:
         print("No algorithm configurations found in grid.yaml")
         return
-    
+
     # Calculate total runs
     total_runs = 0
     breakdown = []
-    
+
     for game in games:
         personas = get_personas_for_game(game)
         if not personas:
             continue
-        
+
         runs_for_game = len(algos) * len(personas) * 2
         total_runs += runs_for_game
         breakdown.append(f"  • {game}: {len(personas)} persona(s) × {len(algos)} algo(s) × 2 skills = {runs_for_game} runs")
-    
+
     if total_runs == 0:
         print("\n❌ No valid training configurations found.")
         return
-    
+
     # Show summary
     print(f"\nThis will train {total_runs} total model(s):")
     print(f"\nGames: {len(games)}")
@@ -610,25 +591,25 @@ def train_complete_grid():
     print("\nBreakdown by game:")
     for line in breakdown:
         print(line)
-    
+
     print(f"Logs will be saved to: {DEFAULT_TB_ROOT}/")
-    
+
     confirm = input(f"\nProceed with {total_runs} training runs? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
-    
+
     # Execute training grid
     skills = ["Novice", "Expert"]
     completed = 0
     failed = 0
-    
+
     try:
         for game in games:
             personas = get_personas_for_game(game)
             if not personas:
                 continue
-            
+
             for algo in algos:
                 for persona in personas:
                     for skill in skills:
@@ -637,7 +618,7 @@ def train_complete_grid():
                         print(f"Progress: {completed}/{total_runs}")
                         print(f"Training: {game} | {algo} | {persona} | {skill}")
                         print("=" * 60)
-                        
+
                         success = execute_training_run(game, algo, persona, skill)
                         if not success:
                             failed += 1
@@ -646,7 +627,7 @@ def train_complete_grid():
         print(f"Completed: {completed - 1}/{total_runs}")
         print(f"Failed: {failed}")
         return
-    
+
     print_training_summary(total_runs, completed - failed, failed)
 
 
@@ -733,7 +714,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
 
 
     meta = parse_model_metadata(model_path)
-    
+
     game = meta["game"]
     algo_name = (meta["algo"] or "").lower()
     persona = (meta["persona"] or "default").lower()
@@ -805,7 +786,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
                 obs, reward, done, info = step_result
 
             frame = env.render(mode="rgb_array")
-            
+
             if frame is not None:
                 frames.append(np.asarray(frame))
 
@@ -838,6 +819,26 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
 
     print(f"\nSaved MP4: {mp4_path}")
     print(f"Saved GIF: {gif_path}\n")
+
+def run_agent_analyzer():
+    """Run the CSV log analyzer script"""
+    print("\n=== Agent Performance Analyzer ===")
+    script_path = Path("code/scripts/agent_analyzer.py")
+
+    # Check if it exists in code/scripts or root
+    if script_path.exists():
+        cmd = [sys.executable, str(script_path)]
+    elif Path("agent_analyzer.py").exists():
+        cmd = [sys.executable, "agent_analyzer.py"]
+    else:
+        print("❌ Cannot find 'agent_analyzer.py'. Make sure it's in the root or code/scripts/ folder.")
+        return
+
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        pass
+    print("\nAnalysis complete.\n")
 
 def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
     """
@@ -937,21 +938,21 @@ def watch_trained_agent():
     # Build display list
     display_options = []
     paths = []
-    
+
     for folder in model_folders:
         parts = folder.name.split("_")
-        
+
         if len(parts) >= 5:
             game, algo, _, persona, skill = parts[:5]
             display = f"{game:<8} | {algo:<4} | {persona:<12} | {skill:<8}"
         else:
             display = folder.name
-        
+
         display_options.append(display)
         paths.append(folder / "best_model.zip")
 
     selected = ask_index("Select a trained model to visualize:", display_options)
-    
+
     if selected is None:
         return
 
@@ -975,7 +976,7 @@ def watch_trained_agent():
         return
 
     algo_cls = ALGO_CLASS_MAP.get(algo_name)
-    
+
     if algo_cls is None:
         print(f"Unsupported/unknown algo '{algo_name}'.")
         return
@@ -990,7 +991,7 @@ def watch_trained_agent():
 
     # Prompt for recording
     rec_choice = input("Record this session to videos/ as MP4 + GIF? [y/N]: ").strip().lower()
-    
+
     if rec_choice in ("y", "yes"):
         # INLINE MODE (Visual + Record)
         # Keeps the user request "see the agent play while its recording"
@@ -1000,7 +1001,7 @@ def watch_trained_agent():
             print("Recording requires 'moviepy'. Run inside the venv and: pip install moviepy imageio[ffmpeg]")
             return
 
-        
+
         # --- Env + model setup
         try:
             from code.wrappers.generic_env import GameEnv
@@ -1022,7 +1023,6 @@ def watch_trained_agent():
         if GameCls is None:
             print(f"No *Core class found in code.games.{game}_core.")
             return
-
         pygame.init()
 
         # IMPORTANT: use human mode for visible window
@@ -1066,12 +1066,12 @@ def watch_trained_agent():
 
             # Model action
             action, _ = model.predict(obs, deterministic=True)
-            
+
             # --- FREE CAM OVERRIDE ---
             if hasattr(env, 'game') and hasattr(env.game, 'debug_manager'):
                 if env.game.debug_manager.free_cam_active:
                     action = 0
-            
+
             step_result = env.step(action)
 
             if len(step_result) == 5:
@@ -1085,7 +1085,7 @@ def watch_trained_agent():
 
             # Record what is actually on screen
             surface = pygame.display.get_surface()
-            
+
             if surface:
                 frame = pygame.surfarray.array3d(surface).swapaxes(0, 1)
                 frames.append(frame)
@@ -1134,7 +1134,7 @@ def watch_trained_agent():
     else:
         # SUBPROCESS MODE (Visual Only - Fixes Freeze)
         # Use this for standard viewing when recording is not required.
-        
+
         env_vars = os.environ.copy()
         if "SDL_VIDEODRIVER" in env_vars:
             del env_vars["SDL_VIDEODRIVER"]
@@ -1147,10 +1147,10 @@ def watch_trained_agent():
             "--game", game,
             "--algo", algo_name
         ]
-        
+
         print("\nLaunching viewer in separate process...")
         print(">>>", " ".join(cmd), "\n")
-        
+
         try:
             subprocess.run(cmd, check=True, env=env_vars)
         except subprocess.CalledProcessError as e:
@@ -1169,15 +1169,15 @@ def run_tensorboard():
         return
 
     games = get_available_games()
-    
+
     # Create a special "Show All" option
     filter_options = ["Show All (no filter)"] + games
     filter_choice = ask_index("Choose TensorBoard filter:", filter_options)
-    
+
     # If user selected Back, return immediately
     if filter_choice is None:
         return
-    
+
     # Determine filter game (None means "Show All")
     if filter_choice == "Show All (no filter)":
         filter_game = None
@@ -1225,7 +1225,7 @@ def delete_logs_and_models():
     if confirm not in ("y", "yes"):
         print("Aborted. Nothing was deleted.")
         return
-    
+
     def safe_clear_dir(path: Path):
         if not path.exists():
             return
@@ -1280,7 +1280,7 @@ def run_manual_play():
     selected_game = available_games[idx - 1]
 
     env = os.environ.copy()
-    
+
     # Remove SDL_VIDEODRIVER to ensure proper window display
     if "SDL_VIDEODRIVER" in env:
         env.pop("SDL_VIDEODRIVER")
@@ -1292,7 +1292,7 @@ def run_manual_play():
     if not script_path.exists():
         print("Manual play script not found at code/scripts/manual_play.py")
         return
-    
+
     subprocess.run([sys.executable, "-m", "code.scripts.manual_play", "--game", selected_game, "--fps", "30"], env=env)
 
 
@@ -1305,7 +1305,7 @@ def show_project_status():
     games = get_available_games()
     algos = get_available_algos_from_grid()
     trained = get_trained_games_from_models_flat()
-    
+
     print(f"Available game configurations (from grid.yaml): {len(games)}")
     for g in games:
         flag = "✓ Trained" if g in trained else "○ Not trained"
@@ -1319,7 +1319,7 @@ def show_project_status():
     if MODELS_DIR.exists():
         model_count = get_trained_models_count()
         print(f"\nTotal trained models: {model_count}")
-        
+
         model_folders = get_model_folders()
         algo_counts = {}
         for folder in model_folders:
@@ -1327,7 +1327,7 @@ def show_project_status():
             if len(parts) >= 2:
                 algo = parts[1]
                 algo_counts[algo] = algo_counts.get(algo, 0) + 1
-        
+
         if algo_counts:
             print("\nModels by algorithm:")
             for algo, count in sorted(algo_counts.items()):
@@ -1337,7 +1337,7 @@ def show_project_status():
 
     if CONF_ROOT.exists():
         print("\nConfiguration status:")
-        for sub in ["algo", "game", "reward"]:
+        for sub in ["algo"]:
             p = CONF_ROOT / sub
             n = len(list(p.glob("*.yaml"))) if p.exists() else 0
             print(f"   {sub}: {n} configs")
@@ -1349,24 +1349,24 @@ def show_project_status():
 # def change_algorithm():
 #     """Manually change the currently selected algorithm"""
 #     global CURRENT_ALGO
-    
+
 #     print("\n=== Change Current Algorithm ===")
 #     algos = get_available_algos_from_grid()
 #     if not algos:
 #         print("No algorithm configurations found in grid.yaml with matching YAML files")
 #         return
-    
+
 #     ensure_current_algo()
-    
+
 #     print(f"\nCurrent algorithm: {CURRENT_ALGO}")
 #     print("\nAvailable algorithms:")
 #     for i, algo in enumerate(algos, 1):
 #         current_flag = " (current)" if algo == CURRENT_ALGO else ""
 #         print(f"  {i}. {algo}{current_flag}")
 #     print(f"  {len(algos) + 1}. Back")
-    
+
 #     choice = input(f"Select new algorithm (1-{len(algos) + 1}): ").strip()
-    
+
 #     try:
 #         num = int(choice)
 #         if num == len(algos) + 1:
@@ -1450,7 +1450,7 @@ def watch_random_agent():
     if GameCls is None:
         print(f"No *Core class found in code.games.{selected_game}_core.")
         return
-    
+
     pygame.init()
 
     # IMPORTANT: human mode so you see it
@@ -1533,21 +1533,21 @@ def main():
     )
 
     global CURRENT_ALGO
-    
+
     while True:
         setup_project()
-        
+
         print("=" * 60)
         print("MULTI-GAME RL TRAINING & EVALUATION MENU")
         print("=" * 60)
-        
+
         games = get_available_games()
         algos = get_available_algos_from_grid()
         trained_games = get_trained_games_from_models_flat()
         trained_models = get_trained_models_count()
-        
 
-        
+
+
         print(f"Games: {len(games)} | Algorithms: {len(algos)} | Trained games: {len(trained_games)} | Trained models: {trained_models}")
 
         print("\nOptions:")
@@ -1560,12 +1560,13 @@ def main():
         print("6. Watch Trained Agent Play (visualize AI performance)")
         print("7. Watch Random Agent Play (random actions)")
         print("8. View TensorBoard Logs (mylogs/)")
-        print("9. Delete TensorBoard Logs & Models")
-        print("10. Exit")
+        print("9. Analyze Agent Performance (CSV Logs)")
+        print("10. Delete TensorBoard Logs & Models")
+        print("11. Exit")
         print("=" * 60)
 
-        choice = input("Select option (1-10): ").strip()
-        
+        choice = input("Select option (1-11): ").strip()
+
         if choice == "1":
             show_project_status()
         # elif choice == "2":
@@ -1585,12 +1586,14 @@ def main():
         elif choice == "8":
             run_tensorboard()
         elif choice == "9":
-            delete_logs_and_models()
+            run_agent_analyzer()
         elif choice == "10":
+            delete_logs_and_models()
+        elif choice == "11":
             print("Exiting. Happy training!")
             break
         else:
-            print("Invalid selection. Please choose 1-10.\n")
+            print("Invalid selection. Please choose 1-11.\n")
 
 if __name__ == "__main__":
     main()
