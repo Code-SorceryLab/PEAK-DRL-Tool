@@ -4,20 +4,20 @@ policy: MultiInputPolicy
 
 # --- Exploration & Memory Settings ---
 n_steps: 4096
-ent_coef: 0.05
+ent_coef: 0.01
 
 # --- Standard PPO Settings ---
-batch_size: 64
-n_epochs: 10
+batch_size: 512
+n_epochs: 6
 learning_rate: 0.0003
 gae_lambda: 0.95
 gamma: 0.99
 clip_range: 0.2
 verbose: 1
 
-# policy_kwargs:
-#   optimizer_kwargs:
-#     weight_decay: 1e-4
+policy_kwargs:
+  optimizer_kwargs:
+    weight_decay: 1e-5
 
 
 device: cpu      # cpu / cuda
