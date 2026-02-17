@@ -2,8 +2,10 @@ from __future__ import annotations
 import os
 import math
 import importlib
+import heapq
+from collections import deque
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Set
 import numpy as np
 import pygame
 import time
@@ -36,6 +38,107 @@ from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATF
     COLOR_WHITE, COLOR_BLACK, COLOR_QBLOCK, COLOR_EMPTY, COLOR_ENEMY,
     COLOR_POWERUP_MUSH, COLOR_POWERUP_STAR, COLOR_COIN, COLOR_HITBOX,
     COLOR_SENSOR, COLOR_AGENT_PANEL, COLOR_STREAK, TILE_SIZE)
+
+# =============================================================================
+# Dijkstra Pathfinding Helper (Global Distance Map)
+# =============================================================================
+class DijkstraSolver:
+    """
+    Computes a 'heatmap' of distances from the Goal to every reachable tile.
+    """
+    def __init__(self, grid: List[List[int]], rows: int, cols: int):
+        self.grid = grid
+        self.rows = rows
+        self.cols = cols
+        # Initialize with Infinity
+        self.dist_map = np.full((rows, cols), float('inf'), dtype=np.float32)
+
+    def compute_map(self, goals: List[Tuple[int, int]], coins: Set[Tuple[int, int]] = None):
+        """
+        Flood fills from all goal positions to generate the distance map.
+        Applies weighted costs to prefer walking on ground and collecting coins.
+        """
+        if coins is None:
+            coins = set()
+
+        # Priority Queue: (current_dist, x, y)
+        pq = []
+        
+        # Initialize goals with distance 0
+        for gx, gy in goals:
+            if 0 <= gx < self.cols and 0 <= gy < self.rows:
+                self.dist_map[gy][gx] = 0.0
+                heapq.heappush(pq, (0.0, gx, gy))
+        
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, -1), (-1, -1), (1, 1), (-1, 1)] # 8-way
+        
+        while pq:
+            current_dist, cx, cy = heapq.heappop(pq)
+            
+            # If we found a shorter path already, skip
+            if current_dist > self.dist_map[cy][cx]:
+                continue
+            
+            for dx, dy in directions:
+                nx, ny = cx + dx, cy + dy
+                
+                if 0 <= nx < self.cols and 0 <= ny < self.rows:
+                    # Check walkability of TARGET tile (nx, ny)
+                    tile = self.grid[ny][nx]
+                    
+                    # FIX: Strict Walkability. Only AIR and GOAL are walkable nodes.
+                    # Spikes are technically walkable but dangerous.
+                    # Solids (Ground, Platform, QBlock) are obstacles.
+                    is_walkable = (tile == TILE_AIR or tile == TILE_GOAL or tile == TILE_SPIKE)
+                    
+                    if is_walkable:
+                        # Base Cost
+                        step_cost = 2.0
+                        
+                        # Spike Penalty (High Cost)
+                        if tile == TILE_SPIKE:
+                            step_cost = 20.0
+                        
+                        # --- COIN ATTRACTION ---
+                        # If the target tile contains a coin, make it cheaper to enter
+                        if (nx, ny) in coins:
+                            step_cost -= 1.0
+
+                        # --- GROUND ATTRACTION LOGIC ---
+                        # Check tile DIRECTLY BELOW the target node (ny+1, nx)
+                        # If it is solid, make entering this node cheaper (gravity preference).
+                        if ny + 1 < self.rows:
+                            below_tile = self.grid[ny + 1][nx]
+                            if below_tile in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.5 # Huge bonus for being on ground
+                        
+                        # Check 2 tiles below (ny+2)
+                        elif ny + 2 < self.rows:
+                            below_2 = self.grid[ny + 2][nx]
+                            if below_2 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.2 # Small bonus for being near ground
+                                
+                        # Check 3 tiles below (ny+3)
+                        elif ny + 3 < self.rows:
+                            below_3 = self.grid[ny + 3][nx]
+                            if below_3 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.1 # Tiny bonus
+                        
+                        # Ensure cost doesn't go negative or too low (min 1.0)
+                        step_cost = max(1.0, step_cost)
+                        
+                        new_dist = current_dist + step_cost
+                        
+                        if new_dist < self.dist_map[ny][nx]:
+                            self.dist_map[ny][nx] = new_dist
+                            heapq.heappush(pq, (new_dist, nx, ny))
+
+    def get_dist(self, x: int, y: int) -> float:
+        if 0 <= x < self.cols and 0 <= y < self.rows:
+            d = self.dist_map[y][x]
+            # Return -1.0 if unreachable/infinite so the observation is clean
+            return d if d != float('inf') else -1.0 
+        return -1.0
 
 # =============================================================================
 # Screen / Tile geometry
@@ -113,25 +216,28 @@ class PlatformerCore(gymnasium.Env):
         self.reset_metrics()
 
         # --- GRID OBSERVATION SIZE ---
-        self.obs_width = 11
-        self.obs_height = 11
+        self.obs_width = 21
+        self.obs_height = 21
         self.obs_pad_x = self.obs_width // 2
         self.obs_pad_y = self.obs_height // 2
 
         # --- RAYCAST CONFIGURATION ---
         # Number of rays to cast around the player
-        self.num_rays = int(kwargs.pop("num_rays", 32)) 
+        self.num_rays = int(kwargs.pop("num_rays", 48)) 
         self.ray_max_dist = 250.0
         # Create angles (0 to 2pi)
         self.ray_angles = np.linspace(0, 2 * math.pi, self.num_rays, endpoint=False)
         self.last_rays = [] # For debug drawing
+        
+        # NEW: Dijkstra Map Storage
+        self.dijkstra = None
 
         self._obs_space = spaces.Dict({
             # 4 Channels (Player, Solid, Hazard, Collectible)
             "grids": spaces.Box(low=0.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
             
-            # Scalars: Increased from 13 to 15 (Added Goal Dir X, Goal Dist Y)
-            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(15,), dtype=np.float32),
+            # Scalars: 16 (Player=5, Tracking=11)
+            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32),
             
             # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
             "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
@@ -221,7 +327,7 @@ class PlatformerCore(gymnasium.Env):
 
         self._update_camera()
         if self.anti_stall: self._update_stall_metrics()
-
+        
         # Check Truncation & Termination
         terminated = self._check_termination()
 
@@ -242,7 +348,9 @@ class PlatformerCore(gymnasium.Env):
             reward = self.reward_fn(self._obs(), base_reward, terminated, info)
         else:
             reward = base_reward
-
+        # In step()
+        if self.coins_step > 0:
+            self._calculate_dijkstra_map() # Re-run with remaining active coins
         return self._obs(), reward, bool(terminated), bool(truncated), info
 
     def reset(self, seed=None, options=None) -> np.ndarray:
@@ -251,7 +359,6 @@ class PlatformerCore(gymnasium.Env):
         if not self.reached_goal:
             self.reset_metrics()
             self.current_index_world = 0
-            self.lives = 3
             self.world = self.level_order[self.current_index_world]
 
         self.load_level()
@@ -306,14 +413,39 @@ class PlatformerCore(gymnasium.Env):
         self.last_x = self.player.gObj.x
 
         self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
+        
+        # --- CALCULATE DIJKSTRA MAP ---
+        self._calculate_dijkstra_map()
+
+    def _calculate_dijkstra_map(self):
+        """Initializes and computes the global Dijkstra distance map."""
+        if not self.level_data.goals:
+            self.dijkstra = None
+            return
+            
+        self.dijkstra = DijkstraSolver(self.level_data.grid, self.level_data.rows, self.level_data.cols)
+        
+        goal_positions = []
+        for g in self.level_data.goals:
+            gx = int(g.gObj.x // TILE_SIZE)
+            gy = int(g.gObj.y // TILE_SIZE)
+            goal_positions.append((gx, gy))
+        
+        # Collect coin positions for Dijkstra weighting
+        coin_positions = set()
+        for c in self.level_data.coins:
+            cx = int(c.gObj.x // TILE_SIZE)
+            cy = int(c.gObj.y // TILE_SIZE)
+            coin_positions.add((cx, cy))
+            
+        self.dijkstra.compute_map(goal_positions, coin_positions)
 
     def complete_level(self):
-        self.score += 1000 + (int(self.timer) * 10)
-        self.reached_goal = True
-        if self.render_mode == "human": # Regular Gameplay
-             self.current_index_world += 1
-        else: # Training
-             self.current_index_world = random.randint(0, len(self.level_order) - 1)        
+        # # ! self.current_index_world += 1
+        # if self.render_mode == "human":
+        #     self.current_index_world += 1
+        # else:
+        self.current_index_world = random.randint(0, len(self.level_order) - 1)
         if self.current_index_world >= len(self.level_order):
             print("all levels done")
             self.current_index_world = 0
@@ -329,7 +461,7 @@ class PlatformerCore(gymnasium.Env):
         else:
             self.alive = False
             self.game_over = True
-            # self.reset()
+            self.reset()
             return True
 
     def _soft_reset(self):
@@ -442,7 +574,7 @@ class PlatformerCore(gymnasium.Env):
         if not self.player:
             return {
                 "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
-                "scalars": np.zeros(15, dtype=np.float32), # Updated to 15
+                "scalars": np.zeros(16, dtype=np.float32), # 16 scalars
                 "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
             }
 
@@ -484,7 +616,7 @@ class PlatformerCore(gymnasium.Env):
         p = self.player
         if not p:
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-            return z, z, z, z
+            return z, z, z, z # Return 4 zeros if no player
 
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
@@ -506,7 +638,7 @@ class PlatformerCore(gymnasium.Env):
 
         hazard_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        player_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        player_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32) # Init player grid
 
         # Calculate window origin
         grid_x_start = slice_x_start - self.obs_pad_x
@@ -541,7 +673,7 @@ class PlatformerCore(gymnasium.Env):
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 collect_grid[local_y, local_x] = 1.0
 
-        # Fill Player Grid
+        # --- FILL PLAYER GRID ---
         p_rect = p.gObj.get_rect()
         rel_x = p_rect.x - wx
         rel_y = p_rect.y - wy
@@ -559,7 +691,7 @@ class PlatformerCore(gymnasium.Env):
 
     def _tracking_obs(self) -> np.ndarray:
         p = self.player
-        if not p: return np.zeros(10, dtype=np.float32)
+        if not p: return np.zeros(11, dtype=np.float32)
 
         def get_dist(obj_list):
             min_d = 9999.0
@@ -579,23 +711,35 @@ class PlatformerCore(gymnasium.Env):
         norm_dist = max(self.level_data.width, self.level_data.height, 1.0)
         
         # --- NEW: DIRECTION CALCULATIONS ---
-        # 1. Normalized Direction X to goal (-1.0 to 1.0)
         closest_goal_x = p.gObj.x + raw_goal_dist # Approx
         if self.level_data.goals:
-            # Find actual closest goal for accurate direction
-            closest = min(self.level_data.goals, key=lambda g: abs(g.gObj.x - p.gObj.x))
-            closest_goal_x = closest.gObj.x
-            closest_goal_y = closest.gObj.y
+             # Find actual closest goal for accurate direction
+             closest = min(self.level_data.goals, key=lambda g: abs(g.gObj.x - p.gObj.x))
+             closest_goal_x = closest.gObj.x
+             closest_goal_y = closest.gObj.y
         else:
-            closest_goal_x = self.level_data.width
-            closest_goal_y = p.gObj.y
+             closest_goal_x = self.level_data.width
+             closest_goal_y = p.gObj.y
 
         dx = closest_goal_x - p.gObj.x
         dy = closest_goal_y - p.gObj.y
         
         dir_x = np.sign(dx) # -1, 0, or 1
         dist_y_norm = np.clip(dy / self.level_data.height, -1.0, 1.0) # Y-distance normalized
+                
+        # --- Dijkstra Signal ---
+        dijkstra_dist = 0.0
+        if self.dijkstra:
+            px = int(p.gObj.x // TILE_SIZE)
+            py = int(p.gObj.y // TILE_SIZE)
+            d = self.dijkstra.get_dist(px, py)
+            if d >= 0:
+                # Normalize based on map width (heuristic max cost)
+                dijkstra_dist = np.clip(d / (self.level_data.cols * 2), 0.0, 1.0)
+            else:
+                dijkstra_dist = 1.0 # Unreachable or off-grid treated as max dist
 
+        # 11 Elements Total
         return np.array([
             np.clip(e_dist / norm_dist, 0.0, 1.0),
             np.clip(c_dist / norm_dist, 0.0, 1.0),
@@ -605,9 +749,9 @@ class PlatformerCore(gymnasium.Env):
             np.clip(self.score / 10000.0, 0.0, 1.0),
             np.clip(self.timer / max(1.0, self.timer_seconds), 0.0, 1.0),
             self.lives / float(max(1.0, self.max_lives)),
-            # NEW: Directional Data
             dir_x, 
-            dist_y_norm
+            dist_y_norm,
+            dijkstra_dist 
         ], dtype=np.float32)
 
     def _perform_raycasts(self) -> np.ndarray:
@@ -718,6 +862,16 @@ class PlatformerCore(gymnasium.Env):
                 "event": event, "cause": cause
             }
 
+        dijkstra_dist = 0.0
+        if self.dijkstra:
+            px = int(p.gObj.x // TILE_SIZE)
+            py = int(p.gObj.y // TILE_SIZE)
+            d = self.dijkstra.get_dist(px, py)
+            if d >= 0:
+                dijkstra_dist = np.clip(d / (self.level_data.cols * 2), 0.0, 1.0)
+            else:
+                dijkstra_dist = 1.0 
+
         return {
             "score": self.score,
             "score_delta": self.score_delta,
@@ -741,7 +895,8 @@ class PlatformerCore(gymnasium.Env):
             "goal_dist": self._get_dist_to_goal() / ts,
             "lives" : self.lives,
             "event": event,
-            "cause": cause
+            "cause": cause,
+            "dijkstra_dist": dijkstra_dist # Used for delta_dijkstra reward
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):

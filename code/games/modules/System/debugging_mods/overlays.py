@@ -58,9 +58,10 @@ class GridOverlay(DebugOverlay):
 
 class AgentViewOverlay(DebugOverlay):
     def render(self, surface: pygame.Surface, core):
-        # Configuration
-        cell_w, cell_h = 16, 16
-        grid_cols, grid_rows = 11, 9
+        # Configuration matches platformer_core.obs_width/height (11x11)
+        grid_cols = getattr(core, 'obs_width', 21)
+        grid_rows = getattr(core, 'obs_height', 21)
+        cell_w, cell_h = 24, 24 # Slightly larger for text visibility
         
         # Dimensions
         content_w = grid_cols * cell_w
@@ -82,7 +83,7 @@ class AgentViewOverlay(DebugOverlay):
         
         # 2. Header
         header_font = core.debug_manager.font
-        header = header_font.render("Agent Vision", True, (200, 200, 200))
+        header = header_font.render("Agent Vision (Dijkstra)", True, (200, 200, 200))
         surface.blit(header, (panel_x + padding, panel_y + 2))
         
         # Separator Line
@@ -96,32 +97,47 @@ class AgentViewOverlay(DebugOverlay):
         player = core.player
         if not player: return
 
-        p_cx = int((player.gObj.x + player.gObj.width / 2) // TILE_SIZE)
-        p_cy = int((player.gObj.y + player.gObj.height / 2) // TILE_SIZE)
+        # Calculate grid origin (top-left of observation window)
+        p_cx = int(player.gObj.x // TILE_SIZE)
+        p_cy = int(player.gObj.y // TILE_SIZE)
+        
+        pad_x = core.obs_pad_x
+        pad_y = core.obs_pad_y
+        
+        origin_x = p_cx - pad_x
+        origin_y = p_cy - pad_y
 
-        # Optimization: Pre-fetch sets
+        # Optimization: Pre-fetch sets for entity lookup
         enemy_locs = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE)) for e in core.level_data.enemies if e.gObj.active}
         coin_locs = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE)) for c in core.level_data.coins if c.gObj.active and not getattr(c, 'collected', False)}
-        Goal_locs = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE)) for g in core.level_data.goals if g.gObj.active}
+        goal_locs = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE)) for g in core.level_data.goals if g.gObj.active}
 
-        for dy_i, dy in enumerate(range(-4, 5)):
-            for dx_i, dx in enumerate(range(-5, 6)):
-                tx, ty = p_cx + dx, p_cy + dy
+        # Font for cost numbers
+        cost_font = core.debug_manager.small_font
+
+        for r in range(grid_rows):
+            for c in range(grid_cols):
+                # World Coordinates
+                tx = origin_x + c
+                ty = origin_y + r
                 
-                draw_x = start_x + dx_i * cell_w
-                draw_y = start_y + dy_i * cell_h
+                draw_x = start_x + c * cell_w
+                draw_y = start_y + r * cell_h
                 
                 # Default: Empty Space (Black/Dark Grey)
                 color = (10, 10, 10) 
                 border_color = (40, 40, 40)
 
-                # World Geometry
+                # World Geometry (Solid/Hazard)
                 if 0 <= ty < core.level_data.rows and 0 <= tx < core.level_data.cols:
                     tile = core.level_data.grid[ty][tx]
                     if tile != TILE_AIR:
-                        color = (150, 150, 150) # Walls are Grey
-                        if tile == TILE_SPIKE: color = (200, 0, 0) # Spikes Red
-                        elif tile == TILE_GOAL: color = (0, 200, 0) # Goal Green
+                        color = (100, 100, 100) # Walls are Grey
+                        if tile == TILE_SPIKE: color = (150, 0, 0) # Spikes Red
+                        elif tile == TILE_GOAL: color = (0, 150, 0) # Goal Green
+                else:
+                    # Out of bounds
+                    color = (5, 5, 5)
                 
                 # Entities Overlay
                 if (tx, ty) in enemy_locs: 
@@ -130,19 +146,33 @@ class AgentViewOverlay(DebugOverlay):
                 elif (tx, ty) in coin_locs: 
                     color = (255, 215, 0)   # Coin Gold
                     border_color = (255, 255, 200)
-                elif (tx, ty) in Goal_locs:
+                elif (tx, ty) in goal_locs:
                     color = (0, 200, 0)     # Goal Green
                     border_color = (100, 255, 100)
                 
-                # Player (Center)
-                if dx == 0 and dy == 0: 
+                # Player (Center relative to grid)
+                if tx == p_cx and ty == p_cy: 
                     color = (0, 150, 255) # Player Blue
                     border_color = (100, 200, 255)
 
                 # Draw Cell
                 pygame.draw.rect(surface, color, (draw_x, draw_y, cell_w - 1, cell_h - 1))
-                # Draw Subtle Border for Grid Effect
+                # Draw Subtle Border
                 pygame.draw.rect(surface, border_color, (draw_x, draw_y, cell_w - 1, cell_h - 1), 1)
+                
+                # --- DRAW DIJKSTRA COST ---
+                if core.dijkstra:
+                    cost = core.dijkstra.get_dist(tx, ty)
+                    if cost >= 0 and cost != float('inf'):
+                        # Render number
+                        val_str = f"{int(cost)}"
+                        # Scale color based on cost? (Lower = Green, Higher = Red)
+                        # Just white for visibility
+                        txt = cost_font.render(val_str, True, (255, 255, 255))
+                        # Center text
+                        tx_x = draw_x + (cell_w - txt.get_width()) // 2
+                        tx_y = draw_y + (cell_h - txt.get_height()) // 2
+                        surface.blit(txt, (tx_x, tx_y))
 
 
 class InfoPanelOverlay(DebugOverlay):
@@ -150,11 +180,11 @@ class InfoPanelOverlay(DebugOverlay):
         if not core.player: return
         
         # Layout relative to Agent View
-        # Agent View Height approx: 20 (Header) + 9*16 (Grid) + 10 (Pad) = ~174
+        # Agent View Height approx: 20 (Header) + 11*24 (Grid) + 10 (Pad) = ~300
         # We start just below it.
         panel_x = 10
-        panel_y = 230 
-        panel_w = 190 # Matching Agent View Width roughly
+        panel_y = 350 
+        panel_w = 190 
         
         p = core.player
         lines = [
@@ -185,10 +215,8 @@ class InfoPanelOverlay(DebugOverlay):
             surface.blit(txt, (panel_x + 10, panel_y + 5 + i * line_h))
 
 class ObsValuesOverlay(DebugOverlay):
-    # ... (Keep the version we fixed in the previous step!) ...
     def render(self, surface: pygame.Surface, core):
         # Copy the code from the previous "UI Fix" response here
-        # (It was perfect, no changes needed unless you lost it)
         try:
             p_vals = core._player_obs()
             t_vals = core._tracking_obs()
@@ -198,8 +226,12 @@ class ObsValuesOverlay(DebugOverlay):
             return
 
         p_labels = ["Px (n)", "Py (n)", "Vx (n)", "Vy (n)", "Grounded"]
-        t_labels = ["Enm Dist", "Coin Dist", "Goal Dist", "Act Enms", "Act Coins", "Score", "Time", "Lives"]
+        t_labels = ["Enm Dist", "Coin Dist", "Goal Dist", "Act Enms", "Act Coins", "Score", "Time", "Lives", "Dir X", "Goal Y", "Dijkstra"]
         
+        # Pad t_labels if necessary to match t_vals length from core
+        if len(t_vals) > len(t_labels):
+             t_labels.extend([f"Val {i}" for i in range(len(t_labels), len(t_vals))])
+
         data = list(zip(p_labels, p_vals)) + list(zip(t_labels, t_vals))
 
         panel_w = 180 

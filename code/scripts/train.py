@@ -96,10 +96,10 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(64),
                     nn.ReLU(),
-                    nn.AdaptiveMaxPool2d((11, 11)),
+                    nn.AdaptiveMaxPool2d((21, 21)),
                     nn.Flatten(),
                 )
-                n_flatten = 11 * 11 * 64
+                n_flatten = 21 * 21 * 64
                 linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, linear)
                 total_concat_size += 256
@@ -181,7 +181,7 @@ def main(cfg: DictConfig):
     if cfg.get("dashboard", True):
         dash_script = repo_root / "dashboard_viewer.py"
         if dash_script.exists():
-            print(f"[INFO] 🚀 Launching Flight Recorder...")
+            print(f"[INFO] Launching Flight Recorder...")
             subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(dash_script)])
 
     # Load configuration lists
@@ -251,7 +251,7 @@ def main(cfg: DictConfig):
             
             # --- FIX: WRAP IN VECNORMALIZE ---
             # This automatically normalizes observations (800 -> 1.0) and rewards
-            env = VecNormalize(raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+            env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
             # Dedicated eval env (Also wrapped, but without reward normalization training)
             # Eval envs must be VecEnvs to use VecNormalize correctly
