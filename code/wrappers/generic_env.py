@@ -37,10 +37,10 @@ class GameEnv(gym.Env):
 
         # episode counters
         self._step_count = 0
-        
+
         # --- FIX: Create a dedicated RewardHub for THIS environment instance ---
-        self.hub = RewardHub() 
-        
+        self.hub = RewardHub()
+
         # --- FIX: Inject Hub into Game's Debug Manager ---
         # This connects the wrapper's reward tracking to the inner game's visualizer
         if hasattr(self.game, "debug_manager"):
@@ -75,14 +75,14 @@ class GameEnv(gym.Env):
 
         obs, base, terminated, truncated, info = self.game.step(action)
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
-        
+
         # --- REWARD PROCESSING (THE FIX) ---
         # 1. Get raw reward from Persona (Could be Float OR Dict)
         if self.reward_fn:
             raw_reward = self.reward_fn(obs, base, terminated, info)
         else:
             raw_reward = self.hub.compute_default_reward(info)
-        
+
         # 2. Handle both formats safely
         final_scalar_reward = 0.0
         reward_breakdown = {}
@@ -98,19 +98,19 @@ class GameEnv(gym.Env):
 
         # 3. Inject Breakdown into Info (for CSV Logger)
         info["reward_breakdown"] = reward_breakdown
-        
+
         # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
         act_name = action
         if hasattr(self.game, "ACTION_NAMES"):
             act_name = self.game.ACTION_NAMES.get(int(action), action)
-        
-        
+
+
         info["action_name"] = str(act_name)
-        
-        
+
+
         # <--- THIS WAS CRASHING BEFORE (reward=raw_reward would fail)
         self.hub.update_reward(reward=final_scalar_reward, action_name=act_name, is_episode_end=terminated)
-        
+
         # 5. Return the Float Sum to the Agent
         return obs, final_scalar_reward, terminated, truncated, info
 
@@ -137,8 +137,10 @@ class GameEnv(gym.Env):
             if os.environ.get("DISPLAY", "") == "":
                 os.environ["SDL_VIDEODRIVER"] = "dummy"
             pygame.init()
+            # Use the game's total width (includes debug panel in human mode)
+            total_w = getattr(self.game, 'TOTAL_WIDTH', self.game.WIDTH)
             self.screen = pygame.display.set_mode(
-                (self.game.WIDTH, self.game.HEIGHT)
+                (total_w, self.game.HEIGHT)
             )
             self.clock = pygame.time.Clock()
             self.font = pygame.font.SysFont(None, 20)

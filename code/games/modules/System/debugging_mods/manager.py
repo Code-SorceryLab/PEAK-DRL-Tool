@@ -1,261 +1,312 @@
 import pygame
-import collections
 from .....wrappers.RewardHub import RewardHub
-from .overlays import HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay
+from .overlays import (
+    HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay,
+    _PAD, _GAP, _BANNER_H, _HDR_H,
+    _card, _section_hdr,
+    _C_BG, _C_CARD, _C_HDR, _C_BORDER, _C_SEP,
+    _C_LBL, _C_VAL, _C_POS, _C_NEG, _C_ACT, _C_ACCENT,
+    _reward_y,
+    RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL,
+)
+
 
 class DebugManager:
     def __init__(self, default_active=True, print_help=True):
         self.active = True
-        self.hub = None # <--- Will be injected by GameEnv wrapper
-        
-        # Toggles
-        self.show_hitboxes = default_active
-        self.show_agent_view = default_active
-        self.show_sensors = default_active
-        self.show_obs_panel = default_active
-        self.show_grid = False
-        
-        # New DRL specific tools
-        self.show_reward_log = False
-        self.slow_motion = False
-        
-        self.show_obs_values = False 
-        
-        # Free Cam Tools
-        self.free_cam_active = False 
-        self.cam_move_speed = 600.0  
-        self.current_cam_move = [0.0, 0.0]
+        self.hub    = None  # injected by GameEnv wrapper
 
-        # Metric tracking
-        #self.reward_history = collections.deque(maxlen=60) # Store last 60 frames of rewards
+        # ── Always-on ──────────────────────────────────────
+        self.show_agent_view = True
+        self.show_obs_panel  = True
+        self.show_grid       = True
+        self.show_reward_log = True
+        self.show_obs_values = True
+
+        # ── Toggleable (F1–F4) ─────────────────────────────
+        self.show_sensors    = False   # F1 — sensor rays
+        self.free_cam_active = False   # F2 — free camera
+        self.slow_motion     = False   # F3 — slow motion
+        self.show_hitboxes   = True    # F4 — hitboxes (default on)
+
+        self.cam_move_speed   = 600.0
+        self.current_cam_move = [0.0, 0.0]
         self.last_action_name = "None"
-        self.font = pygame.font.SysFont("arial", 16, bold=True)
-        self.small_font = pygame.font.SysFont("arial", 12)
-        
-        
-        # Input tracking
+
+        self.font       = pygame.font.SysFont("segoeui", 13, bold=True)
+        self.small_font = pygame.font.SysFont("segoeui", 11)
         self._prev_keys = None
-        
+
         if pygame.display.get_init():
             try:
                 self._prev_keys = pygame.key.get_pressed()
-                # Only load fonts if display is up, otherwise we might crash on some systems
-                self.font = pygame.font.SysFont("arial", 16, bold=True)
-                self.small_font = pygame.font.SysFont("arial", 12)
+                self.font       = pygame.font.SysFont("segoeui", 13, bold=True)
+                self.small_font = pygame.font.SysFont("segoeui", 11)
             except pygame.error:
-                print("[DebugManager] Warning: Video system not initialized. Input disabled.")
+                print("[DebugManager] Warning: Video system not initialized.")
                 self._prev_keys = None
         else:
-            # Headless Mode Defaults (No fonts needed usually, but safe to init if possible)
             if pygame.font.get_init():
-                self.font = pygame.font.SysFont("arial", 16, bold=True)
-                self.small_font = pygame.font.SysFont("arial", 12)
-        # --- FIX ENDS HERE ---
-        
-        # Composited Visualizers
-        self.hitbox_overlay = HitboxOverlay()
-        self.grid_overlay = GridOverlay()
+                self.font       = pygame.font.SysFont("segoeui", 13, bold=True)
+                self.small_font = pygame.font.SysFont("segoeui", 11)
+
+        self.hitbox_overlay     = HitboxOverlay()
+        self.grid_overlay       = GridOverlay()
         self.agent_view_overlay = AgentViewOverlay()
-        self.info_overlay = InfoPanelOverlay()
+        self.info_overlay       = InfoPanelOverlay()
         self.obs_values_overlay = ObsValuesOverlay()
 
         if print_help:
             self._print_help_to_terminal()
-        
-    
 
+    # ─────────────────────────────────────────────────────────
     def _print_help_to_terminal(self):
-        print("\n" + "="*40)
-        print("   PEAK ENGINE - DRL INSPECTOR ENABLED")
-        print("="*40)
-        print(" [1] / [F1] : Toggle Hitboxes")
-        print(" [2] / [F2] : Toggle Agent View (The Matrix)")
-        print(" [3] / [F3] : Toggle Sensor Rays")
-        print(" [4] / [F4] : Toggle Info Panel")
-        print(" [5] / [F5] : Toggle Free Camera (I-J-K-L)")
-        print(" [6] / [F6] : Toggle Tile Grid")
-        print(" [7] / [F7] : Toggle Reward Trace")
-        print(" [8] / [F8] : Toggle Slow Motion (0.5x Speed)")
-        print(" [9] / [F9] : Toggle Semantic OBS Values") # NEW
-        print("="*40 + "\n")
+        print("\n" + "═"*40)
+        print("  PEAK ENGINE — DRL INSPECTOR")
+        print("═"*40)
+        print("  F1  Sensor rays   (toggle)")
+        print("  F2  Free camera   (IJKL to move)")
+        print("  F3  Slow motion   (0.5×)")
+        print("  F4  Hitboxes      (toggle)")
+        print("═"*40 + "\n")
 
+    # ─────────────────────────────────────────────────────────
     def update_input(self):
-        """
-        Polls keys and updates toggle states. 
-        Must be called once per frame.
-        """
-        
         if self._prev_keys is None:
             return
-        
-        # CRITICAL: Pump events to ensure key states are fresh
         pygame.event.pump()
-        
         keys = pygame.key.get_pressed()
-        
-        # Helper for rising-edge detection
-        def check_toggle(k1, k2=None):
-            if k2:
-                return (keys[k1] and not self._prev_keys[k1]) or \
-                       (keys[k2] and not self._prev_keys[k2])
-            return keys[k1] and not self._prev_keys[k1]
 
-        if check_toggle(pygame.K_1, pygame.K_F1): self.show_hitboxes = not self.show_hitboxes
-        if check_toggle(pygame.K_2, pygame.K_F2): self.show_agent_view = not self.show_agent_view
-        if check_toggle(pygame.K_3, pygame.K_F3): self.show_sensors = not self.show_sensors
-        if check_toggle(pygame.K_4, pygame.K_F4): self.show_obs_panel = not self.show_obs_panel
-        if check_toggle(pygame.K_5, pygame.K_F5): self.free_cam_active = not self.free_cam_active
-        if check_toggle(pygame.K_6, pygame.K_F6): self.show_grid = not self.show_grid
+        def rising(k):
+            return keys[k] and not self._prev_keys[k]
 
-        
-        # New Toggles
-        if check_toggle(pygame.K_7, pygame.K_F7): 
-            self.show_reward_log = not self.show_reward_log
-            print(f"[Debug] Reward Log: {self.show_reward_log}")
-            
-        if check_toggle(pygame.K_8, pygame.K_F8): 
+        if rising(pygame.K_F1):
+            self.show_sensors = not self.show_sensors
+            print(f"[Debug] Sensor Rays: {self.show_sensors}")
+        if rising(pygame.K_F2):
+            self.free_cam_active = not self.free_cam_active
+            print(f"[Debug] Free Cam:    {self.free_cam_active}")
+        if rising(pygame.K_F3):
             self.slow_motion = not self.slow_motion
             print(f"[Debug] Slow Motion: {self.slow_motion}")
+        if rising(pygame.K_F4):
+            self.show_hitboxes = not self.show_hitboxes
+            print(f"[Debug] Hitboxes:    {self.show_hitboxes}")
 
-        if check_toggle(pygame.K_9, pygame.K_F9):
-            self.show_obs_values = not self.show_obs_values
-            print(f"[Debug] Obs Values: {self.show_obs_values}")
-        
-            
-        # --- Free Cam Movement ---
-        # Changed to I-J-K-L to avoid ANY conflict with WASD or Arrows
         self.current_cam_move = [0.0, 0.0]
         if self.free_cam_active:
-            if keys[pygame.K_j]:  self.current_cam_move[0] = -self.cam_move_speed
-            if keys[pygame.K_l]:  self.current_cam_move[0] =  self.cam_move_speed
-            if keys[pygame.K_i]:  self.current_cam_move[1] = -self.cam_move_speed
-            if keys[pygame.K_k]:  self.current_cam_move[1] =  self.cam_move_speed
+            if keys[pygame.K_j]: self.current_cam_move[0] = -self.cam_move_speed
+            if keys[pygame.K_l]: self.current_cam_move[0] =  self.cam_move_speed
+            if keys[pygame.K_i]: self.current_cam_move[1] = -self.cam_move_speed
+            if keys[pygame.K_k]: self.current_cam_move[1] =  self.cam_move_speed
 
         self._prev_keys = keys
 
+    # ─────────────────────────────────────────────────────────
     def log_step(self, reward, action_name):
-        """Called by core every step to log metrics"""
-        #self.reward_history.append(reward)
         self.last_action_name = action_name
 
+    # ─────────────────────────────────────────────────────────
     def render_overlays(self, surface: pygame.Surface, core):
-        """
-        Draws active overlays onto the surface.
-        """
-        if self.show_grid:
-            self.grid_overlay.render(surface, core)
-            
+        if core.render_mode != "human":
+            return
+
+        debug_x = core.DEBUG_PANEL_X
+        panel_w = core.TOTAL_WIDTH - debug_x
+        H       = core.HEIGHT
+
+        # ── Panel background ──────────────────────────────────
+        bg = pygame.Surface((panel_w, H))
+        bg.fill(_C_BG)
+        surface.blit(bg, (debug_x, 0))
+        pygame.draw.line(surface, (42, 44, 62), (debug_x, 0), (debug_x, H), 2)
+
+        # ── Banner ────────────────────────────────────────────
+        banner = pygame.Surface((panel_w, _BANNER_H))
+        banner.fill((20, 20, 30))
+        surface.blit(banner, (debug_x, 0))
+        pygame.draw.line(surface, _C_SEP,
+                         (debug_x, _BANNER_H), (debug_x + panel_w, _BANNER_H))
+        # accent strip
+        pygame.draw.rect(surface, _C_ACCENT, (debug_x, 0, 3, _BANNER_H))
+
+        title = self.font.render("DEBUG", True, (130, 135, 170))
+        surface.blit(title, (debug_x + 10, (_BANNER_H - title.get_height()) // 2))
+
+        # F-key hint chips (right-aligned in banner)
+        toggles = [
+            ("F1", "rays",  self.show_sensors),
+            ("F2", "cam",   self.free_cam_active),
+            ("F3", "slow",  self.slow_motion),
+            ("F4", "hbox",  self.show_hitboxes),
+        ]
+        hx = debug_x + panel_w - 6
+        sf = self.small_font
+        for key, desc, active in reversed(toggles):
+            # value
+            ds = sf.render(desc, True, (85, 210, 120) if active else (65, 68, 85))
+            ks = sf.render(key,  True, (120, 145, 220))
+            hx -= ds.get_width() + 3
+            surface.blit(ds, (hx, (_BANNER_H - ds.get_height()) // 2 + 1))
+            hx -= ks.get_width() + 3
+            surface.blit(ks, (hx, (_BANNER_H - ks.get_height()) // 2))
+            hx -= 8
+
+        # ── HUD strip (lives / score / coins / status / time) ─────────────
+        self._render_hud_strip(surface, core, debug_x, panel_w)
+
+        # ── Game-area overlays ────────────────────────────────
+        self.grid_overlay.render(surface, core)
         if self.show_hitboxes:
             self.hitbox_overlay.render(surface, core)
-            
-        if self.show_agent_view:
-            self.agent_view_overlay.render(surface, core)
-            
-        if self.show_obs_panel:
-            self.info_overlay.render(surface, core)
-            
-        if self.show_reward_log:
-            self._render_reward_graph(surface, core)
 
-        # Visual Indicator for Free Cam
+        # ── Panel overlays ────────────────────────────────────
+        self.agent_view_overlay.render(surface, core)
+        self.info_overlay.render(surface, core)
+        self.obs_values_overlay.render(surface, core)
+        self._render_reward_strip(surface, core, debug_x, panel_w)
+
+        # ── Status badges (game area, top-centre) ─────────────
+        by = 6
         if self.free_cam_active:
-            self._draw_badge(surface, core, "FREE CAM - IJKL TO MOVE", (50, 100, 255))
-        
+            by = self._badge(surface, core, "FREE CAM  (IJKL)", (40, 80, 200), y=by) + 4
         if self.slow_motion:
-            self._draw_badge(surface, core, "SLOW MOTION ACTIVE", (255, 165, 0), y_offset=40)
-        
-        if self.show_obs_values:
-            self.obs_values_overlay.render(surface, core)
-        
-        pass
+            by = self._badge(surface, core, "SLOW MOTION",       (185, 110, 0), y=by) + 4
+        if self.show_sensors:
+            self._badge(surface, core, "RAYS ON", (0, 145, 80), y=by)
 
-    def _render_reward_graph(self, surface, core):
-        # Draw a mini graph of recent rewards on UPPER RIGHT
-        panel_w, panel_h = 220, 140
-        x = core.WIDTH - panel_w - 10
-        y = 50  # Moved to top right, below Time display
-        
-        # bg
-        s = pygame.Surface((panel_w, panel_h))
-        s.set_alpha(230) # Increased visibility
-        s.fill((20, 20, 20))
-        surface.blit(s, (x, y))
-        
-        # Border
-        pygame.draw.rect(surface, (100, 100, 100), (x, y, panel_w, panel_h), 1)
-        
-        # Setup - use injected self.hub
+    # ─────────────────────────────────────────────────────────
+    def _render_hud_strip(self, surface, core, debug_x, panel_w):
+        """Render Lives / Score / Coins / Status / Time in the debug panel."""
+        from .overlays import _C_BG, _C_CARD, _C_HDR, _C_BORDER, _C_SEP, _C_LBL, _C_VAL, _C_ACT, _C_NEG, _BANNER_H, _GAP, _PAD, _HDR_H, _HUD_STRIP_H
+
+        # Position: just below the banner
+        px = debug_x + _PAD
+        py = _BANNER_H + _GAP
+        pw = panel_w - _PAD * 2
+        ph = _HUD_STRIP_H  # matches the constant in overlays.py
+
+        # Card background
+        bg = pygame.Surface((pw, ph))
+        bg.fill(_C_CARD)
+        surface.blit(bg, (px, py))
+        pygame.draw.rect(surface, _C_BORDER, (px, py, pw, ph), 1)
+        # left accent bar (cyan-ish)
+        pygame.draw.rect(surface, (60, 190, 210), (px, py, 3, ph))
+
+        sf = self.small_font
+
+        # Pull values from core
+        lives  = max(0, getattr(core, 'lives', 0))
+        score  = getattr(core, 'score', 0)
+        coins  = getattr(core, 'coins_total', 0)
+        timer  = int(getattr(core, 'timer', 0))
+        player = getattr(core, 'player', None)
+        if player:
+            status = "STAR" if player.invincible_timer > 0 else ("SUPER" if player.powered_up else "SMALL")
+        else:
+            status = "—"
+
+        # Warn colours
+        lives_col = _C_NEG if lives <= 1 else _C_VAL
+        time_col  = _C_NEG if timer < 60  else _C_VAL
+
+        # Build label/value pairs and space them evenly
+        items = [
+            ("LIVES",  str(lives),  lives_col),
+            ("SCORE",  str(score),  _C_VAL),
+            ("COINS",  str(coins),  (220, 190, 60)),
+            ("STATUS", status,      _C_ACT),
+            ("TIME",   str(timer),  time_col),
+        ]
+
+        slot_w = pw // len(items)
+
+        # Vertically centre the two-row block (label ~11px + 2px gap + value ~13px = 26px total)
+        block_h = 11 + 2 + 13
+        block_top = py + (ph - block_h) // 2
+        cy_lbl = block_top
+        cy_val = block_top + 13  # label height + gap
+
+        for i, (label, value, vcol) in enumerate(items):
+            sx = px + i * slot_w + slot_w // 2
+
+            ls = sf.render(label, True, _C_LBL)
+            vs = self.font.render(value, True, vcol)
+
+            surface.blit(ls, (sx - ls.get_width() // 2, cy_lbl))
+            surface.blit(vs, (sx - vs.get_width() // 2, cy_val))
+
+            # Thin vertical divider between items
+            if i > 0:
+                pygame.draw.line(surface, _C_SEP,
+                                 (px + i * slot_w, py + 4),
+                                 (px + i * slot_w, py + ph - 4))
+
+    # ─────────────────────────────────────────────────────────
+    def _render_reward_strip(self, surface, core, debug_x, panel_w):
+        py = _reward_y(core)
+        if py + 32 > core.HEIGHT:
+            return
+
+        px = debug_x + _PAD
+        pw = panel_w - _PAD * 2
+        ph = core.HEIGHT - py - _GAP
+
+        _card(surface, px, py, pw, ph)
+        cy = _section_hdr(surface, self.font, "Reward Trace", px, py, pw, accent=(200, 80, 60))
+
         hub = self.hub if self.hub else RewardHub.get_instance()
-        last_action = hub.last_action_name
-        
-        
-        # --- Info Text ---
-        # 1. Action
-        t_action = self.font.render(f"Last Action: {last_action}", True, (255, 255, 255))
-        surface.blit(t_action, (x + 5, y + 5))
-        
-        # 2. Persona
-        persona_name = getattr(core, "persona", "Default")
-        # Format "platformer_dense" to "Platformer Dense"
-        clean_persona = persona_name.replace("_", " ").title()
-        t_persona = self.small_font.render(f"Persona: {clean_persona}", True, (200, 200, 200))
-        surface.blit(t_persona, (x + 5, y + 25))
-        
-        # 3. Reward Function Name
-        rf_name = "Internal Default"
-        if hasattr(core, "reward_fn") and core.reward_fn:
-            # Unwrap if it's wrapped (the uploaded files wrap functions)
-            if hasattr(core.reward_fn, "__name__"):
-                rf_name = core.reward_fn.__name__
-            # If it's a functools.partial or similar
-            elif hasattr(core.reward_fn, "func"):
-                rf_name = core.reward_fn.func.__name__
-                
-        # Format function name for display
-        clean_rf_name = rf_name.replace("_", " ").title()
-        t_rf = self.small_font.render(f"{clean_rf_name}", True, (200, 200, 200))
-        surface.blit(t_rf, (x + 5, y + 40))
+        sf  = self.small_font
 
-        # --- Graph ---
-        graph_rect = pygame.Rect(x + 5, y + 60, panel_w - 10, panel_h - 65)
-        #pygame.draw.rect(surface, (50,50,50), graph_rect, 1) # inner border
+        persona = getattr(core, "persona", "?").replace("_", " ").title()
+        row1 = sf.render(f"Action:  {hub.last_action_name}", True, _C_VAL)
+        row2 = sf.render(f"Persona: {persona}",              True, _C_LBL)
+        surface.blit(row1, (px + 6, cy));   cy += 13
+        surface.blit(row2, (px + 6, cy));   cy += 13
 
-        reward_history = hub.reward_history
-        if len(reward_history) < 2: return
+        rh = hub.reward_history
+        if len(rh) < 2:
+            return
 
-        # Normalize metrics for graph
-        max_r = max(max(reward_history), 0.1)
-        min_r = min(min(reward_history), -0.1)
-        r_range = max_r - min_r
-        
-        if r_range == 0: r_range = 1.0
-        
-        points = []
-        for i, r in enumerate(reward_history):
-            px = graph_rect.left + (i / (len(reward_history) - 1)) * graph_rect.width
-            # Map r to 0..h (inverted because y is down)
-            # relative height in graph area
-            rel_h = (r - min_r) / r_range
-            py = graph_rect.bottom - (rel_h * graph_rect.height)
-            points.append((px, py))
-            
-        if len(points) > 1:
-            pygame.draw.lines(surface, (0, 255, 0), False, points, 2)
-            
-        # Current Value
-        curr = reward_history[-1]
-        col = (0, 255, 0) if curr > 0 else ((255, 0, 0) if curr < 0 else (200, 200, 200))
-        val_t = self.small_font.render(f"R: {curr:.4f}", True, col)
-        surface.blit(val_t, (x + panel_w - val_t.get_width() - 5, y + 60))
+        curr  = rh[-1]
+        r_col = _C_ACT if curr >= 0 else _C_NEG
+        r_lbl = sf.render(f"R: {curr:+.4f}", True, r_col)
+        surface.blit(r_lbl, (px + pw - r_lbl.get_width() - 4, cy - 13))
 
-    def _draw_badge(self, surface, core, text, color, y_offset=10):
-        txt = self.font.render(text, True, (255, 255, 255))
-        bg = pygame.Surface((txt.get_width() + 20, txt.get_height() + 10))
+        # Sparkline
+        aw = pw - 10
+        ah = core.HEIGHT - cy - _GAP - 4
+        if ah < 12 or aw < 20:
+            return
+
+        max_r   = max(max(rh),  0.01)
+        min_r   = min(min(rh), -0.01)
+        r_range = (max_r - min_r) or 1.0
+
+        zero_y = cy + ah - int((0 - min_r) / r_range * ah)
+        pygame.draw.line(surface, _C_SEP,
+                         (px + 5, zero_y), (px + 5 + aw, zero_y))
+
+        pts = [(px + 5 + int(i / (len(rh)-1) * aw),
+                cy + ah - int((r - min_r) / r_range * ah))
+               for i, r in enumerate(rh)]
+
+        if len(pts) > 1:
+            pygame.draw.lines(surface, (55, 200, 100), False, pts, 1)
+        if pts:
+            pygame.draw.circle(surface, r_col, pts[-1], 3)
+
+    # ─────────────────────────────────────────────────────────
+    def _badge(self, surface, core, text, color, y=6):
+        """Draw a status badge centred on the game area. Returns bottom y."""
+        t  = self.font.render(text, True, (230, 235, 245))
+        w  = t.get_width() + 20
+        h  = t.get_height() + 8
+        bg = pygame.Surface((w, h))
         bg.fill(color)
-        bg.set_alpha(230) # Increased visibility
-        
-        x = (core.WIDTH // 2) - (bg.get_width() // 2)
-        y = y_offset
-        
+        bg.set_alpha(210)
+        x = core.WIDTH // 2 - w // 2
         surface.blit(bg, (x, y))
-        surface.blit(txt, (x + 10, y + 5))
+        surface.blit(t,  (x + 10, y + 4))
+        return y + h
