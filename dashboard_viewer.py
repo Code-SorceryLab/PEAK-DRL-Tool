@@ -14,7 +14,7 @@ THEME = {
     "grid": "#442233"
 }
 
-st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="📈")
+st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="ðŸ“ˆ")
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -66,7 +66,7 @@ def get_latest_log_file():
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("🏔️ MISSION CONTROL")
+    st.header("MISSION CONTROL")
     do_refresh = st.checkbox("LIVE DATA FEED", value=True)
 
     st.divider()
@@ -75,7 +75,7 @@ with st.sidebar:
     show_full_history = st.checkbox("Show Full History (Start -> Cursor)", value=True)
 
     st.divider()
-    if st.button("🗑️ WIPE LOGS"):
+    if st.button("WIPE LOGS"):
         log_file = get_latest_log_file()
         if log_file and os.path.exists(log_file):
             try:
@@ -86,11 +86,11 @@ with st.sidebar:
             except: pass
 
 # --- HEADER ---
-st.title("🏔️ PEAK AGENT TRAINING ANALYSIS DASHBOARD")
+st.title("PEAK AGENT TRAINING ANALYSIS DASHBOARD")
 
 log_file = get_latest_log_file()
 if not log_file:
-    st.warning("⚠️ WAITING FOR SIGNAL...")
+    st.warning("WAITING FOR SIGNAL...")
     time.sleep(2)
     st.rerun()
 
@@ -105,7 +105,7 @@ if df.empty:
     st.rerun()
 
 # --- PREPROCESSING ---
-standard_cols = ['step', 'total_reward', 'action', 'level', 'x', 'y', 'vx', 'vy', 'goal_dist', 'event', 'cause']
+standard_cols = ['step', 'total_reward', 'action', 'level', 'levels_completed', 'x', 'y', 'vx', 'vy', 'goal_dist', 'event', 'cause']
 reward_cols = [c for c in df.columns if c.lower() not in standard_cols and "unnamed" not in c.lower()]
 
 # --- SCRUBBER ---
@@ -121,16 +121,92 @@ row = df.iloc[selected_idx]
 # =========================================================
 # 1. MISSION STATUS
 # =========================================================
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("STEP", int(row.get('step', 0)))
 c2.metric("TOTAL REWARD", f"{row.get('total_reward', 0):.4f}")
-c3.metric("LEVEL", str(row.get('level', 0)))
-c4.metric("ACTION", str(row.get('action', 'N/A')))
+c3.metric("CURRENT LEVEL", str(row.get('level', 0)))
+c4.metric("LEVELS BEATEN", int(row.get('levels_completed', 0)))
+
+# Compute wins and deaths up to the scrubber position
+events_up_to_now = df.iloc[:selected_idx + 1]
+wins_so_far  = (events_up_to_now.get('event', pd.Series(dtype=str)) == 'WIN').sum()  if 'event' in df.columns else 0
+deaths_so_far = (events_up_to_now.get('event', pd.Series(dtype=str)) == 'DIED').sum() if 'event' in df.columns else 0
+c5.metric("WINS", int(wins_so_far))
+c6.metric("DEATHS", int(deaths_so_far))
 
 st.divider()
 
 # =========================================================
-# 2. REWARD DNA
+# 2. LEVEL PROGRESS
+# =========================================================
+st.subheader("🗺️ LEVEL PROGRESS")
+
+lp1, lp2, lp3 = st.columns([2, 2, 1])
+
+with lp1:
+    # Level visited over time — shows which levels the agent is reaching
+    if 'level' in df.columns and 'step' in df.columns:
+        subset_level = df.iloc[:selected_idx + 1][['step', 'level']].copy()
+        fig_level = px.line(
+            subset_level, x='step', y='level',
+            color_discrete_sequence=["#00FFFF"],
+            height=200,
+            labels={"level": "Level Index", "step": "Step"},
+        )
+        fig_level.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color=THEME['text']),
+            xaxis=dict(showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor=THEME['grid'], dtick=1),
+            margin=dict(l=0, r=0, t=24, b=0),
+            title=dict(text="Level Index Over Time", font=dict(size=12), x=0),
+        )
+        st.plotly_chart(fig_level, width='stretch')
+    else:
+        st.caption("No level data yet.")
+
+with lp2:
+    # Levels completed over time — the cumulative wins curve
+    if 'levels_completed' in df.columns and 'step' in df.columns:
+        subset_wins = df.iloc[:selected_idx + 1][['step', 'levels_completed']].copy()
+        fig_wins = px.area(
+            subset_wins, x='step', y='levels_completed',
+            color_discrete_sequence=["#00FF88"],
+            height=200,
+            labels={"levels_completed": "Levels Beaten", "step": "Step"},
+        )
+        fig_wins.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color=THEME['text']),
+            xaxis=dict(showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor=THEME['grid']),
+            margin=dict(l=0, r=0, t=24, b=0),
+            title=dict(text="Cumulative Levels Beaten", font=dict(size=12), x=0),
+        )
+        st.plotly_chart(fig_wins, width='stretch')
+    else:
+        st.caption("No completion data yet.")
+
+with lp3:
+    st.caption("Level Breakdown")
+    if 'level' in df.columns and 'event' in df.columns:
+        wins_df = df.iloc[:selected_idx + 1]
+        win_rows = wins_df[wins_df['event'] == 'WIN']
+        if not win_rows.empty:
+            level_counts = win_rows['level'].value_counts().sort_index()
+            for lvl, count in level_counts.items():
+                st.metric(f"Level {lvl}", f"✅ {count}x")
+        else:
+            st.caption("No wins yet.")
+    # Always show current level action
+    st.metric("ACTION", str(row.get('action', 'N/A')))
+
+st.divider()
+
+# =========================================================
+# 3. REWARD DNA
 # =========================================================
 st.subheader("🧬 REWARD COMPOSITION")
 if reward_cols:
@@ -138,7 +214,7 @@ if reward_cols:
     for i, col_name in enumerate(reward_cols):
         val = row[col_name]
         label = col_name.upper()
-        if abs(val) > 0.0001: label = f"⚡ {label}"
+        if abs(val) > 0.0001: label = f"   {label}"
         cols[i].metric(label, f"{val:.4f}")
 else:
     st.caption("No custom components found.")
@@ -152,7 +228,7 @@ col_graph, col_phys = st.columns([3, 1]) # 3:1 Ratio
 
 # --- LEFT COLUMN: GRAPH ---
 with col_graph:
-    st.subheader("📈 SIGNAL VISUALIZER")
+    st.subheader("SIGNAL VISUALIZER")
 
     available_signals = ['total_reward'] + reward_cols
     selected_lines = []
@@ -204,7 +280,7 @@ with col_graph:
 
 # --- RIGHT COLUMN: PHYSICS ---
 with col_phys:
-    st.subheader("📐 PHYSICS")
+    st.subheader("PHYSICS")
     st.caption("Live Telemetry (Tiles)")
 
     # Using nested columns to create a tight 2x2 Grid

@@ -202,7 +202,9 @@ class PlatformerCore(gymnasium.Env):
         self.persona = str(kwargs.pop("persona", "simple")).lower()
         if self.persona == "default":
             self.persona = "simple"
-        self.reward_fn = self._load_reward_fn(self.persona)
+        # reward_fn is owned by generic_env (the wrapper), not the core game.
+        # Kept as None here so the persona label is still accessible via self.persona.
+        self.reward_fn = None
         self.ACTION_NAMES = ACTION_NAMES
 
         # Timer knobs
@@ -278,6 +280,7 @@ class PlatformerCore(gymnasium.Env):
         self.progress_x_best = 0.0; self.progress_y_best = 0.0
         self.death_cause = ""
         self.lives = self.max_lives  # restore lives on every full episode reset
+        self.best_dist_to_goal = float('inf')  # stall tracker anchor
 
     def _load_reward_fn(self, persona_name):
         try:
@@ -354,16 +357,13 @@ class PlatformerCore(gymnasium.Env):
         info = self._info()
         if terminated: info["episode_end"] = True
 
-        # URGENT FIX: Call the reward function here
+        # Return raw score delta as base reward.
+        # The GameEnv wrapper (generic_env.py) applies the actual persona reward fn.
         base_reward = float(self.score_delta)
-        if self.reward_fn:
-            reward = self.reward_fn(self._obs(), base_reward, terminated, info)
-        else:
-            reward = base_reward
-        # In step()
+
         if self.coins_step > 0:
-            self._calculate_dijkstra_map() # Re-run with remaining active coins
-        return self._obs(), reward, bool(terminated), bool(truncated), info
+            self._calculate_dijkstra_map()
+        return self._obs(), base_reward, bool(terminated), bool(truncated), info
 
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
@@ -466,7 +466,7 @@ class PlatformerCore(gymnasium.Env):
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
         self.death_cause = cause
-        self.lives = max(0, self.lives - 1)  # clamp: lives can never go below 0
+        self.lives -= 1
         if self.lives > 0:
             self._soft_reset()
             return False
@@ -552,28 +552,11 @@ class PlatformerCore(gymnasium.Env):
         if player.gObj.y > self.level_data.height:
             return self._handle_death("Pit")
 
-        # 3. GOAL & SPIKES
-        p_rect = player.gObj.get_rect()
-        nearby = self.level_data.static_hash.query(player.gObj)
-
-        for tile in nearby:
-            if not hasattr(tile, 'gObj') or not hasattr(tile.gObj, 'type_id'):
-                continue
-
-            tid = tile.gObj.type_id
-
-            # if p_rect.colliderect(tile.gObj.get_rect()):
-            #     if tid == EntityType.SPIKE:
-            #         self._handle_death("Spike")
-            #         return True
-
-            #     elif tid == EntityType.GOAL:
-            #         # FIX: Prevent left-wall glitch while allowing actual right-side goals.
-            #         if player.gObj.x > 200:
-            #             self.score += 1000 + (int(self.timer) * 10)
-            #             self.reached_goal = True
-            #             self.complete_level()
-            #             return True
+        # 3. Goal and spike collisions are handled by PhysicsManager.resolve_collisions
+        # via the collectible_hash and hazard_hash — no need to duplicate here.
+        # Check if PhysicsManager already triggered a win this frame.
+        if self.reached_goal:
+            return True
 
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
@@ -633,11 +616,9 @@ class PlatformerCore(gymnasium.Env):
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
 
-        slice_y_start = py
-        slice_y_end = py + self.obs_height
-
-        slice_x_start = px
-        slice_x_end = px + self.obs_width
+        # Centre the window on the player
+        slice_y_start = py - self.obs_pad_y
+        slice_x_start = px - self.obs_pad_x
 
         # Safety clamp
         max_h, max_w = self.padded_solid.shape
@@ -652,12 +633,9 @@ class PlatformerCore(gymnasium.Env):
         collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         player_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32) # Init player grid
 
-        # Calculate window origin
-        grid_x_start = slice_x_start - self.obs_pad_x
-        grid_y_start = slice_y_start - self.obs_pad_y
-
-        wx = grid_x_start * TILE_SIZE
-        wy = grid_y_start * TILE_SIZE
+        # Calculate window origin in world-space pixels
+        wx = slice_x_start * TILE_SIZE
+        wy = slice_y_start * TILE_SIZE
 
         window_rect = pygame.Rect(
             wx, wy,
@@ -669,8 +647,8 @@ class PlatformerCore(gymnasium.Env):
         for h in nearby_hazards:
             if not h.gObj.active: continue
             hx, hy = int(h.gObj.x // TILE_SIZE), int(h.gObj.y // TILE_SIZE)
-            local_x = hx - grid_x_start
-            local_y = hy - grid_y_start
+            local_x = hx - slice_x_start
+            local_y = hy - slice_y_start
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 hazard_grid[local_y, local_x] = 1.0
 
@@ -680,8 +658,8 @@ class PlatformerCore(gymnasium.Env):
             if hasattr(c, 'collected') and c.collected: continue
 
             cx, cy = int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE)
-            local_x = cx - grid_x_start
-            local_y = cy - grid_y_start
+            local_x = cx - slice_x_start
+            local_y = cy - slice_y_start
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 collect_grid[local_y, local_x] = 1.0
 
@@ -943,7 +921,7 @@ class PlatformerCore(gymnasium.Env):
                     pygame.draw.line(ray_surf, color, s_cam, e_cam, 1)
                 game_surf.blit(ray_surf, (0, 0))
 
-        # HUD is rendered in the debug panel (manager.py) — not in the game viewport
+        self._draw_ui(game_surf)
 
     def _draw_world(self, surface: pygame.Surface):
         visible_tiles = self.level_data.static_hash.query_rect(self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT)

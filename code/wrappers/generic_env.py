@@ -28,8 +28,15 @@ class GameEnv(gym.Env):
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps
-        self.reward_fn = reward_fn or self._default_reward
         self.hud_fn = hud_fn
+
+        # If the reward_fn is a factory (produced by _wrap_with_tracker),
+        # call it to get a fresh instance with its own _ScoreTracker.
+        # This is critical for parallel training — each env MUST have its own tracker.
+        if reward_fn is not None and getattr(reward_fn, "_is_factory", False):
+            self.reward_fn = reward_fn()
+        else:
+            self.reward_fn = reward_fn or self._default_reward
 
         # spaces from game
         self.action_space = self.game.get_action_space()
@@ -88,13 +95,12 @@ class GameEnv(gym.Env):
         reward_breakdown = {}
 
         if isinstance(raw_reward, dict):
-            # If Dict: SUM it up for the Agent/Hub (so it's a float)
             final_scalar_reward = sum(raw_reward.values())
             reward_breakdown = raw_reward
         else:
-            # If Float: Use as is
             final_scalar_reward = float(raw_reward)
-            reward_breakdown = {"generic": final_scalar_reward}
+            # Prefer the breakdown injected by the persona wrapper over a generic fallback
+            reward_breakdown = info.get("reward_components", {"reward": final_scalar_reward})
 
         # 3. Inject Breakdown into Info (for CSV Logger)
         info["reward_breakdown"] = reward_breakdown
