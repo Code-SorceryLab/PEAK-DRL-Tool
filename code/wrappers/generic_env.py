@@ -19,7 +19,7 @@ class GameEnv(gym.Env):
         render_mode: str = "none",
         fps: int | None = 30,
         max_steps: int | None = None,
-        reward_fn: Callable[[Obs, float | None, bool, Info], float] | None = None,
+        reward_fn: Callable[[Obs, float | None, bool, bool, Info], float] | None = None,  # ✅ Added bool for truncated
         hud_fn: Callable[[pygame.Surface, "GameEnv"], None] | None = None,
         **game_kwargs,
     ):
@@ -53,7 +53,7 @@ class GameEnv(gym.Env):
 
     # -------------------------------- Default reward
     @staticmethod
-    def _default_reward(obs, base, terminated, info):
+    def _default_reward(obs, base, terminated, truncated, info):  # ✅ Added truncated parameter
         return 0.0 if base is None else base
 
     # -------------------------------- Gym API
@@ -79,7 +79,8 @@ class GameEnv(gym.Env):
         # --- REWARD PROCESSING (THE FIX) ---
         # 1. Get raw reward from Persona (Could be Float OR Dict)
         if self.reward_fn:
-            raw_reward = self.reward_fn(obs, base, terminated, info)
+            # ✅ CRITICAL FIX: Pass truncated parameter
+            raw_reward = self.reward_fn(obs, base, terminated, truncated, info)
         else:
             raw_reward = self.hub.compute_default_reward(info)
         
@@ -104,11 +105,9 @@ class GameEnv(gym.Env):
         if hasattr(self.game, "ACTION_NAMES"):
             act_name = self.game.ACTION_NAMES.get(int(action), action)
         
-        
         info["action_name"] = str(act_name)
         
-        
-        # <--- THIS WAS CRASHING BEFORE (reward=raw_reward would fail)
+        # Update hub with scalar reward
         self.hub.update_reward(reward=final_scalar_reward, action_name=act_name, is_episode_end=terminated)
         
         # 5. Return the Float Sum to the Agent
@@ -163,7 +162,6 @@ class GameEnv(gym.Env):
             arr = pygame.surfarray.array3d(self.screen)  # (W, H, 3)
             arr = np.transpose(arr, (1, 0, 2))          # (H, W, 3)
             return arr
-
 
     def close(self):
         if self.screen:

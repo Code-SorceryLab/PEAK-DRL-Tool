@@ -208,10 +208,10 @@ class PlatformerCore(gymnasium.Env):
         self.camera_smoothing = 0.15
         self.camera_lock = True
 
-        # Anti-stall
-        self.anti_stall = bool(kwargs.pop("anti_stall", True))
-        self.stall_window = float(kwargs.pop("stall_window", 2))
-        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 10))
+        # Anti-stall — FIX: Increased tolerance so early exploration isn't killed
+        self.anti_stall = bool(kwargs.pop("anti_stall", False))
+        self.stall_window = float(kwargs.pop("stall_window", 3))      # Was 2s — too tight
+        self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 15))  # Was 10 — now 45s total
 
         self.reset_metrics()
 
@@ -223,11 +223,11 @@ class PlatformerCore(gymnasium.Env):
 
         # --- RAYCAST CONFIGURATION ---
         # Number of rays to cast around the player
-        self.num_rays = int(kwargs.pop("num_rays", 48)) 
-        self.ray_max_dist = 250.0
-        # Create angles (0 to 2pi)
-        self.ray_angles = np.linspace(0, 2 * math.pi, self.num_rays, endpoint=False)
-        self.last_rays = [] # For debug drawing
+        # self.num_rays = int(kwargs.pop("num_rays", 48)) 
+        # self.ray_max_dist = 250.0
+        # # Create angles (0 to 2pi)
+        # self.ray_angles = np.linspace(0, 2 * math.pi, self.num_rays, endpoint=False)
+        # self.last_rays = [] # For debug drawing
         
         # NEW: Dijkstra Map Storage
         self.dijkstra = None
@@ -239,8 +239,8 @@ class PlatformerCore(gymnasium.Env):
             # Scalars: 16 (Player=5, Tracking=11)
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32),
             
-            # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
-            "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
+            # # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
+            # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
         })
 
         # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
@@ -279,10 +279,7 @@ class PlatformerCore(gymnasium.Env):
 
     def step(self, action: int):
         if not self.alive:
-            # Need to return raycasts in dead obs too
-            dead_rays = np.zeros(self.num_rays * 2, dtype=np.float32)
             dead_obs = self._obs()
-            dead_obs['raycasts'] = dead_rays
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
@@ -326,7 +323,7 @@ class PlatformerCore(gymnasium.Env):
         self.level_data.powerups[:] = [p for p in self.level_data.powerups if p.gObj.active]
 
         self._update_camera()
-        if self.anti_stall: self._update_stall_metrics()
+        # if self.anti_stall: self._update_stall_metrics()  # REMOVED - anti-stall disabled
         
         # Check Truncation & Termination
         terminated = self._check_termination()
@@ -342,23 +339,27 @@ class PlatformerCore(gymnasium.Env):
         info = self._info()
         if terminated: info["episode_end"] = True
 
-        # URGENT FIX: Call the reward function here
+        # CRITICAL FIX: Cache observation and pass truncated parameter
+        obs = self._obs()
         base_reward = float(self.score_delta)
         if self.reward_fn:
-            reward = self.reward_fn(self._obs(), base_reward, terminated, info)
+            reward = self.reward_fn(obs, base_reward, terminated, truncated, info)  # ✅ Now passes truncated!
         else:
             reward = base_reward
-        # In step()
+        
+        # Recalculate dijkstra if coins collected
         if self.coins_step > 0:
-            self._calculate_dijkstra_map() # Re-run with remaining active coins
-        return self._obs(), reward, bool(terminated), bool(truncated), info
-
+            self._calculate_dijkstra_map()
+            
+        return obs, reward, bool(terminated), bool(truncated), info
+    
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
 
         if not self.reached_goal:
             self.reset_metrics()
             self.current_index_world = 0
+            self.lives = self.max_lives
             self.world = self.level_order[self.current_index_world]
 
         self.load_level()
@@ -507,13 +508,23 @@ class PlatformerCore(gymnasium.Env):
         return min_d
 
     def _update_stall_metrics(self):
-        """FIX: Stall logic now uses X-distance to goal."""
+        """FIX: Stall logic now uses Dijkstra distance when available,
+        falling back to X-distance. This prevents false stall kills when
+        the agent is making vertical progress (climbing platforms)."""
         if not self.player: return
 
         if self.player.gObj.x > self.max_x_seen:
             self.max_x_seen = self.player.gObj.x
 
+        # FIX: Prefer Dijkstra distance for stall check (accounts for vertical movement)
         current_dist = self._get_dist_to_goal()
+        if self.dijkstra:
+            px = int(self.player.gObj.x // TILE_SIZE)
+            py = int(self.player.gObj.y // TILE_SIZE)
+            d = self.dijkstra.get_dist(px, py)
+            if d >= 0:
+                current_dist = d  # Use Dijkstra if available
+        
         threshold = TILE_SIZE / 2.0
 
         if current_dist < (self.best_dist_to_goal - threshold):
@@ -550,18 +561,19 @@ class PlatformerCore(gymnasium.Env):
 
             tid = tile.gObj.type_id
 
-            # if p_rect.colliderect(tile.gObj.get_rect()):
-            #     if tid == EntityType.SPIKE:
-            #         self._handle_death("Spike")
-            #         return True
+            # FIX: RE-ENABLED — was commented out, agent could never win or die to spikes!
+            if p_rect.colliderect(tile.gObj.get_rect()):
+                if tid == EntityType.SPIKE:
+                    self._handle_death("Spike")
+                    return True
 
-            #     elif tid == EntityType.GOAL:
-            #         # FIX: Prevent left-wall glitch while allowing actual right-side goals.
-            #         if player.gObj.x > 200:
-            #             self.score += 1000 + (int(self.timer) * 10)
-            #             self.reached_goal = True
-            #             self.complete_level()
-            #             return True
+                elif tid == EntityType.GOAL:
+                    # FIX: Prevent left-wall glitch while allowing actual right-side goals.
+                    if player.gObj.x > 200:
+                        self.score += 1000 + (int(self.timer) * 10)
+                        self.reached_goal = True
+                        self.complete_level()
+                        return True
 
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
@@ -575,14 +587,14 @@ class PlatformerCore(gymnasium.Env):
             return {
                 "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
                 "scalars": np.zeros(16, dtype=np.float32), # 16 scalars
-                "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
+                #"raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
             }
 
         p_obs = self._player_obs()
         # Ensure _grid_obs_window returns 4 grids now
         solid_grid, hazard_grid, collect_grid, player_grid = self._grid_obs_window()
         track_obs = self._tracking_obs()
-        rays = self._perform_raycasts()
+        # rays = self._perform_raycasts()
 
         # Stack order: Player (Top), Solid, Hazard, Collectible
         stacked_grids = np.stack([player_grid, solid_grid, hazard_grid, collect_grid], axis=0).astype(np.float32)
@@ -591,7 +603,7 @@ class PlatformerCore(gymnasium.Env):
         return {
             "grids": stacked_grids,
             "scalars": scalars,
-            "raycasts": rays
+            #"raycasts": rays
         }
 
     def _player_obs(self) -> np.ndarray:
@@ -754,88 +766,6 @@ class PlatformerCore(gymnasium.Env):
             dijkstra_dist 
         ], dtype=np.float32)
 
-    def _perform_raycasts(self) -> np.ndarray:
-        """
-        Casts rays from player center.
-        Returns: [dist1, type1, dist2, type2, ...]
-        Type IDs: 0=Empty, 1=Solid, 2=Hazard, 3=Item
-        """
-        p = self.player
-        if not p: return np.zeros(self.num_rays * 2, dtype=np.float32)
-        
-        cx, cy = p.gObj.x + p.gObj.width/2, p.gObj.y + p.gObj.height/2
-        results = []
-        self.last_rays = [] # Debug
-        
-        step_size = TILE_SIZE / 2.0
-        
-        for angle in self.ray_angles:
-            sin_a = math.sin(angle)
-            cos_a = math.cos(angle)
-            
-            hit_dist = 1.0 # Max Range default
-            hit_type = 0.0 # Empty default
-            
-            curr_dist = 0.0
-            found = False
-            
-            while curr_dist < self.ray_max_dist:
-                curr_dist += step_size
-                tx = cx + cos_a * curr_dist
-                ty = cy + sin_a * curr_dist
-                
-                # Check Bounds
-                if tx < 0 or tx >= self.level_data.width or ty < 0 or ty >= self.level_data.height:
-                    hit_dist = curr_dist / self.ray_max_dist
-                    hit_type = 0.0 # USER REQ: Count as Empty Space
-                    found = True
-                    break
-                
-                # 1. Check Static Grid
-                col, row = int(tx // TILE_SIZE), int(ty // TILE_SIZE)
-                if 0 <= row < len(self.level_data.grid) and 0 <= col < len(self.level_data.grid[0]):
-                    tile_val = self.level_data.grid[row][col]
-                    if tile_val != TILE_AIR:
-                        if tile_val == TILE_SPIKE:
-                            hit_dist = curr_dist / self.ray_max_dist
-                            hit_type = 2.0 # Hazard
-                            found = True; break
-                        elif tile_val in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
-                            hit_dist = curr_dist / self.ray_max_dist
-                            hit_type = 1.0 # Solid
-                            found = True; break
-                            
-                # 2. Check Entities
-                # Use a small rect for point query
-                query_rect = pygame.Rect(tx-2, ty-2, 4, 4)
-                
-                hazards = self.physics_manager.hazard_hash.query_rect(tx-2, ty-2, 4, 4)
-                for h in hazards:
-                    if h.gObj.get_rect().collidepoint(tx, ty):
-                        hit_dist = curr_dist / self.ray_max_dist
-                        hit_type = 2.0 # Hazard
-                        found = True; break
-                if found: break
-                
-                items = self.physics_manager.collectible_hash.query_rect(tx-2, ty-2, 4, 4)
-                for i in items:
-                    if hasattr(i, 'collected') and i.collected: continue
-                    if i.gObj.get_rect().collidepoint(tx, ty):
-                        hit_dist = curr_dist / self.ray_max_dist
-                        hit_type = 3.0 # Item
-                        found = True; break
-                if found: break
-            
-            hit_dist = min(1.0, hit_dist)
-            results.extend([hit_dist, hit_type])
-            
-            # Debug Visuals
-            end_x = cx + cos_a * (curr_dist if found else self.ray_max_dist)
-            end_y = cy + sin_a * (curr_dist if found else self.ray_max_dist)
-            self.last_rays.append(((cx, cy), (end_x, end_y), found, hit_type))
-            
-        return np.array(results, dtype=np.float32)
-
     def _info(self) -> Dict:
         p = self.player
         ts = float(TILE_SIZE)
@@ -908,21 +838,6 @@ class PlatformerCore(gymnasium.Env):
 
         if self.debug_manager:
             self.debug_manager.render_overlays(surface, self)
-            
-            # --- DEBUG: DRAW RAYS ---
-            # Draw rays in debug mode so user can see them
-            if hasattr(self, 'last_rays'):
-                for start, end, found, rtype in self.last_rays:
-                    color = (200, 200, 200) # Gray (Empty)
-                    if rtype == 1.0: color = (0, 0, 0) # Solid (Black)
-                    elif rtype == 2.0: color = (255, 0, 0) # Hazard (Red)
-                    elif rtype == 3.0: color = (255, 215, 0) # Item (Gold)
-                    
-                    # Offset by camera
-                    s_cam = (start[0] - self.camera_x, start[1] - self.camera_y)
-                    e_cam = (end[0] - self.camera_x, end[1] - self.camera_y)
-                    pygame.draw.line(surface, color, s_cam, e_cam, 1)
-
         self._draw_ui(surface)
 
     def _draw_world(self, surface: pygame.Surface):

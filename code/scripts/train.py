@@ -25,7 +25,7 @@ from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback, EvalCallback, CheckpointCallback
 # --- FIX: Import VecNormalize ---
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv, VecNormalize, sync_envs_normalization
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sb3_contrib import RecurrentPPO
 
@@ -36,6 +36,19 @@ from code.algos import get_algo
 
 
 #### Helper functions START ####
+
+# --- FIX: Callback to sync VecNormalize stats from train → eval env ---
+class SyncNormCallback(BaseCallback):
+    """Syncs VecNormalize running stats from training env to eval env every N steps."""
+    def __init__(self, eval_env: VecNormalize, sync_every: int = 2000, verbose: int = 0):
+        super().__init__(verbose)
+        self.eval_env = eval_env
+        self.sync_every = sync_every
+
+    def _on_step(self) -> bool:
+        if self.num_timesteps % self.sync_every == 0:
+            sync_envs_normalization(self.training_env, self.eval_env)
+        return True
 
 def _pretty_steps(n: int) -> str:
     """Convert large step counts to human-readable format."""
@@ -88,39 +101,37 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
                 n_input_channels = subspace.shape[0]
+                
+                # CNN with GroupNorm BEFORE activation
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(32),
+                    nn.GroupNorm(4, 32),  # 4 groups, 32 channels → 8 channels per group
                     nn.ReLU(),
                     nn.MaxPool2d(2),
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(64),
+                    nn.GroupNorm(8, 64),  # 8 groups, 64 channels → 8 channels per group
                     nn.ReLU(),
                     nn.AdaptiveMaxPool2d((21, 21)),
                     nn.Flatten(),
                 )
                 n_flatten = 21 * 21 * 64
-                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
+                
+                # LayerNorm for the fully connected part
+                linear = nn.Sequential(
+                    nn.Linear(n_flatten, 256),
+                    nn.LayerNorm(256),
+                    nn.ReLU()
+                )
                 extractors[key] = nn.Sequential(cnn, linear)
                 total_concat_size += 256
 
             elif key == "scalars":
-                # Standard MLP for the 1D scalars
                 extractors[key] = nn.Sequential(
                     nn.Linear(subspace.shape[0], 64),
-                    nn.BatchNorm1d(64),
+                    nn.LayerNorm(64),
                     nn.ReLU()
                 )
                 total_concat_size += 64
-            
-            elif key == "raycasts":
-                # MLP for the raycast data (1D array)
-                extractors[key] = nn.Sequential(
-                    nn.Linear(subspace.shape[0], 128),
-                    nn.BatchNorm1d(128),
-                    nn.ReLU()
-                )
-                total_concat_size += 128
 
         self.extractors = nn.ModuleDict(extractors)
         self._features_dim = total_concat_size
@@ -177,7 +188,7 @@ def main(cfg: DictConfig):
     os.makedirs(models_dir / "checkpoints", exist_ok=True)
     os.makedirs(models_dir / "eval_logs", exist_ok=True)
 
-    # 🚀 AUTO-LAUNCH DASHBOARD
+    # ðŸš€ AUTO-LAUNCH DASHBOARD
     if cfg.get("dashboard", True):
         dash_script = repo_root / "dashboard_viewer.py"
         if dash_script.exists():
@@ -237,9 +248,10 @@ def main(cfg: DictConfig):
                 print(f"[WARNING] Persona '{persona}' not found! Using default.")
                 active_reward_fn = reward_module.default
 
-            def make_env():
+            # FIX: Use default argument binding to avoid late-binding closure bug
+            def make_env(_reward_fn=active_reward_fn, _env_kwargs=env_kwargs.copy()):
                 def _init():
-                    return GameEnv(game_cls, reward_fn=active_reward_fn, **env_kwargs)
+                    return GameEnv(game_cls, reward_fn=_reward_fn, **_env_kwargs)
                 return _init
 
             n_envs = int(cfg.get("n_envs", 1))
@@ -272,6 +284,24 @@ def main(cfg: DictConfig):
                 csv_logger = CsvLoggerCallback(log_dir=str(repo_root), file_name=log_name)
                 
                 # Callbacks
+                # FIX: Removed dead first EvalCallback that was immediately overwritten
+                
+                # Check if this is a recurrent model
+                is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
+                
+                # FIX: Use standard EvalCallback for all models (RecurrentEvalCallback was never imported)
+                # if is_recurrent_model:
+                #     eval_cb = RecurrentEvalCallback(
+                #         eval_env,
+                #         best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                #         log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                #         eval_freq=eval_freq,
+                #         n_eval_episodes=5,
+                #         deterministic=True,
+                #         render=False,
+                #         verbose=1,
+                #     )
+                # else:
                 eval_cb = EvalCallback(
                     eval_env,
                     best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
@@ -281,33 +311,6 @@ def main(cfg: DictConfig):
                     render=False,
                 )
                 
-                # Check if this is a recurrent model
-                is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
-                eval_cb = None
-                
-                if is_recurrent_model:
-                    # Use custom RecurrentEvalCallback for LSTM models
-                    eval_cb = RecurrentEvalCallback(
-                        eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        eval_freq=eval_freq,
-                        n_eval_episodes=5,
-                        deterministic=True,
-                        render=False,
-                        verbose=1,
-                    )
-                else:
-                    # Use standard EvalCallback for non-recurrent models
-                    eval_cb = EvalCallback(
-                        eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        eval_freq=eval_freq,
-                        deterministic=True,
-                        render=False,
-                    )
-                
                 # CheckpointCallback for model saving
                 ckpt_cb = CheckpointCallback(
                     save_freq=save_freq,
@@ -315,7 +318,7 @@ def main(cfg: DictConfig):
                     name_prefix=f"{game_name}_{model_name}_{persona}"
                 )
 
-                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
+                current_callbacks = [eval_cb, ckpt_cb, csv_logger, SyncNormCallback(eval_env)]
 
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir

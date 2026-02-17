@@ -2,7 +2,7 @@ from __future__ import annotations
 import random
 import math
 from typing import Callable, Tuple, Dict, Any, List
-
+import numpy as np
 Info = Dict[str, Any]
 
 # ---- Score Tracker Wrapper --------------------------------------------
@@ -10,7 +10,7 @@ Info = Dict[str, Any]
 class _ScoreTracker:
     """
     Tracks previous score, position, goal distance, and dijkstra cost.
-    Handles 'Soft Resets' to prevent negative progress spikes on respawn.
+    FIX: No longer zeros out progress on death - agent must feel the cost.
     """
     def __init__(self):
         self.prev_score = 0
@@ -47,30 +47,21 @@ class _ScoreTracker:
         if self.last_dist is None:
             self.last_dist = current_dist
             
-        # CRITICAL FIX: If we lost a life, we teleported back to start.
-        # Do NOT calculate progress this frame, or it will be massive negative.
-        if life_lost:
-            progress = 0.0
-            self.last_dist = current_dist # Reset anchor
-        else:
-            progress = self.last_dist - current_dist
-            self.last_dist = current_dist
+        # FIX: Allow negative progress - agent MUST feel cost of death
+        progress = self.last_dist - current_dist
+        self.last_dist = current_dist
         
         info["progress"] = progress
         
-        # 3. Track Dijkstra Progress (NEW)
+        # 3. Track Dijkstra Progress
         current_dijkstra = float(info.get("dijkstra_dist", 1.0)) # Normalized 0-1
         
         if self.last_dijkstra is None:
             self.last_dijkstra = current_dijkstra
             
-        if life_lost:
-            dijkstra_progress = 0.0
-            self.last_dijkstra = current_dijkstra # Reset anchor
-        else:
-            # Positive if we moved to a lower cost tile (closer to goal)
-            dijkstra_progress = self.last_dijkstra - current_dijkstra
-            self.last_dijkstra = current_dijkstra
+        # FIX: Allow negative dijkstra progress - agent must feel cost
+        dijkstra_progress = self.last_dijkstra - current_dijkstra
+        self.last_dijkstra = current_dijkstra
         
         info["dijkstra_progress"] = dijkstra_progress
 
@@ -84,12 +75,7 @@ class _ScoreTracker:
             self.last_x = current_x
             self.max_x = current_x
         
-        # Reset frontier on death? Usually we want to keep it to encourage 
-        # getting back to where we were, but resetting max_x helps prevent 
-        # "lazy" rewards if we reward x-pos directly.
-        if life_lost:
-            self.max_x = current_x 
-
+        # Keep max_x on death to encourage returning to frontier
         env_max = float(info.get("max_x_seen", 0.0))
         if env_max > 0:
             frontier_delta = max(0.0, env_max - self.max_x)
@@ -101,7 +87,6 @@ class _ScoreTracker:
         
         # 5. Track Coins
         current_coins = int(info.get("coins_collected", 0))
-        # Handle coin reset on death if game resets coins (usually it doesn't on soft reset, but safety check)
         if current_coins < self.last_coins:
             self.last_coins = current_coins
         info["coins_delta"] = max(0, current_coins - self.last_coins)
@@ -120,21 +105,22 @@ class _ScoreTracker:
         self.last_x = None
         self.max_x = 0.0
         self.last_coins = 0
-        self.last_lives = None # Reset lives tracker
+        self.last_lives = None
 
 
 def _wrap_with_tracker(core_fn) -> Callable:
     """
     Decorator that maintains the _ScoreTracker state.
+    FIX: Properly passes truncated parameter.
     """
     tracker = _ScoreTracker()
 
-    def reward(obs, base, terminated: bool, info: Info) -> float:
+    def reward(obs, base, terminated: bool, truncated: bool, info: Info) -> float:
         # Step the tracker
         _score, inc = tracker.step(info or {})
 
-        # Get reward components from the persona
-        components = core_fn(inc, terminated, info or {}, _score)
+        # CRITICAL FIX: Pass truncated to core function
+        components = core_fn(inc, terminated, truncated, info or {}, _score)
         
         # Inject breakdown into info for dashboard
         info["reward_components"] = components
@@ -142,10 +128,10 @@ def _wrap_with_tracker(core_fn) -> Callable:
         # Sum components to get the actual float reward for PPO
         total_reward = sum(components.values())
 
-        if terminated or (info and info.get("terminated", False)):
+        if terminated or truncated or (info and info.get("terminated", False)):
             tracker.reset()
             
-        return float(total_reward)
+        return np.clip(float(total_reward), -100.0, 100.0)
 
     return reward
 
@@ -153,10 +139,10 @@ def _wrap_with_tracker(core_fn) -> Callable:
 # ---- Reward Personas --------------------------------------------------
 
 @_wrap_with_tracker
-def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+def delta_dijkstra(score_inc: bool, terminated: bool, truncated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    DELTA DIJKSTRA:
-    Primary driver is the improvement in Dijkstra Distance.
+    DELTA DIJKSTRA - REBALANCED
+    Primary driver is improvement in Dijkstra Distance.
     """
     # 1. Unpack Metrics
     d_prog = float(info.get("dijkstra_progress", 0.0))
@@ -165,29 +151,27 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
     won = info.get("won", False)
     life_lost = info.get("life_lost", False)
     
-    # 2. Gradient Reward
-    r_gradient = d_prog * 100.00 
+    # 2. Gradient Reward - SCALED for visibility
+    r_gradient = d_prog * 500.0  # Was 100, now 500
     
-    # # 3. Stall Penalty
-    # if d_prog <= 0.0001:
-    #     r_gradient -= 0.01 
-        
-    # 4. Interaction Rewards
-    r_coin = 1.0 * coins
+    # 3. Interaction Rewards
+    r_coin = 2.0 * coins  # Was 1.0
     r_kill = 1.0 * kills
     
-    # 5. Win/Loss/Life
+    # 4. Win/Loss/Life - PROPERLY BALANCED
     r_win = 0.0
     r_death = 0.0
     
     if won:
-        r_win = 100.0
+        r_win = 200.0  # Was 100
     elif terminated:
-        r_death = -10.0 # Game Over penalty
+        r_death = -50.0  # Was -2.0 (CRITICAL FIX)
+    elif truncated:
+        r_death = 0.0  # No penalty for timeout
     elif life_lost:
-        r_death = -1.0  # Soft Death penalty (New)
+        r_death = -10.0  # Was -1.0
         
-    r_time = -0.0001
+    r_time = -0.001
 
     return {
         "gradient": r_gradient,
@@ -199,9 +183,10 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
     }
 
 @_wrap_with_tracker
-def complex_navigation(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+def complex_navigation(score_inc: bool, terminated: bool, truncated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    COMPLEX NAVIGATION: Uses directional inputs.
+    COMPLEX NAVIGATION - REBALANCED
+    Uses progress with simplified scaling.
     """
     # 1. Unpack Metrics
     progress = float(info.get("progress", 0.0))
@@ -213,36 +198,34 @@ def complex_navigation(score_inc: bool, terminated: bool, info: Info, score: int
     won = info.get("won", False)
     life_lost = info.get("life_lost", False)
 
-    # 2. Movement Logic
-    proximity_mult = 1.0 + (500.0 / (goal_dist + 200.0))
-    r_move = (progress * 0.02) * proximity_mult
+    # 2. Movement Logic - SIMPLIFIED (removed proximity multiplier)
+    r_move = progress * 1.0
     
-    if progress > 2.0:
+    if progress > 5.0:
         r_move *= 1.5
 
-    # Stall penalty
-    if abs(progress) < 0.1:
-        if current_x < 100.0:
-             r_move -= 0.01 
-        else:
-             r_move -= 0.005
-
     # 3. Actions
-    r_coin = 1.0 * coins 
-    r_kill = 0.5 * kills 
+    r_coin = 2.0 * coins 
+    r_kill = 1.0 * kills 
 
-    # 4. Win/Loss
+    # 4. Win/Loss - REBALANCED
     if won:
-        r_win = 50.0 + (10.0 if score > 1000 else 0.0)
+        r_win = 200.0
         r_death = 0.0
+    elif terminated:
+        r_win = 0.0
+        r_death = -50.0  # Was -2.0
+    elif truncated:
+        r_win = 0.0
+        r_death = 0.0
+    elif life_lost:
+        r_win = 0.0
+        r_death = -10.0  # Was -1.0
     else:
         r_win = 0.0
-        if terminated:
-            r_death = -10.0
-        elif life_lost:
-            r_death = -5.0 # Soft Death penalty
+        r_death = 0.0
 
-    r_time = -0.005 
+    r_time = -0.001
 
     return {
         "movement": r_move,
@@ -254,9 +237,10 @@ def complex_navigation(score_inc: bool, terminated: bool, info: Info, score: int
     }
 
 @_wrap_with_tracker
-def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+def simple(score_inc: bool, terminated: bool, truncated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    SIMPLE: Basic progress reward.
+    SIMPLE - REBALANCED
+    Basic progress reward with proper penalties.
     """
     # 1. Unpack Metrics
     progress = float(info.get("progress", 0.0))
@@ -268,32 +252,35 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
     
     # 2. Calculate Components
     
-    # A. Movement
-    # Note: Progress is now 0.0 on death frames, so no massive penalty here.
-    r_move = progress / 8.0 
-    if progress < 0.001: 
-        r_move -= 0.005 # Stall penalty
+    # A. Movement - SCALED UP
+    r_move = progress * 2.0  # Was 0.5
 
     # B. Actions
-    r_coin = 1.0 * coins 
+    r_coin = 2.0 * coins  # Was 1.0
     r_kill = 1.0 * kills 
-
-    # C. Win/Loss
+    
+    # C. Win/Loss - REBALANCED
     if won:
         if current_x > 200.0:
-            r_win = 50.0
+            r_win = 200.0  # Was 50
             r_death = 0.0
         else:
-            r_win = 0.0
-            r_death = -10.0 
+            r_win = 20.0
+            r_death = 0.0
+    elif terminated:
+        r_win = 0.0
+        r_death = -50.0  # Was -2.0 (CRITICAL FIX)
+    elif truncated:
+        r_win = 0.0
+        r_death = 0.0  # No penalty for timeout
+    elif life_lost:
+        r_win = 0.0
+        r_death = -10.0  # Was -1.0
     else:
         r_win = 0.0
-        if terminated:
-            r_death = -10.0
-        elif life_lost:
-            r_death = -5.0 # Explicit penalty for losing a life
+        r_death = 0.0
 
-    r_time = 0.0
+    r_time = -0.001
 
     return {
         "movement": r_move,
