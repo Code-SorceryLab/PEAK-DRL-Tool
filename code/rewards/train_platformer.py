@@ -182,19 +182,23 @@ def complex_navigation(score_inc: bool, terminated: bool, info: Info, score: int
 
 
 @_wrap_with_tracker
-def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
-    """SIMPLE: Rightward progress only. Good baseline."""
+def simple(score_inc, terminated, info, score):
     progress  = float(info.get("progress", 0.0))
+    frontier  = float(info.get("frontier_dx", 0.0))   # NEW
     kills     = int(info.get("enemies_killed_step", 0))
     coins     = int(info.get("coins_delta", 0))
     won       = info.get("won", False)
     life_lost = info.get("life_lost", False)
 
-    r_move = progress * 0.05
-    if progress < 0.5:
-        r_move -= 0.003
+    # Stronger forward signal, penalize going backwards
+    r_move = progress * 0.15          # 3x stronger
+    if progress < 0:
+        r_move *= 2.5                 # extra backtrack penalty
+    if abs(progress) < 0.5:
+        r_move -= 0.01                # stronger stall penalty
 
-    r_coin = 0.2 * coins
+    r_frontier = frontier * 0.2       # reward exploring new ground only
+    r_coin = 0.05 * coins             # 4x weaker coins so they don't hijack policy
     r_kill = 0.5 * kills
 
     r_win, r_death = 0.0, 0.0
@@ -205,8 +209,8 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
     elif life_lost:
         r_death = -3.0
 
-    return {"movement": r_move, "coins": r_coin, "kills": r_kill,
-            "win": r_win, "time": 0.0, "death": r_death}
+    return {"movement": r_move, "frontier": r_frontier, "coins": r_coin,
+            "kills": r_kill, "win": r_win, "time": -0.002, "death": r_death}
 
 
 # ---- Aliases -------------------------------------------------------------

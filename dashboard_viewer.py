@@ -14,7 +14,7 @@ THEME = {
     "grid": "#442233"
 }
 
-st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="ðŸ“ˆ")
+st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‹â€ ")
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -139,76 +139,99 @@ st.divider()
 # =========================================================
 # 2. LEVEL PROGRESS
 # =========================================================
-st.subheader("🗺️ LEVEL PROGRESS")
+st.subheader("\U0001f5fa\ufe0f LEVEL PROGRESS")
 
-lp1, lp2, lp3 = st.columns([2, 2, 1])
+if 'level' in df.columns and 'event' in df.columns:
+    data_so_far = df.iloc[:selected_idx + 1]
+    all_levels  = sorted(data_so_far['level'].dropna().unique().astype(int))
 
-with lp1:
-    # Level visited over time — shows which levels the agent is reaching
-    if 'level' in df.columns and 'step' in df.columns:
-        subset_level = df.iloc[:selected_idx + 1][['step', 'level']].copy()
-        fig_level = px.line(
-            subset_level, x='step', y='level',
-            color_discrete_sequence=["#00FFFF"],
-            height=200,
-            labels={"level": "Level Index", "step": "Step"},
+    rows = []
+    for lvl in all_levels:
+        lvl_rows = data_so_far[data_so_far['level'] == lvl]
+        visits   = int(len(lvl_rows))
+        wins     = int((lvl_rows['event'] == 'WIN').sum())
+        deaths   = int((lvl_rows['event'] == 'DIED').sum())
+        win_rate = (wins / visits * 100) if visits > 0 else 0.0
+        filled   = int(win_rate / 10)
+        bar      = "\u2588" * filled + "\u2591" * (10 - filled)
+        rows.append({
+            "LEVEL":     f"Level {lvl}",
+            "VISITS":    visits,
+            "WINS":      wins,
+            "DEATHS":    deaths,
+            "WIN RATE":  f"{win_rate:.1f}%",
+            "PROGRESS":  bar,
+        })
+
+    if rows:
+        level_table = pd.DataFrame(rows)
+
+        def _style_row(r):
+            try:
+                wr = float(r["WIN RATE"].replace("%", ""))
+            except Exception:
+                wr = 0.0
+            color = "#27ae60" if wr >= 90 else ("#e67e22" if wr >= 50 else "#e74c3c")
+            return [f"color:{color}" if c == "WIN RATE" else "" for c in r.index]
+
+        styled = (
+            level_table.style
+            .apply(_style_row, axis=1)
+            .set_properties(**{
+                "font-family": "Courier New, monospace",
+                "font-size": "14px",
+                "text-align": "center",
+            })
+            .set_table_styles([{
+                "selector": "th",
+                "props": [
+                    ("background-color", "#2a0a1a"),
+                    ("color", "#B3C8EF"),
+                    ("font-family", "Courier New, monospace"),
+                    ("font-size", "12px"),
+                    ("letter-spacing", "1px"),
+                    ("text-align", "center"),
+                    ("padding", "8px 16px"),
+                    ("border-bottom", "1px solid #801830"),
+                ]
+            }, {
+                "selector": "td",
+                "props": [
+                    ("background-color", "#1a0510"),
+                    ("color", "#B3C8EF"),
+                    ("padding", "7px 16px"),
+                    ("border-bottom", "1px solid #330020"),
+                ]
+            }, {
+                "selector": "tr:hover td",
+                "props": [("background-color", "#2d0a1e")]
+            }])
+            .hide(axis="index")
         )
-        fig_level.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color=THEME['text']),
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor=THEME['grid'], dtick=1),
-            margin=dict(l=0, r=0, t=24, b=0),
-            title=dict(text="Level Index Over Time", font=dict(size=12), x=0),
-        )
-        st.plotly_chart(fig_level, width='stretch')
+        st.markdown(styled.to_html(), unsafe_allow_html=True)
+
+        st.caption("")
+        total_visits = sum(r["VISITS"] for r in rows)
+        total_wins   = sum(r["WINS"]   for r in rows)
+        total_deaths = sum(r["DEATHS"] for r in rows)
+        overall_wr   = (total_wins / total_visits * 100) if total_visits > 0 else 0.0
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("TOTAL VISITS",  total_visits)
+        s2.metric("TOTAL WINS",    total_wins)
+        s3.metric("TOTAL DEATHS",  total_deaths)
+        s4.metric("OVERALL WIN %", f"{overall_wr:.1f}%")
     else:
         st.caption("No level data yet.")
 
-with lp2:
-    # Levels completed over time — the cumulative wins curve
-    if 'levels_completed' in df.columns and 'step' in df.columns:
-        subset_wins = df.iloc[:selected_idx + 1][['step', 'levels_completed']].copy()
-        fig_wins = px.area(
-            subset_wins, x='step', y='levels_completed',
-            color_discrete_sequence=["#00FF88"],
-            height=200,
-            labels={"levels_completed": "Levels Beaten", "step": "Step"},
-        )
-        fig_wins.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color=THEME['text']),
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor=THEME['grid']),
-            margin=dict(l=0, r=0, t=24, b=0),
-            title=dict(text="Cumulative Levels Beaten", font=dict(size=12), x=0),
-        )
-        st.plotly_chart(fig_wins, width='stretch')
-    else:
-        st.caption("No completion data yet.")
-
-with lp3:
-    st.caption("Level Breakdown")
-    if 'level' in df.columns and 'event' in df.columns:
-        wins_df = df.iloc[:selected_idx + 1]
-        win_rows = wins_df[wins_df['event'] == 'WIN']
-        if not win_rows.empty:
-            level_counts = win_rows['level'].value_counts().sort_index()
-            for lvl, count in level_counts.items():
-                st.metric(f"Level {lvl}", f"✅ {count}x")
-        else:
-            st.caption("No wins yet.")
-    # Always show current level action
-    st.metric("ACTION", str(row.get('action', 'N/A')))
-
+    st.caption(f"\u21b3 Current action: **{str(row.get('action', 'N/A'))}**")
+else:
+    st.caption("No level / event data available.")
 st.divider()
 
 # =========================================================
 # 3. REWARD DNA
 # =========================================================
-st.subheader("🧬 REWARD COMPOSITION")
+st.subheader("REWARD COMPOSITION")
 if reward_cols:
     cols = st.columns(len(reward_cols))
     for i, col_name in enumerate(reward_cols):
