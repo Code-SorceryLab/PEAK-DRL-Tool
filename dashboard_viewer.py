@@ -4,6 +4,20 @@ import time
 import os
 import glob
 import plotly.express as px
+import logging
+import warnings
+import sys
+
+# Suppress WebSocket closure warnings (harmless when browser tab closes/refreshes)
+logging.getLogger('tornado.access').setLevel(logging.ERROR)
+logging.getLogger('tornado.application').setLevel(logging.ERROR)
+logging.getLogger('tornado.general').setLevel(logging.ERROR)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+# Suppress asyncio task exception warnings for closed websockets
+if sys.version_info >= (3, 8):
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy() if os.name == 'nt' else None)
 
 # --- THEME CONFIGURATION ---
 THEME = {
@@ -148,9 +162,9 @@ if 'level' in df.columns and 'event' in df.columns:
     rows = []
     for lvl in all_levels:
         lvl_rows = data_so_far[data_so_far['level'] == lvl]
-        visits   = int(len(lvl_rows))
         wins     = int((lvl_rows['event'] == 'WIN').sum())
         deaths   = int((lvl_rows['event'] == 'DIED').sum())
+        visits   = wins + deaths  # Count completed attempts only
         win_rate = (wins / visits * 100) if visits > 0 else 0.0
         filled   = int(win_rate / 10)
         bar      = "\u2588" * filled + "\u2591" * (10 - filled)
@@ -297,7 +311,11 @@ with col_graph:
             yaxis=dict(showgrid=True, gridcolor=THEME['grid']),
             legend=dict(orientation="h", y=1.1, title=None)
         )
-        st.plotly_chart(fig, width="stretch")
+        try:
+            st.plotly_chart(fig, width='stretch')
+        except Exception:
+            # Gracefully handle rendering errors
+            pass
     else:
         st.caption("No signals selected.")
 
@@ -329,4 +347,8 @@ with col_phys:
 
 if do_refresh:
     time.sleep(1)
-    st.rerun()
+    try:
+        st.rerun()
+    except Exception:
+        # Gracefully handle websocket closure (when browser tab is closed)
+        pass

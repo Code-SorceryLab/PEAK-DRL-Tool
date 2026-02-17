@@ -112,15 +112,15 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.ReLU()
                 )
                 total_concat_size += 64
-            
-            elif key == "raycasts":
-                # MLP for the raycast data (1D array)
-                extractors[key] = nn.Sequential(
-                    nn.Linear(subspace.shape[0], 128),
-                    nn.BatchNorm1d(128),
-                    nn.ReLU()
-                )
-                total_concat_size += 128
+
+            # elif key == "raycasts":
+            #     # MLP for the raycast data (1D array)
+            #     extractors[key] = nn.Sequential(
+            #         nn.Linear(subspace.shape[0], 128),
+            #         nn.BatchNorm1d(128),
+            #         nn.ReLU()
+            #     )
+            #     total_concat_size += 128
 
         self.extractors = nn.ModuleDict(extractors)
         self._features_dim = total_concat_size

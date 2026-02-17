@@ -200,7 +200,9 @@ class Player():
 
         if self.jump_hold > 0:
             if self.jump_pressed:
-                self.vy -= 0.30 * (dt * 60) 
+                # Sustained upward thrust (12% gravity cancellation)
+                # Creates variable jump height - tap for short, hold for high
+                self.vy -= (ctx.GRAVITY * 0.12 * dt)
             self.jump_hold -= 1
                 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):

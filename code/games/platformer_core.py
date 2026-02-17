@@ -253,7 +253,7 @@ class PlatformerCore(gymnasium.Env):
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32),
 
             # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
-            "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
+            # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
         })
 
         # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
@@ -295,9 +295,9 @@ class PlatformerCore(gymnasium.Env):
     def step(self, action: int):
         if not self.alive:
             # Need to return raycasts in dead obs too
-            dead_rays = np.zeros(self.num_rays * 2, dtype=np.float32)
+            # dead_rays = np.zeros(self.num_rays * 2, dtype=np.float32)
             dead_obs = self._obs()
-            dead_obs['raycasts'] = dead_rays
+            # dead_obs['raycasts'] = dead_rays
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
@@ -466,9 +466,10 @@ class PlatformerCore(gymnasium.Env):
         # reached_goal=True is already set by the caller (PhysicsManager).
         # _info() needs to read reached_goal to emit "WIN" this frame.
         # reset() will call load_level() when SB3 starts the next episode.
-        self.current_index_world = random.randint(0, len(self.level_order) - 1)
+        # Random walk: move -1, 0, or +1 from current level (curriculum learning)
+        self.current_index_world = max(0, random.randint(self.current_index_world - 1, self.current_index_world + 1))
         if self.current_index_world >= len(self.level_order):
-            self.current_index_world = 0
+            self.current_index_world = len(self.level_order) - 1
         self.world = self.level_order[self.current_index_world]
         # Mark episode as over — SB3 will call env.reset() after terminated=True
         self.game_over = True
@@ -585,14 +586,14 @@ class PlatformerCore(gymnasium.Env):
             return {
                 "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
                 "scalars": np.zeros(16, dtype=np.float32), # 16 scalars
-                "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
+                # "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
             }
 
         p_obs = self._player_obs()
         # Ensure _grid_obs_window returns 4 grids now
         solid_grid, hazard_grid, collect_grid, player_grid = self._grid_obs_window()
         track_obs = self._tracking_obs()
-        rays = self._perform_raycasts()
+        # rays = self._perform_raycasts()
 
         # Stack order: Player (Top), Solid, Hazard, Collectible
         stacked_grids = np.stack([player_grid, solid_grid, hazard_grid, collect_grid], axis=0).astype(np.float32)
@@ -601,7 +602,7 @@ class PlatformerCore(gymnasium.Env):
         return {
             "grids": stacked_grids,
             "scalars": scalars,
-            "raycasts": rays
+            # "raycasts": rays
         }
 
     def _player_obs(self) -> np.ndarray:
