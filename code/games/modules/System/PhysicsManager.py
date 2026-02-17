@@ -402,6 +402,19 @@ class PhysicsManager:
         for obj in nearby_items:
             if player.gObj.collides_with(obj.gObj):
                 self._dispatch_collision(core, player, obj, player_was_falling)
+            else:
+                # Special case: player landed exactly ON TOP of a goal tile.
+                # After AABB resolution the player sits flush on the tile's top edge
+                # so collides_with returns False (zero overlap). Use a 2px downward
+                # probe to catch this case.
+                obj_tid = obj.gObj.type_id if hasattr(obj.gObj, 'type_id') else EntityType.NONE
+                if obj_tid == EntityType.GOAL:
+                    probe = pygame.Rect(
+                        player.gObj.x, player.gObj.y,
+                        player.gObj.width, player.gObj.height + 2
+                    )
+                    if probe.colliderect(obj.gObj.get_rect()):
+                        self._dispatch_collision(core, player, obj, player_was_falling)
 
         for enemy in core.level_data.enemies:
             if not enemy.gObj.active: continue
@@ -432,7 +445,9 @@ class PhysicsManager:
                 elif t_type == EntityType.POWERUP:
                     self._handle_player_powerup(core, source, target)
                 elif t_type == EntityType.GOAL:
-                    if not core.reached_goal and source.gObj.x > 200:
+                    # Guard: goal must not be the left-wall spawn tile (x < 1 tile)
+                    goal_is_real = target.gObj.x > TILE_SIZE
+                    if not core.reached_goal and goal_is_real:
                         core.score += 1000 + (int(core.timer) * 10)
                         core.reached_goal = True
                         core.complete_level()

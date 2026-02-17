@@ -368,10 +368,19 @@ class PlatformerCore(gymnasium.Env):
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
 
-        if not self.reached_goal:
+        was_win = self.reached_goal
+
+        if not was_win:
+            # Death/truncation — restart from level 0
             self.reset_metrics()
             self.current_index_world = 0
             self.world = self.level_order[self.current_index_world]
+        else:
+            # Level completed — world is already set by complete_level()
+            # Just reset per-episode metrics, keep lives/score
+            self.reached_goal = False
+            self.game_over = False
+            self.death_cause = ""
 
         self.load_level()
         return self._obs(), self._info()
@@ -453,27 +462,29 @@ class PlatformerCore(gymnasium.Env):
         self.dijkstra.compute_map(goal_positions, coin_positions)
 
     def complete_level(self):
-        # # ! self.current_index_world += 1
-        # if self.render_mode == "human":
-        #     self.current_index_world += 1
-        # else:
+        # Pick next level but do NOT call load_level() yet.
+        # reached_goal=True is already set by the caller (PhysicsManager).
+        # _info() needs to read reached_goal to emit "WIN" this frame.
+        # reset() will call load_level() when SB3 starts the next episode.
         self.current_index_world = random.randint(0, len(self.level_order) - 1)
         if self.current_index_world >= len(self.level_order):
-            print("all levels done")
             self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
-        self.load_level()
+        # Mark episode as over — SB3 will call env.reset() after terminated=True
+        self.game_over = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
         self.death_cause = cause
-        self.lives -= 1
+        self.lives = max(0, self.lives - 1)
         if self.lives > 0:
             self._soft_reset()
             return False
         else:
+            # Mark game over — do NOT call reset() here.
+            # _info() reads these flags to emit the DIED event.
+            # SB3 calls env.reset() after receiving terminated=True.
             self.alive = False
             self.game_over = True
-            self.reset()
             return True
 
     def _soft_reset(self):
@@ -507,14 +518,18 @@ class PlatformerCore(gymnasium.Env):
     def _get_dist_to_goal(self) -> float:
         if not self.player: return float('inf')
         if not self.level_data.goals:
+            # Fallback: treat right edge as goal, ignore Y (no Y info available)
             return self.level_data.width - self.player.gObj.x
 
         px = self.player.gObj.x
+        py = self.player.gObj.y
         min_d = float('inf')
         for g in self.level_data.goals:
             gx = g.gObj.x
-            d = abs(gx - px)
-            if d < min_d: min_d = d
+            gy = g.gObj.y
+            d = math.sqrt((gx - px) ** 2 + (gy - py) ** 2)
+            if d < min_d:
+                min_d = d
 
         return min_d
 
@@ -832,7 +847,7 @@ class PlatformerCore(gymnasium.Env):
 
         event = ""
         cause = getattr(self, 'death_cause', "")
-        if self.reached_goal and not self.game_over:
+        if self.reached_goal:
             event = "WIN"
             cause = "Goal"
         elif not self.alive:
@@ -874,7 +889,7 @@ class PlatformerCore(gymnasium.Env):
             "enemies_killed_step": self.kills_step,
             "powered_up": p.powered_up,
             "terminated": not self.alive,
-            "won": (self.reached_goal and not self.game_over),
+            "won": self.reached_goal,
             "action": self._last_action,
             "time_left": math.ceil(self.timer),
             "max_x_seen": self.max_x_seen,
