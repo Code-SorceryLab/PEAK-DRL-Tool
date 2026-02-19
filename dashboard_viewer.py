@@ -17,7 +17,28 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 # Suppress asyncio task exception warnings for closed websockets
 if sys.version_info >= (3, 8):
     import asyncio
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy() if os.name == 'nt' else None)
+
+    # Custom exception handler to suppress WebSocketClosedError
+    def _suppress_websocket_errors(loop, context):
+        """Suppress harmless WebSocket closure exceptions"""
+        exception = context.get('exception')
+        if exception:
+            exc_type = type(exception).__name__
+            # Suppress WebSocketClosedError and StreamClosedError
+            if exc_type in ('WebSocketClosedError', 'StreamClosedError'):
+                return
+        # For other exceptions, use default handler
+        loop.default_exception_handler(context)
+
+    # Set the custom exception handler
+    try:
+        loop = asyncio.get_event_loop()
+        loop.set_exception_handler(_suppress_websocket_errors)
+    except RuntimeError:
+        pass  # No event loop running yet
+
+    if os.name == 'nt':
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 # --- THEME CONFIGURATION ---
 THEME = {
@@ -28,7 +49,7 @@ THEME = {
     "grid": "#442233"
 }
 
-st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‹â€ ")
+st.set_page_config(page_title="PEAK Analysis", layout="wide", page_icon="Kev & AL ")
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -120,7 +141,23 @@ if df.empty:
 
 # --- PREPROCESSING ---
 standard_cols = ['step', 'total_reward', 'action', 'level', 'levels_completed', 'x', 'y', 'vx', 'vy', 'goal_dist', 'event', 'cause']
-reward_cols = [c for c in df.columns if c.lower() not in standard_cols and "unnamed" not in c.lower()]
+
+# Obs sanity columns — kept for the OBSERVATION SANITY table only, NOT the graph or reward composition
+_OBS_SANITY_COLS = {
+    'grid_player_mean', 'grid_player_std', 'grid_player_min', 'grid_player_max',
+    'grid_solid_mean',  'grid_solid_std',  'grid_solid_min',  'grid_solid_max',
+    'grid_hazard_mean', 'grid_hazard_std', 'grid_hazard_min', 'grid_hazard_max',
+    'grid_collectible_mean', 'grid_collectible_std', 'grid_collectible_min', 'grid_collectible_max',
+    'scalar_mean', 'scalar_std', 'scalar_min', 'scalar_max',
+    'dijkstra_val', 'obs_warnings',
+}
+
+reward_cols = [
+    c for c in df.columns
+    if c.lower() not in standard_cols
+    and c.lower() not in _OBS_SANITY_COLS
+    and "unnamed" not in c.lower()
+]
 
 # --- SCRUBBER ---
 total_steps = len(df)
@@ -162,17 +199,31 @@ if 'level' in df.columns and 'event' in df.columns:
     rows = []
     for lvl in all_levels:
         lvl_rows = data_so_far[data_so_far['level'] == lvl]
+        died_rows = lvl_rows[lvl_rows['event'] == 'DIED']
         wins     = int((lvl_rows['event'] == 'WIN').sum())
-        deaths   = int((lvl_rows['event'] == 'DIED').sum())
+        deaths   = int(len(died_rows))
         visits   = wins + deaths  # Count completed attempts only
         win_rate = (wins / visits * 100) if visits > 0 else 0.0
         filled   = int(win_rate / 10)
         bar      = "\u2588" * filled + "\u2591" * (10 - filled)
+
+        # Count deaths by cause
+        d_stall   = int((died_rows['cause'] == 'Stall').sum())   if 'cause' in df.columns else 0
+        d_enemy   = int((died_rows['cause'] == 'Enemy').sum())   if 'cause' in df.columns else 0
+        d_pit     = int((died_rows['cause'] == 'Pit').sum())     if 'cause' in df.columns else 0
+        d_spike   = int((died_rows['cause'] == 'Spike').sum())   if 'cause' in df.columns else 0
+        d_timeout = int((died_rows['cause'] == 'Timeout').sum()) if 'cause' in df.columns else 0
+
         rows.append({
             "LEVEL":     f"Level {lvl}",
             "VISITS":    visits,
             "WINS":      wins,
             "DEATHS":    deaths,
+            "STALL":     d_stall,
+            "ENEMY":     d_enemy,
+            "PIT":       d_pit,
+            "SPIKE":     d_spike,
+            "TIMEOUT":   d_timeout,
             "WIN RATE":  f"{win_rate:.1f}%",
             "PROGRESS":  bar,
         })
@@ -180,13 +231,24 @@ if 'level' in df.columns and 'event' in df.columns:
     if rows:
         level_table = pd.DataFrame(rows)
 
+        death_cause_cols = {"STALL", "ENEMY", "PIT", "SPIKE", "TIMEOUT"}
+
         def _style_row(r):
             try:
                 wr = float(r["WIN RATE"].replace("%", ""))
             except Exception:
                 wr = 0.0
-            color = "#27ae60" if wr >= 90 else ("#e67e22" if wr >= 50 else "#e74c3c")
-            return [f"color:{color}" if c == "WIN RATE" else "" for c in r.index]
+            wr_color = "#27ae60" if wr >= 90 else ("#e67e22" if wr >= 50 else "#e74c3c")
+            styles = []
+            for c in r.index:
+                if c == "WIN RATE":
+                    styles.append(f"color:{wr_color}")
+                elif c in death_cause_cols:
+                    val = int(r[c]) if r[c] else 0
+                    styles.append("color:#e74c3c" if val > 0 else "color:#555555")
+                else:
+                    styles.append("")
+            return styles
 
         styled = (
             level_table.style
@@ -344,6 +406,128 @@ with col_phys:
     cause = row.get('cause', "")
     if evt and isinstance(evt, str) and len(evt) > 0:
         st.error(f"{evt} ({cause})")
+
+# =========================================================
+# 5. OBSERVATION SANITY
+# =========================================================
+obs_cols = [c for c in df.columns if c.startswith("grid_") or c.startswith("scalar_") or c == "dijkstra_val" or c == "obs_warnings"]
+if obs_cols:
+    st.divider()
+    st.subheader("OBSERVATION SANITY")
+
+    # Show warnings if any
+    warn_val = row.get("obs_warnings", "")
+    if warn_val and isinstance(warn_val, str) and len(warn_val) > 0:
+        for w in warn_val.split("|"):
+            st.error(f"[WARN] {w}")
+    else:
+        st.success("All channels OK")
+
+    # Grid channel stats table
+    grid_channels = ["player", "solid", "hazard", "collectible"]
+    has_grid_data = any(f"grid_{ch}_mean" in df.columns for ch in grid_channels)
+
+    if has_grid_data:
+        obs_rows = []
+        for ch in grid_channels:
+            mean_val = row.get(f"grid_{ch}_mean", 0.0)
+            std_val  = row.get(f"grid_{ch}_std", 0.0)
+            min_val  = row.get(f"grid_{ch}_min", 0.0)
+            max_val  = row.get(f"grid_{ch}_max", 0.0)
+
+            # Determine status
+            status = "OK"
+            if isinstance(std_val, (int, float)) and std_val < 1e-6 and ch in ("player", "solid"):
+                status = "DEAD"
+            elif isinstance(max_val, (int, float)) and max_val > 1.01:
+                status = "OVERFLOW"
+
+            obs_rows.append({
+                "CHANNEL": ch.upper(),
+                "MEAN": f"{float(mean_val):.4f}" if isinstance(mean_val, (int, float)) else "NULL",
+                "STD":  f"{float(std_val):.4f}" if isinstance(std_val, (int, float)) else "NULL",
+                "MIN":  f"{float(min_val):.4f}" if isinstance(min_val, (int, float)) else "NULL",
+                "MAX":  f"{float(max_val):.4f}" if isinstance(max_val, (int, float)) else "NULL",
+                "STATUS": status,
+            })
+
+        # Scalars row
+        s_mean = row.get("scalar_mean", 0.0)
+        s_std  = row.get("scalar_std", 0.0)
+        s_min  = row.get("scalar_min", 0.0)
+        s_max  = row.get("scalar_max", 0.0)
+        s_status = "OK"
+        if isinstance(s_std, (int, float)) and s_std < 1e-8:
+            s_status = "DEAD"
+        elif isinstance(s_max, (int, float)) and abs(s_max) > 100:
+            s_status = "UNNORM"
+        obs_rows.append({
+            "CHANNEL": "SCALARS",
+            "MEAN": f"{float(s_mean):.4f}" if isinstance(s_mean, (int, float)) else "NULL",
+            "STD":  f"{float(s_std):.4f}" if isinstance(s_std, (int, float)) else "NULL",
+            "MIN":  f"{float(s_min):.4f}" if isinstance(s_min, (int, float)) else "NULL",
+            "MAX":  f"{float(s_max):.4f}" if isinstance(s_max, (int, float)) else "NULL",
+            "STATUS": s_status,
+        })
+
+        # Dijkstra row
+        dijk = row.get("dijkstra_val", 0.0)
+        obs_rows.append({
+            "CHANNEL": "DIJKSTRA",
+            "MEAN": f"{float(dijk):.4f}" if isinstance(dijk, (int, float)) else "NULL",
+            "STD": "NULL", "MIN": "NULL", "MAX": "NULL",
+            "STATUS": "OK" if (isinstance(dijk, (int, float)) and dijk > 0) else "ZERO",
+        })
+
+        obs_table = pd.DataFrame(obs_rows)
+
+        def _style_obs(r):
+            status = r.get("STATUS", "OK")
+            styles = []
+            for c in r.index:
+                if c == "STATUS":
+                    if status == "OK":
+                        styles.append("color:#27ae60")
+                    elif status == "ZERO":
+                        styles.append("color:#e67e22")
+                    else:
+                        styles.append("color:#e74c3c; font-weight:bold")
+                else:
+                    styles.append("")
+            return styles
+
+        styled_obs = (
+            obs_table.style
+            .apply(_style_obs, axis=1)
+            .set_properties(**{
+                "font-family": "Courier New, monospace",
+                "font-size": "13px",
+                "text-align": "center",
+            })
+            .set_table_styles([{
+                "selector": "th",
+                "props": [
+                    ("background-color", "#2a0a1a"),
+                    ("color", "#B3C8EF"),
+                    ("font-family", "Courier New, monospace"),
+                    ("font-size", "11px"),
+                    ("text-align", "center"),
+                    ("padding", "6px 12px"),
+                    ("border-bottom", "1px solid #801830"),
+                ]
+            }, {
+                "selector": "td",
+                "props": [
+                    ("background-color", "#1a0510"),
+                    ("color", "#B3C8EF"),
+                    ("padding", "5px 12px"),
+                    ("border-bottom", "1px solid #330020"),
+                ]
+            }])
+            .hide(axis="index")
+        )
+        st.markdown(styled_obs.to_html(), unsafe_allow_html=True)
+        st.caption(f"Updated every {5000} steps")
 
 if do_refresh:
     time.sleep(1)

@@ -506,7 +506,7 @@ class PhysicsManager:
                 player.powered_up = False
                 player.invincible_timer = 60
             else:
-                core._handle_death()
+                core._handle_death("Enemy")
                 return
 
     def _handle_player_coin(self, core, player, coin):
