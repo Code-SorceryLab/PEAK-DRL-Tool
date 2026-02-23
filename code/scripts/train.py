@@ -90,17 +90,20 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                 n_input_channels = subspace.shape[0]
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(32),
+                    nn.GroupNorm (8, 32),
                     nn.ReLU(),
                     nn.MaxPool2d(2),
                     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(64),
+                    nn.GroupNorm (8, 64),
                     nn.ReLU(),
-                    nn.AdaptiveMaxPool2d((21, 21)),
+                    nn.AdaptiveMaxPool2d((11, 11)),
                     nn.Flatten(),
                 )
-                n_flatten = 21 * 21 * 64
-                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.ReLU())
+                n_flatten = 11 * 11 * 64
+                linear = nn.Sequential(
+                    nn.Linear(n_flatten, 256), 
+                    nn.LayerNorm(256),
+                    nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, linear)
                 total_concat_size += 256
 
@@ -108,7 +111,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                 # Standard MLP for the 1D scalars
                 extractors[key] = nn.Sequential(
                     nn.Linear(subspace.shape[0], 64),
-                    nn.BatchNorm1d(64),
+                    nn.LayerNorm(64),
                     nn.ReLU()
                 )
                 total_concat_size += 64
@@ -210,9 +213,11 @@ def main(cfg: DictConfig):
         algo_kwargs = {k: v for k, v in algo_conf.items() if k not in {"_target_", "name", "policy", "policy_kwargs"}}
 
         if policy == "MultiInputPolicy":
-            if policy_kwargs is None: policy_kwargs = {}
+            if policy_kwargs is None: 
+                policy_kwargs = {}
             policy_kwargs["features_extractor_class"] = CustomCombinedExtractor
         
+        # FIXED
         if policy_kwargs and "activation_fn" in policy_kwargs:
             act_fn = policy_kwargs["activation_fn"]
             if isinstance(act_fn, str):
@@ -221,6 +226,9 @@ def main(cfg: DictConfig):
                     "LeakyReLU": torch.nn.LeakyReLU, "ELU": torch.nn.ELU, "GELU": torch.nn.GELU,
                 }
                 policy_kwargs["activation_fn"] = activation_fn_map.get(act_fn, torch.nn.ReLU)
+
+        # ↓ Dedented — now always runs when policy_kwargs is not None
+        if policy_kwargs is not None:
             algo_kwargs["policy_kwargs"] = policy_kwargs
 
 

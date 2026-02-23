@@ -7,7 +7,6 @@ games: [platformer]   # other games that are setup [ platformer, shooter ]  # mu
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
 personas: [
   platformer_simple,
-  platformer_complex,
   platformer_dijkstra,
 ]
 
@@ -27,7 +26,7 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 4      # 1 for cpu or 16 gpu , or whatever you want
+n_envs: 8      # 1 for cpu or 16 gpu , or whatever you want
 
 # null values mean "no override"
 model: null     # optional single selection
