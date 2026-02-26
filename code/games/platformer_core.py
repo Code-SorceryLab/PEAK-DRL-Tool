@@ -105,16 +105,24 @@ class DijkstraSolver:
                             step_cost -= 1.0
 
                         # --- GROUND ATTRACTION LOGIC ---
-                        # Check tiles below the target node to prefer paths that
-                        # stay close to the ground. Each check is independent (if,
-                        # not elif) so all three bonuses can stack when applicable.
-                        SOLID = [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]
-                        if ny + 1 < self.rows and self.grid[ny + 1][nx] in SOLID:
-                            step_cost -= 0.5  # On ground — strong bonus
-                        if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
-                            step_cost -= 0.2  # One tile above ground — small bonus
-                        if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
-                            step_cost -= 0.1  # Two tiles above ground — tiny bonus
+                        # Check tile DIRECTLY BELOW the target node (ny+1, nx)
+                        # If it is solid, make entering this node cheaper (gravity preference).
+                        if ny + 1 < self.rows:
+                            below_tile = self.grid[ny + 1][nx]
+                            if below_tile in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.5 # Huge bonus for being on ground
+
+                        # Check 2 tiles below (ny+2)
+                        elif ny + 2 < self.rows:
+                            below_2 = self.grid[ny + 2][nx]
+                            if below_2 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.2 # Small bonus for being near ground
+
+                        # Check 3 tiles below (ny+3)
+                        elif ny + 3 < self.rows:
+                            below_3 = self.grid[ny + 3][nx]
+                            if below_3 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
+                                step_cost -= 0.1 # Tiny bonus
 
                         # Ensure cost doesn't go negative or too low (min 1.0)
                         step_cost = max(1.0, step_cost)
@@ -188,7 +196,9 @@ class PlatformerCore(gymnasium.Env):
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
         self.world = str(kwargs.pop("world", "1-1")).lower()
-        self.random_start_world = bool(kwargs.pop("random_start_world", False))
+        # True: each reset() picks a random starting level so training sees all
+        # levels, not just those reachable from winning up from level 0.
+        self.random_start_world = bool(kwargs.pop("random_start_world", True))
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -262,8 +272,7 @@ class PlatformerCore(gymnasium.Env):
             # low=-1.0 because the Dijkstra channel is a relative advantage map
             # in [-1, 1] where positive = closer to goal than player's tile,
             # negative = further away. All other channels remain in [0, 1].
-            # 5 channels: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
-            "grids": spaces.Box(low=-1.0, high=1.0, shape=(5, self.obs_height, self.obs_width), dtype=np.float32),
+            "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
 
             # Scalars: 18 (Player=5, Tracking=13)
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
@@ -472,10 +481,10 @@ class PlatformerCore(gymnasium.Env):
         # if not was_win: ...
         # else: ...  <- removed
 
-        # Full reset: restore lives, score. Start level 0 normally, or pick
-        # a random level if random_start_world=True (useful during watch/eval).
+        # Full reset: restore lives, score. Start from a random level if
+        # random_start_world=True (default) for balanced curriculum exposure.
         self.reset_metrics()
-        if self.random_start_world:
+        if self.random_start_world and len(self.level_order) > 1:
             self.current_index_world = random.randint(0, len(self.level_order) - 1)
         else:
             self.current_index_world = 0
@@ -598,12 +607,17 @@ class PlatformerCore(gymnasium.Env):
 
         The episode continues into the next level; only lives = 0 ends it.
         """
-        # Random walk: +-1 from current index (curriculum learning)
-        self.current_index_world = max(
-            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
+        # Curriculum walk: advance 0, 1, or 2 levels per win — never go backward.
+        #
+        # OLD BUG: min(idx+1, randint(idx-1, idx+2)) capped advancement at +1,
+        # silently killing the +2 jump. The outer max(0,...) then collapsed many
+        # backward outcomes to 0. Result: levels 5-7 got under 3% visits each.
+        # Fix: always advance by 0, 1, or 2 — clamp to last level.
+        step = random.randint(0, 2)  # 0=repeat current, 1=next, 2=skip one
+        self.current_index_world = min(
+            len(self.level_order) - 1,
+            self.current_index_world + step
         )
-        if self.current_index_world >= len(self.level_order):
-            self.current_index_world = len(self.level_order) - 1
         self.world = self.level_order[self.current_index_world]
 
         # Signal step() to load the next level after _info() runs this frame.
@@ -750,8 +764,7 @@ class PlatformerCore(gymnasium.Env):
             return
 
         warnings_list = []
-        # Channel order: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
-        grid_names = ["player", "solid", "hazard", "collectible", "dijkstra"]
+        grid_names = ["player", "solid", "hazard", "collectible"]
         grids = obs.get("grids")
         if grids is not None:
             for i, name in enumerate(grid_names):
@@ -799,7 +812,7 @@ class PlatformerCore(gymnasium.Env):
                 # 4 channels: player, hazard, collectible, dijkstra-advantage.
                 # solid_grid was already removed from the active stack; the null
                 # path incorrectly still claimed 5 channels, causing SB3 shape errors.
-                "grids": np.zeros((5, self.obs_height, self.obs_width), dtype=np.float32),
+                "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
                 "scalars": np.zeros(12, dtype=np.float32),  # 5 (player) + 7 (tracking)
                 # "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
             }
@@ -810,16 +823,17 @@ class PlatformerCore(gymnasium.Env):
 
         # _grid_obs_window returns the unpadded map tile coordinates of the window
         # so that _dijkstra_obs_window can slice dist_map at the identical region.
-        # Channel order: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
-        solid_grid, hazard_grid, collect_grid, player_grid, map_row_start, map_col_start = \
+        # CHANGE 1: solid_grid removed from unpacking — it was already excluded from
+        # the stacked observation channels and returned as dead code.
+        hazard_grid, collect_grid, player_grid, map_row_start, map_col_start = \
             self._grid_obs_window()
 
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # Stack: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
-        # Channel 4 (Dijkstra) is in [-1, 1]; channels 0-3 are in [0, 1].
+        # Stack order: Player, Hazard, Collectible, Dijkstra-Advantage  (4 channels)
+        # Channel 3 (Dijkstra) is in [-1, 1]; channels 0-2 are in [0, 1].
         stacked_grids = np.stack(
-            [player_grid, solid_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
+            [player_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
         ).astype(np.float32)
 
         scalars = np.concatenate([p_obs, track_obs]).astype(np.float32)
@@ -850,11 +864,12 @@ class PlatformerCore(gymnasium.Env):
 
     def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
         """
-        Returns (solid, hazard, collect, player, map_row_start, map_col_start).
+        Returns (hazard, collect, player, map_row_start, map_col_start).
 
-        Solid channel restored: the agent needs to see walls and floor edges
-        to avoid running off ledges. padded_solid is sliced at zero extra cost
-        since it is already maintained by load_level().
+        CHANGE 1: solid_grid removed from the return value. It was computed from
+        padded_solid (used internally for window-position arithmetic) but was
+        never included in the stacked observation — removing it avoids a NumPy
+        slice allocation per step.
 
         padded_solid is still maintained in load_level() because the slice
         indices (slice_y_start, slice_x_start) are computed from it. Only the
@@ -874,7 +889,7 @@ class PlatformerCore(gymnasium.Env):
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
             # Return 0,0 as dummy map coords — _dijkstra_obs_window will see no
             # valid dijkstra and return zeros anyway.
-            return z, z, z, z, 0, 0  # solid, hazard, collect, player + coords
+            return z, z, z, 0, 0
 
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
@@ -890,8 +905,9 @@ class PlatformerCore(gymnasium.Env):
         slice_y_end   = slice_y_start + self.obs_height
         slice_x_end   = slice_x_start + self.obs_width
 
-        # Solid grid: slice directly from padded_solid (already computed for bounds)
-        solid_grid = self.padded_solid[slice_y_start:slice_y_end, slice_x_start:slice_x_end].copy()
+        # CHANGE 1: solid_grid slice removed — padded_solid is still used above
+        # to compute the window bounds (slice_y/x_start), but the resulting
+        # channel is no longer needed in the observation.
 
         hazard_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
@@ -946,7 +962,7 @@ class PlatformerCore(gymnasium.Env):
                 if 0 <= r < self.obs_height and 0 <= c < self.obs_width:
                     player_grid[r, c] = 1.0
 
-        return solid_grid, hazard_grid, collect_grid, player_grid, map_row_start, map_col_start
+        return hazard_grid, collect_grid, player_grid, map_row_start, map_col_start
 
     def _dijkstra_obs_window(self, map_row_start: int, map_col_start: int) -> np.ndarray:
         """
@@ -1015,12 +1031,8 @@ class PlatformerCore(gymnasium.Env):
         # Walls / unreachable tiles have cost=inf → delta = -inf → set to 0 (neutral)
         delta[~np.isfinite(delta)] = 0.0
 
-        # Normalise to [-1, 1] using the actual maximum finite distance in the
-        # map so the signal scales correctly regardless of level width or path cost.
-        # Fall back to cols*2 if no finite values exist (shouldn't happen normally).
-        finite_mask = np.isfinite(self.dijkstra.dist_map)
-        max_cost = float(self.dijkstra.dist_map[finite_mask].max()) if finite_mask.any() else float(self.level_data.cols * 2)
-        max_cost = max(max_cost, 1.0)  # guard against degenerate single-tile levels
+        # Normalise to [-1, 1]
+        max_cost = float(self.level_data.cols * 2)
         delta     = np.clip(delta / max_cost, -1.0, 1.0)
 
         # Place the valid slice into the full output window, leaving edge-padding

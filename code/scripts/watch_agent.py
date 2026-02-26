@@ -67,15 +67,38 @@ def parse_model_info(model_path: str):
 # Find the _vecnorm.pkl sidecar
 # ---------------------------------------------------------------------------
 def find_vecnorm_path(model_path: str) -> Optional[Path]:
+    """
+    Search for the companion VecNormalize .pkl file.
+
+    Training saves it as:  <model_folder>/<folder_name>_vecnorm.pkl
+    e.g. models/best/platformer_ppo_platformer_dijkstra_novice/
+                      platformer_ppo_platformer_dijkstra_novice_vecnorm.pkl
+
+    The model inside that folder is named best_model.zip, so the stem-based
+    guess (best_model_vecnorm.pkl) is always wrong. We therefore search the
+    parent folder for ANY *vecnorm*.pkl before falling back to the grandparent.
+    """
     p = Path(model_path)
-    # Same folder, same stem + _vecnorm.pkl
+
+    # 1. Exact stem match (correct when model and vecnorm share a stem)
     candidate = p.parent / (p.stem + "_vecnorm.pkl")
     if candidate.exists():
+        print(f"[INFO] Vecnorm found (stem match): {candidate}")
         return candidate
-    # Search one level up
-    for parent in [p.parent, p.parent.parent]:
-        for pkl in parent.glob("*vecnorm*.pkl"):
-            return pkl
+
+    # 2. Glob: any *vecnorm*.pkl in the same directory as the .zip
+    for pkl in sorted(p.parent.glob("*vecnorm*.pkl")):
+        print(f"[INFO] Vecnorm found (folder glob): {pkl}")
+        return pkl
+
+    # 3. Glob: search one level up (models/best/ etc.)
+    for pkl in sorted(p.parent.parent.glob("*vecnorm*.pkl")):
+        print(f"[INFO] Vecnorm found (parent glob): {pkl}")
+        return pkl
+
+    print(f"[DEBUG] Vecnorm search locations checked:")
+    print(f"        {p.parent} (model folder)")
+    print(f"        {p.parent.parent} (parent folder)")
     return None
 
 
@@ -102,15 +125,39 @@ def build_env(game: str, persona: str, fps: int, vecnorm_path: Optional[Path], r
     game_module   = importlib.import_module(f"code.games.{game}_core")
     GameCoreClass = getattr(game_module, f"{game.capitalize()}Core")
 
-    # Load reward fn to match training exactly
+    # Load reward fn to match training exactly.
+    # Try several name variants because the CLI receives the short name (e.g.
+    # "dijkstra") while the actual function may be prefixed ("delta_dijkstra").
     reward_fn = None
     try:
-        reward_module = importlib.import_module(f"code.rewards.{game}_rewards")
-        if hasattr(reward_module, persona):
-            reward_fn = getattr(reward_module, persona)
-            print(f"[INFO] Loaded reward persona: {persona}")
+        reward_module = importlib.import_module(f"code.rewards.train_{game}")
+        # Candidate names in priority order
+        candidates = [
+            persona,                    # exact: "dijkstra"
+            f"delta_{persona}",         # prefixed: "delta_dijkstra"
+            f"{persona}",               # suffixed: "dijkstra"
+            f"{game}_{persona}",        # game-prefixed: "platformer_dijkstra"
+        ]
+        found = None
+        for name in candidates:
+            if hasattr(reward_module, name):
+                found = name
+                break
+        if found:
+            reward_fn = getattr(reward_module, found)
+            print(f"[INFO] Loaded reward persona: {found}" +
+                  (f"  (resolved from '{persona}')" if found != persona else ""))
         else:
-            print(f"[WARN] Persona '{persona}' not found in rewards — using default")
+            # Last resort: find any function whose name contains the persona string
+            all_fns = [n for n in dir(reward_module)
+                       if not n.startswith('_') and persona in n
+                       and callable(getattr(reward_module, n))]
+            if all_fns:
+                reward_fn = getattr(reward_module, all_fns[0])
+                print(f"[INFO] Loaded reward persona: {all_fns[0]}  (fuzzy match for '{persona}')")
+            else:
+                print(f"[WARN] Persona '{persona}' not found in {game}_rewards — using default env reward")
+                print(f"       Available: {[n for n in dir(reward_module) if not n.startswith('_')]}")
     except Exception as e:
         print(f"[WARN] Could not load reward module: {e}")
 
