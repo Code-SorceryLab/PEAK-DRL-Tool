@@ -1,5 +1,4 @@
 defaults:
-  - game: none         # pick any file from conf/game/*.yaml
   - callback: none
   - _self_
 
@@ -7,18 +6,14 @@ defaults:
 games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
 personas: [
-  platformer_baseline,
   platformer_simple,
-  platformer_speedrunner,
-  platformer_coin_collector,
-  platformer_master,
-  platformer_explorer
+  platformer_dijkstra,
 ]
 
 # skill -> training steps
 skills:
-  Novice: 1_000_000
-  Expert: 2_000_000
+  Novice: 2_000_000
+  Expert: 5_000_000
 
 # generic env params
 seed: 1234
@@ -36,4 +31,9 @@ n_envs: 3      # 1 for cpu or 16 gpu , or whatever you want
 # null values mean "no override"
 model: null     # optional single selection
 persona: null   # optional single selection
-skill: null     # optional single selection
+skill: null     # optional single selection2
+
+viz_enabled: false
+viz_freq: 50000        # adjust to taste — every 50k steps is reasonable
+viz_preview_episodes: 1
+viz_fps: 30

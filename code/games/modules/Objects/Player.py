@@ -128,10 +128,10 @@ class Player():
         self.anim_handler.set_state(target_state.value)
 
     def handle_input(self, a: int):    
-        agent_left = (a in (1,6))
-        agent_right = (a in (2,4,5,7))
-        agent_jump = (a in (3,4,6,7))
-        agent_run = (a in (5,7))
+        agent_left  = (a in (1, 6, 8, 9))   # added 8, 9
+        agent_right = (a in (2, 4, 5, 7))
+        agent_jump  = (a in (3, 4, 6, 7, 9)) # added 9
+        agent_run   = (a in (5, 7, 8, 9))    # added 8, 9
         
         kb_left = kb_right = kb_jump = kb_run = False
         
@@ -200,7 +200,9 @@ class Player():
 
         if self.jump_hold > 0:
             if self.jump_pressed:
-                self.vy -= 0.30 * (dt * 60) 
+                # Sustained upward thrust (12% gravity cancellation)
+                # Creates variable jump height - tap for short, hold for high
+                self.vy -= (ctx.GRAVITY * 0.12 * dt)
             self.jump_hold -= 1
                 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):

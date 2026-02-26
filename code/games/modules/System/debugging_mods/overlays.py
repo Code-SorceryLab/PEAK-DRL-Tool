@@ -1,235 +1,364 @@
 import pygame
-import traceback
-from ...Parameters.Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL, COLOR_HITBOX)
-from ...Objects.Goal import Goal
+from ...Parameters.Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LAYOUT  (all values in pixels, relative to debug panel left edge)
+#
+#  ┌──────────────────────────────────┐  ← debug panel (350px wide)
+#  │  BANNER                  36px    │
+#  ├──────────────────────────────────┤
+#  │  Agent Vision card       ~290px  │
+#  ├──────────────┬───────────────────┤
+#  │ Player Info  │  Obs Values       │
+#  │   (left)     │  (right)          │
+#  ├──────────────┴───────────────────┤
+#  │  Reward Trace  (rest of height)  │
+#  └──────────────────────────────────┘
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_PAD       = 7
+_BANNER_H  = 36
+_GAP       = 6
+_HDR_H     = 20        # card section header height
+
+# ── Agent Vision ──────────────────────────────────────────────────────────────
+_AV_CELL   = 12        # 21 × 12 = 252px
+_HUD_STRIP_H = 40      # height of the lives/score HUD strip added below the banner
+_AV_Y      = _BANNER_H + _GAP + _HUD_STRIP_H + _GAP   # shifted down for HUD strip
+
+_AV_LEGEND_W = 54   # left legend column width (sq + label)
+_AV_LEGEND_SEP = 3  # gap between legend col and grid
+
+def _av_card_h(core):
+    return _HDR_H + getattr(core, 'obs_height', 21) * _AV_CELL + _PAD
+
+# ── Lower two-column zone ─────────────────────────────────────────────────────
+_INFO_LINE_H  = 15
+_INFO_LINES   = 5
+_VEC_LINE_H   = 12
+_N_OBS        = 16     # 5 player + 11 tracking
+
+def _lower_y(core):
+    return _AV_Y + _av_card_h(core) + _GAP
+
+def _lower_h():
+    info_h = _HDR_H + _INFO_LINES * _INFO_LINE_H + _PAD
+    vec_h  = _HDR_H + ((_N_OBS + 1) // 2) * _VEC_LINE_H + _PAD
+    return max(info_h, vec_h)
+
+# ── Reward strip ──────────────────────────────────────────────────────────────
+def _reward_y(core):
+    return _lower_y(core) + _lower_h() + _GAP
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Colour palette
+# ═══════════════════════════════════════════════════════════════════════════════
+_C_BG      = ( 17,  17,  23)
+_C_CARD    = ( 22,  22,  30)
+_C_HDR     = ( 30,  30,  42)
+_C_BORDER  = ( 50,  52,  70)
+_C_SEP     = ( 40,  42,  58)
+_C_LBL     = (105, 108, 128)
+_C_VAL     = (210, 215, 228)
+_C_POS     = ( 85, 190, 255)
+_C_NEG     = (255,  85,  75)
+_C_ACT     = ( 80, 225, 115)
+_C_ACCENT  = ( 65,  95, 200)
+
+# Ray colours — distinct and highly visible against sky/ground
+RAY_EMPTY  = (255, 255, 255, 80)    # translucent white
+RAY_SOLID  = (255, 120,  30)        # orange  — walls
+RAY_HAZARD = (255,  40,  40)        # red     — spikes/enemies
+RAY_COIN   = ( 50, 255, 220)        # cyan    — coins (pops against gold sprite)
+RAY_GOAL   = (140, 255,  80)        # lime    — goal
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Drawing helpers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _game_surf(surface, core):
+    if core.render_mode == "human":
+        return surface.subsurface(pygame.Rect(0, 0, core.WIDTH, core.HEIGHT))
+    return surface
+
+
+def _card(surface, x, y, w, h):
+    bg = pygame.Surface((w, h))
+    bg.fill(_C_CARD)
+    bg.set_alpha(245)
+    surface.blit(bg, (x, y))
+    pygame.draw.rect(surface, _C_BORDER, (x, y, w, h), 1)
+
+
+def _section_hdr(surface, font, title, x, y, w, accent=None):
+    """Draw a section header bar. Returns y for content start."""
+    hdr = pygame.Surface((w, _HDR_H))
+    hdr.fill(_C_HDR)
+    surface.blit(hdr, (x, y))
+    if accent:
+        pygame.draw.rect(surface, accent, (x, y, 3, _HDR_H))
+    pygame.draw.line(surface, _C_SEP, (x, y + _HDR_H - 1), (x + w, y + _HDR_H - 1))
+    t = font.render(title, True, (170, 172, 205))
+    surface.blit(t, (x + (8 if not accent else 10), y + (_HDR_H - t.get_height()) // 2))
+    return y + _HDR_H
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Overlay classes
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class DebugOverlay:
     def render(self, surface: pygame.Surface, core):
         raise NotImplementedError
 
+
 class HitboxOverlay(DebugOverlay):
-    def render(self, surface: pygame.Surface, core):
-        # 1. Player Hitbox (The "Selection Box" Style)
+    def render(self, surface, core):
+        gs = _game_surf(surface, core)
         player = core.player
         if player:
             px, py, _ = core._world_to_screen(player.gObj)
-            # FIX: Inflate by 4px so it draws AROUND the sprite, not inside it
-            # This makes it pop visually as a distinct collider box
-            rect = pygame.Rect(px, py, player.gObj.width, player.gObj.height)
-            inflated = rect.inflate(4, 4) 
-            pygame.draw.rect(surface, (0, 255, 0), inflated, 2) # Bright Green
-        
-        # 2. Dynamics (Hazards/Items)
+            r = pygame.Rect(px, py, player.gObj.width, player.gObj.height).inflate(6, 6)
+            # Dashed-style: draw 4 corner brackets
+            blen = 7
+            col = (60, 235, 60)
+            for bx, by, dx, dy in [(r.left, r.top, 1, 1), (r.right, r.top, -1, 1),
+                                    (r.left, r.bottom, 1, -1), (r.right, r.bottom, -1, -1)]:
+                pygame.draw.line(gs, col, (bx, by), (bx + dx*blen, by), 2)
+                pygame.draw.line(gs, col, (bx, by), (bx, by + dy*blen), 2)
+
         pm = core.physics_manager
         cx, cy, cw, ch = core.camera_x, core.camera_y, core.WIDTH, core.HEIGHT
-
-        # Query hashes
-        targets = pm.hazard_hash.query_rect(cx, cy, cw, ch) + \
-                  pm.collectible_hash.query_rect(cx, cy, cw, ch)
-
-        for entity in targets:
+        for entity in (pm.hazard_hash.query_rect(cx, cy, cw, ch) +
+                       pm.collectible_hash.query_rect(cx, cy, cw, ch)):
             gObj = entity.gObj if hasattr(entity, 'gObj') else entity
             sx, sy, _ = core._world_to_screen(gObj)
-            
-            # Color coding: Yellow for items, Red for hazards
-            color = (255, 255, 0) if hasattr(entity, 'kind') else (255, 50, 50)
-            
-            # Draw standard hitbox
-            pygame.draw.rect(surface, color, (sx, sy, gObj.width, gObj.height), 1)
+            # Coins = cyan outline, hazards = red
+            color = ( 50, 235, 200) if hasattr(entity, 'kind') else (255, 55, 55)
+            pygame.draw.rect(gs, color, (sx, sy, gObj.width, gObj.height), 1)
+
 
 class GridOverlay(DebugOverlay):
-    def render(self, surface: pygame.Surface, core):
-        start_col = int(core.camera_x // TILE_SIZE)
-        end_col = int((core.camera_x + core.WIDTH) // TILE_SIZE) + 1
-        start_row = int(core.camera_y // TILE_SIZE)
-        end_row = int((core.camera_y + core.HEIGHT) // TILE_SIZE) + 1
-
-        # Draw simpler, cleaner grid lines with alpha
-        grid_surf = pygame.Surface((core.WIDTH, core.HEIGHT), pygame.SRCALPHA)
-        
-        for col in range(start_col, end_col):
+    def render(self, surface, core):
+        gs    = _game_surf(surface, core)
+        sc    = int(core.camera_x // TILE_SIZE)
+        ec    = int((core.camera_x + core.WIDTH)  // TILE_SIZE) + 1
+        sr    = int(core.camera_y // TILE_SIZE)
+        er    = int((core.camera_y + core.HEIGHT) // TILE_SIZE) + 1
+        alpha = pygame.Surface((core.WIDTH, core.HEIGHT), pygame.SRCALPHA)
+        for col in range(sc, ec):
             x = col * TILE_SIZE - core.camera_x
-            pygame.draw.line(grid_surf, (255, 255, 255, 50), (x, 0), (x, core.HEIGHT))
-        for row in range(start_row, end_row):
+            pygame.draw.line(alpha, (200, 210, 255, 22), (x, 0), (x, core.HEIGHT))
+        for row in range(sr, er):
             y = row * TILE_SIZE - core.camera_y
-            pygame.draw.line(grid_surf, (255, 255, 255, 50), (0, y), (core.WIDTH, y))
-            
-        surface.blit(grid_surf, (0,0))
+            pygame.draw.line(alpha, (200, 210, 255, 22), (0, y), (core.WIDTH, y))
+        gs.blit(alpha, (0, 0))
+
 
 class AgentViewOverlay(DebugOverlay):
-    def render(self, surface: pygame.Surface, core):
-        # Configuration
-        cell_w, cell_h = 16, 16
-        grid_cols, grid_rows = 11, 9
-        
-        # Dimensions
-        content_w = grid_cols * cell_w
-        content_h = grid_rows * cell_h
-        padding = 5
-        panel_w = content_w + (padding * 2)
-        panel_h = content_h + (padding * 2) + 20 # +20 for Header
-        
-        panel_x, panel_y = 10, 50
-        
-        # 1. Background Panel (Dark Grey Container)
-        bg = pygame.Surface((panel_w, panel_h))
-        bg.fill((20, 20, 25))
-        bg.set_alpha(240)
-        surface.blit(bg, (panel_x, panel_y))
-        
-        # Border
-        pygame.draw.rect(surface, (100, 100, 100), (panel_x, panel_y, panel_w, panel_h), 1)
-        
-        # 2. Header
-        header_font = core.debug_manager.font
-        header = header_font.render("Agent Vision", True, (200, 200, 200))
-        surface.blit(header, (panel_x + padding, panel_y + 2))
-        
-        # Separator Line
-        line_y = panel_y + 22
-        pygame.draw.line(surface, (80, 80, 80), (panel_x, line_y), (panel_x + panel_w, line_y))
+    _TC = {
+        'wall':   ( 70,  76,  90), 'spike': (160,  36,  36),
+        'goal':   ( 35, 160,  65), 'empty': (  8,   8,  14),
+        'oob':    (  4,   4,   6), 'enemy': (215,  45,  45),
+        'coin':   (215, 175,  18), 'player':( 35, 135, 255),
+    }
+    _BC = {
+        'enemy':  (255, 100, 100), 'coin':  (255, 225,  70),
+        'goal':   ( 70, 255, 110), 'player':(100, 190, 255),
+        'default':( 32,  34,  44),
+    }
+    # Legend items shown as vertical strip on LEFT of grid
+    _LEGEND = [
+        ('player', "You"),
+        ('wall',   "Wall"),
+        ('coin',   "Coin"),
+        ('enemy',  "Enemy"),
+        ('goal',   "Goal"),
+        ('spike',  "Spike"),
+    ]
+    _tiny_font = None  # lazily initialised 8px font for cost numbers
 
-        # 3. The Grid Content
-        start_x = panel_x + padding
-        start_y = line_y + padding
+    def _get_tiny_font(self):
+        if self._tiny_font is None:
+            AgentViewOverlay._tiny_font = pygame.font.SysFont("arial", 8)
+        return self._tiny_font
 
-        player = core.player
-        if not player: return
+    def render(self, surface, core):
+        cols = getattr(core, 'obs_width',  21)
+        rows = getattr(core, 'obs_height', 21)
+        cw = ch = _AV_CELL
 
-        p_cx = int((player.gObj.x + player.gObj.width / 2) // TILE_SIZE)
-        p_cy = int((player.gObj.y + player.gObj.height / 2) // TILE_SIZE)
+        # Card width = legend col + sep + grid + padding
+        grid_w  = cols * cw
+        panel_w = _AV_LEGEND_W + _AV_LEGEND_SEP + grid_w + _PAD * 2
+        panel_h = _av_card_h(core)
+        px = core.DEBUG_PANEL_X + _PAD
+        py = _AV_Y
 
-        # Optimization: Pre-fetch sets
-        enemy_locs = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE)) for e in core.level_data.enemies if e.gObj.active}
-        coin_locs = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE)) for c in core.level_data.coins if c.gObj.active and not getattr(c, 'collected', False)}
-        Goal_locs = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE)) for g in core.level_data.goals if g.gObj.active}
+        _card(surface, px, py, panel_w, panel_h)
+        cy = _section_hdr(surface, core.debug_manager.font,
+                          "Agent Vision", px, py, panel_w, accent=_C_ACCENT)
 
-        for dy_i, dy in enumerate(range(-4, 5)):
-            for dx_i, dx in enumerate(range(-5, 6)):
-                tx, ty = p_cx + dx, p_cy + dy
-                
-                draw_x = start_x + dx_i * cell_w
-                draw_y = start_y + dy_i * cell_h
-                
-                # Default: Empty Space (Black/Dark Grey)
-                color = (10, 10, 10) 
-                border_color = (40, 40, 40)
+        if not core.player:
+            return
 
-                # World Geometry
+        p_cx = int(core.player.gObj.x // TILE_SIZE)
+        p_cy = int(core.player.gObj.y // TILE_SIZE)
+        ox = p_cx - core.obs_pad_x
+        oy = p_cy - core.obs_pad_y
+
+        enemy_locs = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE))
+                      for e in core.level_data.enemies if e.gObj.active}
+        coin_locs  = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE))
+                      for c in core.level_data.coins
+                      if c.gObj.active and not getattr(c, 'collected', False)}
+        goal_locs  = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE))
+                      for g in core.level_data.goals if g.gObj.active}
+
+        tc, bc = self._TC, self._BC
+
+        # ── LEFT: vertical legend strip ───────────────────────────────────────
+        legend_x = px + _PAD
+        lf = core.debug_manager.small_font
+        sq = 9
+        gap = 4
+        total_legend_h = len(self._LEGEND) * (sq + gap)
+        ly_start = cy + (rows * ch - total_legend_h) // 2   # vertically centre
+
+        for i, (key, label) in enumerate(self._LEGEND):
+            lx = legend_x
+            ly = ly_start + i * (sq + gap)
+            pygame.draw.rect(surface, tc[key], (lx, ly, sq, sq))
+            pygame.draw.rect(surface, bc.get(key, bc['default']), (lx, ly, sq, sq), 1)
+            lt = lf.render(label, True, _C_LBL)
+            surface.blit(lt, (lx + sq + 4, ly + (sq - lt.get_height()) // 2))
+
+        # Thin separator between legend and grid
+        sep_x = px + _PAD + _AV_LEGEND_W + 1
+        pygame.draw.line(surface, _C_SEP,
+                         (sep_x, cy), (sep_x, cy + rows * ch))
+
+        # ── RIGHT: the observation grid ───────────────────────────────────────
+        sx0 = sep_x + _AV_LEGEND_SEP
+        sy0 = cy
+
+        tiny = self._get_tiny_font()
+
+        for r in range(rows):
+            for c in range(cols):
+                tx, ty = ox + c, oy + r
+                dx = sx0 + c * cw
+                dy = sy0 + r * ch
+
                 if 0 <= ty < core.level_data.rows and 0 <= tx < core.level_data.cols:
-                    tile = core.level_data.grid[ty][tx]
-                    if tile != TILE_AIR:
-                        color = (150, 150, 150) # Walls are Grey
-                        if tile == TILE_SPIKE: color = (200, 0, 0) # Spikes Red
-                        elif tile == TILE_GOAL: color = (0, 200, 0) # Goal Green
-                
-                # Entities Overlay
-                if (tx, ty) in enemy_locs: 
-                    color = (255, 50, 50)   # Enemy Red
-                    border_color = (255, 100, 100)
-                elif (tx, ty) in coin_locs: 
-                    color = (255, 215, 0)   # Coin Gold
-                    border_color = (255, 255, 200)
-                elif (tx, ty) in Goal_locs:
-                    color = (0, 200, 0)     # Goal Green
-                    border_color = (100, 255, 100)
-                
-                # Player (Center)
-                if dx == 0 and dy == 0: 
-                    color = (0, 150, 255) # Player Blue
-                    border_color = (100, 200, 255)
+                    t = core.level_data.grid[ty][tx]
+                    if   t == TILE_AIR:   col, bcol = tc['empty'],  bc['default']
+                    elif t == TILE_SPIKE: col, bcol = tc['spike'],  bc['default']
+                    elif t == TILE_GOAL:  col, bcol = tc['goal'],   bc['goal']
+                    else:                 col, bcol = tc['wall'],   bc['default']
+                else:
+                    col, bcol = tc['oob'], bc['default']
 
-                # Draw Cell
-                pygame.draw.rect(surface, color, (draw_x, draw_y, cell_w - 1, cell_h - 1))
-                # Draw Subtle Border for Grid Effect
-                pygame.draw.rect(surface, border_color, (draw_x, draw_y, cell_w - 1, cell_h - 1), 1)
+                if   (tx, ty) in enemy_locs: col, bcol = tc['enemy'],  bc['enemy']
+                elif (tx, ty) in coin_locs:  col, bcol = tc['coin'],   bc['coin']
+                elif (tx, ty) in goal_locs:  col, bcol = tc['goal'],   bc['goal']
+                if   tx == p_cx and ty == p_cy: col, bcol = tc['player'], bc['player']
+
+                pygame.draw.rect(surface, col,  (dx, dy, cw - 1, ch - 1))
+                pygame.draw.rect(surface, bcol, (dx, dy, cw - 1, ch - 1), 1)
+
+                # Dijkstra cost number (tiny font, centred in cell)
+                if core.dijkstra:
+                    cost = core.dijkstra.get_dist(tx, ty)
+                    if 0 < cost < float('inf'):
+                        # Heat tint
+                        alpha = min(50, int(cost * 0.7))
+                        tint = pygame.Surface((cw - 1, ch - 1), pygame.SRCALPHA)
+                        tint.fill((255, 130, 0, alpha))
+                        surface.blit(tint, (dx, dy))
+                        # Number
+                        cost = core.dijkstra_current_tile - cost
+                        ns = tiny.render(str(int(cost)), True, (200, 200, 200))
+                        surface.blit(ns, (dx + (cw - ns.get_width()) // 2,
+                                          dy + (ch - ns.get_height()) // 2))
 
 
 class InfoPanelOverlay(DebugOverlay):
-    def render(self, surface: pygame.Surface, core):
-        if not core.player: return
-        
-        # Layout relative to Agent View
-        # Agent View Height approx: 20 (Header) + 9*16 (Grid) + 10 (Pad) = ~174
-        # We start just below it.
-        panel_x = 10
-        panel_y = 230 
-        panel_w = 190 # Matching Agent View Width roughly
-        
+    def render(self, surface, core):
+        if not core.player:
+            return
         p = core.player
-        lines = [
-            f"Pos:  {int(p.gObj.x):>4}, {int(p.gObj.y):>4}",
-            f"Vel:  {p.vx:>5.1f}, {p.vy:>5.1f}",
-            f"Stall: {core.stall_timer:>4.2f}s (x{core.stall_windows_count})",
-            f"Best X:{int(core.progress_x_best):>5}"
-        ]
-        
-        # 1. Background for Text (The "Little Better" Fix)
-        # Makes text readable against any background
-        line_h = 20
-        bg_h = len(lines) * line_h + 10
-        
-        bg = pygame.Surface((panel_w, bg_h))
-        bg.fill((0, 0, 0))
-        bg.set_alpha(180) # Semi-transparent black
-        surface.blit(bg, (panel_x, panel_y))
-        
-        # Border
-        pygame.draw.rect(surface, (100, 100, 100), (panel_x, panel_y, panel_w, bg_h), 1)
 
-        # 2. Render Text
-        font = core.ui_font # Using the bold font
-        for i, ln in enumerate(lines):
-            # Render White text
-            txt = font.render(ln, True, (230, 230, 230))
-            surface.blit(txt, (panel_x + 10, panel_y + 5 + i * line_h))
+        panel_w_total = core.TOTAL_WIDTH - core.DEBUG_PANEL_X - _PAD * 2
+        half_w = panel_w_total // 2 - 2   # left half
+        px = core.DEBUG_PANEL_X + _PAD
+        py = _lower_y(core)
+        ph = _lower_h()
+
+        _card(surface, px, py, half_w, ph)
+        cy = _section_hdr(surface, core.debug_manager.font,
+                          "Player Info", px, py, half_w, accent=(80, 180, 80))
+
+        sf = core.debug_manager.small_font
+        rows = [
+            ("Pos",    f"{int(p.gObj.x)}, {int(p.gObj.y)}"),
+            ("Vel",    f"{p.vx:.1f}, {p.vy:.1f}"),
+            ("Stall",  f"{core.stall_timer:.2f}s ×{core.stall_windows_count}"),
+            ("Best X", f"{int(core.progress_x_best)}"),
+            ("Frame",  f"{core.frame}"),
+        ]
+        rx = px + half_w - 5
+        for label, val in rows:
+            ls = sf.render(label + ":", True, _C_LBL)
+            vs = sf.render(val,         True, _C_VAL)
+            surface.blit(ls, (px + 8, cy))
+            surface.blit(vs, (rx - vs.get_width(), cy))
+            cy += _INFO_LINE_H
+
 
 class ObsValuesOverlay(DebugOverlay):
-    # ... (Keep the version we fixed in the previous step!) ...
-    def render(self, surface: pygame.Surface, core):
-        # Copy the code from the previous "UI Fix" response here
-        # (It was perfect, no changes needed unless you lost it)
+    def render(self, surface, core):
         try:
             p_vals = core._player_obs()
             t_vals = core._tracking_obs()
-        except Exception as e:
-            # print(f"[DEBUG ERROR] ObsValuesOverlay crashed: {e}") 
-            # traceback.print_exc()
+        except Exception:
             return
 
-        p_labels = ["Px (n)", "Py (n)", "Vx (n)", "Vy (n)", "Grounded"]
-        t_labels = ["Enm Dist", "Coin Dist", "Goal Dist", "Act Enms", "Act Coins", "Score", "Time", "Lives"]
-        
+        p_labels = ["Px", "Py", "Vx", "Vy", "Grnd"]
+        t_labels = ["EnmDst", "CoinDst", "GoalDst",
+                    "#Enm", "#Coin", "Score",
+                    "Time", "Lives", "DirX", "GoalY", "Dijkstra"]
+        if len(t_vals) > len(t_labels):
+            t_labels.extend([f"V{i}" for i in range(len(t_labels), len(t_vals))])
         data = list(zip(p_labels, p_vals)) + list(zip(t_labels, t_vals))
 
-        panel_w = 180 
-        line_h = 16
-        panel_h = len(data) * line_h + 25
-        panel_x = core.WIDTH - panel_w - 10 
-        panel_y = 200 
-        
-        bg = pygame.Surface((panel_w, panel_h))
-        bg.set_alpha(220); bg.fill((20, 20, 20)) 
-        surface.blit(bg, (panel_x, panel_y))
-        pygame.draw.rect(surface, (100, 100, 100), (panel_x, panel_y, panel_w, panel_h), 1)
+        panel_w_total = core.TOTAL_WIDTH - core.DEBUG_PANEL_X - _PAD * 2
+        half_w = panel_w_total // 2 - 2
+        px = core.DEBUG_PANEL_X + _PAD + half_w + 4
+        py = _lower_y(core)
+        ph = _lower_h()
 
-        head_font = core.debug_manager.font 
-        head = head_font.render("Vector Values", True, (220, 220, 220))
-        surface.blit(head, (panel_x + 5, panel_y + 5))
-        pygame.draw.line(surface, (100, 100, 100), (panel_x, panel_y + 22), (panel_x + panel_w, panel_y + 22))
+        _card(surface, px, py, half_w, ph)
+        cy = _section_hdr(surface, core.debug_manager.font,
+                          "Obs Values", px, py, half_w, accent=(160, 90, 200))
 
-        font = core.debug_manager.small_font
-        content_y = panel_y + 25
-        
-        for i, (label, val) in enumerate(data):
-            color = (150, 150, 150) 
-            if val > 0: color = (255, 255, 255)
-            if "Dist" in label and val < 0.15: color = (255, 100, 100) 
-            if "Grounded" in label and val > 0.5: color = (100, 255, 100) 
-            
-            txt_label = font.render(f"{label}:", True, (120, 120, 120))
-            surface.blit(txt_label, (panel_x + 5, content_y + i * line_h))
-            
-            txt_val = font.render(f"{val:.3f}", True, color)
-            val_x = panel_x + panel_w - txt_val.get_width() - 5
-            surface.blit(txt_val, (val_x, content_y + i * line_h))
+        sf   = core.debug_manager.small_font
+        rx   = px + half_w - 5
+
+        for label, val in data:
+            if cy + _VEC_LINE_H > py + ph - 2:
+                break
+            if "Dst" in label and 0 < val < 0.15:
+                vc = _C_NEG
+            elif "Grnd" in label and val > 0.5:
+                vc = _C_ACT
+            elif val > 0:
+                vc = _C_VAL
+            else:
+                vc = _C_LBL
+
+            ls = sf.render(label + ":", True, _C_LBL)
+            vs = sf.render(f"{val:.2f}",  True, vc)
+            surface.blit(ls, (px + 5, cy))
+            surface.blit(vs, (rx - vs.get_width(), cy))
+            cy += _VEC_LINE_H

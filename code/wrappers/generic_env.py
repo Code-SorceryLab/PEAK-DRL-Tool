@@ -28,8 +28,15 @@ class GameEnv(gym.Env):
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps
-        self.reward_fn = reward_fn or self._default_reward
         self.hud_fn = hud_fn
+
+        # If the reward_fn is a factory (produced by _wrap_with_tracker),
+        # call it to get a fresh instance with its own _ScoreTracker.
+        # This is critical for parallel training — each env MUST have its own tracker.
+        if reward_fn is not None and getattr(reward_fn, "_is_factory", False):
+            self.reward_fn = reward_fn()
+        else:
+            self.reward_fn = reward_fn or self._default_reward
 
         # spaces from game
         self.action_space = self.game.get_action_space()
@@ -37,10 +44,10 @@ class GameEnv(gym.Env):
 
         # episode counters
         self._step_count = 0
-        
+
         # --- FIX: Create a dedicated RewardHub for THIS environment instance ---
-        self.hub = RewardHub() 
-        
+        self.hub = RewardHub()
+
         # --- FIX: Inject Hub into Game's Debug Manager ---
         # This connects the wrapper's reward tracking to the inner game's visualizer
         if hasattr(self.game, "debug_manager"):
@@ -66,34 +73,52 @@ class GameEnv(gym.Env):
     def step(self, action):
         self._step_count += 1
 
-        # --- normalize action once, do NOT cast to bool unconditionally
+        # --- Normalizing Action (Legacy) ---
         if hasattr(self.action_space, "n"):
             if self.render_mode == "random":
                 action = self.action_space.sample()
-            # Discrete
-            if isinstance(action, (np.generic, np.ndarray)):  # e.g., numpy scalar from SB3
+            if isinstance(action, (np.generic, np.ndarray)):
                 action = int(action)
-        # For Binary(1)/MultiBinary just pass through
-        # For Box actions (not used here), pass as-is
 
         obs, base, terminated, truncated, info = self.game.step(action)
-        
-
         truncated = bool(self.max_steps and self._step_count >= self.max_steps)
-        
-        # FIX: Use self.hub instance instead of static get_instance()
+
+        # --- REWARD PROCESSING (THE FIX) ---
+        # 1. Get raw reward from Persona (Could be Float OR Dict)
         if self.reward_fn:
-            reward = self.reward_fn(obs, base, terminated, info)
+            raw_reward = self.reward_fn(obs, base, terminated, info)
         else:
-            reward = self.hub.compute_default_reward(info)
-        
+            raw_reward = self.hub.compute_default_reward(info)
+
+        # 2. Handle both formats safely
+        final_scalar_reward = 0.0
+        reward_breakdown = {}
+
+        if isinstance(raw_reward, dict):
+            final_scalar_reward = sum(raw_reward.values())
+            reward_breakdown = raw_reward
+        else:
+            final_scalar_reward = float(raw_reward)
+            # Prefer the breakdown injected by the persona wrapper over a generic fallback
+            reward_breakdown = info.get("reward_components", {"reward": final_scalar_reward})
+
+        # 3. Inject Breakdown into Info (for CSV Logger)
+        info["reward_breakdown"] = reward_breakdown
+
+        # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
         act_name = action
         if hasattr(self.game, "ACTION_NAMES"):
-            # .get(key, default) - if key isn't found, returns the number
             act_name = self.game.ACTION_NAMES.get(int(action), action)
-        
-        self.hub.update_reward(reward=reward, action_name=act_name, is_episode_end=terminated)
-        return obs, reward, terminated, truncated, info
+
+
+        info["action_name"] = str(act_name)
+
+
+        # <--- THIS WAS CRASHING BEFORE (reward=raw_reward would fail)
+        self.hub.update_reward(reward=final_scalar_reward, action_name=act_name, is_episode_end=terminated)
+
+        # 5. Return the Float Sum to the Agent
+        return obs, final_scalar_reward, terminated, truncated, info
 
     # -------------------------------- Rendering
     def render(self, mode=None):
@@ -118,8 +143,10 @@ class GameEnv(gym.Env):
             if os.environ.get("DISPLAY", "") == "":
                 os.environ["SDL_VIDEODRIVER"] = "dummy"
             pygame.init()
+            # Use the game's total width (includes debug panel in human mode)
+            total_w = getattr(self.game, 'TOTAL_WIDTH', self.game.WIDTH)
             self.screen = pygame.display.set_mode(
-                (self.game.WIDTH, self.game.HEIGHT)
+                (total_w, self.game.HEIGHT)
             )
             self.clock = pygame.time.Clock()
             self.font = pygame.font.SysFont(None, 20)
