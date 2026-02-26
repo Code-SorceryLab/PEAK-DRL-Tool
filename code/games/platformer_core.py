@@ -228,6 +228,23 @@ class PlatformerCore(gymnasium.Env):
         self.stall_window = float(kwargs.pop("stall_window", 2))
         self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 10))
 
+        # Observation sanity checker
+        self._obs_check_interval = 5000   # Check every N steps
+        self._obs_check_counter = 0
+        self._obs_stats = {               # Latest stats, exposed via _info()
+            "grid_player_mean": 0.0, "grid_player_std": 0.0,
+            "grid_player_min": 0.0, "grid_player_max": 0.0,
+            "grid_solid_mean": 0.0, "grid_solid_std": 0.0,
+            "grid_solid_min": 0.0, "grid_solid_max": 0.0,
+            "grid_hazard_mean": 0.0, "grid_hazard_std": 0.0,
+            "grid_hazard_min": 0.0, "grid_hazard_max": 0.0,
+            "grid_collectible_mean": 0.0, "grid_collectible_std": 0.0,
+            "grid_collectible_min": 0.0, "grid_collectible_max": 0.0,
+            "scalar_mean": 0.0, "scalar_std": 0.0,
+            "scalar_min": 0.0, "scalar_max": 0.0,
+            "dijkstra_val": 0.0, "obs_warnings": "",
+        }
+
         self.reset_metrics()
 
         # --- GRID OBSERVATION SIZE ---
@@ -433,12 +450,14 @@ class PlatformerCore(gymnasium.Env):
         # The GameEnv wrapper (generic_env.py) applies the actual persona reward fn.
         base_reward = float(self.score_delta)
 
+
         # BUG (was): Full Dijkstra recomputation was triggered on every coin
         # collection. Removed -- see comment in original for details.
         # if self.coins_step > 0:
         #     self._calculate_dijkstra_map()
 
         return self._obs(), base_reward, bool(terminated), bool(truncated), info
+
 
     def reset(self, seed=None, options=None) -> np.ndarray:
         """
@@ -725,6 +744,53 @@ class PlatformerCore(gymnasium.Env):
             return self._handle_death("Stall")
 
         return False
+
+    def _check_obs_sanity(self, obs: Dict[str, np.ndarray]) -> None:
+        """Compute observation statistics every N steps. Stored on self for _info() to expose."""
+        self._obs_check_counter += 1
+        if self._obs_check_counter % self._obs_check_interval != 0:
+            return
+
+        warnings_list = []
+        grid_names = ["player", "solid", "hazard", "collectible"]
+        grids = obs.get("grids")
+        if grids is not None:
+            for i, name in enumerate(grid_names):
+                ch = grids[i]
+                self._obs_stats[f"grid_{name}_mean"] = float(ch.mean())
+                self._obs_stats[f"grid_{name}_std"]  = float(ch.std())
+                self._obs_stats[f"grid_{name}_min"]  = float(ch.min())
+                self._obs_stats[f"grid_{name}_max"]  = float(ch.max())
+
+                if float(ch.std()) < 1e-6 and i < 2:
+                    warnings_list.append(f"Grid '{name}' DEAD")
+                if float(ch.max()) > 1.01:
+                    warnings_list.append(f"Grid '{name}' >1.0")
+
+        scalars = obs.get("scalars")
+        if scalars is not None:
+            self._obs_stats["scalar_mean"] = float(scalars.mean())
+            self._obs_stats["scalar_std"]  = float(scalars.std())
+            self._obs_stats["scalar_min"]  = float(scalars.min())
+            self._obs_stats["scalar_max"]  = float(scalars.max())
+            self._obs_stats["dijkstra_val"] = float(scalars[-1])
+
+            if float(scalars.std()) < 1e-8:
+                warnings_list.append("Scalars DEAD")
+            if abs(float(scalars.max())) > 100:
+                warnings_list.append("Scalars unnormalized")
+
+            dijk_val = float(scalars[-1])
+            if hasattr(self, '_last_dijk_nonzero'):
+                if self._last_dijk_nonzero and dijk_val == 0.0:
+                    self._dijk_zero_streak = getattr(self, '_dijk_zero_streak', 0) + 1
+                    if self._dijk_zero_streak >= 3:
+                        warnings_list.append(f"Dijkstra stuck@0 x{self._dijk_zero_streak}")
+                else:
+                    self._dijk_zero_streak = 0
+            self._last_dijk_nonzero = dijk_val != 0.0
+
+        self._obs_stats["obs_warnings"] = "|".join(warnings_list) if warnings_list else ""
 
     def _obs(self) -> Dict[str, np.ndarray]:
         # NULL Check Safety
@@ -1153,10 +1219,14 @@ class PlatformerCore(gymnasium.Env):
                 "stalled": self.stalled_this_frame, "persona": self.persona,
                 "level": self.current_index_world, "goal_dist": 0.0, "lives": self.lives,
                 "event": event, "cause": cause,
+
                 # --- Velocity Alignment / Potential-Based Shaping ---
                 "on_ground": False,
                 "step_dx":   0.0,
                 "step_dy":   0.0,
+
+                **self._obs_stats
+
             }
 
         dijkstra_dist = 0.0
@@ -1209,10 +1279,14 @@ class PlatformerCore(gymnasium.Env):
             "event": event,
             "cause": cause,
             "dijkstra_dist": dijkstra_dist, # Used for delta_dijkstra reward
+
             # --- Velocity Alignment / Potential-Based Shaping ---
             "on_ground": p.on_ground,
             "step_dx":   self._step_dx,
             "step_dy":   self._step_dy,
+
+            **self._obs_stats  # Observation sanity stats (populated every N steps)
+
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):

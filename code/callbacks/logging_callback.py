@@ -16,7 +16,7 @@ class CsvLoggerCallback(BaseCallback):
         if os.path.exists(self.log_path):
             try:
                 os.remove(self.log_path)
-                print(f"[INFO] ðŸ—‘ï¸  Cleared old log file: {self.log_path}")
+                print(f"[INFO] Ã°Å¸â€”â€˜Ã¯Â¸Â  Cleared old log file: {self.log_path}")
             except Exception as e:
                 print(f"[WARN] Could not delete old log: {e}")
 
@@ -51,6 +51,17 @@ class CsvLoggerCallback(BaseCallback):
         if event == "WIN":
             self.levels_completed += 1
 
+        # Observation sanity stats (populated every N steps by _check_obs_sanity in core)
+        _OBS_SANITY_KEYS = [
+            'grid_player_mean', 'grid_player_std', 'grid_player_min', 'grid_player_max',
+            'grid_solid_mean',  'grid_solid_std',  'grid_solid_min',  'grid_solid_max',
+            'grid_hazard_mean', 'grid_hazard_std', 'grid_hazard_min', 'grid_hazard_max',
+            'grid_collectible_mean', 'grid_collectible_std', 'grid_collectible_min', 'grid_collectible_max',
+            'scalar_mean', 'scalar_std', 'scalar_min', 'scalar_max',
+            'dijkstra_val', 'obs_warnings',
+        ]
+        obs_sanity = {k: info.get(k, 0.0) for k in _OBS_SANITY_KEYS}
+
         # --- BUILD ROW ---
         row_data = {
             'step': self.num_timesteps,
@@ -65,7 +76,8 @@ class CsvLoggerCallback(BaseCallback):
             'goal_dist': goal_dist,
             'event': event,
             'cause': cause,
-            **reward_breakdown
+            **reward_breakdown,
+            **obs_sanity,
         }
 
         # Write Headers (Once)
