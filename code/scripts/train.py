@@ -74,10 +74,52 @@ def _resolve_callable_or_instance(node: Dict[str, Any]) -> Any:
         return obj(**kwargs)
     return obj
 #### Helper functions END ####
+class ImpalaResidualBlock(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+        )
 
+    def forward(self, x):
+        return x + self.block(x)  # residual connection
+
+
+class ImpalaConvSequence(nn.Module):
+    """One IMPALA stage: Conv → MaxPool → 2× ResBlock"""
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.seq = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            ImpalaResidualBlock(out_channels),
+            ImpalaResidualBlock(out_channels),
+        )
+
+    def forward(self, x):
+        return self.seq(x)
+    
 # =========================================================================
 # Custom Multimodal Extractor
 # =========================================================================
+class ResidualBlock(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.GroupNorm(4, channels),
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.GroupNorm(4, channels),
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(x + self.block(x))
+    
 class CustomCombinedExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict):
         super().__init__(observation_space, features_dim=1)
@@ -88,42 +130,32 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
                 n_input_channels = subspace.shape[0]
+                h = subspace.shape[1]
+                w = subspace.shape[2]
+
                 cnn = nn.Sequential(
-                    nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm (8, 32),
+                    nn.Conv2d(n_input_channels, 32, kernel_size=3, padding=1),
                     nn.ReLU(),
-                    nn.MaxPool2d(2),
-                    nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm (8, 64),
-                    nn.ReLU(),
-                    nn.AdaptiveMaxPool2d((11, 11)),
-                    nn.Flatten(),
+                    ResidualBlock(32),
+                    ResidualBlock(32),
+                    nn.AdaptiveAvgPool2d((7, 7)),   # caps at 7×7 regardless of input size
+                    nn.Flatten(),                    # always 7×7×32 = 1568
                 )
-                n_flatten = 11 * 11 * 64
                 linear = nn.Sequential(
-                    nn.Linear(n_flatten, 256), 
-                    nn.LayerNorm(256),
-                    nn.ReLU())
+                    nn.Linear(1568, 128),
+                    nn.LayerNorm(128),
+                    nn.ReLU()
+                )
                 extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 256
+                total_concat_size += 128
 
             elif key == "scalars":
-                # Standard MLP for the 1D scalars
                 extractors[key] = nn.Sequential(
                     nn.Linear(subspace.shape[0], 64),
                     nn.LayerNorm(64),
                     nn.ReLU()
                 )
                 total_concat_size += 64
-
-            # elif key == "raycasts":
-            #     # MLP for the raycast data (1D array)
-            #     extractors[key] = nn.Sequential(
-            #         nn.Linear(subspace.shape[0], 128),
-            #         nn.BatchNorm1d(128),
-            #         nn.ReLU()
-            #     )
-            #     total_concat_size += 128
 
         self.extractors = nn.ModuleDict(extractors)
         self._features_dim = total_concat_size

@@ -504,7 +504,7 @@ class PhysicsManager:
             # Lost powerup or Died
             if player.powered_up:
                 player.powered_up = False
-                player.invincible_timer = 60
+                player.invincible_timer = 1.0
             else:
                 core._handle_death()
                 return
@@ -530,7 +530,7 @@ class PhysicsManager:
             player.powered_up = True
             core.score += 50
         else:
-            player.invincible_timer = 300
+            player.invincible_timer = 5.0
             core.score += 100
 
     def _handle_enemy_enemy(self, core, e1, e2):

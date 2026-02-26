@@ -231,8 +231,8 @@ class PlatformerCore(gymnasium.Env):
         self.reset_metrics()
 
         # --- GRID OBSERVATION SIZE ---
-        self.obs_width = 11
-        self.obs_height = 11
+        self.obs_width = 21
+        self.obs_height = 21
         self.obs_pad_x = self.obs_width // 2
         self.obs_pad_y = self.obs_height // 2
 
@@ -252,7 +252,7 @@ class PlatformerCore(gymnasium.Env):
             # low=-1.0 because the Dijkstra channel is a relative advantage map
             # in [-1, 1] where positive = closer to goal than player's tile,
             # negative = further away. All other channels remain in [0, 1].
-            "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
+            "grids": spaces.Box(low=-1.0, high=1.0, shape=(5, self.obs_height, self.obs_width), dtype=np.float32),
 
             # Scalars: 18 (Player=5, Tracking=13)
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
@@ -273,7 +273,7 @@ class PlatformerCore(gymnasium.Env):
         """Helper to clear metrics on reset/death."""
         self.timer = self.timer_seconds
         self.time_last_step = time.time()
-        self.dt = 0.0001
+        self.dt = 1/60.0
         self.score = 0; self.coins_total = 0
         self.alive = True; self.frame = 0
         self.game_over = False; self.reached_goal = False
@@ -310,14 +310,13 @@ class PlatformerCore(gymnasium.Env):
             # dead_obs['raycasts'] = dead_rays
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
-        # Time Calculation
+# Time Calculation
         if self.render_mode != "human":
             self.dt = 1 / 60.0
         else:
             time_curr_step = time.time()
-            raw_dt = time_curr_step - self.time_last_step
             self.time_last_step = time_curr_step
-            self.dt = min(raw_dt, 0.05)
+            self.dt = 1 / 60.0  # locked to training dt — pacing handled by clock.tick(60)
 
         if self.debug_manager.slow_motion:
             self.dt *= 0.5
@@ -750,8 +749,8 @@ class PlatformerCore(gymnasium.Env):
         # Stack order: Player, Solid, Hazard, Collectible, Dijkstra-Advantage
         # Channel 4 (Dijkstra) is in [-1, 1]; channels 0-3 are in [0, 1].
         stacked_grids = np.stack(
-            #[player_grid, solid_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
-            [player_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
+            [player_grid, solid_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
+            #[player_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
         ).astype(np.float32)
 
         scalars = np.concatenate([p_obs, track_obs]).astype(np.float32)

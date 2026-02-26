@@ -127,11 +127,11 @@ class Player():
         # Hand the state (int) to the handler
         self.anim_handler.set_state(target_state.value)
 
-    def handle_input(self, a: int):    
-        agent_left = (a in (1,6))
-        agent_right = (a in (2,4,5,7))
-        agent_jump = (a in (3,4,6,7))
-        agent_run = (a in (5,7))
+    def handle_input(self, a: int):
+        agent_left  = (a in (1, 6, 8, 9))   # added 8, 9
+        agent_right = (a in (2, 4, 5, 7))
+        agent_jump  = (a in (3, 4, 6, 7, 9)) # added 9
+        agent_run   = (a in (5, 7, 8, 9))    # added 8, 9
         
         kb_left = kb_right = kb_jump = kb_run = False
         
@@ -186,24 +186,22 @@ class Player():
         if self.jump_pressed:
             self.jump_buffer = ctx.JUMP_BUFFER_FRAMES
 
-        self.coyote = ctx.COYOTE_FRAMES if self.on_ground else max(0, self.coyote - 1)
-        if self.jump_buffer > 0: self.jump_buffer -= 1
+        self.coyote = ctx.COYOTE_FRAMES if self.on_ground else max(0.0, self.coyote - dt)
+        if self.jump_buffer > 0: self.jump_buffer = max(0.0, self.jump_buffer - dt)
 
         if (self.coyote > 0) and (self.jump_hold == 0) and (self.jump_buffer > 0):
             base = ctx.JUMP_VEL_MIN
             bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
             self.vy = base - bonus 
             self.on_ground = False
-            self.coyote = 0
+            self.coyote = 0.0
             self.jump_hold = ctx.JUMP_HOLD_FRAMES
-            self.jump_buffer = 0
+            self.jump_buffer = 0.0
 
         if self.jump_hold > 0:
             if self.jump_pressed:
-                # Sustained upward thrust (12% gravity cancellation)
-                # Creates variable jump height - tap for short, hold for high
                 self.vy -= (ctx.GRAVITY * 0.12 * dt)
-            self.jump_hold -= 1
+            self.jump_hold = max(0.0, self.jump_hold - dt)
                 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
         # 1. Get Sprite from Handler
