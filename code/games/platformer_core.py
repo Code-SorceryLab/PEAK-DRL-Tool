@@ -730,8 +730,12 @@ class PlatformerCore(gymnasium.Env):
         # NULL Check Safety
         if not self.player:
             return {
-                "grids": np.zeros((5, self.obs_height, self.obs_width), dtype=np.float32),
-                "scalars": np.zeros(12, dtype=np.float32),  # FIXED: matches declared shape=(12,)
+                # CHANGE 1 FIX: was (5, ...) — must match declared obs_space shape (4, ...)
+                # 4 channels: player, hazard, collectible, dijkstra-advantage.
+                # solid_grid was already removed from the active stack; the null
+                # path incorrectly still claimed 5 channels, causing SB3 shape errors.
+                "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
+                "scalars": np.zeros(12, dtype=np.float32),  # 5 (player) + 7 (tracking)
                 # "raycasts": np.zeros(self.num_rays * 2, dtype=np.float32)
             }
 
@@ -739,18 +743,18 @@ class PlatformerCore(gymnasium.Env):
         track_obs = self._tracking_obs()
         # rays = self._perform_raycasts()
 
-        # _grid_obs_window now also returns the unpadded map tile coordinates of
-        # the window so that _dijkstra_obs_window can slice dist_map at the
-        # identical region without recomputing the window position.
-        solid_grid, hazard_grid, collect_grid, player_grid, map_row_start, map_col_start = \
+        # _grid_obs_window returns the unpadded map tile coordinates of the window
+        # so that _dijkstra_obs_window can slice dist_map at the identical region.
+        # CHANGE 1: solid_grid removed from unpacking — it was already excluded from
+        # the stacked observation channels and returned as dead code.
+        hazard_grid, collect_grid, player_grid, map_row_start, map_col_start = \
             self._grid_obs_window()
 
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # Stack order: Player, Solid, Hazard, Collectible, Dijkstra-Advantage
-        # Channel 4 (Dijkstra) is in [-1, 1]; channels 0-3 are in [0, 1].
+        # Stack order: Player, Hazard, Collectible, Dijkstra-Advantage  (4 channels)
+        # Channel 3 (Dijkstra) is in [-1, 1]; channels 0-2 are in [0, 1].
         stacked_grids = np.stack(
-            #[player_grid, solid_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
             [player_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
         ).astype(np.float32)
 
@@ -780,9 +784,18 @@ class PlatformerCore(gymnasium.Env):
             1.0 if p.on_ground else 0.0,
         ], dtype=np.float32)
 
-    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
+    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
         """
-        Returns (solid, hazard, collect, player, map_row_start, map_col_start).
+        Returns (hazard, collect, player, map_row_start, map_col_start).
+
+        CHANGE 1: solid_grid removed from the return value. It was computed from
+        padded_solid (used internally for window-position arithmetic) but was
+        never included in the stacked observation — removing it avoids a NumPy
+        slice allocation per step.
+
+        padded_solid is still maintained in load_level() because the slice
+        indices (slice_y_start, slice_x_start) are computed from it. Only the
+        resulting solid_grid slice is no longer returned.
 
         map_row_start / map_col_start are the UNPADDED map tile coordinates of
         the top-left corner of the observation window. These are returned so
@@ -798,7 +811,7 @@ class PlatformerCore(gymnasium.Env):
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
             # Return 0,0 as dummy map coords — _dijkstra_obs_window will see no
             # valid dijkstra and return zeros anyway.
-            return z, z, z, z, 0, 0
+            return z, z, z, 0, 0
 
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
@@ -814,21 +827,19 @@ class PlatformerCore(gymnasium.Env):
         slice_y_end   = slice_y_start + self.obs_height
         slice_x_end   = slice_x_start + self.obs_width
 
-        solid_grid = self.padded_solid[slice_y_start:slice_y_end, slice_x_start:slice_x_end]
+        # CHANGE 1: solid_grid slice removed — padded_solid is still used above
+        # to compute the window bounds (slice_y/x_start), but the resulting
+        # channel is no longer needed in the observation.
 
         hazard_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         player_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
 
         # Convert padded indices → unpadded map tile coordinates
-        # padded_solid has obs_pad_y extra rows at the top and obs_pad_x extra
-        # cols at the left, so map_row = padded_row - obs_pad_y.
         map_row_start = slice_y_start - self.obs_pad_y
         map_col_start = slice_x_start - self.obs_pad_x
 
         # World-pixel origin of the window (used for entity spatial-hash queries)
-        # wx/wy are derived from the padded slice, which matches world coords
-        # because the padding represents out-of-bounds space (no entities there).
         wx = slice_x_start * TILE_SIZE
         wy = slice_y_start * TILE_SIZE
 
@@ -873,7 +884,7 @@ class PlatformerCore(gymnasium.Env):
                 if 0 <= r < self.obs_height and 0 <= c < self.obs_width:
                     player_grid[r, c] = 1.0
 
-        return solid_grid, hazard_grid, collect_grid, player_grid, map_row_start, map_col_start
+        return hazard_grid, collect_grid, player_grid, map_row_start, map_col_start
 
     def _dijkstra_obs_window(self, map_row_start: int, map_col_start: int) -> np.ndarray:
         """
