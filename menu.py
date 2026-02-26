@@ -1145,7 +1145,8 @@ def watch_trained_agent():
             "--episodes", str(max_episodes),
             "--fps", str(fps),
             "--game", game,
-            "--algo", algo_name
+            "--algo", algo_name,
+            "--persona", persona,
         ]
 
         print("\nLaunching viewer in separate process...")
@@ -1247,6 +1248,7 @@ def delete_logs_and_models():
 
     safe_clear_dir(Path(DEFAULT_TB_ROOT))
     safe_clear_dir(MODELS_DIR)
+    safe_clear_dir(Path("csv"))
 
     print("\n🧹 All logs and models deleted successfully.\n")
 

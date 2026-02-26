@@ -271,22 +271,16 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
     #
     # ALIGNMENT_SCALE: 0.01 × 60fps = 0.6 max reward/sec at perfect alignment.
     # Intentionally weaker than r_potential.
-    ALIGNMENT_SCALE = 0.01
+    ALIGNMENT_SCALE = 0.05  # Raised from 0.01; on_ground gate removed (was killing 99% of signal)
 
     r_alignment = 0.0
-    on_ground   = info.get("on_ground", False)
-
-    if dijkstra_valid and on_ground:
+    if dijkstra_valid:
         vx    = float(info.get("velocity_x", 0.0))
         vy    = float(info.get("velocity_y", 0.0))
         speed = math.sqrt(vx * vx + vy * vy)
-
-        if speed > 0.1:
+        if speed > 0.5:
             step_dx = float(info.get("step_dx", 0.0))
             step_dy = float(info.get("step_dy", 0.0))
-
-            # Dot product of normalised velocity with best-tile direction [-1, 1]
-            # Only reward positive alignment — moving away earns nothing extra
             alignment   = (vx / speed) * step_dx + (vy / speed) * step_dy
             r_alignment = max(0.0, alignment) * ALIGNMENT_SCALE
     # =========================================================================
@@ -295,6 +289,9 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
 
     r_coin = 0.2 * coins   # Small: coins shouldn't compete with forward progress
     r_kill = 0.5 * kills
+
+    # Per-step stall penalty (61% of deaths are stalls — punish before kill fires)
+    r_stall = -0.01 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
@@ -308,6 +305,7 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
         "gradient":   r_gradient,
         "potential":  r_potential,  # Potential-Based Reward Shaping
         "alignment":  r_alignment,  # Velocity Alignment
+        "stall":      r_stall,
         "coins":      r_coin,
         "kills":      r_kill,
         "win":        r_win,

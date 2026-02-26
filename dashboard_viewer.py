@@ -143,11 +143,13 @@ if df.empty:
 standard_cols = ['step', 'total_reward', 'action', 'level', 'levels_completed', 'x', 'y', 'vx', 'vy', 'goal_dist', 'event', 'cause']
 
 # Obs sanity columns — kept for the OBSERVATION SANITY table only, NOT the graph or reward composition
+# Channel order: player(0), hazard(1), collectible(2), dijkstra(3) — solid removed
 _OBS_SANITY_COLS = {
-    'grid_player_mean', 'grid_player_std', 'grid_player_min', 'grid_player_max',
-    'grid_solid_mean',  'grid_solid_std',  'grid_solid_min',  'grid_solid_max',
-    'grid_hazard_mean', 'grid_hazard_std', 'grid_hazard_min', 'grid_hazard_max',
+    'grid_player_mean',      'grid_player_std',      'grid_player_min',      'grid_player_max',
+    'grid_solid_mean',       'grid_solid_std',       'grid_solid_min',       'grid_solid_max',
+    'grid_hazard_mean',      'grid_hazard_std',      'grid_hazard_min',      'grid_hazard_max',
     'grid_collectible_mean', 'grid_collectible_std', 'grid_collectible_min', 'grid_collectible_max',
+    'grid_dijkstra_mean',    'grid_dijkstra_std',    'grid_dijkstra_min',    'grid_dijkstra_max',
     'scalar_mean', 'scalar_std', 'scalar_min', 'scalar_max',
     'dijkstra_val', 'obs_warnings',
 }
@@ -424,7 +426,9 @@ if obs_cols:
         st.success("All channels OK")
 
     # Grid channel stats table
-    grid_channels = ["player", "solid", "hazard", "collectible"]
+    # Channel order matches Change 1: solid removed, dijkstra added as ch3
+    # 5 channels: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
+    grid_channels = ["player", "solid", "hazard", "collectible", "dijkstra"]
     has_grid_data = any(f"grid_{ch}_mean" in df.columns for ch in grid_channels)
 
     if has_grid_data:
@@ -437,7 +441,7 @@ if obs_cols:
 
             # Determine status
             status = "OK"
-            if isinstance(std_val, (int, float)) and std_val < 1e-6 and ch in ("player", "solid"):
+            if isinstance(std_val, (int, float)) and std_val < 1e-6 and ch in ("player", "solid"):  # these channels should be non-sparse
                 status = "DEAD"
             elif isinstance(max_val, (int, float)) and max_val > 1.01:
                 status = "OVERFLOW"
@@ -470,14 +474,8 @@ if obs_cols:
             "STATUS": s_status,
         })
 
-        # Dijkstra row
-        dijk = row.get("dijkstra_val", 0.0)
-        obs_rows.append({
-            "CHANNEL": "DIJKSTRA",
-            "MEAN": f"{float(dijk):.4f}" if isinstance(dijk, (int, float)) else "NULL",
-            "STD": "NULL", "MIN": "NULL", "MAX": "NULL",
-            "STATUS": "OK" if (isinstance(dijk, (int, float)) and dijk > 0) else "ZERO",
-        })
+        # Dijkstra stats come from grid_dijkstra_* via the grid_channels loop above.
+        # dijkstra_val scalar is included in the SCALARS row (it is scalars[-1]).
 
         obs_table = pd.DataFrame(obs_rows)
 
