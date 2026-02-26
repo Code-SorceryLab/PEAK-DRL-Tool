@@ -448,7 +448,11 @@ class PhysicsManager:
                     # Guard: goal must not be the left-wall spawn tile (x < 1 tile)
                     goal_is_real = target.gObj.x > TILE_SIZE
                     if not core.reached_goal and goal_is_real:
-                        core.score += 1000 + (int(core.timer) * 10)
+                        # Time bonus only — no flat 1000pt base.
+                        # The old formula (1000 + timer*10) gave up to 4000pts per
+                        # level which dominated the score and made the metric
+                        # misleading. Remaining time is a clean, bounded bonus.
+                        core.score += int(core.timer)
                         core.reached_goal = True
                         core.complete_level()
                 elif t_type == EntityType.SPIKE:

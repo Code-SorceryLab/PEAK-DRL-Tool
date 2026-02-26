@@ -48,6 +48,41 @@ from code.algos import get_algo
 # Helpers
 # ---------------------------------------------------------------------------
 
+
+class VecnormBestCallback(BaseCallback):
+    """
+    Wraps EvalCallback/RecurrentEvalCallback and saves the VecNormalize stats
+    file next to best_model.zip every time a new best reward is recorded.
+
+    The built-in EvalCallback saves best_model.zip to models/best/<folder>/
+    but vecnorm is only saved at the end of training to models/ root.
+    watch_agent.py searches the model folder first — this closes that gap.
+    """
+    def __init__(self, eval_cb, training_env, best_model_save_path: str, verbose=0):
+        super().__init__(verbose)
+        self.eval_cb              = eval_cb
+        self.training_env         = training_env
+        self.best_model_save_path = Path(best_model_save_path)
+        self._last_best           = -float("inf")
+
+    def _init_callback(self):
+        self.eval_cb.init_callback(self.model)
+
+    def _on_step(self) -> bool:
+        result = self.eval_cb._on_step()
+        current_best = getattr(self.eval_cb, "best_mean_reward", -float("inf"))
+        if current_best > self._last_best:
+            self._last_best = current_best
+            self.best_model_save_path.mkdir(parents=True, exist_ok=True)
+            vecnorm_path = self.best_model_save_path / "best_model_vecnorm.pkl"
+            self.training_env.save(str(vecnorm_path))
+            if self.verbose:
+                print(f"[VecnormBestCallback] New best ({current_best:.3f}) — saved → {vecnorm_path}")
+        return result
+
+    def _on_training_end(self):
+        self.eval_cb._on_training_end()
+
 def _pretty_steps(n: int) -> str:
     if n >= 1_000_000:
         return f"{n // 1_000_000}M"
@@ -226,21 +261,8 @@ def main(cfg: DictConfig):
     viz_preview_episodes = int(cfg.get("viz_preview_episodes", 1))
     viz_fps              = int(cfg.get("viz_fps", 30))
 
-    # Path to watch_agent.py — search multiple candidate locations.
-    # When running as `python -m code.scripts.train`, the CWD (repo_root) is
-    # S:\...\drl-PEAK-agents-balance, so watch_agent.py should live there.
-    # We also check next to train.py itself as a fallback.
-    _watch_candidates = [
-        repo_root / "watch_agent.py",                        # repo root (primary)
-        Path(__file__).parent / "watch_agent.py",            # same dir as train.py
-        repo_root / "code" / "scripts" / "watch_agent.py",  # code/scripts/ fallback
-    ]
-    watch_agent_script = next((p for p in _watch_candidates if p.exists()), _watch_candidates[0])
-    if not watch_agent_script.exists():
-        print(f"[WARNING] watch_agent.py not found. Live preview disabled.")
-        print(f"[WARNING] Place watch_agent.py at: {_watch_candidates[0]}")
-    else:
-        print(f"[INFO] watch_agent.py → {watch_agent_script}")
+    # Path to watch_agent.py — in the repo root
+    watch_agent_script = repo_root / "watch_agent.py"
 
     game_name = str(cfg.game)
     if game_name == 'none':
@@ -364,26 +386,30 @@ def main(cfg: DictConfig):
                 os.makedirs(tb_dir, exist_ok=True)
 
                 log_name = f"training_log_{game_name}_{persona}.csv"
-                csv_logger = CsvLoggerCallback(log_dir=str(repo_root / "csv"), file_name=log_name)
+                csv_logger = CsvLoggerCallback(log_dir=str(repo_root), file_name=log_name)
 
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
 
+                _best_path = str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}")
+
                 if is_recurrent_model:
-                    eval_cb = RecurrentEvalCallback(
+                    _inner_cb = RecurrentEvalCallback(
                         eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                        best_model_save_path=_best_path,
                         log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         eval_freq=eval_freq, n_eval_episodes=5,
                         deterministic=True, render=False, verbose=1,
                     )
                 else:
-                    eval_cb = EvalCallback(
+                    _inner_cb = EvalCallback(
                         eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                        best_model_save_path=_best_path,
                         log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         eval_freq=eval_freq,
                         deterministic=True, render=False,
                     )
+                # Saves best_model_vecnorm.pkl next to best_model.zip on every new best
+                eval_cb = VecnormBestCallback(_inner_cb, env, _best_path, verbose=1)
 
                 ckpt_cb = CheckpointCallback(
                     save_freq=save_freq,
@@ -393,20 +419,25 @@ def main(cfg: DictConfig):
 
                 current_callbacks = [eval_cb, ckpt_cb, csv_logger]
 
-                # CHANGE 3: Live visualisation — inline preview, no subprocess
+                # CHANGE 3: Live visualisation — spawns a real pygame window
                 if viz_enabled:
                     from code.callbacks.LiveVisualizationCallback import LiveVisualizationCallback
 
-                    # Pass game_cls, reward_fn, and env_kwargs directly so the
-                    # preview env is built identically to the training env.
-                    # VecNorm stats are copied live at each trigger — no file needed.
+                    # The vecnorm path won't exist yet at callback-build time,
+                    # but will be written before the first trigger fires (viz_freq steps in).
+                    # We point to where train.py will save it.
+                    live_norm_path = models_dir / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_vecnorm.pkl"
+
                     viz_cb = LiveVisualizationCallback(
-                        game_cls=game_cls,
-                        reward_fn=active_reward_fn,
-                        env_kwargs=env_kwargs,
+                        watch_agent_script=watch_agent_script,
+                        vecnorm_path=live_norm_path,
+                        game=game_name,
+                        algo=model_name,
+                        persona=persona,
                         viz_freq=viz_freq,
                         n_preview_episodes=viz_preview_episodes,
                         fps=viz_fps,
+                        preview_save_dir=str(models_dir),
                         verbose=1,
                     )
                     current_callbacks.append(viz_cb)

@@ -55,83 +55,102 @@ class DijkstraSolver:
 
     def compute_map(self, goals: List[Tuple[int, int]], coins: Set[Tuple[int, int]] = None):
         """
-        Flood fills from all goal positions to generate the distance map.
-        Applies weighted costs to prefer walking on ground and collecting coins.
+        Physics-aware Dijkstra flood-fill from every goal tile.
+
+        Cost model (tuned to ~64px tiles, 800px/s jump, 1200px/s² gravity):
+          Horizontal movement   : 2.0   (free running)
+          Downward movement     : 1.2   (gravity-assisted, cheap)
+          Upward movement       : 3.5   (jump required, expensive)
+          Upward with no ground : +3.0  (floating tile, nearly unreachable)
+          On-platform tiles     : -0.6  (natural landing spots, strong discount)
+          Near-platform tiles   : -0.25 / -0.1
+          Spike tile            : +18.0
+          Coin tile             : -0.8
+
+        KEY FIX for vertical levels: upward steps cost 3.5 instead of 2.0.
+        Without this penalty the solver routes straight up through open air at
+        the same cost as running right, producing a gradient that leads the agent
+        to stall mid-air chasing an impossible straight-up path. Heavier upward
+        costs make paths naturally flow along platforms then jump.
+
+        BUG FIX: ground-proximity checks were elif-chained so the 2-tile and
+        3-tile bonuses were dead code (only fired at the bottom row of the map).
+        Changed to independent if-checks so all three levels apply.
         """
         if coins is None:
             coins = set()
 
-        # Priority Queue: (current_dist, x, y)
-        pq = []
+        MAX_JUMP_TILES = 6   # realistic max jump height: v0²/(2g)/TILE_SIZE ≈ 4.2, +hold ≈ 5.4
+        SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
 
-        # Initialize goals with distance 0
+        pq = []
         for gx, gy in goals:
             if 0 <= gx < self.cols and 0 <= gy < self.rows:
                 self.dist_map[gy][gx] = 0.0
                 heapq.heappush(pq, (0.0, gx, gy))
 
-        directions = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, -1), (-1, -1), (1, 1), (-1, 1)] # 8-way
+        # 8-way: (dx, dy) — dy<0 is UP in screen coordinates (y increases downward)
+        directions = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)]
 
         while pq:
             current_dist, cx, cy = heapq.heappop(pq)
-
-            # If we found a shorter path already, skip
             if current_dist > self.dist_map[cy][cx]:
                 continue
 
             for dx, dy in directions:
                 nx, ny = cx + dx, cy + dy
+                if not (0 <= nx < self.cols and 0 <= ny < self.rows):
+                    continue
 
-                if 0 <= nx < self.cols and 0 <= ny < self.rows:
-                    # Check walkability of TARGET tile (nx, ny)
-                    tile = self.grid[ny][nx]
+                tile = self.grid[ny][nx]
+                if tile not in (TILE_AIR, TILE_GOAL, TILE_SPIKE):
+                    continue   # wall — impassable
 
-                    # FIX: Strict Walkability. Only AIR and GOAL are walkable nodes.
-                    # Spikes are technically walkable but dangerous.
-                    # Solids (Ground, Platform, QBlock) are obstacles.
-                    is_walkable = (tile == TILE_AIR or tile == TILE_GOAL or tile == TILE_SPIKE)
+                # --- Directional base cost ---
+                if dy < 0:          # moving UP — requires a jump
+                    step_cost = 3.5
+                elif dy > 0:        # moving DOWN — gravity-assisted
+                    step_cost = 1.2
+                else:               # horizontal
+                    step_cost = 2.0
 
-                    if is_walkable:
-                        # Base Cost
-                        step_cost = 2.0
+                if dx != 0 and dy != 0:
+                    step_cost *= 1.1   # diagonal slightly more expensive
 
-                        # Spike Penalty (High Cost)
-                        if tile == TILE_SPIKE:
-                            step_cost = 20.0
+                # --- Spike penalty ---
+                if tile == TILE_SPIKE:
+                    step_cost += 18.0
 
-                        # --- COIN ATTRACTION ---
-                        # If the target tile contains a coin, make it cheaper to enter
-                        if (nx, ny) in coins:
-                            step_cost -= 1.0
+                # --- Coin attraction ---
+                if (nx, ny) in coins:
+                    step_cost -= 0.8
 
-                        # --- GROUND ATTRACTION LOGIC ---
-                        # Check tile DIRECTLY BELOW the target node (ny+1, nx)
-                        # If it is solid, make entering this node cheaper (gravity preference).
-                        if ny + 1 < self.rows:
-                            below_tile = self.grid[ny + 1][nx]
-                            if below_tile in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
-                                step_cost -= 0.5 # Huge bonus for being on ground
+                # --- Ground-proximity discount (independent if-checks, not elif) ---
+                if ny + 1 < self.rows and self.grid[ny + 1][nx] in SOLID:
+                    step_cost -= 0.6
+                if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
+                    step_cost -= 0.25
+                if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
+                    step_cost -= 0.1
 
-                        # Check 2 tiles below (ny+2)
-                        elif ny + 2 < self.rows:
-                            below_2 = self.grid[ny + 2][nx]
-                            if below_2 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
-                                step_cost -= 0.2 # Small bonus for being near ground
+                # --- Floating-tile penalty for upward steps ---
+                # If moving up and there is no solid surface within jump height
+                # below the target, the tile is likely only reachable mid-air
+                # (e.g. inside a tall open shaft). Extra cost discourages routing
+                # through tiles the agent can't easily reach or land on.
+                if dy < 0:
+                    has_ground_nearby = any(
+                        ny + k < self.rows and self.grid[ny + k][nx] in SOLID
+                        for k in range(1, MAX_JUMP_TILES + 1)
+                    )
+                    if not has_ground_nearby:
+                        step_cost += 3.0
 
-                        # Check 3 tiles below (ny+3)
-                        elif ny + 3 < self.rows:
-                            below_3 = self.grid[ny + 3][nx]
-                            if below_3 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
-                                step_cost -= 0.1 # Tiny bonus
-
-                        # Ensure cost doesn't go negative or too low (min 1.0)
-                        step_cost = max(1.0, step_cost)
-
-                        new_dist = current_dist + step_cost
-
-                        if new_dist < self.dist_map[ny][nx]:
-                            self.dist_map[ny][nx] = new_dist
-                            heapq.heappush(pq, (new_dist, nx, ny))
+                step_cost = max(1.0, step_cost)
+                new_dist  = current_dist + step_cost
+                if new_dist < self.dist_map[ny][nx]:
+                    self.dist_map[ny][nx] = new_dist
+                    heapq.heappush(pq, (new_dist, nx, ny))
 
     def get_dist(self, x: int, y: int) -> float:
         if 0 <= x < self.cols and 0 <= y < self.rows:
@@ -196,9 +215,6 @@ class PlatformerCore(gymnasium.Env):
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
         self.world = str(kwargs.pop("world", "1-1")).lower()
-        # True: each reset() picks a random starting level so training sees all
-        # levels, not just those reachable from winning up from level 0.
-        self.random_start_world = bool(kwargs.pop("random_start_world", True))
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -481,13 +497,9 @@ class PlatformerCore(gymnasium.Env):
         # if not was_win: ...
         # else: ...  <- removed
 
-        # Full reset: restore lives, score. Start from a random level if
-        # random_start_world=True (default) for balanced curriculum exposure.
+        # Full reset: restore lives, score, return to level 0
         self.reset_metrics()
-        if self.random_start_world and len(self.level_order) > 1:
-            self.current_index_world = random.randint(0, len(self.level_order) - 1)
-        else:
-            self.current_index_world = 0
+        self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
         self.load_level()
         return self._obs(), self._info()
@@ -607,17 +619,12 @@ class PlatformerCore(gymnasium.Env):
 
         The episode continues into the next level; only lives = 0 ends it.
         """
-        # Curriculum walk: advance 0, 1, or 2 levels per win — never go backward.
-        #
-        # OLD BUG: min(idx+1, randint(idx-1, idx+2)) capped advancement at +1,
-        # silently killing the +2 jump. The outer max(0,...) then collapsed many
-        # backward outcomes to 0. Result: levels 5-7 got under 3% visits each.
-        # Fix: always advance by 0, 1, or 2 — clamp to last level.
-        step = random.randint(0, 2)  # 0=repeat current, 1=next, 2=skip one
-        self.current_index_world = min(
-            len(self.level_order) - 1,
-            self.current_index_world + step
+        # Random walk: +-1 from current index (curriculum learning)
+        self.current_index_world = max(
+            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
         )
+        if self.current_index_world >= len(self.level_order):
+            self.current_index_world = len(self.level_order) - 1
         self.world = self.level_order[self.current_index_world]
 
         # Signal step() to load the next level after _info() runs this frame.

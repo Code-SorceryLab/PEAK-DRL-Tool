@@ -128,10 +128,10 @@ class Player():
         self.anim_handler.set_state(target_state.value)
 
     def handle_input(self, a: int):    
-        agent_left = (a in (1,6))
-        agent_right = (a in (2,4,5,7))
-        agent_jump = (a in (3,4,6,7))
-        agent_run = (a in (5,7))
+        agent_left  = (a in (1, 6, 8, 9))   # added 8, 9
+        agent_right = (a in (2, 4, 5, 7))
+        agent_jump  = (a in (3, 4, 6, 7, 9)) # added 9
+        agent_run   = (a in (5, 7, 8, 9))    # added 8, 9
         
         kb_left = kb_right = kb_jump = kb_run = False
         
