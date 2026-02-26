@@ -277,6 +277,7 @@ class AgentViewOverlay(DebugOverlay):
                         tint.fill((255, 130, 0, alpha))
                         surface.blit(tint, (dx, dy))
                         # Number
+                        cost = core.dijkstra_current_tile - cost
                         ns = tiny.render(str(int(cost)), True, (200, 200, 200))
                         surface.blit(ns, (dx + (cw - ns.get_width()) // 2,
                                           dy + (ch - ns.get_height()) // 2))
