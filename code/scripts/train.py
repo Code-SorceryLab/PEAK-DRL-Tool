@@ -159,7 +159,20 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
         parts = [self.extractors[k](observations[k]) for k in self.extractors]
         return torch.cat(parts, dim=1)
 
+class ResidualBlock(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.GroupNorm(4, channels),
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.GroupNorm(4, channels),
+        )
+        self.relu = nn.ReLU()
 
+    def forward(self, x):
+        return self.relu(x + self.block(x))
 # =========================================================================
 # Backward-compatible alias (old checkpoints expect CustomCombinedExtractor)
 # Keep the ORIGINAL architecture here so old .zip files can still be loaded.
@@ -174,21 +187,24 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
                 n_input_channels = subspace.shape[0]
+                h = subspace.shape[1]
+                w = subspace.shape[2]
+
                 cnn = nn.Sequential(
-                    nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm(8, 32),
+                    nn.Conv2d(n_input_channels, 32, kernel_size=3, padding=1),
                     nn.ReLU(),
-                    nn.MaxPool2d(2),
-                    nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm(8, 64),
-                    nn.ReLU(),
-                    nn.AdaptiveMaxPool2d((11, 11)),
-                    nn.Flatten(),
+                    ResidualBlock(32),
+                    ResidualBlock(32),
+                    nn.AdaptiveAvgPool2d((7, 7)),   # caps at 7×7 regardless of input size
+                    nn.Flatten(),                    # always 7×7×32 = 1568
                 )
-                n_flatten = 11 * 11 * 64
-                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.LayerNorm(256), nn.ReLU())
+                linear = nn.Sequential(
+                    nn.Linear(1568, 128),
+                    nn.LayerNorm(128),
+                    nn.ReLU()
+                )
                 extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 256
+                total_concat_size += 128
             elif key == "scalars":
                 extractors[key] = nn.Sequential(nn.Linear(subspace.shape[0], 64), nn.LayerNorm(64), nn.ReLU())
                 total_concat_size += 64
@@ -301,7 +317,7 @@ def main(cfg: DictConfig):
             # CHANGE 2: Use the faster LightCombinedExtractor by default.
             # To use the legacy extractor (for loading old checkpoints), set
             # use_legacy_extractor: true in your algo yaml.
-            if algo_conf.get("use_legacy_extractor", False):
+            if algo_conf.get("use_legacy_extractor", True):
                 policy_kwargs["features_extractor_class"] = CustomCombinedExtractor
                 print("[INFO] Using legacy CustomCombinedExtractor (old checkpoint mode).")
             else:

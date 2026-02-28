@@ -113,13 +113,13 @@ class DijkstraSolver:
                                 step_cost -= 0.5 # Huge bonus for being on ground
 
                         # Check 2 tiles below (ny+2)
-                        elif ny + 2 < self.rows:
+                        if ny + 2 < self.rows:
                             below_2 = self.grid[ny + 2][nx]
                             if below_2 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
                                 step_cost -= 0.2 # Small bonus for being near ground
 
                         # Check 3 tiles below (ny+3)
-                        elif ny + 3 < self.rows:
+                        if ny + 3 < self.rows:
                             below_3 = self.grid[ny + 3][nx]
                             if below_3 in [TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK]:
                                 step_cost -= 0.1 # Tiny bonus
@@ -251,8 +251,8 @@ class PlatformerCore(gymnasium.Env):
         self.reset_metrics()
 
         # --- GRID OBSERVATION SIZE ---
-        self.obs_width = 11
-        self.obs_height = 11
+        self.obs_width = 21
+        self.obs_height = 21
         self.obs_pad_x = self.obs_width // 2
         self.obs_pad_y = self.obs_height // 2
 
@@ -1032,7 +1032,7 @@ class PlatformerCore(gymnasium.Env):
         delta[~np.isfinite(delta)] = 0.0
 
         # Normalise to [-1, 1]
-        max_cost = float(self.level_data.cols * 2)
+        max_cost = float(np.sqrt(self.obs_width/2 **2 + self.obs_height/2 **2))
         delta     = np.clip(delta / max_cost, -1.0, 1.0)
 
         # Place the valid slice into the full output window, leaving edge-padding
@@ -1241,29 +1241,14 @@ class PlatformerCore(gymnasium.Env):
 
             }
 
-        dijkstra_dist = 0.0
-        if self.dijkstra:
+        dijkstra_dist_raw = -1.0
+        if self.dijkstra and p:
             px_tile = int(p.gObj.x // TILE_SIZE)
             py_tile = int(p.gObj.y // TILE_SIZE)
             d = self.dijkstra.get_dist(px_tile, py_tile)
-            self.dijkstra_current_tile = d
             if d >= 0:
-                # Normalise: max meaningful cost ≈ cols * 2  (heuristic)
-                dijkstra_dist = np.clip(d / (self.level_data.cols * 2), 0.0, 1.0)
-            else:
-                # BUG (was): set to 1.0 when unreachable.
-                # The reward tracker interpreted this as "player is at maximum
-                # distance from goal". If the player was near the goal
-                # (last_dijkstra ≈ 0.3) and stepped onto an unreachable tile
-                # (e.g. mid-air), the tracker computed:
-                #     dijkstra_progress = 0.3 - 1.0 = -0.7  → reward = -70
-                # This punished every jump, teaching the agent not to jump.
-                #
-                # FIX: Use the sentinel value -1.0 to signal "no valid reading".
-                # The _ScoreTracker in train_platformer.py checks for this and
-                # emits progress = 0.0 (neither reward nor penalty) instead of
-                # computing a misleading delta.
-                dijkstra_dist = -1.0   # sentinel: unreachable / off-grid
+                max_cost = float(self.level_data.cols * 2)
+                dijkstra_dist_raw = float(np.clip(d / max_cost, 0.0, 1.0))
 
         return {
             "score": self.score,
@@ -1290,7 +1275,7 @@ class PlatformerCore(gymnasium.Env):
             "lives" : self.lives,
             "event": event,
             "cause": cause,
-            "dijkstra_dist": dijkstra_dist, # Used for delta_dijkstra reward
+            "dijkstra_dist":  dijkstra_dist_raw, # Used for delta_dijkstra reward
 
             # --- Velocity Alignment / Potential-Based Shaping ---
             "on_ground": p.on_ground,
