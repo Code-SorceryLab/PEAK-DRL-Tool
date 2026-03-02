@@ -61,7 +61,7 @@ class VecnormBestCallback(BaseCallback):
     def __init__(self, eval_cb, training_env, best_model_save_path: str, verbose=0):
         super().__init__(verbose)
         self.eval_cb              = eval_cb
-        self.training_env         = training_env
+        self._vecnorm_env         = training_env
         self.best_model_save_path = Path(best_model_save_path)
         self._last_best           = -float("inf")
 
@@ -75,7 +75,7 @@ class VecnormBestCallback(BaseCallback):
             self._last_best = current_best
             self.best_model_save_path.mkdir(parents=True, exist_ok=True)
             vecnorm_path = self.best_model_save_path / "best_model_vecnorm.pkl"
-            self.training_env.save(str(vecnorm_path))
+            self._vecnorm_env.save(str(vecnorm_path))
             if self.verbose:
                 print(f"[VecnormBestCallback] New best ({current_best:.3f}) — saved → {vecnorm_path}")
         return result

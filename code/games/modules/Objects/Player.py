@@ -208,12 +208,12 @@ class Player():
         """
         print ("try fire")
         if not self.power_machine.state == PowerState.FIRE:
-            print ("can't fire: not in fire state")
+            #print ("can't fire: not in fire state")
             return False
         if self._fire_cooldown > 0.0:
-            print (f"can't fire: on cooldown for {self._fire_cooldown:.2f} more seconds")
+            #print (f"can't fire: on cooldown for {self._fire_cooldown:.2f} more seconds")
             return False
-        print ("fire!")
+        #print ("fire!")
         self.fire_requested = True
         self._fire_cooldown = _FIRE_COOLDOWN
         return True
