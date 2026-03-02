@@ -317,14 +317,14 @@ def ask_index(prompt, options, add_back=True, default=None):
     print("Invalid selection.")
     return None
 
-# def ensure_current_algo():
-#     """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
-#     global CURRENT_ALGO
+def ensure_current_algo():
+    """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
+    global CURRENT_ALGO
 
-#     if CURRENT_ALGO is None:
-#         algos = get_available_algos_from_grid()
-#         if algos:
-#             CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
+    if CURRENT_ALGO is None:
+        algos = get_available_algos_from_grid()
+        if algos:
+            CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
 
 # ============================================================================
 # TRAINING EXECUTION - Core Logic (DRY refactor)
@@ -1161,6 +1161,52 @@ def watch_trained_agent():
 
     print("\nVisualization completed.\n")
 
+def watch_all_models():
+    """Launch the grid viewer to watch ALL trained models simultaneously."""
+    print("\n=== Watch All Models (Grid View) ===")
+
+    # Quick check for models
+    from pathlib import Path as _P
+    best_dir = _P("models/best")
+    if not best_dir.exists():
+        print("No models/best/ directory found. Train some models first.")
+        return
+
+    folders = [f for f in best_dir.iterdir()
+               if f.is_dir() and (f / "best_model.zip").exists()]
+    if not folders:
+        print("No trained models found in models/best/.")
+        return
+
+    print(f"Found {len(folders)} trained model(s).")
+
+    fps_input = input("Rendering FPS? [20]: ").strip()
+    fps = int(fps_input) if fps_input.isdigit() and int(fps_input) > 0 else 20
+
+    ep_input = input("Episodes per agent? [5]: ").strip()
+    episodes = int(ep_input) if ep_input.isdigit() and int(ep_input) >= 0 else 5
+
+    env_vars = os.environ.copy()
+    env_vars.pop("SDL_VIDEODRIVER", None)
+
+    cmd = [
+        sys.executable, "watch_all.py",
+        "--fps", str(fps),
+        "--episodes", str(episodes),
+    ]
+
+    print(f"\nLaunching grid viewer ({len(folders)} models, {fps} FPS)...")
+    print(">>>", " ".join(cmd), "\n")
+
+    try:
+        subprocess.run(cmd, check=True, env=env_vars)
+    except subprocess.CalledProcessError as e:
+        print(f"\nGrid viewer exited with error code {e.returncode}")
+    except KeyboardInterrupt:
+        print("\nGrid viewer stopped by user.")
+
+    print("\nGrid view completed.\n")
+
 def run_tensorboard():
     """Launch TensorBoard with auto-open browser"""
     print("\n=== TensorBoard (auto-open, blocking) ===")
@@ -1560,14 +1606,15 @@ def main():
         print("4. Train Complete Grid (all games × algos × personas)")
         print("5. Play Game Manually (keyboard)")
         print("6. Watch Trained Agent Play (visualize AI performance)")
-        print("7. Watch Random Agent Play (random actions)")
-        print("8. View TensorBoard Logs (mylogs/)")
-        print("9. Analyze Agent Performance (CSV Logs)")
-        print("10. Delete TensorBoard Logs & Models")
-        print("11. Exit")
+        print("7. Watch All Models (side-by-side grid view)")
+        print("8. Watch Random Agent Play (random actions)")
+        print("9. View TensorBoard Logs (mylogs/)")
+        print("10. Analyze Agent Performance (CSV Logs)")
+        print("11. Delete TensorBoard Logs & Models")
+        print("12. Exit")
         print("=" * 60)
 
-        choice = input("Select option (1-11): ").strip()
+        choice = input("Select option (1-12): ").strip()
 
         if choice == "1":
             show_project_status()
@@ -1584,18 +1631,20 @@ def main():
         elif choice == "6":
             watch_trained_agent()
         elif choice == "7":
-            watch_random_agent()
+            watch_all_models()
         elif choice == "8":
-            run_tensorboard()
+            watch_random_agent()
         elif choice == "9":
-            run_agent_analyzer()
+            run_tensorboard()
         elif choice == "10":
-            delete_logs_and_models()
+            run_agent_analyzer()
         elif choice == "11":
+            delete_logs_and_models()
+        elif choice == "12":
             print("Exiting. Happy training!")
             break
         else:
-            print("Invalid selection. Please choose 1-11.\n")
+            print("Invalid selection. Please choose 1-12.\n")
 
 if __name__ == "__main__":
     main()

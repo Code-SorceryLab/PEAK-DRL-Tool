@@ -253,12 +253,12 @@ class PlatformerCore(gymnasium.Env):
         self._obs_stats = {               # Latest stats, exposed via _info()
             "grid_player_mean": 0.0, "grid_player_std": 0.0,
             "grid_player_min": 0.0, "grid_player_max": 0.0,
-            "grid_solid_mean": 0.0, "grid_solid_std": 0.0,
-            "grid_solid_min": 0.0, "grid_solid_max": 0.0,
             "grid_hazard_mean": 0.0, "grid_hazard_std": 0.0,
             "grid_hazard_min": 0.0, "grid_hazard_max": 0.0,
             "grid_collectible_mean": 0.0, "grid_collectible_std": 0.0,
             "grid_collectible_min": 0.0, "grid_collectible_max": 0.0,
+            "grid_dijkstra_mean": 0.0, "grid_dijkstra_std": 0.0,
+            "grid_dijkstra_min": 0.0, "grid_dijkstra_max": 0.0,
             "scalar_mean": 0.0, "scalar_std": 0.0,
             "scalar_min": 0.0, "scalar_max": 0.0,
             "dijkstra_val": 0.0, "obs_warnings": "",
@@ -475,7 +475,10 @@ class PlatformerCore(gymnasium.Env):
         # if self.coins_step > 0:
         #     self._calculate_dijkstra_map()
 
-        return self._obs(), base_reward, bool(terminated), bool(truncated), info
+        obs = self._obs()
+        self._check_obs_sanity(obs)
+
+        return obs, base_reward, bool(terminated), bool(truncated), info
 
 
     def reset(self, seed=None, options=None) -> np.ndarray:
@@ -771,7 +774,8 @@ class PlatformerCore(gymnasium.Env):
             return
 
         warnings_list = []
-        grid_names = ["player", "solid", "hazard", "collectible"]
+        # Stack order: Player(0), Hazard(1), Collectible(2), Dijkstra(3)
+        grid_names = ["player", "hazard", "collectible", "dijkstra"]
         grids = obs.get("grids")
         if grids is not None:
             for i, name in enumerate(grid_names):
@@ -783,7 +787,9 @@ class PlatformerCore(gymnasium.Env):
 
                 if float(ch.std()) < 1e-6 and i < 2:
                     warnings_list.append(f"Grid '{name}' DEAD")
-                if float(ch.max()) > 1.01:
+                # Channels 0-2 (player, hazard, collectible) are in [0,1];
+                # channel 3 (dijkstra) is in [-1,1], so skip the >1.0 check for it.
+                if i < 3 and float(ch.max()) > 1.01:
                     warnings_list.append(f"Grid '{name}' >1.0")
 
         scalars = obs.get("scalars")

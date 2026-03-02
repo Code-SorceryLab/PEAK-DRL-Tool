@@ -36,6 +36,7 @@ from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback, EvalCallback, CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv, VecNormalize
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sb3_contrib import RecurrentPPO
 
@@ -47,41 +48,6 @@ from code.algos import get_algo
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-class VecnormBestCallback(BaseCallback):
-    """
-    Wraps EvalCallback/RecurrentEvalCallback and saves the VecNormalize stats
-    file next to best_model.zip every time a new best reward is recorded.
-
-    The built-in EvalCallback saves best_model.zip to models/best/<folder>/
-    but vecnorm is only saved at the end of training to models/ root.
-    watch_agent.py searches the model folder first — this closes that gap.
-    """
-    def __init__(self, eval_cb, training_env, best_model_save_path: str, verbose=0):
-        super().__init__(verbose)
-        self.eval_cb              = eval_cb
-        self.training_env         = training_env
-        self.best_model_save_path = Path(best_model_save_path)
-        self._last_best           = -float("inf")
-
-    def _init_callback(self):
-        self.eval_cb.init_callback(self.model)
-
-    def _on_step(self) -> bool:
-        result = self.eval_cb._on_step()
-        current_best = getattr(self.eval_cb, "best_mean_reward", -float("inf"))
-        if current_best > self._last_best:
-            self._last_best = current_best
-            self.best_model_save_path.mkdir(parents=True, exist_ok=True)
-            vecnorm_path = self.best_model_save_path / "best_model_vecnorm.pkl"
-            self.training_env.save(str(vecnorm_path))
-            if self.verbose:
-                print(f"[VecnormBestCallback] New best ({current_best:.3f}) — saved → {vecnorm_path}")
-        return result
-
-    def _on_training_end(self):
-        self.eval_cb._on_training_end()
 
 def _pretty_steps(n: int) -> str:
     if n >= 1_000_000:
@@ -238,6 +204,113 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 # =========================================================================
 # Main training entry point
 # =========================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EvalPreviewCallback
+# ─────────────────────────────────────────────────────────────────────────────
+# Wraps EvalCallback (or RecurrentEvalCallback).
+# Every time a new best model is saved it:
+#   1. Saves the VecNormalize stats alongside best_model.zip
+#   2. Opens a live pygame window, plays 2 episodes, then closes it
+#
+# Why synchronous / in-process?
+#   Training is already PAUSED while EvalCallback runs its eval episodes.
+#   The preview just uses that idle window. No subprocess, no thread,
+#   no Windows flash-and-close, no SDL conflicts.
+# ─────────────────────────────────────────────────────────────────────────────
+class EvalPreviewCallback(BaseCallback):
+    def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
+                 make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
+        super().__init__(verbose)
+        self.eval_cb              = eval_cb
+        self._vecnorm_env         = vecnorm_env          # training VecNormalize
+        self.best_model_save_path = Path(best_model_save_path)
+        self.make_env_fn          = make_env_fn           # kept for API compat
+        self.repo_root            = Path(repo_root)
+        self.fps                  = fps
+        self.n_preview_episodes   = n_preview_episodes
+        self._last_best           = float("-inf")
+
+    # Wire the inner eval_cb so it has model / logger access
+    def _init_callback(self):
+        self.eval_cb.parent = self
+        self.eval_cb.init_callback(self.model)
+
+    def _on_step(self):
+        result = self.eval_cb.on_step()
+        current_best = getattr(self.eval_cb, "best_mean_reward", float("-inf"))
+        if current_best > self._last_best:
+            self._last_best = current_best
+            if self.verbose:
+                print(f"\n[EvalPreview] New best: {current_best:.3f}")
+            self._save_vecnorm()
+            if self.n_preview_episodes > 0:
+                self._run_preview()
+        return result
+
+    def _on_training_end(self):
+        self.eval_cb.on_training_end()
+
+    # ── Save vecnorm next to best_model.zip ───────────────────────────────
+    def _save_vecnorm(self):
+        out = self.best_model_save_path / "best_model_vecnorm.pkl"
+        try:
+            self.best_model_save_path.mkdir(parents=True, exist_ok=True)
+            self._vecnorm_env.save(str(out))
+            if self.verbose:
+                print(f"[EvalPreview] Saved vecnorm -> {out}")
+        except Exception as e:
+            print(f"[EvalPreview] vecnorm save failed: {e}")
+
+    # ── Launch watch_agent.py as a SUBPROCESS ─────────────────────────────
+    # Why subprocess?
+    #   In-process pygame init/quit cycles leak Windows GDI handles.
+    #   After enough eval cycles the OS limit (10,000) is hit and
+    #   "Couldn't create window" errors appear. A subprocess gets its
+    #   own handle space; when it exits the OS reclaims everything.
+    def _run_preview(self):
+        model_zip   = self.best_model_save_path / "best_model.zip"
+        vecnorm_pkl = self.best_model_save_path / "best_model_vecnorm.pkl"
+
+        if not model_zip.exists():
+            print(f"[EvalPreview] Skipping preview — {model_zip} not found")
+            return
+
+        cmd = [
+            sys.executable, "-m", "code.scripts.watch_agent",
+            str(model_zip),
+            "--episodes", str(self.n_preview_episodes),
+            "--fps",      str(self.fps),
+        ]
+        if vecnorm_pkl.exists():
+            cmd += ["--vecnorm", str(vecnorm_pkl)]
+
+        if self.verbose:
+            print(f"[EvalPreview] Launching preview subprocess "
+                  f"({self.n_preview_episodes} ep @ {self.fps} FPS)...")
+
+        try:
+            # Run from repo root so "code.*" imports resolve.
+            # Timeout = 120s safety net (preview should finish well before).
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(self.repo_root),
+                # Inherit stdout/stderr so preview logs are visible
+                stdout=None, stderr=None,
+            )
+            proc.wait(timeout=120)
+            if self.verbose:
+                rc = proc.returncode
+                print(f"[EvalPreview] Preview subprocess exited (rc={rc}) "
+                      f"— training resumed.\n")
+        except subprocess.TimeoutExpired:
+            print("[EvalPreview] Preview timed out — killing subprocess.")
+            proc.kill()
+            proc.wait()
+        except Exception as exc:
+            print(f"[EvalPreview] Preview error: {type(exc).__name__}: {exc}")
+
+
 @hydra.main(version_base=None, config_path="../conf", config_name="grid")
 def main(cfg: DictConfig):
     repo_root = Path(get_original_cwd())
@@ -375,7 +448,16 @@ def main(cfg: DictConfig):
 
             env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
-            eval_raw_env = DummyVecEnv([make_env()])
+            def make_monitored_env(render_mode=None):
+                """Factory that wraps the env with Monitor for proper eval logging."""
+                kw = env_kwargs.copy()
+                if render_mode is not None:
+                    kw['render_mode'] = render_mode
+                def _init():
+                    return Monitor(GameEnv(game_cls, reward_fn=active_reward_fn, **kw))
+                return _init
+
+            eval_raw_env = DummyVecEnv([make_monitored_env()])
             eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
             eval_env.training = False
             eval_env.norm_reward = False
@@ -386,30 +468,28 @@ def main(cfg: DictConfig):
                 os.makedirs(tb_dir, exist_ok=True)
 
                 log_name = f"training_log_{game_name}_{persona}.csv"
-                csv_logger = CsvLoggerCallback(log_dir=str(repo_root), file_name=log_name)
+                csv_dir = repo_root / "csv"
+                csv_dir.mkdir(parents=True, exist_ok=True)
+                csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
 
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
 
-                _best_path = str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}")
-
                 if is_recurrent_model:
-                    _inner_cb = RecurrentEvalCallback(
+                    eval_cb = RecurrentEvalCallback(
                         eval_env,
-                        best_model_save_path=_best_path,
+                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         eval_freq=eval_freq, n_eval_episodes=5,
                         deterministic=True, render=False, verbose=1,
                     )
                 else:
-                    _inner_cb = EvalCallback(
+                    eval_cb = EvalCallback(
                         eval_env,
-                        best_model_save_path=_best_path,
+                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
                         eval_freq=eval_freq,
                         deterministic=True, render=False,
                     )
-                # Saves best_model_vecnorm.pkl next to best_model.zip on every new best
-                eval_cb = VecnormBestCallback(_inner_cb, env, _best_path, verbose=1)
 
                 ckpt_cb = CheckpointCallback(
                     save_freq=save_freq,
@@ -417,35 +497,23 @@ def main(cfg: DictConfig):
                     name_prefix=f"{game_name}_{model_name}_{persona}",
                 )
 
-                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
-
-                # CHANGE 3: Live visualisation — spawns a real pygame window
+                # Wrap eval_cb: saves vecnorm + opens pygame preview on each new best
+                _best_path = (models_dir / "best" /
+                              f"{game_name}_{model_name}_{persona}_{str(skill).lower()}")
+                eval_cb = EvalPreviewCallback(
+                    eval_cb              = eval_cb,
+                    vecnorm_env          = env,
+                    best_model_save_path = _best_path,
+                    make_env_fn          = make_env,
+                    repo_root            = repo_root,
+                    fps                  = viz_fps,
+                    n_preview_episodes   = viz_preview_episodes if viz_enabled else 0,
+                    verbose              = 1,
+                )
                 if viz_enabled:
-                    from code.callbacks.LiveVisualizationCallback import LiveVisualizationCallback
+                    print("[INFO] Preview ON — window opens on each new best.")
 
-                    # The vecnorm path won't exist yet at callback-build time,
-                    # but will be written before the first trigger fires (viz_freq steps in).
-                    # We point to where train.py will save it.
-                    live_norm_path = models_dir / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_vecnorm.pkl"
-
-                    viz_cb = LiveVisualizationCallback(
-                        watch_agent_script=watch_agent_script,
-                        vecnorm_path=live_norm_path,
-                        game=game_name,
-                        algo=model_name,
-                        persona=persona,
-                        viz_freq=viz_freq,
-                        n_preview_episodes=viz_preview_episodes,
-                        fps=viz_fps,
-                        preview_save_dir=str(models_dir),
-                        verbose=1,
-                    )
-                    current_callbacks.append(viz_cb)
-                    print(
-                        f"[INFO] Live visualisation enabled — "
-                        f"a pygame window will open every {viz_freq:,} steps "
-                        f"showing {viz_preview_episodes} episode(s) at {viz_fps} FPS."
-                    )
+                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
 
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir

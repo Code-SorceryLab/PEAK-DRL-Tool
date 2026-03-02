@@ -16,7 +16,7 @@ class CsvLoggerCallback(BaseCallback):
         if os.path.exists(self.log_path):
             try:
                 os.remove(self.log_path)
-                print(f"[INFO] Ã°Å¸â€”â€˜Ã¯Â¸Â  Cleared old log file: {self.log_path}")
+                print(f"[INFO] Cleared old log file: {self.log_path}")
             except Exception as e:
                 print(f"[WARN] Could not delete old log: {e}")
 
@@ -56,7 +56,6 @@ class CsvLoggerCallback(BaseCallback):
 
         _OBS_SANITY_KEYS = [
             'grid_player_mean',      'grid_player_std',      'grid_player_min',      'grid_player_max',
-            'grid_solid_mean',       'grid_solid_std',       'grid_solid_min',       'grid_solid_max',
             'grid_hazard_mean',      'grid_hazard_std',      'grid_hazard_min',      'grid_hazard_max',
             'grid_collectible_mean', 'grid_collectible_std', 'grid_collectible_min', 'grid_collectible_max',
             'grid_dijkstra_mean',    'grid_dijkstra_std',    'grid_dijkstra_min',    'grid_dijkstra_max',
