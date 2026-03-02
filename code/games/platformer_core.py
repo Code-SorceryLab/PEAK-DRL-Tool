@@ -171,9 +171,28 @@ DEBUG_PANEL_WIDTH = 350  # Width of the side debug panel (shown only in human mo
 
 # Action Map for Debug Display
 ACTION_NAMES = {
-    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
-    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP",
-    8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
+    # ── Original 10 (no fire) ─────────────────────────────────────────
+    0:  "IDLE",
+    1:  "LEFT",
+    2:  "RIGHT",
+    3:  "JUMP",
+    4:  "RIGHT+JUMP",
+    5:  "RUN+RIGHT",
+    6:  "LEFT+JUMP",
+    7:  "RUN+RIGHT+JUMP",
+    8:  "RUN+LEFT",
+    9:  "RUN+LEFT+JUMP",
+    # ── Fire variants (offset +10) ────────────────────────────────────
+    10: "FIRE",
+    11: "LEFT+FIRE",
+    12: "RIGHT+FIRE",
+    13: "JUMP+FIRE",
+    14: "RIGHT+JUMP+FIRE",
+    15: "RUN+RIGHT+FIRE",
+    16: "LEFT+JUMP+FIRE",
+    17: "RUN+RIGHT+JUMP+FIRE",
+    18: "RUN+LEFT+FIRE",
+    19: "RUN+LEFT+JUMP+FIRE",
 }
 
 class PlatformerCore(gymnasium.Env):
@@ -301,7 +320,7 @@ class PlatformerCore(gymnasium.Env):
         })
 
         # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
-        self._act_space = spaces.Discrete(10)
+        self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)

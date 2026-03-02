@@ -155,10 +155,11 @@ class Player():
         self.anim_handler.set_state(target_state.value)
 
     def handle_input(self, a: int):
-        agent_left  = (a in (1, 6, 8, 9))
-        agent_right = (a in (2, 4, 5, 7))
-        agent_jump  = (a in (3, 4, 6, 7, 9))
-        agent_run   = (a in (5, 7, 8, 9))
+        agent_left  = (a in (1, 6, 8, 9, 11, 16, 18, 19))
+        agent_right = (a in (2, 4, 5, 7, 12, 14, 15, 17))
+        agent_jump  = (a in (3, 4, 6, 7, 9, 13, 14, 16, 17, 19))
+        agent_run   = (a in (5, 7, 8, 9, 15, 17, 18, 19))
+        agent_fire  = (a in (10, 11, 12, 13, 14, 15, 16, 17, 18, 19)) 
 
         kb_left = kb_right = kb_jump = kb_run = kb_fire = False
 
@@ -185,7 +186,7 @@ class Player():
 
         # Fire input — try_fire() enforces cooldown and power state internally.
         # fire_requested is consumed by platformer_core.step() to spawn the projectile.
-        if kb_fire:
+        if agent_fire or kb_fire:
             self.try_fire()
 
     def try_fire(self) -> bool:
