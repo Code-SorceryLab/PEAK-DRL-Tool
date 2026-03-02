@@ -12,7 +12,7 @@ from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR
 from ..System.PhysicsManager import PhysicsContext
 from ..System.AnimationHandler import AnimationHandler
 from ..System.PlayerStateMachine import PlayerStateMachine
-
+from ..System.PlayerStateMachine import PowerState
 
 # --- PLAYER SPECIFIC ENUM ---
 class PlayerAnim(Enum):
@@ -20,6 +20,10 @@ class PlayerAnim(Enum):
     RUN  = auto()
     JUMP = auto()
     FALL = auto()
+
+
+# How long (seconds) the player must wait between shots
+_FIRE_COOLDOWN = 0.35
 
 
 @dataclass
@@ -62,11 +66,21 @@ class Player():
     run_held: bool = False
     jump_pressed: bool = False
 
+    # --- FIRE STATE ---
+    # fire_requested is set True by try_fire() and consumed by platformer_core
+    # in step() to actually spawn the projectile. platformer_core is the only
+    # place that should reset this flag to False after reading it.
+    fire_requested: bool = False
+
     def __post_init__(self):
         # 1. Initialise power state machine (no on_death yet — wired later if needed)
         self.power_machine = PlayerStateMachine()
 
-        # 2. Animation paths
+        # 2. Fire cooldown timer — tracked here so try_fire() is self-contained.
+        #    Decremented in update() so it ticks even when no fire input is given.
+        self._fire_cooldown: float = 0.0
+
+        # 3. Animation paths
         default_asset = 'code/games/assets/player1.png'
 
         anim_paths = {
@@ -120,6 +134,10 @@ class Player():
         self.gObj.y += self.vy * dt
         self.on_ground = False
 
+        # 6. Tick fire cooldown — keeps it draining even when fire key is not held
+        if self._fire_cooldown > 0.0:
+            self._fire_cooldown = max(0.0, self._fire_cooldown - dt)
+
     def _update_animation_logic(self, dt: float):
         """Decides which animation state to use based on physics."""
         if not self.anim_handler:
@@ -142,7 +160,7 @@ class Player():
         agent_jump  = (a in (3, 4, 6, 7, 9))
         agent_run   = (a in (5, 7, 8, 9))
 
-        kb_left = kb_right = kb_jump = kb_run = False
+        kb_left = kb_right = kb_jump = kb_run = kb_fire = False
 
         if pygame.get_init():
             keys = pygame.key.get_pressed()
@@ -150,6 +168,7 @@ class Player():
             kb_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
             kb_jump  = keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]
             kb_run   = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+            kb_fire  = keys[pygame.K_z]   # Z fires a fireball (human mode)
 
         is_left  = agent_left  or kb_left
         is_right = agent_right or kb_right
@@ -163,6 +182,40 @@ class Player():
 
         if self.jump_pressed:
             self.jump_buffer = 6
+
+        # Fire input — try_fire() enforces cooldown and power state internally.
+        # fire_requested is consumed by platformer_core.step() to spawn the projectile.
+        if kb_fire:
+            self.try_fire()
+
+    def try_fire(self) -> bool:
+        """
+        Request a FireFlowerProjectile to be spawned on this frame.
+
+        Called by handle_input() (human key), or directly by the game loop
+        for any other trigger (e.g. an RL action).
+
+        Guards:
+          - Player must be in the FIRE power state (power_machine.is_fire).
+          - Cooldown of _FIRE_COOLDOWN seconds between shots.
+
+        When both guards pass, sets fire_requested = True and starts the
+        cooldown. platformer_core.step() reads fire_requested, spawns the
+        projectile, then resets the flag.
+
+        Returns True if a shot was queued this frame, False otherwise.
+        """
+        print ("try fire")
+        if not self.power_machine.state == PowerState.FIRE:
+            print ("can't fire: not in fire state")
+            return False
+        if self._fire_cooldown > 0.0:
+            print (f"can't fire: on cooldown for {self._fire_cooldown:.2f} more seconds")
+            return False
+        print ("fire!")
+        self.fire_requested = True
+        self._fire_cooldown = _FIRE_COOLDOWN
+        return True
 
     def apply_physics(self, dt: float, ctx: PhysicsContext):
         if self.run_held:

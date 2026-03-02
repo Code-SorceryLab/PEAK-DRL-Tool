@@ -25,6 +25,7 @@ from .modules.Objects.Enemy import Enemy
 from .modules.Objects.Powerup import Powerup
 from .modules.Objects.Coin import Coin
 from .modules.Objects.QuestionBlock import QuestionBlock
+from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile   # NEW
 
 # System
 from .modules.System.LevelLoader import LevelLoader, LevelData
@@ -420,6 +421,16 @@ class PlatformerCore(gymnasium.Env):
             else:
                 self.player.vx = 0; self.player.jump_hold = 0
 
+            # --- Fire Flower projectile spawn ---
+            # Player.handle_input() sets fire_requested via try_fire() when the
+            # Z key is pressed (human mode) or try_fire() is called externally
+            # (RL mode). We consume the flag here — the core is the only place
+            # that should read and clear it, keeping Player free of level/list refs.
+            if self.player.fire_requested:
+                self.player.fire_requested = False
+                proj = FireFlowerProjectile.from_player(self.player)
+                self.level_data.projectiles.append(proj)
+
         self.physics_manager.update_system(self.dt, self)
         self.physics_manager.resolve_collisions(self)
 
@@ -437,6 +448,12 @@ class PlatformerCore(gymnasium.Env):
             len(self.level_data.coins)    != coins_before    or
             len(self.level_data.powerups) != powerups_before):
             self._hash_dirty = True
+
+        # Prune dead projectiles so the list doesn't grow unbounded.
+        # No dirty flag needed — projectiles are not in any spatial hash.
+        self.level_data.projectiles[:] = [
+            p for p in self.level_data.projectiles if p.gObj.active
+        ]
 
         # PERF: Cache goal distance once per step.
         # _get_dist_to_goal() was called 3x per step (stall metrics, tracking obs,
@@ -522,6 +539,10 @@ class PlatformerCore(gymnasium.Env):
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
 
+        # Clear any fireballs from the previous level — they belong to the old
+        # world and should not carry over or linger across level transitions.
+        self.level_data.projectiles = []
+
         raw_grid = np.array(self.level_data.grid, dtype=np.int32)
         self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
 
@@ -569,6 +590,9 @@ class PlatformerCore(gymnasium.Env):
             self.player.input_dir    = 0
             self.player.run_held     = False
             self.player.jump_pressed = False
+            # Reset fire state so a held key from last life can't instantly re-fire
+            self.player.fire_requested  = False
+            self.player._fire_cooldown  = 0.0
 
             if preserve_power:
                 # Level completion — keep power state (stack + star timer).
@@ -1341,7 +1365,7 @@ class PlatformerCore(gymnasium.Env):
         if self.debug_manager:
             self.debug_manager.render_overlays(surface, self)
 
-            # Draw sensor rays Ã¢â‚¬â€ colour-coded, respects F1 toggle
+            # Draw sensor rays — colour-coded, respects F1 toggle
             if self.debug_manager.show_sensors and hasattr(self, 'last_rays'):
                 from .modules.System.debugging_mods.overlays import (
                     RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL)
@@ -1400,6 +1424,16 @@ class PlatformerCore(gymnasium.Env):
         for entity in visible_collectibles:
             if hasattr(entity, 'render'):
                 entity.render(surface, entity.x - cx, entity.y - cy)
+
+        # Draw active projectiles — iterated directly since they are not in any
+        # spatial hash (they move every frame and are few in number).
+        for proj in self.level_data.projectiles:
+            if proj.gObj.active:
+                proj.render(
+                    surface,
+                    proj.gObj.x - cx,
+                    proj.gObj.y - cy,
+                )
 
     def _draw_player(self, surface: pygame.Surface):
         p = self.player

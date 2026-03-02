@@ -45,6 +45,7 @@ class LevelData:
     powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
+    projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
     rows:             int                      = 0
     cols:             int                      = 0

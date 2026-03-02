@@ -10,3 +10,4 @@ class EntityType(Enum):
     TILE = auto()
     GOAL = auto()
     SPIKE = auto()
+    PROJECTILE = auto()

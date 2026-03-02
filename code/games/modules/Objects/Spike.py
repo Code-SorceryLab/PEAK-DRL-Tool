@@ -123,16 +123,12 @@ class Spike:
         w = self.gObj.width
         h = self.gObj.height
 
-        # 1. Base rectangle
-        pygame.draw.rect(surface, _COL_BASE, (int(sx), int(sy), w, h))
-
-        # 2. Spike triangle (upward-pointing)
         #    Apex at horizontal centre, top edge.
         #    Base corners at bottom-left and bottom-right.
         apex  = (int(sx + w / 2), int(sy + 1))
         bl    = (int(sx + 1),     int(sy + h - 1))
         br    = (int(sx + w - 1), int(sy + h - 1))
-        pygame.draw.polygon(surface, _COL_TRIANGLE, [apex, bl, br])
+        pygame.draw.polygon(surface, _COL_BASE, [apex, bl, br])
 
         # 3. Debug: red hitbox
         if debug:

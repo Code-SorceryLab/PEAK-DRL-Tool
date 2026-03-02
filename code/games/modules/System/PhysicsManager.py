@@ -186,6 +186,7 @@ class PhysicsManager:
         self.update_list(dt, level_data.coins)
         self.update_list(dt, level_data.powerups)
         self.update_list(dt, level_data.moving_platforms)
+        self.update_list(dt, level_data.projectiles)
 
     def update_list(self, dt: float, objects: List[Any]):
         """

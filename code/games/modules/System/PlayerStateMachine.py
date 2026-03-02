@@ -69,7 +69,7 @@ class PowerState(Enum):
 STAR_DURATION : float = 10.0   # seconds star power lasts
 HIT_IFRAMES   : float = 2.0    # seconds of i-frames after surviving a hit
 SMALL_HEIGHT  : int   = 32     # px — player height in SMALL state
-BIG_HEIGHT    : int   = 64     # px — player height in BIG / FIRE state
+BIG_HEIGHT    : int   = 42     # px — player height in BIG / FIRE state
 
 
 # ── Machine ───────────────────────────────────────────────────────────────────
