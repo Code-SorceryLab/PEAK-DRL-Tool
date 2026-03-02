@@ -31,6 +31,8 @@ from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager
 from .modules.System.debugging_mods.manager import DebugManager
+from .modules.Objects.Spike import Spike
+from .modules.Objects.MovingPlatform import MovingPlatform
 
 # Parameters
 from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
@@ -396,6 +398,13 @@ class PlatformerCore(gymnasium.Env):
             if pup.gObj.active:
                 self.physics_manager.hazard_hash.insert(pup)
 
+        # Moving platforms shift every frame — rebuild their hash so
+        # query_rect in observation and rendering always uses current positions.
+        self.physics_manager.platform_hash.clear()
+        for plat in self.level_data.moving_platforms:
+            if plat.gObj.active:
+                self.physics_manager.platform_hash.insert(plat)
+
         if self._hash_dirty:
             self.physics_manager.collectible_hash.clear()
             for coin in self.level_data.coins:
@@ -460,7 +469,7 @@ class PlatformerCore(gymnasium.Env):
         # touches them.
         if self._needs_level_transition:
             self._needs_level_transition = False
-            self.load_level()   # loads self.world (already set by complete_level())
+            self.load_level(preserve_power=True)   # win — keep power state
 
         if terminated:
             info["episode_end"] = True
@@ -504,7 +513,7 @@ class PlatformerCore(gymnasium.Env):
         self.load_level()
         return self._obs(), self._info()
 
-    def load_level(self):
+    def load_level(self, preserve_power: bool = False):
         self.alive = True
         self.frame = 0
         self.game_over = False
@@ -554,14 +563,23 @@ class PlatformerCore(gymnasium.Env):
             self.player.vy           = 0.0
             self.player.on_ground    = False
             self.player.facing_right = True
-            self.player.powered_up   = False
-            self.player.invincible_timer = 0
             self.player.coyote       = 0
             self.player.jump_hold    = 0
             self.player.jump_buffer  = 0
             self.player.input_dir    = 0
             self.player.run_held     = False
             self.player.jump_pressed = False
+
+            if preserve_power:
+                # Level completion — keep power state (stack + star timer).
+                # Only clear the i-frame window since there's no pending hit
+                # to carry over into the new level.
+                self.player.power_machine._iframes_timer = 0.0
+            else:
+                # Death or full episode reset — wipe power state back to SMALL.
+                self.player.power_machine.reset()
+                self.player.powered_up       = False
+                self.player.invincible_timer = 0
 
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
@@ -1039,7 +1057,7 @@ class PlatformerCore(gymnasium.Env):
         delta[~np.isfinite(delta)] = 0.0
 
         # Normalise to [-1, 1]
-        max_cost = float(self.level_data.cols * 2)
+        max_cost = float(math.sqrt((self.obs_height/2)**2 + (self.obs_width/2)**2))  # diagonal distance in tiles
         delta     = np.clip(delta / max_cost, -1.0, 1.0)
 
         # Place the valid slice into the full output window, leaving edge-padding
@@ -1347,7 +1365,10 @@ class PlatformerCore(gymnasium.Env):
         for tile in visible_tiles:
             if tile.x + tile.width < self.camera_x or tile.x > self.camera_x + self.WIDTH: continue
 
-            if isinstance(tile, Tile):
+            if isinstance(tile, Spike):
+                # Spike.render expects (surface, screen_x, screen_y)
+                tile.render(surface, tile.gObj.x - self.camera_x, tile.gObj.y - self.camera_y)
+            elif isinstance(tile, Tile):
                 if tile.color == COLOR_QBLOCK: continue
                 tile.render(surface, self.camera_x, self.camera_y)
             elif isinstance(tile, QuestionBlock):
@@ -1357,6 +1378,15 @@ class PlatformerCore(gymnasium.Env):
                     tile.render(surface, self.camera_x, self.camera_y)
                 except TypeError:
                     tile.render(surface, tile.x - self.camera_x, tile.y - self.camera_y)
+
+        # Moving platforms are not in static_hash (they move each frame).
+        # Query the up-to-date platform_hash by the camera viewport.
+        visible_platforms = self.physics_manager.platform_hash.query_rect(
+            self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT
+        )
+        for plat in visible_platforms:
+            if plat.gObj.active:
+                plat.render(surface, plat.gObj.x - self.camera_x, plat.gObj.y - self.camera_y)
 
     def _draw_entities(self, surface: pygame.Surface):
         cx, cy, cw, ch = self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT
