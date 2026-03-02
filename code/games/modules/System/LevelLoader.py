@@ -18,7 +18,10 @@ from ..Objects.GameObject import GameObject
 from ..Objects.Enemy import Enemy
 from ..Objects.Coin import Coin
 from ..Objects.QuestionBlock import QuestionBlock
-from ..Objects.Powerup import Powerup
+from ..Objects.Mushroom import Mushroom
+from ..Objects.LifeUp import LifeUp
+from ..Objects.StarPowerUp import StarPowerUp
+from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
 from .SpatialHash import SpatialHash
 
@@ -39,7 +42,7 @@ class LevelData:
     enemies:          List[Enemy]               = field(default_factory=list)
     coins:            List[Coin]               = field(default_factory=list)
     qblocks:          List[QuestionBlock]      = field(default_factory=list)
-    powerups:         List[Powerup]            = field(default_factory=list)
+    powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
@@ -69,6 +72,16 @@ class LevelLoader:
         self.TILE_MAP = {
             '#': (TILE_GROUND,   COLOR_GROUND,   True,  EntityType.TILE),
             '=': (TILE_PLATFORM, COLOR_PLATFORM, True,  EntityType.TILE),
+        }
+
+        # QBlock char → what the block contains
+        # '?' = coin, '>' = star, '<' = mushroom, 'F' = flower, 'L' = life
+        self.QBLOCK_CONTAINS = {
+            '?': 'coin',
+            '>': 'star',
+            '<': 'mushroom',
+            'F': 'flower',
+            'L': 'life',
         }
 
     def load_level(self, source: Union[Dict[str, Any], str]) -> LevelData:
@@ -196,23 +209,10 @@ class LevelLoader:
                         data.static_hash.insert(new_tile)
 
                 # 3. Handle Complex Entities (QBlocks, Enemies, Start Pos)
-                elif ascii_char == '?': 
+                elif ascii_char in self.QBLOCK_CONTAINS:
+                    contains = self.QBLOCK_CONTAINS[ascii_char]
                     data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="coin")
-                    qb.gObj.type_id = EntityType.QBLOCK
-                    data.qblocks.append(qb)
-                    data.static_hash.insert(qb)
-
-                elif ascii_char == '>': 
-                    data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="star")
-                    qb.gObj.type_id = EntityType.QBLOCK
-                    data.qblocks.append(qb)
-                    data.static_hash.insert(qb)
-
-                elif ascii_char == '<': 
-                    data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="mushroom")
+                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains=contains)
                     qb.gObj.type_id = EntityType.QBLOCK
                     data.qblocks.append(qb)
                     data.static_hash.insert(qb)
@@ -254,9 +254,18 @@ class LevelLoader:
                 data.coins.append(coin)
 
         if 'powerups' in dynamics:
+            _KIND_MAP = {
+                'mushroom': Mushroom,
+                'star':     StarPowerUp,
+                'flower':   FireFlower,
+                'life':     LifeUp,
+            }
             for p in dynamics['powerups']:
-                x = p.get('x', 0); y = p.get('y', 0); kind = p.get('type', 'mushroom')
-                pup = Powerup(gObj=GameObject(x, y, 20, 20, True), kind=kind)
+                x    = p.get('x', 0)
+                y    = p.get('y', 0)
+                kind = p.get('type', 'mushroom')
+                cls  = _KIND_MAP.get(kind, Mushroom)
+                pup  = cls(gObj=GameObject(x, y, 20, 20, True))
                 pup.gObj.type_id = EntityType.POWERUP
                 data.powerups.append(pup)
 

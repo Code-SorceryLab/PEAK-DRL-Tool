@@ -11,7 +11,10 @@ from ..Parameters.Jump_parameters import *
 from ..Parameters.Map_parameters import TILE_SIZE, TILE_QBLOCK, TILE_PLATFORM
 from .SpatialHash import SpatialHash
 from ..Objects.Coin import Coin
-from ..Objects.Powerup import Powerup
+from ..Objects.Mushroom import Mushroom
+from ..Objects.LifeUp import LifeUp
+from ..Objects.StarPowerUp import StarPowerUp
+from ..Objects.FireFlower import FireFlower
 from ..Objects.GameObject import GameObject
 
 @dataclass
@@ -354,6 +357,8 @@ class PhysicsManager:
                     if ent_rect.bottom >= tile_rect.top:
                         entity.gObj.y = tile_rect.top - entity.gObj.height
                         entity.vy = 0
+                        if hasattr(entity, 'on_ground'):
+                            entity.on_ground = True
                 elif entity.vy < 0: # Jumping up
                      if ent_rect.top <= tile_rect.bottom:
                         entity.gObj.y = tile_rect.bottom
@@ -614,16 +619,14 @@ class PhysicsManager:
 
     def _handle_player_powerup(self, core, player, powerup):
         """
-        Applies powerup effect via PlayerStateMachine and removes the item.
+        Applies powerup effect and removes the item.
 
-        Powerup kinds:
-          "mushroom" → collect_mushroom()  (SMALL → BIG)
-          "flower"   → collect_flower()    (any   → FIRE, auto-BIG if needed)
-          "star"     → collect_star()      (starts/refreshes star timer)
-
-        The machine handles all stack logic — no manual mutation of
-        player.powered_up or player.invincible_timer here.
-        apply_to_player() in Player.update() will sync those fields next frame.
+        Kind          Class         Effect
+        ---------     ----------    ------------------------------------
+        "mushroom"  → Mushroom    → collect_mushroom()  SMALL→BIG
+        "flower"    → FireFlower  → collect_flower()    any→FIRE
+        "star"      → StarPowerup → collect_star()      star timer
+        "life"      → LifePowerup → lives += 1          no power change
         """
         powerup.gObj.active = False
         core.powerups_step += 1
@@ -634,8 +637,11 @@ class PhysicsManager:
         elif powerup.kind == "flower":
             player.power_machine.collect_flower()
             core.score += 50
+        elif powerup.kind == "life":
+            core.lives += 1
+            core.score += 200
         else:
-            # "star" or any unknown kind defaults to star
+            # "star" or unknown → star
             player.power_machine.collect_star()
             core.score += 100
 
@@ -681,7 +687,15 @@ class PhysicsManager:
     def _hit_qblock(self, core, col: int, row: int):
         """
         Triggered when a player hits a Question Block from below.
-        Spawns the contained item (Coin, Mushroom, Star) and changes the block state.
+        Spawns the correct powerup class based on block.contains.
+
+        contains      spawns
+        ----------    ----------------
+        "coin"      → fly-up Coin
+        "mushroom"  → Mushroom  (walks, bounces)
+        "star"      → StarPowerup (bounces and jumps)
+        "flower"    → FireFlower  (stationary)
+        "life"      → LifePowerup (walks, bounces)
         """
         for block in core.level_data.qblocks:
             b_col = int(block.gObj.x // TILE_SIZE)
@@ -689,18 +703,38 @@ class PhysicsManager:
 
             if b_col == col and b_row == row and not block.hit:
                 block.hit = True
-                spawn_x, spawn_y = col * TILE_SIZE, row * TILE_SIZE - 22
+                spawn_x = col * TILE_SIZE
+                spawn_y = row * TILE_SIZE - 22
 
                 if block.contains == "coin":
-                    c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True), flyup=True, vy=-280.0, life=0.3, auto_collect=True)
+                    c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
+                             flyup=True, vy=-280.0, life=0.3, auto_collect=True)
                     c.gObj.type_id = EntityType.COIN
                     core.level_data.coins.append(c)
+
                 elif block.contains == "mushroom":
-                    p = Powerup(gObj=GameObject(spawn_x, spawn_y, 20, 20, True), kind="mushroom")
+                    p = Mushroom(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
                     p.gObj.type_id = EntityType.POWERUP
                     core.level_data.powerups.append(p)
+
+                elif block.contains == "star":
+                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
+                elif block.contains == "flower":
+                    p = FireFlower(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
+                elif block.contains == "life":
+                    p = LifeUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
                 else:
-                    p = Powerup(gObj=GameObject(spawn_x, spawn_y, 20, 20, True), kind="star")
+                    # Fallback — treat unknown as star
+                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
                     p.gObj.type_id = EntityType.POWERUP
                     core.level_data.powerups.append(p)
 
