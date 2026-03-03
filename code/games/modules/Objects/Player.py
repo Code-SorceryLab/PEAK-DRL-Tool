@@ -206,7 +206,7 @@ class Player():
 
         Returns True if a shot was queued this frame, False otherwise.
         """
-        print ("try fire")
+        # print ("try fire")
         if not self.power_machine.state == PowerState.FIRE:
             #print ("can't fire: not in fire state")
             return False

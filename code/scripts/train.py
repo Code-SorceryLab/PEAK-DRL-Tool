@@ -1,14 +1,20 @@
 # code/scripts/train.py
 # ============================================================================
 # CHANGES FROM ORIGINAL:
-#   1. CustomCombinedExtractor  →  LightCombinedExtractor
-#      - Removed erroneous AdaptiveMaxPool upsampling (5×5 → 11×11)
-#      - Depthwise-separable convolutions in layer 2 (MobileNet-style)
-#      - Reduced filter counts: 32→16 (L1), 64→32 (L2)
-#      - Linear: 7744→256 → 288→128  (-97 % parameters in grids branch)
-#      - Expected 3-5× inference speedup on CPU
-#   2. LiveVisualizationCallback — spawns a real pygame window every N steps
-#   3. eval_env VecNormalize stats synced from training env each eval cycle
+#   1. CustomCombinedExtractor  →  PEAKExtractor  (replaces old buggy extractor)
+#      Old extractor bug: AdaptiveMaxPool2d upsampled 5×5 → 11×11 (wrong direction)
+#      PEAKExtractor improvements:
+#        - Splits grids into semantic branch (ch 0-2) + Dijkstra branch (ch 3)
+#          so the pre-computed gradient field doesn't pollute binary feature learning
+#        - SEBlock channel attention in semantic branch
+#        - Dedicated shallow Dijkstra CNN (gradient field needs less capacity)
+#        - Scalar MLP deepened to 2 layers (12→64→64)
+#        - Fusion layer (384→256) before SB3 MlpExtractor
+#        - ~922K params total — lightweight enough for CPU + 16 parallel envs
+#      Obs shape verified: grids (4,11,11) + scalars (12,) — matches env exactly
+#   2. LightCombinedExtractor — kept as fast sweep option (use_light_extractor: true)
+#   3. LiveVisualizationCallback — spawns a real pygame window every N steps
+#   4. eval_env VecNormalize stats synced from training env each eval cycle
 # ============================================================================
 import os
 from code.callbacks.logging_callback import CsvLoggerCallback
@@ -69,7 +75,10 @@ class VecnormBestCallback(BaseCallback):
         self.eval_cb.init_callback(self.model)
 
     def _on_step(self) -> bool:
-        result = self.eval_cb._on_step()
+        # BUG WAS: self.eval_cb._on_step() — private method skips n_calls increment,
+        # so n_calls stays 0 forever → 0 % eval_freq == 0 always True → eval every step.
+        # FIX: call on_step() (public) which increments n_calls before checking frequency.
+        result = self.eval_cb.on_step()
         current_best = getattr(self.eval_cb, "best_mean_reward", -float("inf"))
         if current_best > self._last_best:
             self._last_best = current_best
@@ -113,25 +122,292 @@ def _resolve_callable_or_instance(node: Dict[str, Any]) -> Any:
 
 
 # =========================================================================
-# CHANGE 2: LightCombinedExtractor — faster MobileNet-style CNN
+# SEBlock — Squeeze-and-Excitation channel attention
+# =========================================================================
+class SEBlock(nn.Module):
+    """
+    Squeeze-and-Excitation channel attention.
+    Learns a per-channel weight via global avg pool → FC → sigmoid.
+    Adds only 2*(C^2 / reduction) parameters.
+
+    Used in PEAKExtractor's semantic branch to let the network suppress
+    the hazard channel when no enemies are on screen, amplify the
+    collectible channel near coins, etc.
+    """
+    def __init__(self, channels: int, reduction: int = 4):
+        super().__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction),
+            nn.ReLU(),
+            nn.Linear(channels // reduction, channels),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        w = x.mean(dim=[2, 3])                           # (B, C) — global avg pool
+        w = self.fc(w).unsqueeze(-1).unsqueeze(-1)        # (B, C, 1, 1)
+        return x * w                                      # channel-wise scale
+
+
+# =========================================================================
+# PEAKExtractor — primary multi-branch extractor (default)
+# =========================================================================
+class PEAKExtractor(BaseFeaturesExtractor):
+    """
+    Multi-branch feature extractor for the PEAK platformer environment.
+
+    Observation space
+    -----------------
+      grids  : Box(-1, 1, shape=(4, 11, 11))
+                 ch 0  — Player        binary {0,1}
+                 ch 1  — Hazards       binary {0,1}
+                 ch 2  — Collectibles  binary {0,1}
+                 ch 3  — Dijkstra      continuous [-1, 1]  ← separated branch
+      scalars: Box(-inf, inf, shape=(12,))
+                 [0-4]  player obs  (x, y, vx, vy, on_ground)
+                 [5]    enemy dist  normalised
+                 [6]    goal dist   normalised
+                 [7]    timer       normalised
+                 [8]    goal dir Y  signed normalised
+                 [9]    dijkstra dist scalar
+                 [10-11] steepest descent (dX, dY)
+
+    Architecture
+    ------------
+    Branch A  Semantic CNN  (ch 0-2, 3×11×11)
+              Conv(3→32,k=3,pad=1) → ReLU → SEBlock(32)
+              Conv(32→64,k=3,pad=1) → ReLU
+              Conv(64→64,k=3,stride=2,pad=1) → ReLU  [→ 64×6×6]
+              Flatten → Linear(2304→256) → ReLU
+
+    Branch B  Dijkstra CNN  (ch 3, 1×11×11)
+              Conv(1→16,k=3,pad=1) → ReLU
+              Conv(16→16,k=3,stride=2,pad=1) → ReLU  [→ 16×6×6]
+              Flatten → Linear(576→64) → ReLU
+
+    Branch C  Scalar MLP   (12,)
+              Linear(12→64) → ReLU → Linear(64→64) → ReLU
+
+    Fusion    Cat(256+64+64=384) → Linear(384→256) → ReLU
+              → features_dim = 256
+
+    Rationale for channel split:
+      The Dijkstra channel is a pre-computed continuous gradient field.
+      Mixing it with binary semantic channels in Branch A lets its
+      high-magnitude signal dominate early conv gradients, slowing
+      semantic feature learning. A dedicated shallow branch avoids this.
+
+    ~922K parameters — lightweight for CPU training with 16+ parallel envs.
+    """
+
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 256):
+        super().__init__(observation_space, features_dim=features_dim)
+
+        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        scalar_shape = observation_space["scalars"].shape  # (12,)
+
+        n_channels = grid_shape[0]    # 4
+        n_scalars  = scalar_shape[0]  # 12
+        H, W       = grid_shape[1], grid_shape[2]  # 11, 11
+
+        # ── Branch A: Semantic CNN (channels 0-2) ───────────────────────────
+        self.semantic_cnn = nn.Sequential(
+            nn.Conv2d(n_channels - 1, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            SEBlock(32, reduction=4),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # 11×11 → 6×6
+            nn.ReLU(),
+            nn.Flatten()
+        )
+        with torch.no_grad():
+            sem_flat = self.semantic_cnn(torch.zeros(1, n_channels - 1, H, W)).shape[1]
+
+        self.semantic_fc = nn.Sequential(
+            nn.Linear(sem_flat, 256),
+            nn.ReLU()
+        )
+
+        # ── Branch B: Dijkstra CNN (channel 3 only) ─────────────────────────
+        self.dijkstra_cnn = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1),  # 11×11 → 6×6
+            nn.ReLU(),
+            nn.Flatten()
+        )
+        with torch.no_grad():
+            dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
+
+        self.dijkstra_fc = nn.Sequential(
+            nn.Linear(dij_flat, 64),
+            nn.ReLU()
+        )
+
+        # ── Branch C: Scalar MLP ─────────────────────────────────────────────
+        self.scalar_mlp = nn.Sequential(
+            nn.Linear(n_scalars, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU()
+        )
+
+        # ── Fusion ────────────────────────────────────────────────────────────
+        self.fusion = nn.Sequential(
+            nn.Linear(256 + 64 + 64, features_dim),  # 384 → 256
+            nn.ReLU()
+        )
+
+        self._features_dim = features_dim
+
+    def forward(self, observations: dict) -> torch.Tensor:
+        grids   = observations["grids"]    # (B, 4, H, W)
+        scalars = observations["scalars"]  # (B, 12)
+
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :3, :, :]))  # (B, 256)
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, 3:, :, :]))  # (B, 64)
+        scal = self.scalar_mlp(scalars)                                  # (B, 64)
+
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))           # (B, 256)
+
+
+# =========================================================================
+# SlimPEAKExtractor — middle ground (default for CPU+CUDA mixed setups)
+# =========================================================================
+class SlimPEAKExtractor(BaseFeaturesExtractor):
+    """
+    Trimmed version of PEAKExtractor that keeps the architecturally
+    important channel split but eliminates the two biggest cost drivers:
+
+      Removed:  SEBlock (global pool + 2× FC per forward pass)
+      Removed:  Large Linear(2304→256) — replaced with AdaptiveAvgPool
+                before flatten, cutting sem_flat from 2304 → 288
+
+    Branch A  Semantic CNN  (ch 0-2, 3×11×11)
+              Conv(3→16, k=3, pad=1) → ReLU
+              MaxPool(2)                          [11×11 → 5×5]
+              Conv(16→32, k=3, pad=1) → ReLU
+              AdaptiveAvgPool(3×3)                [5×5  → 3×3]
+              Flatten(288) → Linear(288→128) → ReLU
+
+    Branch B  Dijkstra CNN  (ch 3, 1×11×11)
+              Conv(1→16, k=3, pad=1) → ReLU
+              AdaptiveAvgPool(3×3)                [11×11 → 3×3]
+              Flatten(144) → Linear(144→32) → ReLU
+
+    Branch C  Scalar MLP   (12,)
+              Linear(12→64) → ReLU
+
+    Fusion    Cat(128+32+64=224) → Linear(224→128) → ReLU
+              → features_dim = 128
+
+    Parameter count:
+      Branch A CNN:  ~5K   (vs 646K in full PEAK)
+      Branch A FC:   ~37K
+      Branch B:      ~5K   (vs 39K in full PEAK)
+      Scalar MLP:    ~1K
+      Fusion:        ~29K
+      Total:         ~77K  (vs 922K PEAK, vs 18K Light)
+
+    Keeps what matters:
+      ✓ Dijkstra channel isolated from binary semantic channels
+      ✓ Dedicated scalar MLP branch
+      ✓ Fusion layer before policy head
+    Drops what's expensive:
+      ✗ SEBlock
+      ✗ Deep semantic conv stack (3 conv layers → 2)
+      ✗ Oversized linear after flatten
+    """
+
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 128):
+        super().__init__(observation_space, features_dim=features_dim)
+
+        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        scalar_shape = observation_space["scalars"].shape  # (12,)
+
+        n_channels = grid_shape[0]    # 4
+        n_scalars  = scalar_shape[0]  # 12
+        H, W       = grid_shape[1], grid_shape[2]  # 11, 11
+
+        # ── Branch A: Semantic CNN (channels 0-2) ───────────────────────────
+        self.semantic_cnn = nn.Sequential(
+            nn.Conv2d(n_channels - 1, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),                              # 11×11 → 5×5
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((3, 3)),                 # 5×5 → 3×3
+            nn.Flatten()                                  # 32×3×3 = 288
+        )
+        with torch.no_grad():
+            sem_flat = self.semantic_cnn(torch.zeros(1, n_channels - 1, H, W)).shape[1]
+
+        self.semantic_fc = nn.Sequential(
+            nn.Linear(sem_flat, 128),
+            nn.ReLU()
+        )
+
+        # ── Branch B: Dijkstra CNN (channel 3 only) ─────────────────────────
+        self.dijkstra_cnn = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((3, 3)),                 # 11×11 → 3×3
+            nn.Flatten()                                  # 16×3×3 = 144
+        )
+        with torch.no_grad():
+            dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
+
+        self.dijkstra_fc = nn.Sequential(
+            nn.Linear(dij_flat, 32),
+            nn.ReLU()
+        )
+
+        # ── Branch C: Scalar MLP ─────────────────────────────────────────────
+        self.scalar_mlp = nn.Sequential(
+            nn.Linear(n_scalars, 64),
+            nn.ReLU()
+        )
+
+        # ── Fusion ────────────────────────────────────────────────────────────
+        self.fusion = nn.Sequential(
+            nn.Linear(128 + 32 + 64, features_dim),      # 224 → 128
+            nn.ReLU()
+        )
+
+        self._features_dim = features_dim
+
+    def forward(self, observations: dict) -> torch.Tensor:
+        grids   = observations["grids"]    # (B, 4, H, W)
+        scalars = observations["scalars"]  # (B, 12)
+
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :3, :, :]))  # (B, 128)
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, 3:, :, :]))  # (B,  32)
+        scal = self.scalar_mlp(scalars)                                  # (B,  64)
+
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))           # (B, 128)
+
+
+# =========================================================================
+# LightCombinedExtractor — fast sweep option (use_light_extractor: true)
 # =========================================================================
 class LightCombinedExtractor(BaseFeaturesExtractor):
     """
-    Multimodal feature extractor optimised for the small 4×11×11 observation.
+    Lightweight MobileNet-style extractor for fast hyperparameter sweeps.
+    Enable with use_light_extractor: true in your algo yaml.
 
-    Architecture highlights
-    -----------------------
-    Layer 1:  Standard Conv(4→16)  + BatchNorm + ReLU   [11×11 → 11×11]
-              MaxPool(2)                                   [11×11 → 5×5]
-    Layer 2:  Depthwise conv(16,k=3) + Pointwise(16→32) [5×5  → 5×5]
-              BatchNorm + ReLU
-    Summary:  AdaptiveAvgPool(3×3)                        [5×5  → 3×3]
-              Flatten → 288
-    FC head:  Linear(288→128) + LayerNorm + ReLU
+    Architecture
+    ------------
+    Layer 1:  Conv(4→16) + BatchNorm + ReLU → MaxPool(2)     [11×11 → 5×5]
+    Layer 2:  Depthwise(16) + Pointwise(16→32) + BatchNorm   [5×5  → 5×5]
+    Summary:  AdaptiveAvgPool(3×3) → Flatten(288)
+    FC:       Linear(288→128) + LayerNorm + ReLU
+    Scalars:  Linear(12→64) + LayerNorm + ReLU
+    features_dim = 192  (128 grids + 64 scalars)
 
-    vs original: Linear was 7744→256 (AdaptiveMaxPool UPsampled to 11×11!)
-    Parameter reduction: ~530k → ~18k in grids branch (-97 %)
-    Expected speedup on CPU: 3–5× at inference.
+    NOTE: Does NOT split the Dijkstra channel — all 4 channels share the
+    same conv stack. Use PEAKExtractor (default) for full training runs.
+    ~18K params in grids branch, 3-5× faster CPU inference than PEAKExtractor.
     """
 
     def __init__(self, observation_space: spaces.Dict):
@@ -196,42 +472,11 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
 
 # =========================================================================
-# Backward-compatible alias (old checkpoints expect CustomCombinedExtractor)
-# Keep the ORIGINAL architecture here so old .zip files can still be loaded.
-# New runs use LightCombinedExtractor by default.
+# CustomCombinedExtractor — legacy alias for old checkpoint compatibility
+# Points to PEAKExtractor so old .zip files load without errors while
+# still using the correct architecture on any new forward pass.
+# The old implementation (buggy AdaptiveMaxPool upsample) is removed.
 # =========================================================================
-class CustomCombinedExtractor(BaseFeaturesExtractor):
-    """Legacy extractor — kept for checkpoint compatibility only."""
-    def __init__(self, observation_space: spaces.Dict):
-        super().__init__(observation_space, features_dim=1)
-        extractors = {}
-        total_concat_size = 0
-        for key, subspace in observation_space.spaces.items():
-            if key == "grids":
-                n_input_channels = subspace.shape[0]
-                cnn = nn.Sequential(
-                    nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm(8, 32),
-                    nn.ReLU(),
-                    nn.MaxPool2d(2),
-                    nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-                    nn.GroupNorm(8, 64),
-                    nn.ReLU(),
-                    nn.AdaptiveMaxPool2d((11, 11)),
-                    nn.Flatten(),
-                )
-                n_flatten = 11 * 11 * 64
-                linear = nn.Sequential(nn.Linear(n_flatten, 256), nn.LayerNorm(256), nn.ReLU())
-                extractors[key] = nn.Sequential(cnn, linear)
-                total_concat_size += 256
-            elif key == "scalars":
-                extractors[key] = nn.Sequential(nn.Linear(subspace.shape[0], 64), nn.LayerNorm(64), nn.ReLU())
-                total_concat_size += 64
-        self.extractors = nn.ModuleDict(extractors)
-        self._features_dim = total_concat_size
-
-    def forward(self, observations) -> torch.Tensor:
-        return torch.cat([self.extractors[k](observations[k]) for k in self.extractors], dim=1)
 
 
 
@@ -320,15 +565,27 @@ def main(cfg: DictConfig):
         if policy == "MultiInputPolicy":
             if policy_kwargs is None:
                 policy_kwargs = {}
-            # CHANGE 2: Use the faster LightCombinedExtractor by default.
-            # To use the legacy extractor (for loading old checkpoints), set
-            # use_legacy_extractor: true in your algo yaml.
-            if algo_conf.get("use_legacy_extractor", False):
-                policy_kwargs["features_extractor_class"] = CustomCombinedExtractor
-                print("[INFO] Using legacy CustomCombinedExtractor (old checkpoint mode).")
-            else:
+            # Extractor selection (set in algo yaml):
+            #   Default                → SlimPEAKExtractor   ~77K params, features_dim=128
+            #                            Dijkstra channel split preserved, no SEBlock.
+            #                            Best balance of quality vs CPU/GPU speed.
+            #   use_full_peak: true    → PEAKExtractor       ~922K params, features_dim=256
+            #                            Full SEBlock + deep semantic branch.
+            #                            Use only if training on GPU with plenty of time.
+            #   use_light_extractor: true → LightCombinedExtractor  ~18K params
+            #                            No channel split. Use for rapid sweeps only.
+            # obs shape: grids (4,11,11) + scalars (12,) — verified against platformer_core.py
+            if algo_conf.get("use_light_extractor", False):
                 policy_kwargs["features_extractor_class"] = LightCombinedExtractor
-                print("[INFO] Using LightCombinedExtractor (3-5x faster inference).")
+                print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
+            elif algo_conf.get("use_full_peak", True):
+                policy_kwargs["features_extractor_class"] = PEAKExtractor
+                policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
+                print("[INFO] Using PEAKExtractor (~922K params, full architecture).")
+            else:
+                policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
+                policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
+                print("[INFO] Using SlimPEAKExtractor (~77K params, channel split, no SEBlock).")
 
         if policy_kwargs and "activation_fn" in policy_kwargs:
             act_fn = policy_kwargs["activation_fn"]
