@@ -99,7 +99,13 @@ levels:
     #   x: 800.0
     #   y: 350.0
 
-    # dynamics:
+    dynamics:
+      moving_platforms:
+        - start: [320, 384]     # world pixels — col 10, row 12 at 32px tiles
+          end: [640, 384]       # same row, col 20 — purely horizontal travel
+          speed: 80.0           # pixels per second
+          width: 96             # 3 tiles wide
+          height: 16            # half tile tall
     #   enemies:
     #     - type: "Enemy"
     #       x: 832

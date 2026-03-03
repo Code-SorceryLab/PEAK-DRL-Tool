@@ -25,12 +25,15 @@ from .modules.Objects.Enemy import Enemy
 from .modules.Objects.Powerup import Powerup
 from .modules.Objects.Coin import Coin
 from .modules.Objects.QuestionBlock import QuestionBlock
+from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile   # NEW
 
 # System
 from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager
 from .modules.System.debugging_mods.manager import DebugManager
+from .modules.Objects.Spike import Spike
+from .modules.Objects.MovingPlatform import MovingPlatform
 
 # Parameters
 from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
@@ -168,9 +171,28 @@ DEBUG_PANEL_WIDTH = 350  # Width of the side debug panel (shown only in human mo
 
 # Action Map for Debug Display
 ACTION_NAMES = {
-    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
-    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP",
-    8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
+    # ── Original 10 (no fire) ─────────────────────────────────────────
+    0:  "IDLE",
+    1:  "LEFT",
+    2:  "RIGHT",
+    3:  "JUMP",
+    4:  "RIGHT+JUMP",
+    5:  "RUN+RIGHT",
+    6:  "LEFT+JUMP",
+    7:  "RUN+RIGHT+JUMP",
+    8:  "RUN+LEFT",
+    9:  "RUN+LEFT+JUMP",
+    # ── Fire variants (offset +10) ────────────────────────────────────
+    10: "FIRE",
+    11: "LEFT+FIRE",
+    12: "RIGHT+FIRE",
+    13: "JUMP+FIRE",
+    14: "RIGHT+JUMP+FIRE",
+    15: "RUN+RIGHT+FIRE",
+    16: "LEFT+JUMP+FIRE",
+    17: "RUN+RIGHT+JUMP+FIRE",
+    18: "RUN+LEFT+FIRE",
+    19: "RUN+LEFT+JUMP+FIRE",
 }
 
 class PlatformerCore(gymnasium.Env):
@@ -298,7 +320,7 @@ class PlatformerCore(gymnasium.Env):
         })
 
         # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
-        self._act_space = spaces.Discrete(10)
+        self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
@@ -396,6 +418,13 @@ class PlatformerCore(gymnasium.Env):
             if pup.gObj.active:
                 self.physics_manager.hazard_hash.insert(pup)
 
+        # Moving platforms shift every frame — rebuild their hash so
+        # query_rect in observation and rendering always uses current positions.
+        self.physics_manager.platform_hash.clear()
+        for plat in self.level_data.moving_platforms:
+            if plat.gObj.active:
+                self.physics_manager.platform_hash.insert(plat)
+
         if self._hash_dirty:
             self.physics_manager.collectible_hash.clear()
             for coin in self.level_data.coins:
@@ -410,6 +439,16 @@ class PlatformerCore(gymnasium.Env):
                 self.player.handle_input(a = int(action))
             else:
                 self.player.vx = 0; self.player.jump_hold = 0
+
+            # --- Fire Flower projectile spawn ---
+            # Player.handle_input() sets fire_requested via try_fire() when the
+            # Z key is pressed (human mode) or try_fire() is called externally
+            # (RL mode). We consume the flag here — the core is the only place
+            # that should read and clear it, keeping Player free of level/list refs.
+            if self.player.fire_requested:
+                self.player.fire_requested = False
+                proj = FireFlowerProjectile.from_player(self.player)
+                self.level_data.projectiles.append(proj)
 
         self.physics_manager.update_system(self.dt, self)
         self.physics_manager.resolve_collisions(self)
@@ -428,6 +467,12 @@ class PlatformerCore(gymnasium.Env):
             len(self.level_data.coins)    != coins_before    or
             len(self.level_data.powerups) != powerups_before):
             self._hash_dirty = True
+
+        # Prune dead projectiles so the list doesn't grow unbounded.
+        # No dirty flag needed — projectiles are not in any spatial hash.
+        self.level_data.projectiles[:] = [
+            p for p in self.level_data.projectiles if p.gObj.active
+        ]
 
         # PERF: Cache goal distance once per step.
         # _get_dist_to_goal() was called 3x per step (stall metrics, tracking obs,
@@ -460,7 +505,7 @@ class PlatformerCore(gymnasium.Env):
         # touches them.
         if self._needs_level_transition:
             self._needs_level_transition = False
-            self.load_level()   # loads self.world (already set by complete_level())
+            self.load_level(preserve_power=True)   # win — keep power state
 
         if terminated:
             info["episode_end"] = True
@@ -507,7 +552,7 @@ class PlatformerCore(gymnasium.Env):
         self.load_level()
         return self._obs(), self._info()
 
-    def load_level(self):
+    def load_level(self, preserve_power: bool = False):
         self.alive = True
         self.frame = 0
         self.game_over = False
@@ -515,6 +560,10 @@ class PlatformerCore(gymnasium.Env):
 
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
+
+        # Clear any fireballs from the previous level — they belong to the old
+        # world and should not carry over or linger across level transitions.
+        self.level_data.projectiles = []
 
         raw_grid = np.array(self.level_data.grid, dtype=np.int32)
         self.solid_grid_np = (raw_grid != TILE_AIR).astype(np.float32)
@@ -557,14 +606,26 @@ class PlatformerCore(gymnasium.Env):
             self.player.vy           = 0.0
             self.player.on_ground    = False
             self.player.facing_right = True
-            self.player.powered_up   = False
-            self.player.invincible_timer = 0
             self.player.coyote       = 0
             self.player.jump_hold    = 0
             self.player.jump_buffer  = 0
             self.player.input_dir    = 0
             self.player.run_held     = False
             self.player.jump_pressed = False
+            # Reset fire state so a held key from last life can't instantly re-fire
+            self.player.fire_requested  = False
+            self.player._fire_cooldown  = 0.0
+
+            if preserve_power:
+                # Level completion — keep power state (stack + star timer).
+                # Only clear the i-frame window since there's no pending hit
+                # to carry over into the new level.
+                self.player.power_machine._iframes_timer = 0.0
+            else:
+                # Death or full episode reset — wipe power state back to SMALL.
+                self.player.power_machine.reset()
+                self.player.powered_up       = False
+                self.player.invincible_timer = 0
 
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
@@ -1045,7 +1106,7 @@ class PlatformerCore(gymnasium.Env):
         delta[~np.isfinite(delta)] = 0.0
 
         # Normalise to [-1, 1]
-        max_cost = float(self.level_data.cols * 2)
+        max_cost = float(math.sqrt((self.obs_height/2)**2 + (self.obs_width/2)**2))  # diagonal distance in tiles
         delta     = np.clip(delta / max_cost, -1.0, 1.0)
 
         # Place the valid slice into the full output window, leaving edge-padding
@@ -1329,7 +1390,7 @@ class PlatformerCore(gymnasium.Env):
         if self.debug_manager:
             self.debug_manager.render_overlays(surface, self)
 
-            # Draw sensor rays Ã¢â‚¬â€ colour-coded, respects F1 toggle
+            # Draw sensor rays — colour-coded, respects F1 toggle
             if self.debug_manager.show_sensors and hasattr(self, 'last_rays'):
                 from .modules.System.debugging_mods.overlays import (
                     RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL)
@@ -1353,7 +1414,10 @@ class PlatformerCore(gymnasium.Env):
         for tile in visible_tiles:
             if tile.x + tile.width < self.camera_x or tile.x > self.camera_x + self.WIDTH: continue
 
-            if isinstance(tile, Tile):
+            if isinstance(tile, Spike):
+                # Spike.render expects (surface, screen_x, screen_y)
+                tile.render(surface, tile.gObj.x - self.camera_x, tile.gObj.y - self.camera_y)
+            elif isinstance(tile, Tile):
                 if tile.color == COLOR_QBLOCK: continue
                 tile.render(surface, self.camera_x, self.camera_y)
             elif isinstance(tile, QuestionBlock):
@@ -1363,6 +1427,15 @@ class PlatformerCore(gymnasium.Env):
                     tile.render(surface, self.camera_x, self.camera_y)
                 except TypeError:
                     tile.render(surface, tile.x - self.camera_x, tile.y - self.camera_y)
+
+        # Moving platforms are not in static_hash (they move each frame).
+        # Query the up-to-date platform_hash by the camera viewport.
+        visible_platforms = self.physics_manager.platform_hash.query_rect(
+            self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT
+        )
+        for plat in visible_platforms:
+            if plat.gObj.active:
+                plat.render(surface, plat.gObj.x - self.camera_x, plat.gObj.y - self.camera_y)
 
     def _draw_entities(self, surface: pygame.Surface):
         cx, cy, cw, ch = self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT
@@ -1376,6 +1449,16 @@ class PlatformerCore(gymnasium.Env):
         for entity in visible_collectibles:
             if hasattr(entity, 'render'):
                 entity.render(surface, entity.x - cx, entity.y - cy)
+
+        # Draw active projectiles — iterated directly since they are not in any
+        # spatial hash (they move every frame and are few in number).
+        for proj in self.level_data.projectiles:
+            if proj.gObj.active:
+                proj.render(
+                    surface,
+                    proj.gObj.x - cx,
+                    proj.gObj.y - cy,
+                )
 
     def _draw_player(self, surface: pygame.Surface):
         p = self.player

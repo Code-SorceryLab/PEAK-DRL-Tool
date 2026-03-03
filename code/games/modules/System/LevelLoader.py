@@ -12,11 +12,16 @@ from ..Parameters.Map_parameters import (
     COLOR_QBLOCK, TILE_SIZE
 )
 from ..Objects.Tile import Tile, create_tile
+from ..Objects.Spike import Spike
+from ..Objects.MovingPlatform import MovingPlatform
 from ..Objects.GameObject import GameObject
 from ..Objects.Enemy import Enemy
 from ..Objects.Coin import Coin
 from ..Objects.QuestionBlock import QuestionBlock
-from ..Objects.Powerup import Powerup
+from ..Objects.Mushroom import Mushroom
+from ..Objects.LifeUp import LifeUp
+from ..Objects.StarPowerUp import StarPowerUp
+from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
 from .SpatialHash import SpatialHash
 
@@ -24,20 +29,29 @@ from .SpatialHash import SpatialHash
 class LevelData:
     """
     Data Transfer Object to hold all level assets.
+
+    Spatial hashes owned here:
+      static_hash  — immovable geometry (ground, platforms, spikes, qblocks).
+                     Built once at load time, never rebuilt mid-episode.
+
+    Moving-platform and enemy/collectible hashes are owned by PhysicsManager
+    and rebuilt every frame in platformer_core.step() because those objects move.
     """
-    tiles: List[List[Tile]] = field(default_factory=list)
-    grid: List[List[int]] = field(default_factory=list)
-    enemies: List[Enemy] = field(default_factory=list)
-    coins: List[Coin] = field(default_factory=list)
-    qblocks: List[QuestionBlock] = field(default_factory=list)
-    powerups: List[Powerup] = field(default_factory=list)
-    goals: List[Goal] = field(default_factory=list)
-    player_start: Tuple[float, float] = (100.0, 350.0)
-    rows: int = 0
-    cols: int = 0
-    width: float = 0.0
-    height: float = 0.0
-    static_hash: SpatialHash = field(default_factory=lambda: SpatialHash(64))
+    tiles:            List[List[Tile]]          = field(default_factory=list)
+    grid:             List[List[int]]           = field(default_factory=list)
+    enemies:          List[Enemy]               = field(default_factory=list)
+    coins:            List[Coin]               = field(default_factory=list)
+    qblocks:          List[QuestionBlock]      = field(default_factory=list)
+    powerups:         List[Any]              = field(default_factory=list)
+    goals:            List[Goal]               = field(default_factory=list)
+    moving_platforms: List[MovingPlatform]     = field(default_factory=list)
+    projectiles:      List[Any]              = field(default_factory=list)
+    player_start:     Tuple[float, float]      = (100.0, 350.0)
+    rows:             int                      = 0
+    cols:             int                      = 0
+    width:            float                    = 0.0
+    height:           float                    = 0.0
+    static_hash:      SpatialHash              = field(default_factory=lambda: SpatialHash(64))
 
 class LevelLoader:
     """
@@ -55,10 +69,20 @@ class LevelLoader:
         
         # --- DICTIONARY MAPPING FOR STATIC TILES ---
         # Char -> (TileType, Color, Solid, EntityType)
+        # Note: '^' (Spike) is handled separately to instantiate the Spike class.
         self.TILE_MAP = {
-            '#': (TILE_GROUND, COLOR_GROUND, True, EntityType.TILE),
-            '=': (TILE_PLATFORM, COLOR_PLATFORM, True, EntityType.TILE),
-            '^': (TILE_SPIKE, COLOR_SPIKE, False, EntityType.SPIKE),
+            '#': (TILE_GROUND,   COLOR_GROUND,   True,  EntityType.TILE),
+            '=': (TILE_PLATFORM, COLOR_PLATFORM, True,  EntityType.TILE),
+        }
+
+        # QBlock char → what the block contains
+        # '?' = coin, '>' = star, '<' = mushroom, 'F' = flower, 'L' = life
+        self.QBLOCK_CONTAINS = {
+            '?': 'coin',
+            '>': 'star',
+            '<': 'mushroom',
+            'F': 'flower',
+            'L': 'life',
         }
 
     def load_level(self, source: Union[Dict[str, Any], str]) -> LevelData:
@@ -68,35 +92,64 @@ class LevelLoader:
         1. Determines if the source is a Dictionary (YAML config) or String (file path).
         2. Constructs the full file path to the ASCII map file.
         3. Calls _parse_ascii_map to generate the grid and static geometry.
-        4. If a YAML config was provided, calls _spawn_entities_from_yaml to add extra dynamic objects.
-        5. Returns the fully populated LevelData object.
+        4. Loads a per-level sidecar YAML ([level].yaml) if it exists alongside the .txt.
+        5. If a YAML config was provided, calls _spawn_entities_from_yaml for extra dynamics.
+        6. Inserts spikes into hazard_hash, moving platforms into dynamic_hash.
+        7. Returns the fully populated LevelData object.
         """
-        data = LevelData()
+        data     = LevelData()
         filename = ""
-        config = {}
+        config   = {}
 
         # 1. Determine input type
         if isinstance(source, dict):
-            config = source
-            raw_file = config.get('file', '') 
+            config   = source
+            raw_file = config.get('file', '')
             filename = os.path.basename(raw_file)
         elif isinstance(source, str):
             filename = os.path.basename(source)
-            config = {} 
-        
+            config   = {}
+
         # 2. Build full path
         txt_path = os.path.join(self.level_path, filename)
-        
+
         if os.path.exists(txt_path):
             self._parse_ascii_map(txt_path, data)
         else:
-            print(f"[LevelLoader] Warning: Level file {txt_path} not found. Returning empty/default data.")
+            print(f"[LevelLoader] Warning: Level file {txt_path} not found.")
 
-        # 3. Spawn Dynamic Entities if config exists (Additive to ASCII spawns)
+        # 3. Load sidecar YAML ([level_name].yaml next to the .txt)
+        sidecar_path = txt_path.rsplit('.', 1)[0] + '.yaml'
+        sidecar_dynamics: Dict[str, Any] = {}
+        if os.path.exists(sidecar_path):
+            try:
+                with open(sidecar_path, 'r') as f:
+                    sidecar_data = yaml.safe_load(f) or {}
+                sidecar_dynamics = sidecar_data.get('dynamics', {}) or {}
+            except Exception as e:
+                print(f"[LevelLoader] Sidecar YAML error ({sidecar_path}): {e}")
+
+        # 4. Merge config dynamics + sidecar dynamics then spawn
+        merged_dynamics: Dict[str, Any] = {}
+        if sidecar_dynamics:
+            self._dict_merge(merged_dynamics, sidecar_dynamics)
         if config and 'dynamics' in config:
-            self._spawn_entities_from_yaml(config['dynamics'], data)
+            self._dict_merge(merged_dynamics, config['dynamics'])
+
+        if merged_dynamics:
+            self._spawn_entities_from_yaml(merged_dynamics, data)
 
         return data
+
+    def _dict_merge(self, base: dict, override: dict):
+        """Recursively merge override into base (list values are extended)."""
+        for k, v in override.items():
+            if k in base and isinstance(base[k], list) and isinstance(v, list):
+                base[k].extend(v)
+            elif k in base and isinstance(base[k], dict) and isinstance(v, dict):
+                self._dict_merge(base[k], v)
+            else:
+                base[k] = v
 
     def _parse_ascii_map(self, path: str, data: LevelData):
         """
@@ -126,44 +179,41 @@ class LevelLoader:
             for col in range(len(curr_row)):
                 ascii_char = curr_row[col]
                 
-                # 1. Handle Static Tiles via Dictionary
-                if ascii_char in self.TILE_MAP:
+                # 1. Handle Spikes with dedicated Spike class
+                if ascii_char == '^':
+                    spike = Spike.from_tile(col * TILE_SIZE, row * TILE_SIZE)
+                    data.grid[row][col] = TILE_SPIKE
+                    data.tiles[row][col] = spike
+                    # Spikes go into static_hash only — PhysicsManager._resolve_player_world
+                    # already detects EntityType.SPIKE via _get_tile_rects_near and routes
+                    # to core._handle_death(). No separate hazard_hash needed.
+                    data.static_hash.insert(spike)
+
+                # 2. Handle other Static Tiles via Dictionary
+                elif ascii_char in self.TILE_MAP:
                     t_type, color, solid, e_type = self.TILE_MAP[ascii_char]
                     
                     data.grid[row][col] = t_type
                     new_tile = create_tile(t_type, col * TILE_SIZE, row * TILE_SIZE, solid, color)
                     
-                    new_tile.type_id = e_type
+                    # IMPORTANT: new_tile.type_id is the int constant (TILE_GROUND,
+                    # TILE_PLATFORM etc.) set by create_tile — do NOT overwrite it.
+                    # _get_tile_rects_near reads item.type_id to distinguish platforms
+                    # from ground tiles for one-way collision. Overwriting with
+                    # EntityType.TILE loses that information.
+                    # Only set the gObj EntityType for dispatch/filter purposes.
                     new_tile.gObj.type_id = e_type
                     
                     data.tiles[row][col] = new_tile
                     
-                    # Add Solids and Spikes to static hash
                     if solid:
                         data.static_hash.insert(new_tile)
-                    if t_type == EntityType.SPIKE:
-                        data.enemies.append(new_tile)
 
-                # 2. Handle Complex Entities (QBlocks, Enemies, Start Pos)
-                elif ascii_char == '?': 
-                    # QBlock is both an entity and a solid tile
+                # 3. Handle Complex Entities (QBlocks, Enemies, Start Pos)
+                elif ascii_char in self.QBLOCK_CONTAINS:
+                    contains = self.QBLOCK_CONTAINS[ascii_char]
                     data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="coin")
-                    qb.gObj.type_id = EntityType.QBLOCK
-                    data.qblocks.append(qb)
-                    data.static_hash.insert(qb)
-
-                elif ascii_char == '>': 
-                    # QBlock is both an entity and a solid tile
-                    data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="star")
-                    qb.gObj.type_id = EntityType.QBLOCK
-                    data.qblocks.append(qb)
-                    data.static_hash.insert(qb)
-                elif ascii_char == '<': 
-                    # QBlock is both an entity and a solid tile
-                    data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains="mushroom")
+                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains=contains)
                     qb.gObj.type_id = EntityType.QBLOCK
                     data.qblocks.append(qb)
                     data.static_hash.insert(qb)
@@ -187,7 +237,8 @@ class LevelLoader:
 
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """
-        Parses the 'dynamics' section of the YAML config.
+        Parses the 'dynamics' section of a YAML config or sidecar file.
+        Supports: enemies, coins, powerups, moving_platforms.
         """
         if 'enemies' in dynamics:
             for e in dynamics['enemies']:
@@ -204,8 +255,38 @@ class LevelLoader:
                 data.coins.append(coin)
 
         if 'powerups' in dynamics:
+            _KIND_MAP = {
+                'mushroom': Mushroom,
+                'star':     StarPowerUp,
+                'flower':   FireFlower,
+                'life':     LifeUp,
+            }
             for p in dynamics['powerups']:
-                x = p.get('x', 0); y = p.get('y', 0); kind = p.get('type', 'mushroom')
-                pup = Powerup(gObj=GameObject(x, y, 20, 20, True), kind=kind)
+                x    = p.get('x', 0)
+                y    = p.get('y', 0)
+                kind = p.get('type', 'mushroom')
+                cls  = _KIND_MAP.get(kind, Mushroom)
+                pup  = cls(gObj=GameObject(x, y, 20, 20, True))
                 pup.gObj.type_id = EntityType.POWERUP
                 data.powerups.append(pup)
+
+        if 'moving_platforms' in dynamics:
+            for mp_data in dynamics['moving_platforms']:
+                start  = mp_data.get('start',  [0, 0])
+                end    = mp_data.get('end',    [64, 0])
+                speed  = float(mp_data.get('speed',  80.0))
+                width  = int(mp_data.get('width',  TILE_SIZE * 3))
+                height = int(mp_data.get('height', TILE_SIZE // 2))
+                plat = MovingPlatform.from_points(
+                    start=tuple(start),
+                    end=tuple(end),
+                    speed=speed,
+                    width=width,
+                    height=height,
+                )
+                data.moving_platforms.append(plat)
+                # NOTE: Moving platforms are NOT inserted into static_hash.
+                # static_hash is for immovable geometry only — anything in it is
+                # assumed to never change position. Platforms move every frame and
+                # are instead managed through PhysicsManager.platform_hash, which
+                # is rebuilt each step() in platformer_core.
