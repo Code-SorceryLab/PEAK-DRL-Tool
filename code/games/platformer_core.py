@@ -277,10 +277,12 @@ class PlatformerCore(gymnasium.Env):
             "grid_player_min": 0.0, "grid_player_max": 0.0,
             "grid_solid_mean": 0.0, "grid_solid_std": 0.0,
             "grid_solid_min": 0.0, "grid_solid_max": 0.0,
-            "grid_hazard_mean": 0.0, "grid_hazard_std": 0.0,
-            "grid_hazard_min": 0.0, "grid_hazard_max": 0.0,
             "grid_collectible_mean": 0.0, "grid_collectible_std": 0.0,
             "grid_collectible_min": 0.0, "grid_collectible_max": 0.0,
+            "grid_hazard_mean": 0.0, "grid_hazard_std": 0.0,
+            "grid_hazard_min": 0.0, "grid_hazard_max": 0.0,
+            "grid_dijkstra_mean": 0.0, "grid_dijkstra_std": 0.0,
+            "grid_dijkstra_min": 0.0, "grid_dijkstra_max": 0.0,
             "scalar_mean": 0.0, "scalar_std": 0.0,
             "scalar_min": 0.0, "scalar_max": 0.0,
             "dijkstra_val": 0.0, "obs_warnings": "",
@@ -306,11 +308,14 @@ class PlatformerCore(gymnasium.Env):
         self.dijkstra = None
         self.dijkstra_current_tile= 0.0
         self._obs_space = spaces.Dict({
-            # 5 Channels: Player, Solid, Hazard, Collectible, Dijkstra-Advantage
-            # low=-1.0 because the Dijkstra channel is a relative advantage map
-            # in [-1, 1] where positive = closer to goal than player's tile,
-            # negative = further away. All other channels remain in [0, 1].
-            "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
+            # 5 Channels (in order): Player, Solids, Collectible, Hazard, Dijkstra-Advantage
+            #   0 - Player       : tiles occupied by the player bounding box
+            #   1 - Solids       : ground, static platforms, moving platforms, question blocks
+            #   2 - Collectible  : coins, powerups, goals
+            #   3 - Hazard       : enemies, spikes
+            #   4 - Dijkstra     : relative advantage map in [-1, 1]
+            # low=-1.0 because channel 4 spans [-1, 1]; channels 0-3 are binary {0, 1}.
+            "grids": spaces.Box(low=-1.0, high=1.0, shape=(5, self.obs_height, self.obs_width), dtype=np.float32),
 
             # Scalars: 18 (Player=5, Tracking=13)
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
@@ -800,7 +805,7 @@ class PlatformerCore(gymnasium.Env):
             return
 
         warnings_list = []
-        grid_names = ["player", "solid", "hazard", "collectible"]
+        grid_names = ["player", "solid", "collectible", "hazard", "dijkstra"]
         grids = obs.get("grids")
         if grids is not None:
             for i, name in enumerate(grid_names):
@@ -844,11 +849,8 @@ class PlatformerCore(gymnasium.Env):
         # NULL Check Safety
         if not self.player:
             return {
-                # CHANGE 1 FIX: was (5, ...) — must match declared obs_space shape (4, ...)
-                # 4 channels: player, hazard, collectible, dijkstra-advantage.
-                # solid_grid was already removed from the active stack; the null
-                # path incorrectly still claimed 5 channels, causing SB3 shape errors.
-                "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
+                # 5 channels: player, solids, collectible, hazard, dijkstra-advantage.
+                "grids": np.zeros((5, self.obs_height, self.obs_width), dtype=np.float32),
                 "scalars": np.zeros(12, dtype=np.float32),  # 5 (player) + 7 (tracking)
             }
 
@@ -857,15 +859,15 @@ class PlatformerCore(gymnasium.Env):
 
         # _grid_obs_window returns the unpadded map tile coordinates of the window
         # so that _dijkstra_obs_window can slice dist_map at the identical region.
-        hazard_grid, collect_grid, player_grid, map_row_start, map_col_start = \
+        hazard_grid, collect_grid, player_grid, solid_grid, map_row_start, map_col_start = \
             self._grid_obs_window()
 
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # Stack order: Player, Hazard, Collectible, Dijkstra-Advantage  (4 channels)
-        # Channel 3 (Dijkstra) is in [-1, 1]; channels 0-2 are in [0, 1].
+        # Stack order: Player, Solids, Collectible, Hazard, Dijkstra-Advantage  (5 channels)
+        # Channels 0-3 are binary {0, 1}. Channel 4 (Dijkstra) is in [-1, 1].
         stacked_grids = np.stack(
-            [player_grid, hazard_grid, collect_grid, dijkstra_grid], axis=0
+            [player_grid, solid_grid, collect_grid, hazard_grid, dijkstra_grid], axis=0
         ).astype(np.float32)
 
         scalars = np.concatenate([p_obs, track_obs]).astype(np.float32)
@@ -893,21 +895,25 @@ class PlatformerCore(gymnasium.Env):
             1.0 if p.on_ground else 0.0,
         ], dtype=np.float32)
 
-    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
+    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
         """
-        Returns (hazard, collect, player, map_row_start, map_col_start).
+        Returns (hazard, collect, player, solid, map_row_start, map_col_start).
 
-        map_row_start / map_col_start are the UNPADDED map tile coordinates of
-        the top-left corner of the observation window. These are returned so
-        _dijkstra_obs_window can slice dist_map at the same region without
-        recomputing the window position independently.
+        All four binary grids share the same coordinate frame:
+          player  — tiles occupied by the player bounding box
+          solid   — ground, static platforms (incl. question blocks), moving platforms
+          collect — coins + powerups + goals (from collectible_hash)
+          hazard  — enemies + spikes (from hazard_hash)
+
+        map_row_start / map_col_start are the unpadded map tile coordinates of
+        the top-left corner of the observation window, centered on the player.
+        Returned so _dijkstra_obs_window can slice dist_map at the same region.
+        Coordinates can be negative when the player is near the top/left edge.
         """
         p = self.player
         if not p:
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-            # Return 0,0 as dummy map coords — _dijkstra_obs_window will see no
-            # valid dijkstra and return zeros anyway.
-            return z, z, z, 0, 0
+            return z, z, z, z, 0, 0
 
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
@@ -921,6 +927,7 @@ class PlatformerCore(gymnasium.Env):
         hazard_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         player_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        solid_grid   = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
 
         # World-pixel origin of the window (used for entity spatial-hash queries)
         wx = map_col_start * TILE_SIZE
@@ -928,6 +935,7 @@ class PlatformerCore(gymnasium.Env):
 
         window_rect = pygame.Rect(wx, wy, self.obs_width * TILE_SIZE, self.obs_height * TILE_SIZE)
 
+        # --- Hazard channel: enemies + spikes (from hazard_hash) ---
         nearby_hazards = self.physics_manager.hazard_hash.query_rect(
             window_rect.x, window_rect.y, window_rect.width, window_rect.height
         )
@@ -940,6 +948,7 @@ class PlatformerCore(gymnasium.Env):
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 hazard_grid[local_y, local_x] = 1.0
 
+        # --- Collectible channel: coins + powerups + goals (from collectible_hash) ---
         nearby_items = self.physics_manager.collectible_hash.query_rect(
             window_rect.x, window_rect.y, window_rect.width, window_rect.height
         )
@@ -953,7 +962,39 @@ class PlatformerCore(gymnasium.Env):
             if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
                 collect_grid[local_y, local_x] = 1.0
 
-        # --- FILL PLAYER GRID ---
+        # --- Solid channel: static geometry (ground, platforms, qblocks) ---
+        # Query static_hash — covers all immovable geometry inserted at load time.
+        # Spikes live in static_hash too but belong in the hazard channel, so skip them.
+        nearby_solids = self.level_data.static_hash.query_rect(
+            window_rect.x, window_rect.y, window_rect.width, window_rect.height
+        )
+        for obj in nearby_solids:
+            if isinstance(obj, Spike): continue   # spikes → hazard channel
+            sx = int(obj.gObj.x // TILE_SIZE)
+            sy = int(obj.gObj.y // TILE_SIZE)
+            lx = sx - map_col_start
+            ly = sy - map_row_start
+            if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height:
+                solid_grid[ly, lx] = 1.0
+
+        # Moving platforms (from platform_hash — positions update every frame).
+        # platform_hash is rebuilt each step() so positions are always current.
+        # Multi-tile platforms span several columns — iterate all covered tiles.
+        nearby_plats = self.physics_manager.platform_hash.query_rect(
+            window_rect.x, window_rect.y, window_rect.width, window_rect.height
+        )
+        for plat in nearby_plats:
+            if not plat.gObj.active: continue
+            pc0 = int(plat.gObj.x // TILE_SIZE)
+            pc1 = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
+            pr  = int(plat.gObj.y // TILE_SIZE)
+            for pc in range(pc0, pc1):
+                lx = pc - map_col_start
+                ly = pr - map_row_start
+                if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height:
+                    solid_grid[ly, lx] = 1.0
+
+        # --- Player channel ---
         p_rect      = p.gObj.get_rect()
         rel_x       = p_rect.x - wx
         rel_y       = p_rect.y - wy
@@ -967,7 +1008,7 @@ class PlatformerCore(gymnasium.Env):
                 if 0 <= r < self.obs_height and 0 <= c < self.obs_width:
                     player_grid[r, c] = 1.0
 
-        return hazard_grid, collect_grid, player_grid, map_row_start, map_col_start
+        return hazard_grid, collect_grid, player_grid, solid_grid, map_row_start, map_col_start
 
     def _dijkstra_obs_window(self, map_row_start: int, map_col_start: int) -> np.ndarray:
             """

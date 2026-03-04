@@ -4,14 +4,15 @@
 #   1. CustomCombinedExtractor  →  PEAKExtractor  (replaces old buggy extractor)
 #      Old extractor bug: AdaptiveMaxPool2d upsampled 5×5 → 11×11 (wrong direction)
 #      PEAKExtractor improvements:
-#        - Splits grids into semantic branch (ch 0-2) + Dijkstra branch (ch 3)
+#        - Splits grids into semantic branch (ch 0-3) + Dijkstra branch (ch 4)
 #          so the pre-computed gradient field doesn't pollute binary feature learning
 #        - SEBlock channel attention in semantic branch
 #        - Dedicated shallow Dijkstra CNN (gradient field needs less capacity)
 #        - Scalar MLP deepened to 2 layers (12→64→64)
 #        - Fusion layer (384→256) before SB3 MlpExtractor
 #        - ~922K params total — lightweight enough for CPU + 16 parallel envs
-#      Obs shape verified: grids (4,11,11) + scalars (12,) — matches env exactly
+#      Obs shape verified: grids (5,11,11) + scalars (12,) — matches env exactly
+#      Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
 #   2. LightCombinedExtractor — kept as fast sweep option (use_light_extractor: true)
 #   3. LiveVisualizationCallback — spawns a real pygame window every N steps
 #   4. eval_env VecNormalize stats synced from training env each eval cycle
@@ -159,11 +160,12 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
     Observation space
     -----------------
-      grids  : Box(-1, 1, shape=(4, 11, 11))
+      grids  : Box(-1, 1, shape=(5, 11, 11))
                  ch 0  — Player        binary {0,1}
-                 ch 1  — Hazards       binary {0,1}
+                 ch 1  — Solids        binary {0,1}  (ground, platforms, qblocks)
                  ch 2  — Collectibles  binary {0,1}
-                 ch 3  — Dijkstra      continuous [-1, 1]  ← separated branch
+                 ch 3  — Hazards       binary {0,1}
+                 ch 4  — Dijkstra      continuous [-1, 1]  ← separated branch
       scalars: Box(-inf, inf, shape=(12,))
                  [0-4]  player obs  (x, y, vx, vy, on_ground)
                  [5]    enemy dist  normalised
@@ -175,13 +177,13 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
     Architecture
     ------------
-    Branch A  Semantic CNN  (ch 0-2, 3×11×11)
-              Conv(3→32,k=3,pad=1) → ReLU → SEBlock(32)
+    Branch A  Semantic CNN  (ch 0-3, 4×11×11)
+              Conv(4→32,k=3,pad=1) → ReLU → SEBlock(32)
               Conv(32→64,k=3,pad=1) → ReLU
               Conv(64→64,k=3,stride=2,pad=1) → ReLU  [→ 64×6×6]
               Flatten → Linear(2304→256) → ReLU
 
-    Branch B  Dijkstra CNN  (ch 3, 1×11×11)
+    Branch B  Dijkstra CNN  (ch 4, 1×11×11)
               Conv(1→16,k=3,pad=1) → ReLU
               Conv(16→16,k=3,stride=2,pad=1) → ReLU  [→ 16×6×6]
               Flatten → Linear(576→64) → ReLU
@@ -204,16 +206,19 @@ class PEAKExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 256):
         super().__init__(observation_space, features_dim=features_dim)
 
-        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        grid_shape   = observation_space["grids"].shape    # (5, H, W)
         scalar_shape = observation_space["scalars"].shape  # (12,)
 
-        n_channels = grid_shape[0]    # 4
+        n_channels = grid_shape[0]    # 5
         n_scalars  = scalar_shape[0]  # 12
         H, W       = grid_shape[1], grid_shape[2]  # 11, 11
 
-        # ── Branch A: Semantic CNN (channels 0-2) ───────────────────────────
+        # Number of semantic channels = all except the last (Dijkstra)
+        n_semantic = n_channels - 1   # 4
+
+        # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
         self.semantic_cnn = nn.Sequential(
-            nn.Conv2d(n_channels - 1, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(n_semantic, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             SEBlock(32, reduction=4),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
@@ -223,14 +228,14 @@ class PEAKExtractor(BaseFeaturesExtractor):
             nn.Flatten()
         )
         with torch.no_grad():
-            sem_flat = self.semantic_cnn(torch.zeros(1, n_channels - 1, H, W)).shape[1]
+            sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 256),
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (channel 3 only) ─────────────────────────
+        # ── Branch B: Dijkstra CNN (last channel only) ──────────────────────
         self.dijkstra_cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -263,14 +268,15 @@ class PEAKExtractor(BaseFeaturesExtractor):
         self._features_dim = features_dim
 
     def forward(self, observations: dict) -> torch.Tensor:
-        grids   = observations["grids"]    # (B, 4, H, W)
+        grids   = observations["grids"]    # (B, 5, H, W)
         scalars = observations["scalars"]  # (B, 12)
 
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :3, :, :]))  # (B, 256)
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, 3:, :, :]))  # (B, 64)
-        scal = self.scalar_mlp(scalars)                                  # (B, 64)
+        # ch 0-3: semantic binary channels  |  ch 4: Dijkstra continuous
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))  # (B, 256)
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))  # (B, 64)
+        scal = self.scalar_mlp(scalars)                                   # (B, 64)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))           # (B, 256)
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))            # (B, 256)
 
 
 # =========================================================================
@@ -285,14 +291,23 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
       Removed:  Large Linear(2304→256) — replaced with AdaptiveAvgPool
                 before flatten, cutting sem_flat from 2304 → 288
 
-    Branch A  Semantic CNN  (ch 0-2, 3×11×11)
-              Conv(3→16, k=3, pad=1) → ReLU
+    Observation space
+    -----------------
+      grids  : Box(-1, 1, shape=(5, 11, 11))
+                 ch 0  — Player        binary {0,1}
+                 ch 1  — Solids        binary {0,1}  (ground, platforms, qblocks)
+                 ch 2  — Collectibles  binary {0,1}
+                 ch 3  — Hazards       binary {0,1}
+                 ch 4  — Dijkstra      continuous [-1, 1]  ← separated branch
+
+    Branch A  Semantic CNN  (ch 0-3, 4×11×11)
+              Conv(4→16, k=3, pad=1) → ReLU
               MaxPool(2)                          [11×11 → 5×5]
               Conv(16→32, k=3, pad=1) → ReLU
               AdaptiveAvgPool(3×3)                [5×5  → 3×3]
               Flatten(288) → Linear(288→128) → ReLU
 
-    Branch B  Dijkstra CNN  (ch 3, 1×11×11)
+    Branch B  Dijkstra CNN  (ch 4, 1×11×11)
               Conv(1→16, k=3, pad=1) → ReLU
               AdaptiveAvgPool(3×3)                [11×11 → 3×3]
               Flatten(144) → Linear(144→32) → ReLU
@@ -324,16 +339,19 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 128):
         super().__init__(observation_space, features_dim=features_dim)
 
-        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        grid_shape   = observation_space["grids"].shape    # (5, H, W)
         scalar_shape = observation_space["scalars"].shape  # (12,)
 
-        n_channels = grid_shape[0]    # 4
+        n_channels = grid_shape[0]    # 5
         n_scalars  = scalar_shape[0]  # 12
         H, W       = grid_shape[1], grid_shape[2]  # 11, 11
 
-        # ── Branch A: Semantic CNN (channels 0-2) ───────────────────────────
+        # Number of semantic channels = all except the last (Dijkstra)
+        n_semantic = n_channels - 1   # 4
+
+        # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
         self.semantic_cnn = nn.Sequential(
-            nn.Conv2d(n_channels - 1, 16, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(n_semantic, 16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2),                              # 11×11 → 5×5
             nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
@@ -342,14 +360,14 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
             nn.Flatten()                                  # 32×3×3 = 288
         )
         with torch.no_grad():
-            sem_flat = self.semantic_cnn(torch.zeros(1, n_channels - 1, H, W)).shape[1]
+            sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 128),
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (channel 3 only) ─────────────────────────
+        # ── Branch B: Dijkstra CNN (last channel only) ──────────────────────
         self.dijkstra_cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -379,14 +397,15 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         self._features_dim = features_dim
 
     def forward(self, observations: dict) -> torch.Tensor:
-        grids   = observations["grids"]    # (B, 4, H, W)
+        grids   = observations["grids"]    # (B, 5, H, W)
         scalars = observations["scalars"]  # (B, 12)
 
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :3, :, :]))  # (B, 128)
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, 3:, :, :]))  # (B,  32)
-        scal = self.scalar_mlp(scalars)                                  # (B,  64)
+        # ch 0-3: semantic binary channels  |  ch 4: Dijkstra continuous
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))  # (B, 128)
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))  # (B,  32)
+        scal = self.scalar_mlp(scalars)                                   # (B,  64)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))           # (B, 128)
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))            # (B, 128)
 
 
 # =========================================================================
@@ -399,15 +418,17 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
     Architecture
     ------------
-    Layer 1:  Conv(4→16) + BatchNorm + ReLU → MaxPool(2)     [11×11 → 5×5]
+    Layer 1:  Conv(5→16) + BatchNorm + ReLU → MaxPool(2)     [11×11 → 5×5]
     Layer 2:  Depthwise(16) + Pointwise(16→32) + BatchNorm   [5×5  → 5×5]
     Summary:  AdaptiveAvgPool(3×3) → Flatten(288)
     FC:       Linear(288→128) + LayerNorm + ReLU
     Scalars:  Linear(12→64) + LayerNorm + ReLU
     features_dim = 192  (128 grids + 64 scalars)
 
-    NOTE: Does NOT split the Dijkstra channel — all 4 channels share the
-    same conv stack. Use PEAKExtractor (default) for full training runs.
+    NOTE: Does NOT split the Dijkstra channel — all 5 channels share the
+    same conv stack (n_ch is read dynamically from the observation space).
+    Use PEAKExtractor (default) for full training runs where the Dijkstra
+    channel split matters.
     ~18K params in grids branch, 3-5× faster CPU inference than PEAKExtractor.
     """
 
@@ -669,7 +690,8 @@ def main(cfg: DictConfig):
             #                            Use only if training on GPU with plenty of time.
             #   use_light_extractor: true → LightCombinedExtractor  ~18K params
             #                            No channel split. Use for rapid sweeps only.
-            # obs shape: grids (4,11,11) + scalars (12,) — verified against platformer_core.py
+            # obs shape: grids (5,11,11) + scalars (12,) — verified against platformer_core.py
+            # Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
             if algo_conf.get("use_light_extractor", False):
                 policy_kwargs["features_extractor_class"] = LightCombinedExtractor
                 print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")

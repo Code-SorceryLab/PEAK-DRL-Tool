@@ -125,7 +125,7 @@ class PhysicsManager:
     def rebuild_dynamic_hashes(self, level_data, cached_spikes=None):
         """
         Clears and repopulates the spatial hashes with active entities
-        (enemies, spikes, coins, powerups) for optimized collision queries.
+        (enemies, spikes, coins, powerups, goals) for optimized collision queries.
 
         cached_spikes: pre-built list of Spike tile objects from load_level().
         Spikes are inserted into hazard_hash so the CNN observation grid
@@ -142,8 +142,6 @@ class PhysicsManager:
             if coin.gObj.active and not coin.collected: self.collectible_hash.insert(coin)
         for pup in level_data.powerups:
             if pup.gObj.active: self.collectible_hash.insert(pup)
-
-        # Add goals to collectible hash (since they are 'collected' to win)
         for goal in level_data.goals:
             self.collectible_hash.insert(goal)
 
@@ -219,7 +217,8 @@ class PhysicsManager:
 
         1. Captures the player's falling state (vy > 0) before any velocity modifications.
            This is crucial for "stomp" logic, as hitting the ground later resets vy to 0.
-        2. Resolves static world collisions (walls/floors) for the Player, Enemies, and Powerups.
+        2. Resolves static world collisions (walls/floors) for the Player, Enemies,
+           Powerups, and Projectiles.
         3. Resolves dynamic interactions (Player vs Enemy, Enemy vs Enemy, etc.) using the
            previously captured falling state.
         """
@@ -238,6 +237,7 @@ class PhysicsManager:
         self._resolve_player_moving_platforms(core, level_data)
         self._resolve_enemy_world(core, level_data)
         self._resolve_powerup_world(core, level_data)
+        self._resolve_projectile_world(core, level_data)
 
         # 3. Resolve Dynamic Entity Interactions
         self._resolve_dynamic_interactions(core, player_was_falling)
@@ -246,16 +246,27 @@ class PhysicsManager:
 
     def _resolve_player_moving_platforms(self, core, level_data):
         """
-        Handles player colliding with moving platforms — all four sides solid.
+        Resolves player collisions against moving platforms.
 
-        Uses velocity to discriminate floor vs ceiling hit, NOT centery.
-        centery fails for tall (BIG) players whose centre can be above the
-        platform centre while still jumping into it from below.
+        Moving platforms are fully solid on all four sides — unlike static
+        TILE_PLATFORM tiles they have no one-way pass-through behaviour.
+
+        Uses velocity direction (vx / vy) for axis discrimination, NOT center
+        position comparisons:
+
+          centerx / centery comparisons fail when the player clips more than
+          halfway into a platform (deep penetration or fast platforms) and can
+          push the player through to the wrong side.
+
+          The old centery <= trect.top guard was added to prevent ghost-stepping
+          (treating a side-clip as a floor hit) but broke for large (BIG) players
+          whose centre sits below the platform top even when standing on it
+          correctly. Removed in favour of the axis-dominance check (ox < oy).
 
         Resolution per overlapping platform:
-          overlap_x < overlap_y  →  wall hit  (push out horizontally, zero vx)
-          overlap_y <= overlap_x and vy >= 0  →  floor hit (snap to top, carry, land)
-          overlap_y <= overlap_x and vy <  0  →  ceiling hit (snap to bottom, bonk)
+          ox < oy  →  wall hit  : push horizontally (vx direction), zero vx
+          vy >= 0  →  floor hit : snap to top, carry (delta_x), land
+          vy <  0  →  ceiling   : snap to bottom, zero vy (bonk)
         """
         player = core.player
         if not player or not level_data.moving_platforms:
@@ -272,43 +283,37 @@ class PhysicsManager:
             if not prect.colliderect(trect):
                 continue
 
-            overlap_x = min(prect.right  - trect.left, trect.right  - prect.left)
-            overlap_y = min(prect.bottom - trect.top,  trect.bottom - prect.top)
+            ox = min(prect.right  - trect.left, trect.right  - prect.left)
+            oy = min(prect.bottom - trect.top,  trect.bottom - prect.top)
 
-            if overlap_x < overlap_y:
+            if ox < oy:
                 # ── Wall hit ──────────────────────────────────────────────────
-                if prect.centerx < trect.centerx:
+                if player.vx > 0:
                     player.gObj.x = trect.left - player.gObj.width
-                else:
+                elif player.vx < 0:
                     player.gObj.x = trect.right
+                else:
+                    # Stationary — push away from platform centre
+                    if prect.centerx <= trect.centerx:
+                        player.gObj.x = trect.left - player.gObj.width
+                    else:
+                        player.gObj.x = trect.right
                 player.vx = 0
 
-            elif player.vy >= 0 and prect.centery <= trect.top:
-                # ── Floor hit (moving down, centre above platform surface) ────
-                # The centery guard stops "ghost stepping": a player running into
-                # the side of a thin platform can get overlap_x > overlap_y,
-                # which would pass the axis test. But if the player's centre is
-                # BELOW the platform top they came from the side, not the top.
-                player.gObj.x += plat.delta_x
-                player.gObj.y  = trect.top - player.gObj.height
-                player.vy      = 0
+            elif player.vy >= 0:
+                # ── Floor hit (falling or standing on platform) ───────────────
+                # Carry the player with the platform's horizontal movement so
+                # they don't slide off while riding it.
+                player.gObj.x  += plat.delta_x
+                player.gObj.y   = trect.top - player.gObj.height
+                player.vy       = 0
                 player.on_ground = True
                 player.jump_hold = 0
 
-            elif player.vy < 0:
-                # ── Ceiling hit (moving up) ───────────────────────────────────
+            else:
+                # ── Ceiling hit (jumping into underside) ──────────────────────
                 player.gObj.y = trect.bottom
                 player.vy     = 0
-
-            else:
-                # ── Side approach below platform — treat as wall ──────────────
-                # Catches the ghost-step case where overlap_x > overlap_y but
-                # the player's centre is below the platform top (ran into side).
-                if prect.centerx < trect.centerx:
-                    player.gObj.x = trect.left - player.gObj.width
-                else:
-                    player.gObj.x = trect.right
-                player.vx = 0
 
             prect = player.gObj.get_rect()
 
@@ -331,6 +336,23 @@ class PhysicsManager:
             if not pup.gObj.active: continue
             nearby = self._get_tile_rects_near(level_data, pup.gObj)
             self._solve_aabb_collision(pup, nearby, bounce_x=True)
+
+    def _resolve_projectile_world(self, core, level_data):
+        """
+        Handles collisions between FireFlowerProjectiles and the static map.
+
+        bounce_x=False: wall contact zeroes vx instead of reversing it.
+        FireFlowerProjectile.update() detects vx==0 and deactivates the projectile,
+        matching the classic behaviour where fireballs vanish on wall impact.
+
+        Floor contact sets projectile.on_ground=True via _solve_aabb_collision's
+        hasattr guard. FireFlowerProjectile.update() reads on_ground and applies
+        PROJ_JUMP_VEL to produce the bouncing arc.
+        """
+        for proj in level_data.projectiles:
+            if not proj.gObj.active: continue
+            nearby = self._get_tile_rects_near(level_data, proj.gObj)
+            self._solve_aabb_collision(proj, nearby, bounce_x=False)
 
     def _solve_aabb_collision(self, entity, nearby_tiles, bounce_x=False):
         """
@@ -399,92 +421,76 @@ class PhysicsManager:
 
     def _resolve_player_world(self, core, level_data):
         """
-        Specialized collision resolution for the Player against static tiles.
+        Resolves player collisions against static tiles. Ground (#) and
+        platform (=) tiles behave identically — fully solid on all four sides:
 
-        1. Identifies nearby tiles using spatial hashing.
-        2. Iterates through tiles and calculates overlap depth in X and Y.
-        3. Prioritizes the shallowest axis of penetration (Separating Axis Theorem principle).
-        4. If X collision (Wall): Pushes player out and zeroes X velocity.
-        5. If Y collision (Floor/Ceiling):
-           - Floor: Pushes player up. Sets 'on_ground' = True ONLY if player was falling (vy >= 0).
-           - Ceiling: Pushes player down. Zeroes upward velocity (Bonk).
-           - Checks for QBlock interactions on ceiling hits.
+          ox < oy  →  wall hit  : push horizontally (vx direction), zero vx
+          vy >= 0  →  floor hit : snap to top, zero vy, land
+          vy <  0  →  ceiling   : snap to bottom, zero vy (bonk / qblock)
         """
         player = core.player
         if not player: return
 
-        rect = player.gObj.get_rect()
         nearby = self._get_tile_rects_near(level_data, player.gObj)
+        rect   = player.gObj.get_rect()
 
         for (row, col, trect, tile_type) in nearby:
-            if not rect.colliderect(trect): continue
+            if not rect.colliderect(trect):
+                continue
 
-            # --- Handle Spikes (Static Tiles but Deadly) ---
+            # Spikes — lethal on any contact (star power = immune)
             if tile_type == EntityType.SPIKE:
-                # Star power makes the player invincible to spikes too
-                if player.power_machine.is_invincible:
-                    continue
-                core._handle_death("Spike")
-                return
+                if not player.power_machine.is_invincible:
+                    core._handle_death("Spike")
+                    return
+                continue
 
-            overlap_x = min(rect.right - trect.left, trect.right - rect.left)
-            overlap_y = min(rect.bottom - trect.top, trect.bottom - rect.top)
+            ox = min(rect.right  - trect.left, trect.right  - rect.left)
+            oy = min(rect.bottom - trect.top,  trect.bottom - rect.top)
 
-            # Prioritize the shallowest axis
-            if overlap_x < overlap_y:
-                # --- Resolve X (Wall Hit) ---
-                if rect.centerx < trect.centerx:
+            if ox < oy:
+                # ── Wall hit ──────────────────────────────────────────────────
+                if player.vx > 0:
                     player.gObj.x = trect.left - player.gObj.width
-                else:
+                elif player.vx < 0:
                     player.gObj.x = trect.right
-
-                # Zero X velocity on wall hit (stops sticking)
+                else:
+                    # Stationary (e.g. spawn inside geometry) — use center
+                    if rect.centerx <= trect.centerx:
+                        player.gObj.x = trect.left - player.gObj.width
+                    else:
+                        player.gObj.x = trect.right
                 player.vx = 0
 
+            elif player.vy >= 0:
+                # ── Floor hit ─────────────────────────────────────────────────
+                player.gObj.y    = trect.top - player.gObj.height
+                player.vy        = 0
+                player.on_ground = True
+                player.jump_hold = 0
+
             else:
-                    # --- Resolve Y (Floor/Ceiling Hit) ---
-                if rect.centery < trect.centery:
-                    # Player is ABOVE the tile (Floor Hit)
-                    player.gObj.y = trect.top - player.gObj.height
+                # ── Ceiling hit (moving up) ───────────────────────────────────
+                player.gObj.y = trect.bottom
+                player.vy     = 0
+                if tile_type == TILE_QBLOCK:
+                    self._hit_qblock(core, col, row)
 
-                    # Only trigger "landing" logic if we were actually falling
-                    # This prevents "snapping" to the floor while jumping up
-                    if player.vy >= 0:
-                        player.vy = 0
-                        player.on_ground = True
-                        player.jump_hold = 0
-                else:
-                    # Player is BELOW the tile (Ceiling Hit)
-                    # ONE-WAY PLATFORM: platforms are solid from the top only.
-                    # If the player is jumping up into the underside of a platform,
-                    # skip — let them pass through. Only ground tiles and qblocks
-                    # act as true ceilings.
-                    if tile_type == TILE_PLATFORM:
-                        rect = player.gObj.get_rect()
-                        continue
-
-                    player.gObj.y = trect.bottom
-
-                    # Bonk head: kill upward velocity
-                    if player.vy < 0:
-                        player.vy = 0
-
-                    if tile_type == TILE_QBLOCK:
-                        self._hit_qblock(core, col, row)
-
-            # Update rect for the next tile check in the loop
             rect = player.gObj.get_rect()
 
     # --- DYNAMIC COLLISIONS ---
 
     def _resolve_dynamic_interactions(self, core, player_was_falling):
         """
-        Handles interactions between moving entities (Player, Enemies, Coins).
+        Handles interactions between moving entities (Player, Enemies, Coins,
+        and Projectiles).
 
         1. Queries the spatial hash for hazards (Enemies) near the player.
         2. Dispatches collision events if overlaps occur.
         3. Queries for collectibles (Coins/Powerups) and dispatches events.
         4. Checks Enemy-vs-Enemy collisions (to prevent stacking/overlap).
+        5. Checks Projectile-vs-Enemy collisions — kills enemy and deactivates
+           projectile on contact.
         """
         player = core.player
         if not player: return
@@ -495,10 +501,10 @@ class PhysicsManager:
         nearby_hazards = self.hazard_hash.query(player)
         for obj in nearby_hazards:
             # Skip spikes — their lethal collision is already handled by
-            # _resolve_player_world via static_hash (AABB overlap with full
-            # penetration depth). Processing them here would trigger a second
-            # _handle_death call in the same frame, double-decrementing lives.
-            if getattr(obj.gObj, 'type_id', None) == EntityType.SPIKE:
+            # _resolve_player_world via static_hash. Processing them here
+            # would trigger a second _handle_death call, double-decrementing lives.
+            t_type = obj.gObj.type_id if hasattr(obj.gObj, 'type_id') else EntityType.NONE
+            if t_type == EntityType.SPIKE:
                 continue
             if player.gObj.collides_with(obj.gObj):
                 self._dispatch_collision(core, player, obj, player_was_falling)
@@ -529,6 +535,27 @@ class PhysicsManager:
                     if isinstance(other, type(enemy)):
                         if enemy.gObj.collides_with(other.gObj):
                             self._dispatch_collision(core, enemy, other)
+
+        # --- Projectile vs Enemy ---
+        # Iterate active projectiles, query hazard_hash (which holds all active
+        # enemies) at the projectile's position. On hit: kill enemy, kill projectile.
+        # Guard against double-kills: check active flags before and after each hit
+        # so a projectile that already died this frame can't kill a second enemy.
+        for proj in core.level_data.projectiles:
+            if not proj.gObj.active:
+                continue
+            nearby_enemies = self.hazard_hash.query_rect(
+                proj.gObj.x, proj.gObj.y, proj.gObj.width, proj.gObj.height
+            )
+            for enemy in nearby_enemies:
+                if not enemy.gObj.active:
+                    continue
+                t_type = enemy.gObj.type_id if hasattr(enemy.gObj, 'type_id') else EntityType.NONE
+                if t_type != EntityType.ENEMY:
+                    continue   # skip spikes or anything else in hazard_hash
+                if proj.gObj.collides_with(enemy.gObj):
+                    self._handle_projectile_enemy(core, proj, enemy)
+                    break      # projectile is now dead — stop checking further enemies
 
     def _dispatch_collision(self, core, source, target, player_was_falling=False):
         """
@@ -630,6 +657,19 @@ class PhysicsManager:
             core.score += 10
             core.coins_step += 1
             core.coins_total += 1
+
+    def _handle_projectile_enemy(self, core, proj, enemy):
+        """
+        Resolves a FireFlowerProjectile hitting an Enemy.
+
+        - Enemy is killed (active = False) and awards 100pts + kills_step counter.
+        - Projectile is deactivated so it cannot hit a second enemy the same frame.
+        """
+        enemy.gObj.active = False
+        proj.gObj.active  = False
+        core.score += 100
+        if hasattr(core, 'kills_step'):
+            core.kills_step += 1
 
     def _handle_player_powerup(self, core, player, powerup):
         """

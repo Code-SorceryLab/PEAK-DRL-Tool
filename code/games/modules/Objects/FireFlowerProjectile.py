@@ -4,10 +4,27 @@ from dataclasses import dataclass, field
 from ..Objects.GameObject import GameObject
 from ..System.EntityType import EntityType
 
-PROJECTILE_SPEED  = 420.0   # px/s
-PROJECTILE_WIDTH  = 12
-PROJECTILE_HEIGHT = 12
-PROJECTILE_LIFETIME = 3.0   # seconds before auto-expiry
+# ── Tunable parameters ────────────────────────────────────────────────────────
+# Horizontal speed (px/s).  Positive = rightward; sign is flipped for left-facing shots.
+PROJECTILE_SPEED    = 280.0
+
+# Upward velocity applied on every ground bounce (negative = up in screen coords).
+# Increase magnitude for higher bounces, decrease for flatter arcs.
+PROJ_JUMP_VEL       = -260.0
+
+# Gravity acceleration applied each frame (px/s²).
+# Matches world gravity for a natural arc; lower values produce floatier fireballs.
+PROJ_GRAVITY        = 900.0
+
+# Maximum downward fall speed (px/s).
+PROJ_MAX_FALL_SPEED = 480.0
+
+# Seconds before the projectile auto-expires regardless of bounces.
+PROJECTILE_LIFETIME = 3.0
+
+PROJECTILE_WIDTH    = 12
+PROJECTILE_HEIGHT   = 12
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -15,17 +32,29 @@ class FireFlowerProjectile:
     """
     A fireball fired by the player when in Fire state.
 
-    Spawned via FireFlowerProjectile.from_player(player).
-    Travels horizontally at a fixed speed in the direction the player was facing.
+    Movement
+    --------
+    - Horizontal : constant vx (set at spawn, preserved across bounces).
+    - Vertical   : gravity pulls it down each frame; the moment PhysicsManager
+                   sets on_ground=True (floor contact), update() launches an
+                   instant upward bounce (PROJ_JUMP_VEL). No jump timer —
+                   every landing bounces immediately, giving the classic
+                   Mario fireball arc.
+
     Deactivates on:
-      - hitting an enemy  (handled by PhysicsManager)
-      - hitting a solid wall (handled by PhysicsManager._resolve_projectile_world)
+      - hitting a solid wall  (PhysicsManager._resolve_projectile_world,
+                               bounce_x=False → vx zeroed → deactivates next frame
+                               via the vx==0 guard below)
+      - hitting an enemy      (PhysicsManager._resolve_dynamic_interactions)
       - exceeding its lifetime
+
+    Spawn via FireFlowerProjectile.from_player(player).
     """
-    gObj: GameObject
-    vx:   float = 0.0
-    vy:   float = 0.0
-    _age: float = field(default=0.0, repr=False)
+    gObj:      GameObject
+    vx:        float = 0.0
+    vy:        float = 0.0          # starts at 0; gravity pulls it into the first bounce
+    on_ground: bool  = False        # written True by PhysicsManager on floor contact
+    _age:      float = field(default=0.0, repr=False)
 
     def __post_init__(self):
         self.gObj.type_id = EntityType.PROJECTILE
@@ -35,32 +64,62 @@ class FireFlowerProjectile:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_player(cls, player) -> "FireFlowerProjectile":
+    def from_player(
+        cls,
+        player,
+        speed: float    = PROJECTILE_SPEED,
+        jump_vel: float = PROJ_JUMP_VEL,
+    ) -> "FireFlowerProjectile":
         """
         Spawn a projectile centred on the player, travelling in the direction
         they are currently facing.
+
+        Parameters
+        ----------
+        speed    : horizontal speed in px/s (sign is applied automatically).
+        jump_vel : initial upward vy in px/s (negative = up).
+                   Pass a less-negative value for a flatter arc.
         """
         cx = player.gObj.x + player.gObj.width  / 2 - PROJECTILE_WIDTH  / 2
         cy = player.gObj.y + player.gObj.height / 2 - PROJECTILE_HEIGHT / 2
-        speed = PROJECTILE_SPEED if player.facing_right else -PROJECTILE_SPEED
-        proj = cls(
+        vx = speed if player.facing_right else -speed
+        return cls(
             gObj=GameObject(cx, cy, PROJECTILE_WIDTH, PROJECTILE_HEIGHT, True),
-            vx=speed,
-            vy=0.0,
+            vx=vx,
+            vy=jump_vel,    # launch immediately upward on spawn
         )
-        return proj
 
     # ------------------------------------------------------------------
     # Update
     # ------------------------------------------------------------------
 
-    def update(self, dt: float, _ctx=None):
+    def update(self, dt: float, ctx=None):
         if not self.gObj.active:
             return
+
+        # Lifetime expiry
         self._age += dt
         if self._age >= PROJECTILE_LIFETIME:
             self.gObj.active = False
             return
+
+        # Wall hit: PhysicsManager zeroed vx when bounce_x=False.
+        # A stationary fireball is dead — deactivate.
+        if self.vx == 0.0:
+            self.gObj.active = False
+            return
+
+        # Gravity — use ctx values when available so level physics config applies.
+        gravity        = ctx.GRAVITY        if ctx else PROJ_GRAVITY
+        max_fall_speed = ctx.MAX_FALL_SPEED if ctx else PROJ_MAX_FALL_SPEED
+        self.vy = min(self.vy + gravity * dt, max_fall_speed)
+
+        # Bounce — PhysicsManager sets on_ground=True after snapping to floor.
+        # We read it here (same pattern as StarPowerUp) and immediately re-launch.
+        if self.on_ground:
+            self.vy = PROJ_JUMP_VEL
+        self.on_ground = False   # PhysicsManager sets True again next frame if still grounded
+
         self.gObj.x += self.vx * dt
         self.gObj.y += self.vy * dt
 
