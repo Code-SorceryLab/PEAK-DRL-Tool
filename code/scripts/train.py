@@ -386,6 +386,7 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         # ── Fusion ────────────────────────────────────────────────────────────
         self.fusion = nn.Sequential(
             nn.Linear(128 + 32 + 64, features_dim),      # 224 → 128
+            nn.LayerNorm(features_dim),
             nn.ReLU()
         )
 
@@ -688,11 +689,11 @@ def main(cfg: DictConfig):
             #                            No channel split. Use for rapid sweeps only.
             # obs shape: grids (5,11,11) + scalars (12,) — verified against platformer_core.py
             # Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
-            if algo_conf.get("use_light_extractor", True):
+            if algo_conf.get("use_light_extractor", False):
                 policy_kwargs["features_extractor_class"] = LightCombinedExtractor
                 extractor_tag = "light"
                 print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
-            elif algo_conf.get("use_full_peak", False):
+            elif algo_conf.get("use_full_peak", True):
                 policy_kwargs["features_extractor_class"] = PEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
                 extractor_tag = "peak"
