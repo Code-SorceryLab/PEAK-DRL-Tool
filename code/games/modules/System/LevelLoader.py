@@ -107,11 +107,17 @@ class LevelLoader:
             raw_file = config.get('file', '')
             filename = os.path.basename(raw_file)
         elif isinstance(source, str):
-            filename = os.path.basename(source)
-            config   = {}
+            config = {}
+            # Absolute or existing path → use directly; otherwise join with level_path
+            if os.path.isabs(source) or os.path.exists(source):
+                txt_path = source
+            else:
+                filename = os.path.basename(source)
+                txt_path = os.path.join(self.level_path, filename)
 
-        # 2. Build full path
-        txt_path = os.path.join(self.level_path, filename)
+        # 2. Build full path (dict source only — str source sets txt_path above)
+        if isinstance(source, dict):
+            txt_path = os.path.join(self.level_path, filename)
 
         if os.path.exists(txt_path):
             self._parse_ascii_map(txt_path, data)

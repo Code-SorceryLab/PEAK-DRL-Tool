@@ -237,6 +237,8 @@ class PlatformerCore(gymnasium.Env):
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
         self.world = str(kwargs.pop("world", "1-1")).lower()
+        # locked_level: when set, reset() always returns to this level (editor playtest)
+        self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -534,10 +536,18 @@ class PlatformerCore(gymnasium.Env):
         """
         super().reset(seed=seed)
 
-        # Full reset: restore lives, score, return to level 0
+        # Full reset: restore lives, score, return to level 0 (or locked level)
         self.reset_metrics()
-        self.current_index_world = 0
-        self.world = self.level_order[self.current_index_world]
+        if self.locked_level:
+            self.world = self.locked_level
+            # Keep current_index_world consistent
+            if self.locked_level in self.level_order:
+                self.current_index_world = self.level_order.index(self.locked_level)
+            else:
+                self.current_index_world = 0
+        else:
+            self.current_index_world = 0
+            self.world = self.level_order[self.current_index_world]
         self.load_level()
         return self._obs(), self._info()
 
@@ -1317,7 +1327,7 @@ class PlatformerCore(gymnasium.Env):
                 "action": self._last_action, "time_left": math.ceil(self.timer),
                 "max_x_seen": self.max_x_seen, "stall_windows": self.stall_windows_count,
                 "stalled": self.stalled_this_frame, "persona": self.persona,
-                "level": self.current_index_world, "goal_dist": 0.0, "lives": self.lives,
+                "level": self.world, "goal_dist": 0.0, "lives": self.lives,
                 "event": event, "cause": cause,
                 "on_ground": False,
                 "step_dx":   0.0,
@@ -1355,7 +1365,7 @@ class PlatformerCore(gymnasium.Env):
             "stall_windows": self.stall_windows_count,
             "stalled": self.stalled_this_frame,
             "persona": self.persona,
-            "level": self.current_index_world,
+            "level": self.world,
             "goal_dist": getattr(self, '_goal_dist_cache', self._get_dist_to_goal()) / ts,
             "lives" : self.lives,
             "event": event,

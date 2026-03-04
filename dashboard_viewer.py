@@ -170,7 +170,9 @@ st.divider()
 st.subheader("LEVEL PROGRESS")
 if 'level' in df.columns and 'event' in df.columns:
     data_so_far = df.iloc[:selected_idx+1]
-    all_levels  = sorted(data_so_far['level'].dropna().unique().astype(int))
+    # Sort levels by their order of first appearance in the log, not alphabetically
+    seen_order = data_so_far['level'].dropna().unique().tolist()
+    all_levels  = list(dict.fromkeys(seen_order))  # deduplicated, insertion-ordered
     rows_list   = []
     for lvl in all_levels:
         lvl_rows  = data_so_far[data_so_far['level']==lvl]
@@ -186,7 +188,7 @@ if 'level' in df.columns and 'event' in df.columns:
         d_pit     = int((died_rows['cause']=='Pit').sum())     if 'cause' in df.columns else 0
         d_spike   = int((died_rows['cause']=='Spike').sum())   if 'cause' in df.columns else 0
         d_timeout = int((died_rows['cause']=='Timeout').sum()) if 'cause' in df.columns else 0
-        rows_list.append({"LEVEL":f"Level {lvl}","VISITS":visits,"WINS":wins,"DEATHS":deaths,
+        rows_list.append({"LEVEL": str(lvl),"VISITS":visits,"WINS":wins,"DEATHS":deaths,
             "STALL":d_stall,"ENEMY":d_enemy,"PIT":d_pit,"SPIKE":d_spike,"TIMEOUT":d_timeout,
             "WIN RATE":f"{win_rate:.1f}%","PROGRESS":bar})
 

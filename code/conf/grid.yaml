@@ -17,7 +17,8 @@ personas: [
 # skill -> training steps
 skills:
   Novice: 1_000_000
-  Expert: 4_000_000
+  Expert: 2_000_000
+
 
 # generic env params
 seed: 1234
@@ -30,7 +31,8 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 25      # 1 for cpu or 16 gpu , or whatever you want
+n_envs: 4 # 1 for cpu or 16 gpu , or whatever you want
+
 
 # null values mean "no override"
 model: null     # optional single selection

@@ -1,4 +1,3 @@
-
 import os
 from code.callbacks.logging_callback import CsvLoggerCallback
 
@@ -660,6 +659,7 @@ def main(cfg: DictConfig):
         algo_kwargs   = {k: v for k, v in algo_conf.items()
                          if k not in {"_target_", "name", "policy", "policy_kwargs"}}
 
+        extractor_tag = "mlp"  # default for non-MultiInputPolicy
         if policy == "MultiInputPolicy":
             if policy_kwargs is None:
                 policy_kwargs = {}
@@ -674,16 +674,19 @@ def main(cfg: DictConfig):
             #                            No channel split. Use for rapid sweeps only.
             # obs shape: grids (5,11,11) + scalars (12,) — verified against platformer_core.py
             # Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
-            if algo_conf.get("use_light_extractor", False):
+            if algo_conf.get("use_light_extractor", True):
                 policy_kwargs["features_extractor_class"] = LightCombinedExtractor
+                extractor_tag = "light"
                 print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
-            elif algo_conf.get("use_full_peak", True):
+            elif algo_conf.get("use_full_peak", False):
                 policy_kwargs["features_extractor_class"] = PEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
+                extractor_tag = "peak"
                 print("[INFO] Using PEAKExtractor (~922K params, full architecture).")
             else:
                 policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
+                extractor_tag = "slim"
                 print("[INFO] Using SlimPEAKExtractor (~77K params, channel split, no SEBlock).")
 
         if policy_kwargs and "activation_fn" in policy_kwargs:
@@ -757,19 +760,23 @@ def main(cfg: DictConfig):
 
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
 
+                # Build a unique run ID that includes the extractor tag
+                # Format: {game}_{algo}_{persona}_{skill}_{extractor}
+                run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
+
                 if is_recurrent_model:
                     eval_cb = RecurrentEvalCallback(
                         eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                        best_model_save_path=str(models_dir / "best" / run_id),
+                        log_path=str(models_dir / "eval_logs" / run_id),
                         eval_freq=eval_freq, n_eval_episodes=5,
                         deterministic=True, render=False, verbose=1,
                     )
                 else:
                     eval_cb = EvalCallback(
                         eval_env,
-                        best_model_save_path=str(models_dir / "best" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
-                        log_path=str(models_dir / "eval_logs" / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}"),
+                        best_model_save_path=str(models_dir / "best" / run_id),
+                        log_path=str(models_dir / "eval_logs" / run_id),
                         eval_freq=eval_freq,
                         deterministic=True, render=False,
                     )
@@ -777,12 +784,11 @@ def main(cfg: DictConfig):
                 ckpt_cb = CheckpointCallback(
                     save_freq=save_freq,
                     save_path=str(models_dir / "checkpoints"),
-                    name_prefix=f"{game_name}_{model_name}_{persona}",
+                    name_prefix=run_id,
                 )
 
                 # Wrap eval_cb: saves vecnorm + opens pygame preview on each new best
-                _best_path = (models_dir / "best" /
-                              f"{game_name}_{model_name}_{persona}_{str(skill).lower()}")
+                _best_path = models_dir / "best" / run_id
                 eval_cb = EvalPreviewCallback(
                     eval_cb              = eval_cb,
                     vecnorm_env          = env,
@@ -803,7 +809,7 @@ def main(cfg: DictConfig):
                 train_kwargs["device"] = device
 
                 model = Algo(policy, env, **train_kwargs)
-                tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}"
+                tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
 
                 model.learn(
                     total_timesteps=int(total_timesteps),
@@ -812,15 +818,30 @@ def main(cfg: DictConfig):
                     progress_bar=True,
                 )
 
-                filename = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}.zip"
+                filename = f"{run_id}.zip"
                 save_path = models_dir / filename
                 model.save(save_path)
 
-                norm_path = models_dir / f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_vecnorm.pkl"
+                norm_path = models_dir / f"{run_id}_vecnorm.pkl"
                 env.save(str(norm_path))
+
+                # Write model_info.json alongside best_model.zip so metadata
+                # is readable without parsing the folder name
+                import json as _json, datetime as _dt
+                _best_path.mkdir(parents=True, exist_ok=True)
+                (_best_path / "model_info.json").write_text(_json.dumps({
+                    "game":      game_name,
+                    "algo":      model_name,
+                    "persona":   persona,
+                    "skill":     str(skill).lower(),
+                    "extractor": extractor_tag,
+                    "trained":   _dt.datetime.now().isoformat(timespec="seconds"),
+                    "timesteps": int(total_timesteps),
+                }, indent=2))
 
                 print(f"[{run_count}] saved → {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
                 print(f"       VecNorm → {norm_path}  (required for watch_agent.py)")
+                print(f"       Extractor tag: [{extractor_tag}]")
 
             try:
                 env.close()

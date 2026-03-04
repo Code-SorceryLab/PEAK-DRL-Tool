@@ -16,6 +16,13 @@ import random
 import pygame
 import numpy as np
 
+# Enable ANSI escape codes on Windows 10+ terminals
+if sys.platform == "win32":
+    try:
+        os.system("")  # triggers VT100 mode in cmd.exe / powershell
+    except Exception:
+        pass
+
 
 # Stable-Baselines3 Algo Imports
 try:
@@ -1569,9 +1576,147 @@ def watch_random_agent():
         print(f"\nSaved MP4: {mp4_path}")
         print(f"Saved GIF: {gif_path}\n")
 
+def clear_cli():
+    """Clear the terminal screen cross-platform."""
+    os.system("cls" if sys.platform == "win32" else "clear")
+
+def run_level_editor():
+    """Launch the PEAK level editor (pygame-based tile painter)."""
+    print("\n  Launching PEAK Level Editor...")
+
+    # Locate the script — check both code/scripts and project root
+    candidates = [
+        Path("code/scripts/level_editor.py"),
+        Path("code/games/platformer/level_editor.py"),
+        Path("level_editor.py"),
+    ]
+
+    editor_path = None
+    for p in candidates:
+        if p.exists():
+            editor_path = p
+            break
+
+    if editor_path is None:
+        print("  Could not find level_editor.py.")
+        print("  Checked: " + ", ".join(str(c) for c in candidates))
+        return
+
+    # Optionally open an existing level file
+    levels_dir = Path("code/games/platformer/levels")
+    level_files = sorted(levels_dir.glob("*.txt")) if levels_dir.exists() else []
+
+    if level_files:
+        print("\n  Existing levels:")
+        print("    0. New blank level")
+        for i, lf in enumerate(level_files, 1):
+            print(f"    {i}. {lf.name}")
+        print(f"    {len(level_files) + 1}. Back")
+
+        pick = input(f"\n  Open level (0-{len(level_files) + 1}): ").strip()
+        try:
+            n = int(pick)
+            if n == len(level_files) + 1:
+                return
+            if n == 0:
+                # new blank
+                cmd = [sys.executable, str(editor_path)]
+            elif 1 <= n <= len(level_files):
+                cmd = [sys.executable, str(editor_path), str(level_files[n - 1])]
+            else:
+                print("  Invalid selection.")
+                return
+        except ValueError:
+            print("  Invalid selection.")
+            return
+    else:
+        cmd = [sys.executable, str(editor_path)]
+
+    env_vars = os.environ.copy()
+    env_vars.pop("SDL_VIDEODRIVER", None)
+
+    print("  >>>", " ".join(cmd), "\n")
+    try:
+        subprocess.run(cmd, check=True, env=env_vars)
+    except subprocess.CalledProcessError as e:
+        print(f"\n  Editor exited with error code {e.returncode}")
+    except KeyboardInterrupt:
+        print("\n  Editor closed.")
+
+
 # ============================================================================
-# MAIN MENU
+# MAIN MENU — PEAK ENGINE
 # ============================================================================
+
+# ── ANSI helpers ──────────────────────────────────────────────────────────────
+_SUPPORTS_COLOR = (
+    hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+    and os.environ.get("NO_COLOR") is None
+)
+
+def _c(code: str, text: str) -> str:
+    """Wrap *text* in an ANSI escape if the terminal supports it."""
+    if not _SUPPORTS_COLOR:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+# Palette
+_DIM     = lambda t: _c("2",    t)
+_BOLD    = lambda t: _c("1",    t)
+_CYAN    = lambda t: _c("96",   t)
+_MAG     = lambda t: _c("95",   t)
+_YEL     = lambda t: _c("93",   t)
+_GRN     = lambda t: _c("92",   t)
+_RED     = lambda t: _c("91",   t)
+_WHT     = lambda t: _c("97",   t)
+_BGDARK  = lambda t: _c("48;5;233", t)
+
+LOGO = ("""
+    ██████╗ ███████╗ █████╗ ██╗  ██╗
+    ██╔══██╗██╔════╝██╔══██╗██║ ██╔╝
+    ██████╔╝█████╗  ███████║█████╔╝
+    ██╔═══╝ ██╔══╝  ██╔══██║██╔═██╗
+    ██║     ███████╗██║  ██║██║  ██╗
+    ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
+""")
+
+SUB_LOGO = "         E  N  G  I  N  E   v2"
+
+
+def _print_header(games, algos, trained_games, trained_models):
+    """Print the PEAK ENGINE banner + live stats bar."""
+    W = 58
+
+    print()
+    for line in LOGO.splitlines():
+        if line.strip():
+            print(_CYAN(line))
+
+    print(_DIM("    ─" * 11))
+    print(_MAG(SUB_LOGO))
+    print(_DIM("    ─" * 11))
+
+    # Stats bar
+    g_str = _WHT(f"{len(games)}")
+    a_str = _WHT(f"{len(algos)}")
+    tg_str = _GRN(f"{len(trained_games)}") if trained_games else _DIM("0")
+    tm_str = _GRN(f"{trained_models}") if trained_models else _DIM("0")
+
+    print()
+    print(f"    Games {g_str}  │  Algos {a_str}  │  Trained {tg_str}  │  Models {tm_str}")
+    print(_DIM("    " + "─" * (W - 4)))
+
+
+def _menu_item(key: str, label: str, hint: str = "") -> str:
+    """Format a single menu row."""
+    k = _YEL(f"  [{key:>2}]")
+    h = _DIM(f"  {hint}") if hint else ""
+    return f"{k}  {label}{h}"
+
+
+def _section(title: str):
+    print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}")
+
 
 def main():
     import warnings
@@ -1582,69 +1727,74 @@ def main():
 
     global CURRENT_ALGO
 
+    DISPATCH = {
+        "1":  ("show_project_status",  show_project_status),
+        "2":  ("run_training",         run_training),
+        "3":  ("train_all_game",       train_all_models_for_game),
+        "4":  ("train_grid",           train_complete_grid),
+        "5":  ("manual_play",          run_manual_play),
+        "6":  ("watch_agent",          watch_trained_agent),
+        "7":  ("watch_all",            watch_all_models),
+        "8":  ("watch_random",         watch_random_agent),
+        "9":  ("level_editor",         run_level_editor),
+        "10": ("tensorboard",          run_tensorboard),
+        "11": ("analyzer",             run_agent_analyzer),
+        "12": ("delete_all",           delete_logs_and_models),
+        "c":  ("clear_cli",            clear_cli),
+        "0":  ("exit",                 None),
+    }
+
     while True:
         setup_project()
+        clear_cli()
 
-        print("=" * 60)
-        print("MULTI-GAME RL TRAINING & EVALUATION MENU")
-        print("=" * 60)
-
-        games = get_available_games()
-        algos = get_available_algos_from_grid()
-        trained_games = get_trained_games_from_models_flat()
+        games          = get_available_games()
+        algos          = get_available_algos_from_grid()
+        trained_games  = get_trained_games_from_models_flat()
         trained_models = get_trained_models_count()
 
+        _print_header(games, algos, trained_games, trained_models)
 
+        _section("TRAIN")
+        print(_menu_item("1",  "Project Status"))
+        print(_menu_item("2",  "Train Single",        "game / algo / persona / skill"))
+        print(_menu_item("3",  "Train All (1 game)",  "every combo for one game"))
+        print(_menu_item("4",  "Train Full Grid",     "all games × algos × personas"))
 
-        print(f"Games: {len(games)} | Algorithms: {len(algos)} | Trained games: {len(trained_games)} | Trained models: {trained_models}")
+        _section("PLAY")
+        print(_menu_item("5",  "Play Manually",       "keyboard controls"))
+        print(_menu_item("6",  "Watch Agent",         "visualize a trained model"))
+        print(_menu_item("7",  "Watch All Models",    "side-by-side grid"))
+        print(_menu_item("8",  "Watch Random Agent",  "random actions"))
 
-        print("\nOptions:")
-        print("1. Show Detailed Project Status")
-        print("2. Run Training (pick Game, Algorithm, Persona, Skill)")
-        #print("2. Run Evaluation (per-game, scans models/*.zip)") - Not Adapted Yet
-        print("3. Train All Models for One Game")
-        print("4. Train Complete Grid (all games × algos × personas)")
-        print("5. Play Game Manually (keyboard)")
-        print("6. Watch Trained Agent Play (visualize AI performance)")
-        print("7. Watch All Models (side-by-side grid view)")
-        print("8. Watch Random Agent Play (random actions)")
-        print("9. View TensorBoard Logs (mylogs/)")
-        print("10. Analyze Agent Performance (CSV Logs)")
-        print("11. Delete TensorBoard Logs & Models")
-        print("12. Exit")
-        print("=" * 60)
+        _section("TOOLS")
+        print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
+        print(_menu_item("10", "TensorBoard",          "mylogs/"))
+        print(_menu_item("11", "Analyze Performance",  "CSV log deep-dive"))
+        print(_menu_item("12", "Delete Logs & Models", "nuclear option"))
+        print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
-        choice = input("Select option (1-12): ").strip()
+        print()
+        print(f"    {_DIM('───────────────────────────────────')}")
+        print(_menu_item("0",  _RED("Exit")))
+        print()
 
-        if choice == "1":
-            show_project_status()
-        # elif choice == "2":
-        #     run_evaluation() -> Not Adapted Yet
-        elif choice == "2":
-            run_training()
-        elif choice == "3":
-            train_all_models_for_game()
-        elif choice == "4":
-            train_complete_grid()
-        elif choice == "5":
-            run_manual_play()
-        elif choice == "6":
-            watch_trained_agent()
-        elif choice == "7":
-            watch_all_models()
-        elif choice == "8":
-            watch_random_agent()
-        elif choice == "9":
-            run_tensorboard()
-        elif choice == "10":
-            run_agent_analyzer()
-        elif choice == "11":
-            delete_logs_and_models()
-        elif choice == "12":
-            print("Exiting. Happy training!")
+        choice = input(_BOLD("    ⟫ ")).strip().lower()
+
+        if choice == "0":
+            print()
+            print(_DIM("    Shutting down PEAK ENGINE. Happy training!"))
+            print()
             break
-        else:
-            print("Invalid selection. Please choose 1-12.\n")
+
+        entry = DISPATCH.get(choice)
+        if entry is None:
+            print(_RED(f"\n    Invalid selection: '{choice}'"))
+            continue
+
+        _, fn = entry
+        if fn is not None:
+            fn()
 
 if __name__ == "__main__":
     main()
