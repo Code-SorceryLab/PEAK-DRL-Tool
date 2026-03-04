@@ -489,10 +489,12 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 # ─────────────────────────────────────────────────────────────────────────────
 class EvalPreviewCallback(BaseCallback):
     def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
-                 make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
+                 make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1,
+                 eval_env=None):
         super().__init__(verbose)
         self.eval_cb              = eval_cb
         self._vecnorm_env         = vecnorm_env          # training VecNormalize
+        self._eval_env            = eval_env             # eval VecNormalize (for obs_rms sync)
         self.best_model_save_path = Path(best_model_save_path)
         self.make_env_fn          = make_env_fn           # kept for API compat
         self.repo_root            = Path(repo_root)
@@ -506,6 +508,20 @@ class EvalPreviewCallback(BaseCallback):
         self.eval_cb.init_callback(self.model)
 
     def _on_step(self):
+        # ── Sync obs_rms from training env → eval env before each eval fires ──
+        # The eval env starts with default stats (mean=0, var=1) and training=False
+        # so it never self-updates. Without syncing, the model sees a completely
+        # different observation scale during evaluation vs training, making eval
+        # rewards unreliable and corrupting best-model selection.
+        if self._eval_env is not None and self._vecnorm_env is not None:
+            try:
+                self._eval_env.obs_rms = self._vecnorm_env.obs_rms
+                if hasattr(self._vecnorm_env, "ret_rms"):
+                    self._eval_env.ret_rms = self._vecnorm_env.ret_rms
+            except Exception as _e:
+                if self.verbose:
+                    print(f"[EvalPreview] obs_rms sync warning: {_e}")
+
         result = self.eval_cb.on_step()
         current_best = getattr(self.eval_cb, "best_mean_reward", float("-inf"))
         if current_best > self._last_best:
@@ -792,6 +808,7 @@ def main(cfg: DictConfig):
                 eval_cb = EvalPreviewCallback(
                     eval_cb              = eval_cb,
                     vecnorm_env          = env,
+                    eval_env             = eval_env,
                     best_model_save_path = _best_path,
                     make_env_fn          = make_env,
                     repo_root            = repo_root,

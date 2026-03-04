@@ -236,7 +236,8 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
-        self.world = str(kwargs.pop("world", "1-1")).lower()
+        _default_world = self.level_order[0] if self.level_order else "1-1"
+        self.world = str(kwargs.pop("world", _default_world))
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
@@ -259,6 +260,17 @@ class PlatformerCore(gymnasium.Env):
 
         self.max_lives = 3
         self.lives = self.max_lives
+
+        # ── Curriculum sampling ───────────────────────────────────────────────
+        # sticky_prob: chance of staying on the same level after an episode ends.
+        # max_consecutive: hard cap — after this many episodes in a row on the
+        #   same level the env MUST switch, preventing any env from locking onto
+        #   one level forever (critical when n_envs > 1).
+        self.sticky_prob       = float(kwargs.pop("sticky_prob", 0.50))
+        self.max_consecutive   = int(kwargs.pop("max_consecutive", 4))
+        self._consecutive_same = 0          # episodes on current level in a row
+        self._level_visits     = {lvl: 0 for lvl in self.level_order}
+        self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
         # Camera
         self.camera_x = 0.0
@@ -536,18 +548,48 @@ class PlatformerCore(gymnasium.Env):
         """
         super().reset(seed=seed)
 
-        # Full reset: restore lives, score, return to level 0 (or locked level)
+        # Full reset: restore lives/score, then pick the next training level.
+        #
+        # Strategy — sticky + performance-weighted + forced rotation:
+        #   1. If consecutive episodes on this level < max_consecutive AND
+        #      random roll < sticky_prob  → stay (agent gets repeated practice).
+        #   2. Otherwise                 → performance-weighted random switch.
+        #      Levels with lower win-rates get higher sampling weight so the
+        #      agent focuses effort where it's actually struggling.
+        #   3. Locked level (editor playtest) always overrides everything.
         self.reset_metrics()
         if self.locked_level:
             self.world = self.locked_level
-            # Keep current_index_world consistent
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-        else:
-            self.current_index_world = 0
+            self._consecutive_same = 0
+        elif self.level_order:
+            force_switch = self._consecutive_same >= self.max_consecutive
+            if not force_switch and random.random() < self.sticky_prob:
+                # Stay on the same level
+                self._consecutive_same += 1
+            else:
+                # Performance-weighted pick from the OTHER levels
+                # weight = 1 - win_rate  (struggling levels weighted higher)
+                # Unvisited levels get weight 1.0 (worst possible score assumed)
+                idxs = [i for i in range(len(self.level_order))
+                        if i != self.current_index_world]
+                if idxs:
+                    weights = []
+                    for i in idxs:
+                        lvl = self.level_order[i]
+                        v = self._level_visits.get(lvl, 0)
+                        w = self._level_wins.get(lvl, 0)
+                        win_rate = w / v if v > 0 else 0.0
+                        weights.append(max(0.1, 1.0 - win_rate))
+                    total = sum(weights)
+                    probs = [x / total for x in weights]
+                    self.current_index_world = random.choices(idxs, weights=probs, k=1)[0]
+                self._consecutive_same = 0
             self.world = self.level_order[self.current_index_world]
+        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
 
@@ -682,13 +724,15 @@ class PlatformerCore(gymnasium.Env):
 
         The episode continues into the next level; only lives = 0 ends it.
         """
-        # Random walk: +-1 from current index (curriculum learning)
-        self.current_index_world = max(
-            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
-        )
-        if self.current_index_world >= len(self.level_order):
-            self.current_index_world = len(self.level_order) - 1
+        # Record the win for the level just completed
+        self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
+
+        # Advance to the next level in order; wrap at the end so long episodes
+        # cycle through the full curriculum without ending prematurely.
+        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
         self.world = self.level_order[self.current_index_world]
+        # Count the new level visit immediately so win-rates stay accurate mid-episode
+        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
 
         # Signal step() to load the next level after _info() runs this frame.
         self._needs_level_transition = True

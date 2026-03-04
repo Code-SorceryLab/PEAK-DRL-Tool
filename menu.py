@@ -234,6 +234,21 @@ def get_personas_for_game(game: str):
     filtered = [p for p in all_personas if p.startswith(f"{game}_")]
     return filtered if filtered else all_personas
 
+# Architecture metadata used by the menu
+_ARCH_INFO = {
+    "light": ("LightCombinedExtractor", "~18K params  — no channel split, fast sweeps"),
+    "slim":  ("SlimPEAKExtractor",       "~77K params  — channel split, no SEBlock  [recommended]"),
+    "peak":  ("PEAKExtractor",           "~922K params — full SEBlock + deep semantic branch"),
+}
+
+def get_available_architectures_from_grid():
+    """Return architectures list from grid.yaml, falling back to all three if absent."""
+    cfg = load_grid_config()
+    if cfg is not None and "architectures" in cfg and cfg.architectures:
+        return list(cfg.architectures)
+    return ["light", "slim", "peak"]
+
+
 def get_trained_models_count():
     """Count total number of trained models in models/best/"""
     BEST_DIR = MODELS_DIR / "best"
@@ -337,7 +352,7 @@ def ensure_current_algo():
 # TRAINING EXECUTION - Core Logic (DRY refactor)
 # ============================================================================
 
-def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT):
+def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, architecture=None):
     """Execute a single training run with error handling"""
     cmd = [
         sys.executable, "-m", "code.scripts.train",
@@ -347,6 +362,8 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT):
         f"+skill={skill}",
         f"tb_root={tb_root}",
     ]
+    if architecture:
+        cmd.append(f"+architecture={architecture}")
 
     print(">>> " + " ".join(cmd) + "\n")
 
@@ -425,6 +442,25 @@ def run_training():
 
     tb_root = input(f"TensorBoard log root [{DEFAULT_TB_ROOT}]: ").strip() or DEFAULT_TB_ROOT
 
+    # Architecture selection
+    archs = get_available_architectures_from_grid()
+    print("\nAvailable architectures:")
+    for i, a in enumerate(archs, 1):
+        name, desc = _ARCH_INFO.get(a, (a, ""))
+        print(f"  {i}. {a:<6}  {name:<28} {desc}")
+    print(f"  {len(archs)+1}. Back")
+    arch_pick = input(f"Select architecture (1-{len(archs)+1}) or Enter for [slim]: ").strip()
+    if arch_pick == str(len(archs) + 1):
+        return
+    if arch_pick == "":
+        arch_choice = "slim" if "slim" in archs else archs[0]
+    else:
+        try:
+            arch_choice = archs[int(arch_pick) - 1]
+        except (ValueError, IndexError):
+            print("Invalid selection, defaulting to slim.")
+            arch_choice = "slim" if "slim" in archs else archs[0]
+
     # Custom steps
     if skill_choice == "Custom steps":
         steps_str = input("Enter total steps (e.g., 300000): ").strip()
@@ -438,6 +474,7 @@ def run_training():
             sys.executable, "-m", "code.scripts.train",
             f"+game={game}", f"+model={algo_choice}", f"+persona={persona_choice}",
             "skill=Custom", f"+skills.Custom={steps}", f"tb_root={tb_root}",
+            f"+architecture={arch_choice}",
         ]
         print("\n>>>", " ".join(cmd), "\n")
         subprocess.run(cmd)
@@ -450,14 +487,14 @@ def run_training():
     if skill_choice == "Novice & Expert":
         for sk in ("Novice", "Expert"):
             print(f"\n>>> Training {game} | Algo: {algo_choice} | Persona: {persona_choice} | Skill: {sk}")
-            execute_training_run(game, algo_choice, persona_choice, sk, tb_root)
+            execute_training_run(game, algo_choice, persona_choice, sk, tb_root, arch_choice)
         print("\n✓ Completed Novice & Expert runs.\n")
         if HAS_WINSOUND:
             winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
         return
 
     # Single skill
-    execute_training_run(game, algo_choice, persona_choice, skill_choice, tb_root)
+    execute_training_run(game, algo_choice, persona_choice, skill_choice, tb_root, arch_choice)
     if HAS_WINSOUND:
         winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
     print("\nTraining completed.\n")
@@ -526,7 +563,23 @@ def train_all_models_for_game():
     print(f"  Personas: {len(personas)}")
     print(f"  Skills: {len(skills)}")
 
-    confirm = input(f"\nProceed with {total_runs} training runs? [y/N]: ").strip().lower()
+    # Architecture selection
+    archs = get_available_architectures_from_grid()
+    print("\nAvailable architectures:")
+    for i, a in enumerate(archs, 1):
+        name, desc = _ARCH_INFO.get(a, (a, ""))
+        print(f"  {i}. {a:<6}  {name:<28} {desc}")
+    arch_pick = input(f"Select architecture (1-{len(archs)}) or Enter for [slim]: ").strip()
+    if arch_pick == "":
+        arch_choice = "slim" if "slim" in archs else archs[0]
+    else:
+        try:
+            arch_choice = archs[int(arch_pick) - 1]
+        except (ValueError, IndexError):
+            print("Invalid, defaulting to slim.")
+            arch_choice = "slim" if "slim" in archs else archs[0]
+
+    confirm = input(f"\nProceed with {total_runs} training runs using [{arch_choice}] architecture? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
@@ -542,10 +595,10 @@ def train_all_models_for_game():
                     completed += 1
                     print("\n" + "=" * 60)
                     print(f"Progress: {completed}/{total_runs}")
-                    print(f"Training: {game} | {algo} | {persona} | {skill}")
+                    print(f"Training: {game} | {algo} | {persona} | {skill} | arch: {arch_choice}")
                     print("=" * 60)
 
-                    success = execute_training_run(game, algo, persona, skill)
+                    success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
                     if not success:
                         failed += 1
     except KeyboardInterrupt:
@@ -601,7 +654,23 @@ def train_complete_grid():
 
     print(f"Logs will be saved to: {DEFAULT_TB_ROOT}/")
 
-    confirm = input(f"\nProceed with {total_runs} training runs? [y/N]: ").strip().lower()
+    # Architecture selection
+    archs = get_available_architectures_from_grid()
+    print("\nAvailable architectures:")
+    for i, a in enumerate(archs, 1):
+        name, desc = _ARCH_INFO.get(a, (a, ""))
+        print(f"  {i}. {a:<6}  {name:<28} {desc}")
+    arch_pick = input(f"Select architecture (1-{len(archs)}) or Enter for [slim]: ").strip()
+    if arch_pick == "":
+        arch_choice = "slim" if "slim" in archs else archs[0]
+    else:
+        try:
+            arch_choice = archs[int(arch_pick) - 1]
+        except (ValueError, IndexError):
+            print("Invalid, defaulting to slim.")
+            arch_choice = "slim" if "slim" in archs else archs[0]
+
+    confirm = input(f"\nProceed with {total_runs} training runs using [{arch_choice}] architecture? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
@@ -623,10 +692,10 @@ def train_complete_grid():
                         completed += 1
                         print("\n" + "=" * 60)
                         print(f"Progress: {completed}/{total_runs}")
-                        print(f"Training: {game} | {algo} | {persona} | {skill}")
+                        print(f"Training: {game} | {algo} | {persona} | {skill} | arch: {arch_choice}")
                         print("=" * 60)
 
-                        success = execute_training_run(game, algo, persona, skill)
+                        success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
                         if not success:
                             failed += 1
     except KeyboardInterrupt:
@@ -1680,7 +1749,7 @@ LOGO = ("""
     ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
 """)
 
-SUB_LOGO = "         E  N  G  I  N  E   v2"
+SUB_LOGO = "         E  N  G  I  N  E   By AL and Kevin"
 
 
 def _print_header(games, algos, trained_games, trained_models):
@@ -1690,7 +1759,7 @@ def _print_header(games, algos, trained_games, trained_models):
     print()
     for line in LOGO.splitlines():
         if line.strip():
-            print(_CYAN(line))
+            print(_RED(line))
 
     print(_DIM("    ─" * 11))
     print(_MAG(SUB_LOGO))
@@ -1790,11 +1859,23 @@ def main():
         entry = DISPATCH.get(choice)
         if entry is None:
             print(_RED(f"\n    Invalid selection: '{choice}'"))
+            time.sleep(1.2)
             continue
 
         _, fn = entry
         if fn is not None:
-            fn()
+            try:
+                fn()
+            except Exception as e:
+                print(_RED(f"\n    ✖  Error: {e}"))
+
+            # Pause so the user can read output before the screen is cleared,
+            # unless the action was "clear screen" itself.
+            if fn is not clear_cli:
+                try:
+                    input(_DIM("\n    Press Enter to return to menu..."))
+                except (EOFError, KeyboardInterrupt):
+                    pass
 
 if __name__ == "__main__":
     main()

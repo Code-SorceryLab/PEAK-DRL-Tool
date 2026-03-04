@@ -36,7 +36,7 @@ class CsvLoggerCallback(BaseCallback):
         action_name = info.get("action_name", info.get("action", "N/A"))
 
         # Telemetry
-        level = info.get("level", 0)
+        level = info.get("level", "")
         x_pos = info.get("x_position", 0.0)
         y_pos = info.get("y_position", 0.0)
         vx = info.get("velocity_x", 0.0)
