@@ -122,15 +122,22 @@ class PhysicsManager:
         self.context.MAX_WALK_SPEED *= mult
         self.context.MAX_RUN_SPEED *= mult
 
-    def rebuild_dynamic_hashes(self, level_data):
+    def rebuild_dynamic_hashes(self, level_data, cached_spikes=None):
         """
         Clears and repopulates the spatial hashes with active entities
-        (enemies, coins, powerups) for optimized collision queries.
+        (enemies, spikes, coins, powerups) for optimized collision queries.
+
+        cached_spikes: pre-built list of Spike tile objects from load_level().
+        Spikes are inserted into hazard_hash so the CNN observation grid
+        picks them up in channel 1 (hazard) via a single query_rect call.
         """
         self.hazard_hash.clear()
         self.collectible_hash.clear()
         for enemy in level_data.enemies:
             if enemy.gObj.active: self.hazard_hash.insert(enemy)
+        if cached_spikes:
+            for spike in cached_spikes:
+                self.hazard_hash.insert(spike)
         for coin in level_data.coins:
             if coin.gObj.active and not coin.collected: self.collectible_hash.insert(coin)
         for pup in level_data.powerups:
@@ -487,6 +494,12 @@ class PhysicsManager:
 
         nearby_hazards = self.hazard_hash.query(player)
         for obj in nearby_hazards:
+            # Skip spikes — their lethal collision is already handled by
+            # _resolve_player_world via static_hash (AABB overlap with full
+            # penetration depth). Processing them here would trigger a second
+            # _handle_death call in the same frame, double-decrementing lives.
+            if getattr(obj.gObj, 'type_id', None) == EntityType.SPIKE:
+                continue
             if player.gObj.collides_with(obj.gObj):
                 self._dispatch_collision(core, player, obj, player_was_falling)
 

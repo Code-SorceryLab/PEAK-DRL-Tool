@@ -243,7 +243,8 @@ class AgentViewOverlay(DebugOverlay):
         sy0 = cy
 
         tiny = self._get_tiny_font()
-
+        cost_cache = getattr(core, '_dijkstra_window_cache', None)
+            
         for r in range(rows):
             for c in range(cols):
                 tx, ty = ox + c, oy + r
@@ -268,19 +269,22 @@ class AgentViewOverlay(DebugOverlay):
                 pygame.draw.rect(surface, bcol, (dx, dy, cw - 1, ch - 1), 1)
 
                 # Dijkstra cost number (tiny font, centred in cell)
-                if core.dijkstra:
-                    cost = core.dijkstra.get_dist(tx, ty)
-                    if 0 < cost < float('inf'):
-                        # Heat tint
-                        alpha = min(50, int(cost * 0.7))
+                # Dijkstra advantage from the CNN observation (patched + normalised)
+                if cost_cache is not None and 0 <= r < cost_cache.shape[0] and 0 <= c < cost_cache.shape[1]:
+                    val = float(cost_cache[r, c]) * 10
+                    if abs(val) > 0.01:
+                        intensity = min(90, int(abs(val) * 90))
                         tint = pygame.Surface((cw - 1, ch - 1), pygame.SRCALPHA)
-                        tint.fill((255, 130, 0, alpha))
+                        if val > 0:
+                            tint.fill((0, 200, 80, intensity))
+                        else:
+                            tint.fill((255, 60, 30, intensity))
                         surface.blit(tint, (dx, dy))
-                        # Number
-                        cost = core.dijkstra_current_tile - cost
-                        ns = tiny.render(str(int(cost)), True, (200, 200, 200))
-                        surface.blit(ns, (dx + (cw - ns.get_width()) // 2,
-                                          dy + (ch - ns.get_height()) // 2))
+                        label = str(int(val * 10))
+                        ns = tiny.render(label, True, (200, 200, 200))
+                        nx = dx + (cw - 1 - ns.get_width()) // 2
+                        ny = dy + 1
+                        surface.blit(ns, (nx, ny))
 
 
 class InfoPanelOverlay(DebugOverlay):
