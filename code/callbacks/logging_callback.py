@@ -52,10 +52,11 @@ class CsvLoggerCallback(BaseCallback):
             self.levels_completed += 1
 
         # Observation sanity stats (populated every N steps by _check_obs_sanity in core)
-        # 5-channel order: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
+        # 5-channel order: Player(0), Solid(1), Collectible(2), Hazard(3), Dijkstra(4)
 
         _OBS_SANITY_KEYS = [
             'grid_player_mean',      'grid_player_std',      'grid_player_min',      'grid_player_max',
+            'grid_solid_mean',       'grid_solid_std',       'grid_solid_min',       'grid_solid_max',
             'grid_hazard_mean',      'grid_hazard_std',      'grid_hazard_min',      'grid_hazard_max',
             'grid_collectible_mean', 'grid_collectible_std', 'grid_collectible_min', 'grid_collectible_max',
             'grid_dijkstra_mean',    'grid_dijkstra_std',    'grid_dijkstra_min',    'grid_dijkstra_max',

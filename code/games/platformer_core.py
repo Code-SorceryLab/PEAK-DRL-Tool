@@ -494,6 +494,11 @@ class PlatformerCore(gymnasium.Env):
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
 
+        # Build observation BEFORE _info() so that _check_obs_sanity can
+        # populate self._obs_stats in time for _info() to spread them.
+        obs = self._obs()
+        self._check_obs_sanity(obs)
+
         info = self._info()
 
         # Inline level transition on win.
@@ -514,7 +519,7 @@ class PlatformerCore(gymnasium.Env):
         # The GameEnv wrapper (generic_env.py) applies the actual persona reward fn.
         base_reward = float(self.score_delta)
 
-        return self._obs(), base_reward, bool(terminated), bool(truncated), info
+        return obs, base_reward, bool(terminated), bool(truncated), info
 
 
     def reset(self, seed=None, options=None) -> np.ndarray:

@@ -1,22 +1,4 @@
-# code/scripts/train.py
-# ============================================================================
-# CHANGES FROM ORIGINAL:
-#   1. CustomCombinedExtractor  →  PEAKExtractor  (replaces old buggy extractor)
-#      Old extractor bug: AdaptiveMaxPool2d upsampled 5×5 → 11×11 (wrong direction)
-#      PEAKExtractor improvements:
-#        - Splits grids into semantic branch (ch 0-3) + Dijkstra branch (ch 4)
-#          so the pre-computed gradient field doesn't pollute binary feature learning
-#        - SEBlock channel attention in semantic branch
-#        - Dedicated shallow Dijkstra CNN (gradient field needs less capacity)
-#        - Scalar MLP deepened to 2 layers (12→64→64)
-#        - Fusion layer (384→256) before SB3 MlpExtractor
-#        - ~922K params total — lightweight enough for CPU + 16 parallel envs
-#      Obs shape verified: grids (5,11,11) + scalars (12,) — matches env exactly
-#      Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
-#   2. LightCombinedExtractor — kept as fast sweep option (use_light_extractor: true)
-#   3. LiveVisualizationCallback — spawns a real pygame window every N steps
-#   4. eval_env VecNormalize stats synced from training env each eval cycle
-# ============================================================================
+
 import os
 from code.callbacks.logging_callback import CsvLoggerCallback
 
@@ -440,7 +422,7 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
-                n_ch = subspace.shape[0]  # 4 channels
+                n_ch = subspace.shape[0]  # 5 channels
 
                 # --- Layer 1: standard conv ---
                 l1 = nn.Sequential(
