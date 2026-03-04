@@ -157,36 +157,47 @@ class PhysicsManager:
         Updates the physics state (position, velocity) for all entities.
         Includes Continuous Collision Detection (CCD) for the player to prevent tunneling.
 
-        1. Checks how far the player intends to move this frame.
-        2. If the distance > 0.5 tiles, splits the frame into multiple smaller sub-steps.
-        3. Executes each sub-step for the player, resolving wall collisions immediately after each step.
-        4. Updates enemies, coins, and powerups normally (single step).
+        X/Y collision split:
+          Each CCD sub-step applies the full player.update() (moves both axes),
+          then resolves X and Y independently:
+            1. Reset Y to pre-update value — only X has moved.
+               Any collision is unambiguously a wall. Resolve X.
+            2. Restore post-update Y — only Y has moved from the X-resolved position.
+               Any collision is unambiguously floor or ceiling. Resolve Y.
+
+          This eliminates the axis-ambiguity bug that fires when stacked tiles are
+          processed in an order where a wall tile's oy < ox looks like a ceiling hit.
         """
         ctx = self.context
         player = core.player
         level_data = core.level_data
 
         if player:
-            # --- ANTI-TUNNELING (Continuous Collision Detection) ---
-            # 1. Calculate how far the player WANTS to move this frame
             predicted_dist = max(abs(player.vx), abs(player.vy)) * dt
-
-            # 2. If moving more than 1/2 a tile, break it into smaller steps
-            #    (We use 0.5 tile size to be safe)
             step_count = 1
             if predicted_dist > TILE_SIZE * 0.5:
                 step_count = int(math.ceil(predicted_dist / (TILE_SIZE * 0.5)))
-
             step_dt = dt / step_count
 
-            # 3. Execute the steps
             for _ in range(step_count):
-                player.update(step_dt, ctx)
-                # Resolve ONLY player world collisions immediately
-                # This stops them from entering a wall during a sub-step
-                self._resolve_player_world(core, level_data)
+                pre_y = player.gObj.y          # save Y before update
 
-        # Update everything else normally (Enemies usually don't move fast enough to tunnel)
+                player.update(step_dt, ctx)    # moves both X and Y
+
+                post_y = player.gObj.y         # save post-update Y
+
+                # ── Pass 1: X only ────────────────────────────────────────────
+                # Y is reset to pre-update so only X has changed.
+                # Every collision must be a wall — push out horizontally.
+                player.gObj.y = pre_y
+                self._resolve_player_world_x(core, level_data)
+
+                # ── Pass 2: Y only ────────────────────────────────────────────
+                # X is now resolved. Restore post-update Y so only Y has moved.
+                # Every remaining collision must be floor or ceiling.
+                player.gObj.y = post_y
+                self._resolve_player_world_y(core, level_data)
+
         self.update_list(dt, level_data.enemies)
         self.update_list(dt, level_data.coins)
         self.update_list(dt, level_data.powerups)
@@ -421,12 +432,51 @@ class PhysicsManager:
 
     def _resolve_player_world(self, core, level_data):
         """
-        Resolves player collisions against static tiles. Ground (#) and
-        platform (=) tiles behave identically — fully solid on all four sides:
+        Full static-tile resolution — runs X pass then Y pass in sequence.
+        Used by resolve_collisions after moving platforms may have shifted the player.
+        """
+        self._resolve_player_world_x(core, level_data)
+        self._resolve_player_world_y(core, level_data)
 
-          ox < oy  →  wall hit  : push horizontally (vx direction), zero vx
-          vy >= 0  →  floor hit : snap to top, zero vy, land
-          vy <  0  →  ceiling   : snap to bottom, zero vy (bonk / qblock)
+    def _resolve_player_world_x(self, core, level_data):
+        """
+        Wall-only pass. Called after only X has moved so every overlap is
+        unambiguously a wall. No ox/oy axis comparison needed or used —
+        that comparison is the root cause of the stacked-tile ceiling-snap bug.
+        Spikes deferred to the Y pass.
+        """
+        player = core.player
+        if not player: return
+
+        nearby = self._get_tile_rects_near(level_data, player.gObj)
+        rect   = player.gObj.get_rect()
+
+        for (row, col, trect, tile_type) in nearby:
+            if tile_type == EntityType.SPIKE:
+                continue  # handled in Y pass
+            if not rect.colliderect(trect):
+                continue
+
+            if player.vx > 0:
+                player.gObj.x = trect.left - player.gObj.width
+            elif player.vx < 0:
+                player.gObj.x = trect.right
+            else:
+                # Stationary (e.g. spawned inside geometry) — use center as tiebreaker
+                if rect.centerx <= trect.centerx:
+                    player.gObj.x = trect.left - player.gObj.width
+                else:
+                    player.gObj.x = trect.right
+            player.vx = 0
+            rect = player.gObj.get_rect()
+
+    def _resolve_player_world_y(self, core, level_data):
+        """
+        Floor/ceiling-only pass. Called after X is resolved so every remaining
+        overlap is unambiguously vertical. vy direction decides floor vs ceiling:
+          vy >= 0  →  floor   : snap to top, zero vy, land
+          vy <  0  →  ceiling : snap to bottom, zero vy (bonk / qblock)
+        Spikes checked here so lethal contact fires on any approach direction.
         """
         player = core.player
         if not player: return
@@ -438,39 +488,18 @@ class PhysicsManager:
             if not rect.colliderect(trect):
                 continue
 
-            # Spikes — lethal on any contact (star power = immune)
             if tile_type == EntityType.SPIKE:
                 if not player.power_machine.is_invincible:
                     core._handle_death("Spike")
                     return
                 continue
 
-            ox = min(rect.right  - trect.left, trect.right  - rect.left)
-            oy = min(rect.bottom - trect.top,  trect.bottom - rect.top)
-
-            if ox < oy:
-                # ── Wall hit ──────────────────────────────────────────────────
-                if player.vx > 0:
-                    player.gObj.x = trect.left - player.gObj.width
-                elif player.vx < 0:
-                    player.gObj.x = trect.right
-                else:
-                    # Stationary (e.g. spawn inside geometry) — use center
-                    if rect.centerx <= trect.centerx:
-                        player.gObj.x = trect.left - player.gObj.width
-                    else:
-                        player.gObj.x = trect.right
-                player.vx = 0
-
-            elif player.vy >= 0:
-                # ── Floor hit ─────────────────────────────────────────────────
+            if player.vy >= 0:
                 player.gObj.y    = trect.top - player.gObj.height
                 player.vy        = 0
                 player.on_ground = True
                 player.jump_hold = 0
-
             else:
-                # ── Ceiling hit (moving up) ───────────────────────────────────
                 player.gObj.y = trect.bottom
                 player.vy     = 0
                 if tile_type == TILE_QBLOCK:
