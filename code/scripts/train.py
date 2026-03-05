@@ -141,47 +141,44 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
     Observation space
     -----------------
-      grids  : Box(-1, 1, shape=(5, 11, 11))
+      grids  : Box(-1, 1, shape=(5, H, W))
                  ch 0  — Player        binary {0,1}
-                 ch 1  — Solids        binary {0,1}  (ground, platforms, qblocks)
+                 ch 1  — Solids        binary {0,1}
                  ch 2  — Collectibles  binary {0,1}
                  ch 3  — Hazards       binary {0,1}
-                 ch 4  — Dijkstra      continuous [-1, 1]  ← separated branch
+                 ch 4  — Dijkstra      continuous [-1, 1]
       scalars: Box(-inf, inf, shape=(12,))
-                 [0-4]  player obs  (x, y, vx, vy, on_ground)
-                 [5]    enemy dist  normalised
-                 [6]    goal dist   normalised
-                 [7]    timer       normalised
-                 [8]    goal dir Y  signed normalised
-                 [9]    dijkstra dist scalar
-                 [10-11] steepest descent (dX, dY)
 
     Architecture
     ------------
-    Branch A  Semantic CNN  (ch 0-3, 4×11×11)
-              Conv(4→32,k=3,pad=1) → ReLU → SEBlock(32)
-              Conv(32→64,k=3,pad=1) → ReLU
-              Conv(64→64,k=3,stride=2,pad=1) → ReLU  [→ 64×6×6]
-              Flatten → Linear(2304→256) → ReLU
+    Branch A  Semantic CNN  (ch 0-3, 4×H×W)
+              Conv(4→32, k=3) → GroupNorm(8,32) → ReLU → SEBlock(32)
+              Conv(32→64, k=3) → GroupNorm(16,64) → ReLU
+              Conv(64→64, k=3) → GroupNorm(16,64) → ReLU
+              AdaptiveAvgPool(4×4) → Flatten(1024) → Linear(1024→256) → LayerNorm → ReLU
 
-    Branch B  Dijkstra CNN  (ch 4, 1×11×11)
-              Conv(1→16,k=3,pad=1) → ReLU
-              Conv(16→16,k=3,stride=2,pad=1) → ReLU  [→ 16×6×6]
-              Flatten → Linear(576→64) → ReLU
+    Branch B  Dijkstra CNN  (ch 4, 1×H×W)
+              Conv(1→16, k=3) → GroupNorm(4,16) → ReLU
+              Conv(16→32, k=3) → GroupNorm(8,32) → ReLU
+              AdaptiveAvgPool(3×3) → Flatten(288) → Linear(288→64) → LayerNorm → ReLU
 
     Branch C  Scalar MLP   (12,)
-              Linear(12→64) → ReLU → Linear(64→64) → ReLU
+              Linear(12→64) → LayerNorm → ReLU
+              Linear(64→64) → LayerNorm → ReLU
 
-    Fusion    Cat(256+64+64=384) → Linear(384→256) → ReLU
+    Fusion    Cat(256+64+64=384) → Linear(384→256) → LayerNorm → ReLU
               → features_dim = 256
 
-    Rationale for channel split:
-      The Dijkstra channel is a pre-computed continuous gradient field.
-      Mixing it with binary semantic channels in Branch A lets its
-      high-magnitude signal dominate early conv gradients, slowing
-      semantic feature learning. A dedicated shallow branch avoids this.
+    Grid-size invariant: AdaptiveAvgPool absorbs any H×W before flatten.
+    No stride-2 convs — spatial reduction handled entirely by pooling.
 
-    ~922K parameters — lightweight for CPU training with 16+ parallel envs.
+    GroupNorm instead of BatchNorm: correct for RL (no batch-dimension
+    dependency, works identically in train and eval, stable under
+    non-stationary observation distributions).
+
+    SEBlock retained in Branch A: channel attention helps the network
+    suppress irrelevant semantic channels per-frame (e.g. collectible
+    channel when no coins are visible).
     """
 
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 256):
@@ -192,57 +189,68 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
         n_channels = grid_shape[0]    # 5
         n_scalars  = scalar_shape[0]  # 12
-        H, W       = grid_shape[1], grid_shape[2]  # 11, 11
+        H, W       = grid_shape[1], grid_shape[2]
 
-        # Number of semantic channels = all except the last (Dijkstra)
-        n_semantic = n_channels - 1   # 4
+        n_semantic = n_channels - 1   # 4 (all except Dijkstra)
 
         # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
         self.semantic_cnn = nn.Sequential(
             nn.Conv2d(n_semantic, 32, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(8, 32),
             nn.ReLU(),
             SEBlock(32, reduction=4),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(16, 64),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # 11×11 → 6×6
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(16, 64),
             nn.ReLU(),
-            nn.Flatten()
+            nn.AdaptiveAvgPool2d((4, 4)),   # any H×W → 4×4
+            nn.Flatten()                    # 64×4×4 = 1024
         )
         with torch.no_grad():
             sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 256),
+            nn.LayerNorm(256),
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (last channel only) ──────────────────────
+        # ── Branch B: Dijkstra CNN (last channel only) ───────────────────────
         self.dijkstra_cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1),  # 11×11 → 6×6
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(8, 32),
             nn.ReLU(),
-            nn.Flatten()
+            nn.AdaptiveAvgPool2d((3, 3)),   # any H×W → 3×3
+            nn.Flatten()                    # 32×3×3 = 288
         )
         with torch.no_grad():
             dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
 
         self.dijkstra_fc = nn.Sequential(
             nn.Linear(dij_flat, 64),
+            nn.LayerNorm(64),
             nn.ReLU()
         )
 
         # ── Branch C: Scalar MLP ─────────────────────────────────────────────
         self.scalar_mlp = nn.Sequential(
             nn.Linear(n_scalars, 64),
+            nn.LayerNorm(64),
             nn.ReLU(),
             nn.Linear(64, 64),
+            nn.LayerNorm(64),
             nn.ReLU()
         )
 
         # ── Fusion ────────────────────────────────────────────────────────────
         self.fusion = nn.Sequential(
-            nn.Linear(256 + 64 + 64, features_dim),  # 384 → 256
+            nn.Linear(256 + 64 + 64, features_dim),   # 384 → 256
+            nn.LayerNorm(features_dim),
             nn.ReLU()
         )
 
@@ -253,11 +261,11 @@ class PEAKExtractor(BaseFeaturesExtractor):
         scalars = observations["scalars"]  # (B, 12)
 
         # ch 0-3: semantic binary channels  |  ch 4: Dijkstra continuous
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))  # (B, 256)
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))  # (B, 64)
-        scal = self.scalar_mlp(scalars)                                   # (B, 64)
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))   # (B, 256)
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))   # (B,  64)
+        scal = self.scalar_mlp(scalars)                                    # (B,  64)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))            # (B, 256)
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))             # (B, 256)
 
 
 # =========================================================================
@@ -325,7 +333,7 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
 
         n_channels = grid_shape[0]    # 5
         n_scalars  = scalar_shape[0]  # 12
-        H, W       = grid_shape[1], grid_shape[2]  # 11, 11
+        H, W       = grid_shape[1], grid_shape[2]  # 21,21
 
         # Number of semantic channels = all except the last (Dijkstra)
         n_semantic = n_channels - 1   # 4
@@ -333,11 +341,13 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
         self.semantic_cnn = nn.Sequential(
             nn.Conv2d(n_semantic, 16, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 16),  # GroupNorm with num_groups=4 (1 group per channel) is a lightweight alternative to BatchNorm/SEBlock
             nn.ReLU(),
-            nn.MaxPool2d(2),                              # 11×11 → 5×5
+            nn.MaxPool2d(2),                              # 21×21 → 10×10
             nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(8, 32),  # num_groups=8 for 32 channels
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),                 # 5×5 → 3×3
+            nn.AdaptiveAvgPool2d((3, 3)),                 # 10×10 → 3×3
             nn.Flatten()                                  # 32×3×3 = 288
         )
         with torch.no_grad():
@@ -345,14 +355,16 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 128),
+            nn.LayerNorm(128),
             nn.ReLU()
         )
 
         # ── Branch B: Dijkstra CNN (last channel only) ──────────────────────
         self.dijkstra_cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 16),  # num_groups=4 for 16 channels
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),                 # 11×11 → 3×3
+            nn.AdaptiveAvgPool2d((3, 3)),                 # 21×21 → 3×3
             nn.Flatten()                                  # 16×3×3 = 144
         )
         with torch.no_grad():
@@ -360,18 +372,21 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
 
         self.dijkstra_fc = nn.Sequential(
             nn.Linear(dij_flat, 32),
+            nn.LayerNorm(32),
             nn.ReLU()
         )
 
         # ── Branch C: Scalar MLP ─────────────────────────────────────────────
         self.scalar_mlp = nn.Sequential(
             nn.Linear(n_scalars, 64),
+            nn.LayerNorm(64),  # num_groups=4 for 64 channels
             nn.ReLU()
         )
 
         # ── Fusion ────────────────────────────────────────────────────────────
         self.fusion = nn.Sequential(
             nn.Linear(128 + 32 + 64, features_dim),      # 224 → 128
+            nn.LayerNorm(features_dim),
             nn.ReLU()
         )
 
@@ -387,7 +402,6 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         scal = self.scalar_mlp(scalars)                                   # (B,  64)
 
         return self.fusion(torch.cat([sem, dij, scal], dim=1))            # (B, 128)
-
 
 # =========================================================================
 # LightCombinedExtractor — fast sweep option (use_light_extractor: true)
