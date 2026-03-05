@@ -358,9 +358,252 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
     }
 
 
+@_wrap_with_tracker
+def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+    """
+    COIN HUNTER: Maximise coin collection.
+
+    KEY DESIGN: NO dijkstra potential. The goal gradient is removed so the
+    agent cannot "cheat" by just running to the goal. The ONLY consistent
+    positive signal comes from collecting coins.
+
+    Without a goal gradient, the agent must learn to navigate by following
+    the coin channel in its observation grid. Frontier reward provides a
+    weak nudge to explore new territory (where uncollected coins are).
+    A small survival bonus keeps the agent alive long enough to find coins.
+    Win bonus scales with total coins collected.
+    """
+    kills     = int(info.get("enemies_killed_step", 0))
+    coins     = int(info.get("coins_delta", 0))
+    total_coins = int(info.get("coins_collected", 0))
+    won       = info.get("won", False)
+    life_lost = info.get("life_lost", False)
+
+    # ── Primary signal: coins (the ONLY strong positive) ───────────────
+    r_coin = 5.0 * coins
+
+    # ── Exploration: reward visiting new ground (where uncollected coins live)
+    frontier = float(info.get("frontier_dx", 0.0))
+    r_frontier = frontier * 0.3
+
+    # ── Survival bonus: staying alive = more time to find coins ────────
+    r_alive = 0.002
+
+    # ── NO dijkstra potential — deliberately omitted ───────────────────
+    # r_potential = 0.0  (not computed at all)
+
+    r_kill = 0.2 * kills           # Incidental, not a focus
+
+    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+
+    r_win, r_death = 0.0, 0.0
+    if won:
+        # Win bonus scales with coins collected — completing with 0 coins
+        # is worth almost nothing; completing with 20+ coins is huge.
+        r_win = 5.0 + min(total_coins, 30) * 1.0   # 5 base + up to 30 bonus
+    elif terminated:
+        r_death = -15.0
+    elif life_lost:
+        r_death = -2.0
+
+    return {
+        "coins":     r_coin,
+        "frontier":  r_frontier,
+        "alive":     r_alive,
+        "kills":     r_kill,
+        "stall":     r_stall,
+        "win":       r_win,
+        "time":      -0.0001,      # Near-zero: don't pressure speed
+        "death":     r_death,
+    }
+
+
+@_wrap_with_tracker
+def enemy_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+    """
+    ENEMY HUNTER: Maximise enemy kills.
+
+    KEY DESIGN: NO dijkstra potential. The goal gradient is removed so the
+    agent doesn't just skip past enemies to reach the goal. The ONLY strong
+    positive signal comes from stomping enemies.
+
+    Without a goal gradient, the agent must learn to approach enemies using
+    the hazard channel in its observation grid. Frontier reward nudges it
+    forward to encounter new enemies. Powered-up bonus encourages grabbing
+    mushrooms/stars that make killing safer.
+    """
+    kills      = int(info.get("enemies_killed_step", 0))
+    coins      = int(info.get("coins_delta", 0))
+    won        = info.get("won", False)
+    life_lost  = info.get("life_lost", False)
+    powered_up = bool(info.get("powered_up", False))
+
+    # ── Primary signal: kills (the ONLY strong positive) ───────────────
+    r_kill = 8.0 * kills
+
+    # ── Powerup bonus: being big = safer stomps ────────────────────────
+    r_powerup = 0.008 if powered_up else 0.0
+
+    # ── Exploration: move forward to find new enemies ──────────────────
+    frontier = float(info.get("frontier_dx", 0.0))
+    r_frontier = frontier * 0.25
+
+    # ── Survival bonus: alive = more chances to kill ───────────────────
+    r_alive = 0.001
+
+    # ── NO dijkstra potential — deliberately omitted ───────────────────
+
+    r_coin = 0.1 * coins           # Incidental
+
+    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+
+    r_win, r_death = 0.0, 0.0
+    if won:
+        r_win  = 10.0              # Moderate: finishing is fine but not the goal
+    elif terminated:
+        r_death = -8.0             # Lighter: aggressive play = more deaths expected
+    elif life_lost:
+        r_death = -0.5             # Very light: dying to attempt a kill is acceptable
+
+    return {
+        "kills":     r_kill,
+        "powerup":   r_powerup,
+        "frontier":  r_frontier,
+        "alive":     r_alive,
+        "coins":     r_coin,
+        "stall":     r_stall,
+        "win":       r_win,
+        "time":      -0.0001,      # Near-zero: no rush, find enemies
+        "death":     r_death,
+    }
+
+
+@_wrap_with_tracker
+def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+    """
+    SPEEDRUNNER: Finish as fast as possible.
+
+    Dominant signal is rightward velocity. Dijkstra potential is kept but
+    at moderate weight — it provides direction while velocity provides
+    urgency. Steep time penalty makes every step without progress costly.
+    Backtracking is severely punished. Coins and kills are irrelevant.
+    """
+    kills     = int(info.get("enemies_killed_step", 0))
+    coins     = int(info.get("coins_delta", 0))
+    won       = info.get("won", False)
+    life_lost = info.get("life_lost", False)
+    dijkstra_valid = info.get("dijkstra_valid", False)
+
+    # ── Primary signal: rightward velocity ─────────────────────────────
+    vx = float(info.get("velocity_x", 0.0))
+    r_velocity = max(0.0, vx) * 0.05    # Only reward rightward, ignore leftward
+    # Penalise standing still or moving left
+    if vx < 0.5:
+        r_velocity -= 0.01
+
+    # ── Moderate dijkstra potential for direction ──────────────────────
+    POTENTIAL_GAMMA = 0.99
+    POTENTIAL_SCALE = 8.0
+
+    r_potential = 0.0
+    curr_d = float(info.get("dijkstra_dist", -1.0))
+    prev_d = float(info.get("dijkstra_dist_prev", -1.0))
+    if dijkstra_valid and prev_d >= 0.0:
+        r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
+
+    # ── Backtrack penalty ──────────────────────────────────────────────
+    progress = float(info.get("progress", 0.0))
+    r_backtrack = min(0.0, progress) * 0.5  # Only when progress < 0
+
+    r_coin = 0.0                   # Zero: don't waste time on coins
+    r_kill = 0.0                   # Zero: don't waste time on enemies
+
+    r_stall = -0.04 if bool(info.get("stalled", False)) else 0.0
+
+    r_win, r_death = 0.0, 0.0
+    if won:
+        r_win  = 40.0              # Massive: the whole point
+    elif terminated:
+        r_death = -10.0
+    elif life_lost:
+        r_death = -2.0
+
+    return {
+        "velocity":  r_velocity,
+        "potential": r_potential,
+        "backtrack": r_backtrack,
+        "stall":     r_stall,
+        "win":       r_win,
+        "time":      -0.005,       # 10× vs dijkstra — brutal time pressure
+        "death":     r_death,
+    }
+
+
+@_wrap_with_tracker
+def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+    """
+    COMPLETIONIST: Do everything — coins, kills, progress, survive.
+
+    Uses dijkstra potential at moderate weight, plus meaningful rewards for
+    coins and kills. Unlike coin_hunter/enemy_hunter (which remove the goal
+    gradient), completionist keeps it but at parity with the other signals
+    so no single component dominates.
+
+    The agent should learn versatile play: grab coins when nearby, stomp
+    enemies when possible, but keep moving toward the goal.
+    """
+    kills     = int(info.get("enemies_killed_step", 0))
+    coins     = int(info.get("coins_delta", 0))
+    total_coins = int(info.get("coins_collected", 0))
+    won       = info.get("won", False)
+    life_lost = info.get("life_lost", False)
+    dijkstra_valid = info.get("dijkstra_valid", False)
+
+    # ── Moderate dijkstra potential (same magnitude as coin/kill events) ─
+    POTENTIAL_GAMMA = 0.99
+    POTENTIAL_SCALE = 6.0          # Weaker than dijkstra(10) / speedrunner(8)
+
+    r_potential = 0.0
+    curr_d = float(info.get("dijkstra_dist", -1.0))
+    prev_d = float(info.get("dijkstra_dist_prev", -1.0))
+    if dijkstra_valid and prev_d >= 0.0:
+        r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
+
+    # ── All objectives at meaningful weight ────────────────────────────
+    r_coin     = 3.0 * coins       # Strong (between dijkstra 0.2 and coin_hunter 5.0)
+    r_kill     = 4.0 * kills       # Strong (between dijkstra 0.5 and enemy_hunter 8.0)
+    r_frontier = float(info.get("frontier_dx", 0.0)) * 0.2
+
+    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+
+    r_win, r_death = 0.0, 0.0
+    if won:
+        # Bonus scales with how "complete" the run was
+        r_win = 15.0 + min(total_coins, 30) * 0.5
+    elif terminated:
+        r_death = -20.0            # Harsh: completionists don't die
+    elif life_lost:
+        r_death = -4.0             # Strictest life penalty
+
+    return {
+        "potential": r_potential,
+        "coins":     r_coin,
+        "kills":     r_kill,
+        "frontier":  r_frontier,
+        "stall":     r_stall,
+        "win":       r_win,
+        "time":      -0.001,       # Moderate time pressure
+        "death":     r_death,
+    }
+
+
 # =============================================================================
 # Aliases
 # =============================================================================
-platformer_simple   = simple
-platformer_dijkstra = delta_dijkstra
-default             = simple
+platformer_simple       = simple
+platformer_dijkstra    = delta_dijkstra
+platformer_coin_hunter = coin_hunter
+platformer_enemy_hunter = enemy_hunter
+platformer_speedrunner = speedrunner
+platformer_completionist = completionist
+default                = simple

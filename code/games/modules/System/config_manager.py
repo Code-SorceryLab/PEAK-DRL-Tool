@@ -63,7 +63,7 @@ class ConfigManager:
         final_config = copy.deepcopy(self.base_config)
         if 'defaults' in self.yaml_data:
             self._deep_update(final_config, self.yaml_data['defaults'])
-        if 'levels' in self.yaml_data and level_id in self.yaml_data['levels']:
+        if 'levels' in self.yaml_data and (self.yaml_data['levels'] or {}).get(level_id):
             self._deep_update(final_config, self.yaml_data['levels'][level_id])
         return final_config
 
@@ -77,6 +77,5 @@ class ConfigManager:
     
     def get_level_order(self):
         """Returns a list of level IDs in the order they appear in YAML."""
-        if 'levels' in self.yaml_data:
-            return list(self.yaml_data['levels'].keys())
-        return []
+        levels = self.yaml_data.get('levels') or {}
+        return list(levels.keys())

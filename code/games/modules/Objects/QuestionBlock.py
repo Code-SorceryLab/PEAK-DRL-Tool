@@ -10,6 +10,7 @@ class QuestionBlock:
     gObj: GameObject
     contains: str = "coin"
     hit: bool = False
+    solid: bool = True   # QBlocks are solid — required by _get_tile_rects_near filter
     
     @property
     def x(self): return self.gObj.x

@@ -16,7 +16,7 @@ class CsvLoggerCallback(BaseCallback):
         if os.path.exists(self.log_path):
             try:
                 os.remove(self.log_path)
-                print(f"[INFO] Ã°Å¸â€”â€˜Ã¯Â¸Â  Cleared old log file: {self.log_path}")
+                print(f"[INFO] Cleared old log file: {self.log_path}")
             except Exception as e:
                 print(f"[WARN] Could not delete old log: {e}")
 
@@ -36,7 +36,7 @@ class CsvLoggerCallback(BaseCallback):
         action_name = info.get("action_name", info.get("action", "N/A"))
 
         # Telemetry
-        level = info.get("level", 0)
+        level = info.get("level", "")
         x_pos = info.get("x_position", 0.0)
         y_pos = info.get("y_position", 0.0)
         vx = info.get("velocity_x", 0.0)
@@ -52,7 +52,7 @@ class CsvLoggerCallback(BaseCallback):
             self.levels_completed += 1
 
         # Observation sanity stats (populated every N steps by _check_obs_sanity in core)
-        # 5-channel order: Player(0), Solid(1), Hazard(2), Collectible(3), Dijkstra(4)
+        # 5-channel order: Player(0), Solid(1), Collectible(2), Hazard(3), Dijkstra(4)
 
         _OBS_SANITY_KEYS = [
             'grid_player_mean',      'grid_player_std',      'grid_player_min',      'grid_player_max',

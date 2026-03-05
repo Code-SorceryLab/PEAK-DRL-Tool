@@ -8,10 +8,13 @@ import math
 from .EntityType import EntityType
 from ..Parameters.Movement_parameters import *
 from ..Parameters.Jump_parameters import *
-from ..Parameters.Map_parameters import TILE_SIZE, TILE_QBLOCK
+from ..Parameters.Map_parameters import TILE_SIZE, TILE_QBLOCK, TILE_PLATFORM
 from .SpatialHash import SpatialHash
 from ..Objects.Coin import Coin
-from ..Objects.Powerup import Powerup
+from ..Objects.Mushroom import Mushroom
+from ..Objects.LifeUp import LifeUp
+from ..Objects.StarPowerUp import StarPowerUp
+from ..Objects.FireFlower import FireFlower
 from ..Objects.GameObject import GameObject
 
 @dataclass
@@ -50,8 +53,13 @@ class PhysicsManager:
         self.speed_mult = speed_mult
 
         # --- SPATIAL HASHES FOR AI OBSERVATION ---
-        self.hazard_hash = SpatialHash(64)
+        self.hazard_hash     = SpatialHash(64)
         self.collectible_hash = SpatialHash(64)
+
+        # Moving platforms get their own hash — rebuilt every frame in step()
+        # because their positions change. Kept separate from static_hash so
+        # static geometry never needs to be rebuilt.
+        self.platform_hash = SpatialHash(64)
 
         if config_file:
             self.load_config(config_file)
@@ -114,21 +122,26 @@ class PhysicsManager:
         self.context.MAX_WALK_SPEED *= mult
         self.context.MAX_RUN_SPEED *= mult
 
-    def rebuild_dynamic_hashes(self, level_data):
+    def rebuild_dynamic_hashes(self, level_data, cached_spikes=None):
         """
         Clears and repopulates the spatial hashes with active entities
-        (enemies, coins, powerups) for optimized collision queries.
+        (enemies, spikes, coins, powerups, goals) for optimized collision queries.
+
+        cached_spikes: pre-built list of Spike tile objects from load_level().
+        Spikes are inserted into hazard_hash so the CNN observation grid
+        picks them up in channel 1 (hazard) via a single query_rect call.
         """
         self.hazard_hash.clear()
         self.collectible_hash.clear()
         for enemy in level_data.enemies:
             if enemy.gObj.active: self.hazard_hash.insert(enemy)
+        if cached_spikes:
+            for spike in cached_spikes:
+                self.hazard_hash.insert(spike)
         for coin in level_data.coins:
             if coin.gObj.active and not coin.collected: self.collectible_hash.insert(coin)
         for pup in level_data.powerups:
             if pup.gObj.active: self.collectible_hash.insert(pup)
-
-        # Add goals to collectible hash (since they are 'collected' to win)
         for goal in level_data.goals:
             self.collectible_hash.insert(goal)
 
@@ -144,39 +157,52 @@ class PhysicsManager:
         Updates the physics state (position, velocity) for all entities.
         Includes Continuous Collision Detection (CCD) for the player to prevent tunneling.
 
-        1. Checks how far the player intends to move this frame.
-        2. If the distance > 0.5 tiles, splits the frame into multiple smaller sub-steps.
-        3. Executes each sub-step for the player, resolving wall collisions immediately after each step.
-        4. Updates enemies, coins, and powerups normally (single step).
+        X/Y collision split:
+          Each CCD sub-step applies the full player.update() (moves both axes),
+          then resolves X and Y independently:
+            1. Reset Y to pre-update value — only X has moved.
+               Any collision is unambiguously a wall. Resolve X.
+            2. Restore post-update Y — only Y has moved from the X-resolved position.
+               Any collision is unambiguously floor or ceiling. Resolve Y.
+
+          This eliminates the axis-ambiguity bug that fires when stacked tiles are
+          processed in an order where a wall tile's oy < ox looks like a ceiling hit.
         """
         ctx = self.context
         player = core.player
         level_data = core.level_data
 
         if player:
-            # --- ANTI-TUNNELING (Continuous Collision Detection) ---
-            # 1. Calculate how far the player WANTS to move this frame
             predicted_dist = max(abs(player.vx), abs(player.vy)) * dt
-
-            # 2. If moving more than 1/2 a tile, break it into smaller steps
-            #    (We use 0.5 tile size to be safe)
             step_count = 1
             if predicted_dist > TILE_SIZE * 0.5:
                 step_count = int(math.ceil(predicted_dist / (TILE_SIZE * 0.5)))
-
             step_dt = dt / step_count
 
-            # 3. Execute the steps
             for _ in range(step_count):
-                player.update(step_dt, ctx)
-                # Resolve ONLY player world collisions immediately
-                # This stops them from entering a wall during a sub-step
-                self._resolve_player_world(core, level_data)
+                pre_y = player.gObj.y          # save Y before update
 
-        # Update everything else normally (Enemies usually don't move fast enough to tunnel)
+                player.update(step_dt, ctx)    # moves both X and Y
+
+                post_y = player.gObj.y         # save post-update Y
+
+                # ── Pass 1: X only ────────────────────────────────────────────
+                # Y is reset to pre-update so only X has changed.
+                # Every collision must be a wall — push out horizontally.
+                player.gObj.y = pre_y
+                self._resolve_player_world_x(core, level_data)
+
+                # ── Pass 2: Y only ────────────────────────────────────────────
+                # X is now resolved. Restore post-update Y so only Y has moved.
+                # Every remaining collision must be floor or ceiling.
+                player.gObj.y = post_y
+                self._resolve_player_world_y(core, level_data)
+
         self.update_list(dt, level_data.enemies)
         self.update_list(dt, level_data.coins)
         self.update_list(dt, level_data.powerups)
+        self.update_list(dt, level_data.moving_platforms)
+        self.update_list(dt, level_data.projectiles)
 
     def update_list(self, dt: float, objects: List[Any]):
         """
@@ -202,7 +228,8 @@ class PhysicsManager:
 
         1. Captures the player's falling state (vy > 0) before any velocity modifications.
            This is crucial for "stomp" logic, as hitting the ground later resets vy to 0.
-        2. Resolves static world collisions (walls/floors) for the Player, Enemies, and Powerups.
+        2. Resolves static world collisions (walls/floors) for the Player, Enemies,
+           Powerups, and Projectiles.
         3. Resolves dynamic interactions (Player vs Enemy, Enemy vs Enemy, etc.) using the
            previously captured falling state.
         """
@@ -218,13 +245,88 @@ class PhysicsManager:
 
         # 2. Resolve Static World Collisions (Walls/Floors)
         self._resolve_player_world(core, level_data)
+        self._resolve_player_moving_platforms(core, level_data)
         self._resolve_enemy_world(core, level_data)
         self._resolve_powerup_world(core, level_data)
+        self._resolve_projectile_world(core, level_data)
 
         # 3. Resolve Dynamic Entity Interactions
         self._resolve_dynamic_interactions(core, player_was_falling)
 
     # --- WORLD COLLISION IMPLEMENTATION ---
+
+    def _resolve_player_moving_platforms(self, core, level_data):
+        """
+        Resolves player collisions against moving platforms.
+
+        Moving platforms are fully solid on all four sides — unlike static
+        TILE_PLATFORM tiles they have no one-way pass-through behaviour.
+
+        Uses velocity direction (vx / vy) for axis discrimination, NOT center
+        position comparisons:
+
+          centerx / centery comparisons fail when the player clips more than
+          halfway into a platform (deep penetration or fast platforms) and can
+          push the player through to the wrong side.
+
+          The old centery <= trect.top guard was added to prevent ghost-stepping
+          (treating a side-clip as a floor hit) but broke for large (BIG) players
+          whose centre sits below the platform top even when standing on it
+          correctly. Removed in favour of the axis-dominance check (ox < oy).
+
+        Resolution per overlapping platform:
+          ox < oy  →  wall hit  : push horizontally (vx direction), zero vx
+          vy >= 0  →  floor hit : snap to top, carry (delta_x), land
+          vy <  0  →  ceiling   : snap to bottom, zero vy (bonk)
+        """
+        player = core.player
+        if not player or not level_data.moving_platforms:
+            return
+
+        prect = player.gObj.get_rect()
+
+        for plat in level_data.moving_platforms:
+            if not plat.gObj.active:
+                continue
+
+            trect = plat.gObj.get_rect()
+
+            if not prect.colliderect(trect):
+                continue
+
+            ox = min(prect.right  - trect.left, trect.right  - prect.left)
+            oy = min(prect.bottom - trect.top,  trect.bottom - prect.top)
+
+            if ox < oy:
+                # ── Wall hit ──────────────────────────────────────────────────
+                if player.vx > 0:
+                    player.gObj.x = trect.left - player.gObj.width
+                elif player.vx < 0:
+                    player.gObj.x = trect.right
+                else:
+                    # Stationary — push away from platform centre
+                    if prect.centerx <= trect.centerx:
+                        player.gObj.x = trect.left - player.gObj.width
+                    else:
+                        player.gObj.x = trect.right
+                player.vx = 0
+
+            elif player.vy >= 0:
+                # ── Floor hit (falling or standing on platform) ───────────────
+                # Carry the player with the platform's horizontal movement so
+                # they don't slide off while riding it.
+                player.gObj.x  += plat.delta_x
+                player.gObj.y   = trect.top - player.gObj.height
+                player.vy       = 0
+                player.on_ground = True
+                player.jump_hold = 0
+
+            else:
+                # ── Ceiling hit (jumping into underside) ──────────────────────
+                player.gObj.y = trect.bottom
+                player.vy     = 0
+
+            prect = player.gObj.get_rect()
 
     def _resolve_enemy_world(self, core, level_data):
         """
@@ -245,6 +347,23 @@ class PhysicsManager:
             if not pup.gObj.active: continue
             nearby = self._get_tile_rects_near(level_data, pup.gObj)
             self._solve_aabb_collision(pup, nearby, bounce_x=True)
+
+    def _resolve_projectile_world(self, core, level_data):
+        """
+        Handles collisions between FireFlowerProjectiles and the static map.
+
+        bounce_x=False: wall contact zeroes vx instead of reversing it.
+        FireFlowerProjectile.update() detects vx==0 and deactivates the projectile,
+        matching the classic behaviour where fireballs vanish on wall impact.
+
+        Floor contact sets projectile.on_ground=True via _solve_aabb_collision's
+        hasattr guard. FireFlowerProjectile.update() reads on_ground and applies
+        PROJ_JUMP_VEL to produce the bouncing arc.
+        """
+        for proj in level_data.projectiles:
+            if not proj.gObj.active: continue
+            nearby = self._get_tile_rects_near(level_data, proj.gObj)
+            self._solve_aabb_collision(proj, nearby, bounce_x=False)
 
     def _solve_aabb_collision(self, entity, nearby_tiles, bounce_x=False):
         """
@@ -279,6 +398,8 @@ class PhysicsManager:
                     if ent_rect.bottom >= tile_rect.top:
                         entity.gObj.y = tile_rect.top - entity.gObj.height
                         entity.vy = 0
+                        if hasattr(entity, 'on_ground'):
+                            entity.on_ground = True
                 elif entity.vy < 0: # Jumping up
                      if ent_rect.top <= tile_rect.bottom:
                         entity.gObj.y = tile_rect.bottom
@@ -311,81 +432,94 @@ class PhysicsManager:
 
     def _resolve_player_world(self, core, level_data):
         """
-        Specialized collision resolution for the Player against static tiles.
+        Full static-tile resolution — runs X pass then Y pass in sequence.
+        Used by resolve_collisions after moving platforms may have shifted the player.
+        """
+        self._resolve_player_world_x(core, level_data)
+        self._resolve_player_world_y(core, level_data)
 
-        1. Identifies nearby tiles using spatial hashing.
-        2. Iterates through tiles and calculates overlap depth in X and Y.
-        3. Prioritizes the shallowest axis of penetration (Separating Axis Theorem principle).
-        4. If X collision (Wall): Pushes player out and zeroes X velocity.
-        5. If Y collision (Floor/Ceiling):
-           - Floor: Pushes player up. Sets 'on_ground' = True ONLY if player was falling (vy >= 0).
-           - Ceiling: Pushes player down. Zeroes upward velocity (Bonk).
-           - Checks for QBlock interactions on ceiling hits.
+    def _resolve_player_world_x(self, core, level_data):
+        """
+        Wall-only pass. Called after only X has moved so every overlap is
+        unambiguously a wall. No ox/oy axis comparison needed or used —
+        that comparison is the root cause of the stacked-tile ceiling-snap bug.
+        Spikes deferred to the Y pass.
         """
         player = core.player
         if not player: return
 
-        rect = player.gObj.get_rect()
         nearby = self._get_tile_rects_near(level_data, player.gObj)
+        rect   = player.gObj.get_rect()
 
         for (row, col, trect, tile_type) in nearby:
-            if not rect.colliderect(trect): continue
-
-            # --- Handle Spikes (Static Tiles but Deadly) ---
             if tile_type == EntityType.SPIKE:
-                core._handle_death()
-                return
+                continue  # handled in Y pass
+            if not rect.colliderect(trect):
+                continue
 
-            overlap_x = min(rect.right - trect.left, trect.right - rect.left)
-            overlap_y = min(rect.bottom - trect.top, trect.bottom - rect.top)
-
-            # Prioritize the shallowest axis
-            if overlap_x < overlap_y:
-                # --- Resolve X (Wall Hit) ---
-                if rect.centerx < trect.centerx:
+            if player.vx > 0:
+                player.gObj.x = trect.left - player.gObj.width
+            elif player.vx < 0:
+                player.gObj.x = trect.right
+            else:
+                # Stationary (e.g. spawned inside geometry) — use center as tiebreaker
+                if rect.centerx <= trect.centerx:
                     player.gObj.x = trect.left - player.gObj.width
                 else:
                     player.gObj.x = trect.right
+            player.vx = 0
+            rect = player.gObj.get_rect()
 
-                # Zero X velocity on wall hit (stops sticking)
-                player.vx = 0
+    def _resolve_player_world_y(self, core, level_data):
+        """
+        Floor/ceiling-only pass. Called after X is resolved so every remaining
+        overlap is unambiguously vertical. vy direction decides floor vs ceiling:
+          vy >= 0  →  floor   : snap to top, zero vy, land
+          vy <  0  →  ceiling : snap to bottom, zero vy (bonk / qblock)
+        Spikes checked here so lethal contact fires on any approach direction.
+        """
+        player = core.player
+        if not player: return
 
+        nearby = self._get_tile_rects_near(level_data, player.gObj)
+        rect   = player.gObj.get_rect()
+
+        for (row, col, trect, tile_type) in nearby:
+            if not rect.colliderect(trect):
+                continue
+
+            if tile_type == EntityType.SPIKE:
+                if not player.power_machine.is_invincible:
+                    core._handle_death("Spike")
+                    return
+                continue
+
+            if player.vy >= 0:
+                player.gObj.y    = trect.top - player.gObj.height
+                player.vy        = 0
+                player.on_ground = True
+                player.jump_hold = 0
             else:
-                # --- Resolve Y (Floor/Ceiling Hit) ---
-                if rect.centery < trect.centery:
-                    # Player is ABOVE the tile (Floor Hit)
-                    player.gObj.y = trect.top - player.gObj.height
+                player.gObj.y = trect.bottom
+                player.vy     = 0
+                if tile_type == TILE_QBLOCK:
+                    self._hit_qblock(core, col, row)
 
-                    # Only trigger "landing" logic if we were actually falling
-                    # This prevents "snapping" to the floor while jumping up
-                    if player.vy >= 0:
-                        player.vy = 0
-                        player.on_ground = True
-                        player.jump_hold = 0
-                else:
-                    # Player is BELOW the tile (Ceiling Hit)
-                    player.gObj.y = trect.bottom
-
-                    # Bonk head: kill upward velocity
-                    if player.vy < 0:
-                        player.vy = 0
-
-                    if tile_type == TILE_QBLOCK:
-                        self._hit_qblock(core, col, row)
-
-            # Update rect for the next tile check in the loop
             rect = player.gObj.get_rect()
 
     # --- DYNAMIC COLLISIONS ---
 
     def _resolve_dynamic_interactions(self, core, player_was_falling):
         """
-        Handles interactions between moving entities (Player, Enemies, Coins).
+        Handles interactions between moving entities (Player, Enemies, Coins,
+        and Projectiles).
 
         1. Queries the spatial hash for hazards (Enemies) near the player.
         2. Dispatches collision events if overlaps occur.
         3. Queries for collectibles (Coins/Powerups) and dispatches events.
         4. Checks Enemy-vs-Enemy collisions (to prevent stacking/overlap).
+        5. Checks Projectile-vs-Enemy collisions — kills enemy and deactivates
+           projectile on contact.
         """
         player = core.player
         if not player: return
@@ -395,6 +529,12 @@ class PhysicsManager:
 
         nearby_hazards = self.hazard_hash.query(player)
         for obj in nearby_hazards:
+            # Skip spikes — their lethal collision is already handled by
+            # _resolve_player_world via static_hash. Processing them here
+            # would trigger a second _handle_death call, double-decrementing lives.
+            t_type = obj.gObj.type_id if hasattr(obj.gObj, 'type_id') else EntityType.NONE
+            if t_type == EntityType.SPIKE:
+                continue
             if player.gObj.collides_with(obj.gObj):
                 self._dispatch_collision(core, player, obj, player_was_falling)
 
@@ -424,6 +564,27 @@ class PhysicsManager:
                     if isinstance(other, type(enemy)):
                         if enemy.gObj.collides_with(other.gObj):
                             self._dispatch_collision(core, enemy, other)
+
+        # --- Projectile vs Enemy ---
+        # Iterate active projectiles, query hazard_hash (which holds all active
+        # enemies) at the projectile's position. On hit: kill enemy, kill projectile.
+        # Guard against double-kills: check active flags before and after each hit
+        # so a projectile that already died this frame can't kill a second enemy.
+        for proj in core.level_data.projectiles:
+            if not proj.gObj.active:
+                continue
+            nearby_enemies = self.hazard_hash.query_rect(
+                proj.gObj.x, proj.gObj.y, proj.gObj.width, proj.gObj.height
+            )
+            for enemy in nearby_enemies:
+                if not enemy.gObj.active:
+                    continue
+                t_type = enemy.gObj.type_id if hasattr(enemy.gObj, 'type_id') else EntityType.NONE
+                if t_type != EntityType.ENEMY:
+                    continue   # skip spikes or anything else in hazard_hash
+                if proj.gObj.collides_with(enemy.gObj):
+                    self._handle_projectile_enemy(core, proj, enemy)
+                    break      # projectile is now dead — stop checking further enemies
 
     def _dispatch_collision(self, core, source, target, player_was_falling=False):
         """
@@ -456,7 +617,8 @@ class PhysicsManager:
                         core.reached_goal = True
                         core.complete_level()
                 elif t_type == EntityType.SPIKE:
-                    core._handle_death("Spike")
+                    if not source.power_machine.is_invincible:
+                        core._handle_death("Spike")
 
             case EntityType.ENEMY:
                 if t_type == EntityType.ENEMY:
@@ -476,42 +638,43 @@ class PhysicsManager:
     def _handle_player_enemy(self, core, player, enemy, player_was_falling):
         """
         Handles logic when Player hits an Enemy.
-        - If player was falling and hits the top of the enemy: KILL ENEMY (Stomp) & BOUNCE PLAYER.
-        - If player has Star power: KILL ENEMY.
-        - Otherwise: KILL PLAYER (or remove powerup).
+
+        Resolution order:
+          1. Stomp    — player was falling AND feet above enemy centre → kill enemy, bounce player.
+          2. Star     — player.power_machine.is_invincible → kill enemy, no damage to player.
+          3. Damage   — player.power_machine.take_hit():
+                          True  → survived (downgraded or i-frames absorbed)
+                          False → dead, core._handle_death() already called by machine
+                                  (or we call it here if on_death was not set on machine)
         """
         if not enemy.gObj.active:
             return
 
-        moving_down = player_was_falling
-
         player_bottom = player.gObj.y + player.gObj.height
-        enemy_center = enemy.gObj.y + enemy.gObj.height/2
+        enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
 
-        # Check if we are above the enemy center and moving down (stomping)
-        if player_bottom < enemy_center + 10 and moving_down:
-            # Platformer jumped on enemy
+        # 1. Stomp — falling and feet above enemy midpoint
+        if player_was_falling and player_bottom < enemy_center + 10:
             enemy.gObj.active = False
-            # Bounce player
-            player.vy = JUMP_VEL_MIN * 0.6
-            self.context.score = getattr(core, 'score', 0) + 100 # Safety attr check
+            player.vy = JUMP_VEL_MIN * 0.6   # bounce
             core.score += 100
+            if hasattr(core, 'kills_step'):
+                core.kills_step += 1
+            return
 
-            if hasattr(core, 'kills_step'): core.kills_step += 1
-
-        elif player.invincible_timer > 0:
-            # Star power
+        # 2. Star — kill enemy without taking damage
+        if player.power_machine.is_invincible:
             enemy.gObj.active = False
             core.score += 100
-            if hasattr(core, 'kills_step'): core.kills_step += 1
-        else:
-            # Lost powerup or Died
-            if player.powered_up:
-                player.powered_up = False
-                player.invincible_timer = 60
-            else:
-                core._handle_death("Enemy")
-                return
+            if hasattr(core, 'kills_step'):
+                core.kills_step += 1
+            return
+
+        # 3. Take a hit through the state machine
+        survived = player.power_machine.take_hit()
+        if not survived:
+            # on_death may not be wired on the machine — call core directly
+            core._handle_death("Enemy")
 
     def _handle_player_coin(self, core, player, coin):
         """
@@ -524,17 +687,45 @@ class PhysicsManager:
             core.coins_step += 1
             core.coins_total += 1
 
+    def _handle_projectile_enemy(self, core, proj, enemy):
+        """
+        Resolves a FireFlowerProjectile hitting an Enemy.
+
+        - Enemy is killed (active = False) and awards 100pts + kills_step counter.
+        - Projectile is deactivated so it cannot hit a second enemy the same frame.
+        """
+        enemy.gObj.active = False
+        proj.gObj.active  = False
+        core.score += 100
+        if hasattr(core, 'kills_step'):
+            core.kills_step += 1
+
     def _handle_player_powerup(self, core, player, powerup):
         """
-        Applies powerup effect (Super Mushroom or Star) and removes the item.
+        Applies powerup effect and removes the item.
+
+        Kind          Class         Effect
+        ---------     ----------    ------------------------------------
+        "mushroom"  → Mushroom    → collect_mushroom()  SMALL→BIG
+        "flower"    → FireFlower  → collect_flower()    any→FIRE
+        "star"      → StarPowerup → collect_star()      star timer
+        "life"      → LifePowerup → lives += 1          no power change
         """
         powerup.gObj.active = False
         core.powerups_step += 1
+
         if powerup.kind == "mushroom":
-            player.powered_up = True
+            player.power_machine.collect_mushroom()
             core.score += 50
+        elif powerup.kind == "flower":
+            player.power_machine.collect_flower()
+            core.score += 50
+        elif powerup.kind == "life":
+            core.lives += 1
+            core.score += 200
         else:
-            player.invincible_timer = 300
+            # "star" or unknown → star
+            player.power_machine.collect_star()
             core.score += 100
 
     def _handle_enemy_enemy(self, core, e1, e2):
@@ -579,7 +770,15 @@ class PhysicsManager:
     def _hit_qblock(self, core, col: int, row: int):
         """
         Triggered when a player hits a Question Block from below.
-        Spawns the contained item (Coin, Mushroom, Star) and changes the block state.
+        Spawns the correct powerup class based on block.contains.
+
+        contains      spawns
+        ----------    ----------------
+        "coin"      → fly-up Coin
+        "mushroom"  → Mushroom  (walks, bounces)
+        "star"      → StarPowerup (bounces and jumps)
+        "flower"    → FireFlower  (stationary)
+        "life"      → LifePowerup (walks, bounces)
         """
         for block in core.level_data.qblocks:
             b_col = int(block.gObj.x // TILE_SIZE)
@@ -587,18 +786,38 @@ class PhysicsManager:
 
             if b_col == col and b_row == row and not block.hit:
                 block.hit = True
-                spawn_x, spawn_y = col * TILE_SIZE, row * TILE_SIZE - 22
+                spawn_x = col * TILE_SIZE
+                spawn_y = row * TILE_SIZE - 22
 
                 if block.contains == "coin":
-                    c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True), flyup=True, vy=-280.0, life=0.3, auto_collect=True)
+                    c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
+                             flyup=True, vy=-280.0, life=0.3, auto_collect=True)
                     c.gObj.type_id = EntityType.COIN
                     core.level_data.coins.append(c)
+
                 elif block.contains == "mushroom":
-                    p = Powerup(gObj=GameObject(spawn_x, spawn_y, 20, 20, True), kind="mushroom")
+                    p = Mushroom(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
                     p.gObj.type_id = EntityType.POWERUP
                     core.level_data.powerups.append(p)
+
+                elif block.contains == "star":
+                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
+                elif block.contains == "flower":
+                    p = FireFlower(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
+                elif block.contains == "life":
+                    p = LifeUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+                    p.gObj.type_id = EntityType.POWERUP
+                    core.level_data.powerups.append(p)
+
                 else:
-                    p = Powerup(gObj=GameObject(spawn_x, spawn_y, 20, 20, True), kind="star")
+                    # Fallback — treat unknown as star
+                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
                     p.gObj.type_id = EntityType.POWERUP
                     core.level_data.powerups.append(p)
 
@@ -609,26 +828,48 @@ class PhysicsManager:
     def _get_tile_rects_near(self, level_data, obj):
         """
         Uses the LevelLoader Static Hash to find nearby tiles.
+
+        Type resolution:
+          Tile objects  → item.type_id  is an int (TILE_GROUND, TILE_PLATFORM …)
+                          item.gObj.type_id is EntityType.TILE (used only for filter)
+          Spike objects → item.gObj.type_id is EntityType.SPIKE
+          QBlock objects→ item.gObj.type_id is EntityType.QBLOCK
+
+        tid passed downstream must be:
+          EntityType.SPIKE  — so _resolve_player_world death-check fires
+          TILE_QBLOCK (int) — so _hit_qblock fires
+          TILE_PLATFORM (int) — so one-way pass-through fires
+          anything else     — treated as solid ground
         """
         nearby_objects = level_data.static_hash.query(obj)
         out = []
         for item in nearby_objects:
-            # FIX: Allow Solids AND Special Triggers (Spikes)
-            # GameObject does not have 'solid' attribute, so it always defaulted to False.
-            is_solid = getattr(item, 'solid', False)
+            is_solid  = getattr(item, 'solid', False)
+            gobj_tid  = item.gObj.type_id if hasattr(item.gObj, 'type_id') else EntityType.TILE
 
-            tid = item.gObj.type_id if hasattr(item.gObj, 'type_id') else EntityType.TILE
-
-            # CHANGED: Allow solids OR spikes
-            if not is_solid and tid != EntityType.SPIKE:
+            # Filter: pass solids, spikes, and qblocks through
+            if not is_solid and gobj_tid not in (EntityType.SPIKE, EntityType.QBLOCK):
                 continue
 
             rect = item.gObj.get_rect()
-            col = int(item.gObj.x // TILE_SIZE)
-            row = int(item.gObj.y // TILE_SIZE)
+            col  = int(item.gObj.x // TILE_SIZE)
+            row  = int(item.gObj.y // TILE_SIZE)
 
-            if hasattr(item, 'type_id') and item.type_id == EntityType.QBLOCK:
+            # Resolve the tile type to pass to _resolve_player_world:
+            #   Spikes  → keep EntityType.SPIKE  (death check uses this)
+            #   QBlocks → TILE_QBLOCK int         (hit_qblock check uses this)
+            #   Tiles   → item.type_id int        (TILE_GROUND or TILE_PLATFORM)
+            #             This is the KEY fix: gObj.type_id is always EntityType.TILE
+            #             for all ground/platform tiles. item.type_id (set by
+            #             create_tile) is the actual int constant we need.
+            if gobj_tid == EntityType.SPIKE:
+                tid = EntityType.SPIKE
+            elif gobj_tid == EntityType.QBLOCK:
                 tid = TILE_QBLOCK
+            elif hasattr(item, 'type_id') and isinstance(item.type_id, int):
+                tid = item.type_id   # TILE_GROUND, TILE_PLATFORM etc.
+            else:
+                tid = gobj_tid       # fallback
 
             out.append((row, col, rect, tid))
         return out

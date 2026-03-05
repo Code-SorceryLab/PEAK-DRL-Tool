@@ -39,7 +39,22 @@ os.environ.pop("SDL_VIDEODRIVER", None)
 # ---------------------------------------------------------------------------
 # Parse (game, algo, persona, skill) from the model folder/filename
 # ---------------------------------------------------------------------------
+# Known extractor tags (the last segment added to run_id by train.py)
+_EXTRACTOR_TAGS = {"light", "slim", "peak", "mlp"}
+# Known skill levels (the second-to-last segment)
+_SKILL_LEVELS   = {"novice", "expert", "custom"}
+
 def parse_model_info(model_path: str):
+    """
+    Parse (game, algo, persona, skill) from the model folder or filename.
+
+    run_id format produced by train.py:
+        {game}_{algo}_{persona}_{skill}_{extractor_tag}
+    e.g. platformer_ppo_platformer_coin_hunter_novice_slim
+
+    The extractor_tag segment was added later, so we detect it by checking
+    the last part against known tags before falling back to old 4-part logic.
+    """
     path = Path(model_path)
     folder = path.parent.name
     if folder not in {".", "models", "best"}:
@@ -47,11 +62,16 @@ def parse_model_info(model_path: str):
     else:
         parts = path.stem.replace("_model", "").replace("best", "").split("_")
 
+    # Drop trailing extractor tag if present (5-part format)
+    if len(parts) >= 5 and parts[-1].lower() in _EXTRACTOR_TAGS:
+        parts = parts[:-1]
+
     if len(parts) >= 4:
         game        = parts[0]
         algo        = parts[1]
         skill       = parts[-1]
         raw_persona = "_".join(parts[2:-1])
+        # Strip leading game prefix that train.py prepends to persona names
         persona = (
             raw_persona[len(game) + 1:] if raw_persona.startswith(f"{game}_") else
             raw_persona[len(game):]     if raw_persona.startswith(game) else
@@ -132,11 +152,20 @@ def build_env(game: str, persona: str, fps: int, vecnorm_path: Optional[Path], r
     try:
         reward_module = importlib.import_module(f"code.rewards.train_{game}")
         # Candidate names in priority order
+        # Strip any trailing skill suffix that may have leaked into the name
+        # e.g. "coin_hunter_novice" → "coin_hunter"
+        _base_persona = persona
+        for _sfx in ("_novice", "_expert", "_custom"):
+            if _base_persona.endswith(_sfx):
+                _base_persona = _base_persona[: -len(_sfx)]
+                break
+
         candidates = [
-            persona,                    # exact: "dijkstra"
-            f"delta_{persona}",         # prefixed: "delta_dijkstra"
-            f"{persona}",               # suffixed: "dijkstra"
-            f"{game}_{persona}",        # game-prefixed: "platformer_dijkstra"
+            _base_persona,                    # exact: "coin_hunter"
+            persona,                          # original (in case suffix is intentional)
+            f"delta_{_base_persona}",         # prefixed: "delta_dijkstra"
+            f"{game}_{_base_persona}",        # game-prefixed: "platformer_coin_hunter"
+            f"{game}_{persona}",              # game-prefixed with skill: last resort
         ]
         found = None
         for name in candidates:

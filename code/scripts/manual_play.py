@@ -11,9 +11,15 @@ from code.wrappers.generic_env import GameEnv
 os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--game", default="platformer", help="game key (e.g., platformer, mario)")
-parser.add_argument("--fps", type=int, default=30, help="target FPS for manual play")
+parser.add_argument("--game", default="platformer", help="game key")
+parser.add_argument("--fps", type=int, default=30, help="target FPS")
+parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. 1-3)")
+parser.add_argument("--file", default=None, help="Absolute path to a .txt level file (unlisted)")
 args = parser.parse_args()
+
+# Level ID priority: CLI arg > env var > default
+level_id  = args.level or os.environ.get('PEAK_PLAY_LEVEL', None)
+level_file = args.file  or os.environ.get('PEAK_PLAY_FILE',  None)
 
 # Normalize game name (mario -> platformer) if needed
 if args.game == "mario":
@@ -89,7 +95,16 @@ print(f"{controls}")
 print("=================================")
 
 # --- Build env
-env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps)
+env_kwargs = {}
+if level_id:
+    env_kwargs['world'] = level_id
+    env_kwargs['lock_level'] = True   # stay on this level on every reset
+    print(f"[Play] Loading level: {level_id}")
+if level_file:
+    env_kwargs['level_file'] = level_file
+    env_kwargs['lock_level'] = True   # always replay the same file
+    print(f"[Play] Loading level file: {level_file}")
+env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps, **env_kwargs)
 
 # Helper to find the actual game core instance through wrappers
 def find_core_game(env_instance):
@@ -103,6 +118,55 @@ def find_core_game(env_instance):
     return None
 
 core_game = find_core_game(env)
+
+# ── Handle level_id override ──────────────────────────────────────
+if level_id and core_game and hasattr(core_game, 'world'):
+    if core_game.world.lower() != level_id.lower():
+        core_game.world = level_id.lower()
+        core_game.locked_level = level_id.lower()
+        if hasattr(core_game, 'load_level'):
+            core_game.load_level()
+        print(f"[Play] Forced level override: {level_id}")
+
+# ── Handle raw file path (unlisted level) ────────────────────────
+if level_file and core_game:
+    fp = Path(level_file)
+    if not fp.exists():
+        print(f"[Play] ERROR: file not found: {level_file}")
+    else:
+        # Inject a synthetic config entry so the existing load pipeline works.
+        # The LevelLoader builds path as: levels_dir / basename, so we must
+        # ensure the file is accessible there — either it's already in levels/,
+        # or we inject the FULL path into yaml_data so loader can find it.
+        import shutil as _shutil
+        levels_dir = Path(core_game.loader.level_path)
+        dest = levels_dir / fp.name
+        if not dest.exists() or dest.resolve() != fp.resolve():
+            try:
+                _shutil.copy2(str(fp), str(dest))
+                print(f"[Play] Copied {fp.name} → {dest}")
+            except Exception as _e:
+                print(f"[Play] Could not copy file: {_e}")
+        # Register as '__editor_test__' in the config manager's in-memory dict
+        TEMP_ID = '__editor_test__'
+        if 'levels' not in core_game.config_manager.yaml_data:
+            core_game.config_manager.yaml_data['levels'] = {}
+        core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
+            'file': fp.name,
+            'time_limit': 300,
+        }
+        if TEMP_ID not in core_game.config_manager.get_level_order():
+            core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
+                'file': fp.name, 'time_limit': 300
+            }
+        # Update level_order in-place if it is cached
+        if hasattr(core_game, 'level_order') and TEMP_ID not in core_game.level_order:
+            core_game.level_order.append(TEMP_ID)
+        core_game.world = TEMP_ID
+        core_game.locked_level = TEMP_ID
+        if hasattr(core_game, 'load_level'):
+            core_game.load_level()
+        print(f"[Play] Loaded file: {fp.name} as '{TEMP_ID}'")
 
 obs, _ = env.reset()
 running = True
@@ -143,8 +207,14 @@ while running:
     
     if (info.get("episode_end", False)) or (done if 'done' in locals() else False):
         obs, _ = env.reset()
-        # Re-fetch core game in case reset created a new instance
         core_game = find_core_game(env)
+        # Keep locked level after reset
+        active_id = level_id or ('__editor_test__' if level_file else None)
+        if active_id and core_game and hasattr(core_game,'world'):
+            if core_game.world.lower() != active_id.lower():
+                core_game.world = active_id.lower()
+                if hasattr(core_game,'locked_level'): core_game.locked_level=active_id.lower()
+                if hasattr(core_game,'load_level'): core_game.load_level()
 
 env.close()
 pygame.quit()

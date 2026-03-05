@@ -1,6 +1,8 @@
 # ==========================================
-# GLOBAL GAME SETTINGS
+# PEAK PLATFORMER — game_config.yaml
 # ==========================================
+
+# ── Engine / environment ──────────────────
 game:
   title: "PEAK Platformer"
   screen_width: 800
@@ -8,21 +10,8 @@ game:
   fps: 60
   render_mode: "human"
 
-# ==========================================
-# MOVED FROM code/conf/game/platformer.yaml
-# ==========================================
-# conf/game/platformer.yaml
-_target_: code.games.platformer_core.PlatformerCore
-
-name: platformer
 env_cls: PlatformerCore
 module: code.games.platformer_core
-
-# Optional: keep your current setting
-render_mode: human
-fps: 30
-
-# Strongly recommended so the env’s built-in step limit is respected:
 max_steps: 10000
 
 observation_space:
@@ -32,7 +21,7 @@ observation_space:
   high: 500.0
 
 action_space:
-  type: Discrete # NOTE: Can be Discrete or MultiBinary or MultiDiscrete
+  type: Discrete   # Discrete | MultiBinary | MultiDiscrete
   n: 8
 
 reward:
@@ -46,8 +35,8 @@ episode:
   max_steps: 1000
 
 init:
-  seed: 42 # Optional: for reproducibility
-  level: easy # Options: easy, medium, hard | not adapted yet
+  seed: 42
+  level: easy   # easy | medium | hard
 
 persona: null
 
@@ -63,211 +52,53 @@ render:
 logging:
   tensorboard: true
 
-
-
-
-# ==========================================
-# DEFAULTS (Layer 2)
-# ==========================================
+# ── Physics / player defaults ─────────────
 defaults:
   physics:
-    # gravity: 950.0          #
+    gravity: 1300
+    fast_fall_gravity: 2500
     friction:
-      # ground: 500.0
-      # air: 250.0
+      ground: 1300
+      air: 250
+    max_fall_speed: 550
+    max_run_speed: 150
 
   player:
     lives: 3
-    dimensions: {width: 20, height: 32} #
+    dimensions: {width: 20, height: 32}
     movement:
-      # walk_accel: 1000.0     #
-      # max_run_speed: 340.0   #
+      walk_accel: 1000.0
+      max_run_speed: 340.0
     jump:
-      # max_velocity: -600.0   #
+      max_velocity: -600.0
 
-# ==========================================
-# LEVELS (Layer 1)
-# ==========================================
+# ── Levels ───────────────────────────────
 levels:
-  "1-1":
+  # "Mario_1-1":
+    # file: "world1_1.txt"
+    # time_limit: 300
+    # background_color: [0, 0, 0]
+  "1-2":
     file: "stage_1.txt"
     time_limit: 300
-    background_color: [107, 140, 255]
-
-    # PLAYER SPAWN POINT (World Space Coords)
-    # spawn:
-    #   x: 800.0
-    #   y: 350.0
-
-    # dynamics:
-    #   enemies:
-    #     - type: "Enemy"
-    #       x: 832
-    #       y: 416
-    #       vx: -60.0
-
-  "1-2":
-    file: "stage_2.txt"
+    background_color: [0, 0, 0]
+  "All Features":
+    file: "testlevel.txt"
     time_limit: 300
     background_color: [0, 0, 0]
-
-    # Different spawn for level 1-2
-    # spawn:
-    #   x: 50.0
-    #   y: 500.0
-
-    # # physics:
-    # #   gravity: 500.0
-
-    # dynamics:
-    #   enemies:
-    #     - type: "Enemy"
-    #       x: 400
-    #       y: 300
-
-  "1-3":
-    file: "stage_3.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-
-    # # Different spawn for level 1-2
-    # spawn:
-    #   x: 50.0
-    #   y: 500.0
-
-    # physics:
-    #   gravity: 500.0
-
-    # dynamics:
-    #   enemies:
-    #     - type: "Enemy"
-    #       x: 400
-    #       y: 300
-
-  "1-4":
+  "1-1":
     file: "stage_4.txt"
     time_limit: 300
     background_color: [0, 0, 0]
-
-    # # Different spawn for level 1-2
-    # spawn:
-    #   x: 50.0
-    #   y: 500.0
-
-    # physics:
-    #   gravity: 500.0
-
-    # dynamics:
-    #   enemies:
-    #     - type: "Enemy"
-    #       x: 400
-    #       y: 300
-
-  "1-5":
-    file: "stage_5.txt"
+  "Path Finding":
+    file: "stage_7.txt"
     time_limit: 300
     background_color: [0, 0, 0]
-
-  "1-11":
-    file: "stage_11.txt"
+  "Mario1-2":
+    file: "world1_2.txt"
     time_limit: 300
     background_color: [0, 0, 0]
-
-  "1-13":
+  "Long Level":
     file: "stage_13.txt"
     time_limit: 300
     background_color: [0, 0, 0]
-
-  "1-14":
-    file: "stage_14.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-
-  #   # # Different spawn for level 1-2
-  #   # spawn:
-  #   #   x: 50.0
-  #   #   y: 500.0
-
-  #   # physics:
-  #   #   gravity: 500.0
-
-  #   # dynamics:
-  #   #   enemies:
-  #   #     - type: "Enemy"
-  #   #       x: 400
-  #   #       y: 300
-  # "1-6":
-  #   file: "stage_6.txt"
-  #   time_limit: 300
-  #   background_color: [0, 0, 0]
-
-  #   # # Different spawn for level 1-2
-  #   # spawn:
-  #   #   x: 50.0
-  #   #   y: 500.0
-
-  #   # physics:
-  #   #   gravity: 500.0
-
-  #   # dynamics:
-  #   #   enemies:
-  #   #     - type: "Enemy"
-  #   #       x: 400
-  #   #       y: 300
-
-  # "1-7":
-  #   file: "stage_7.txt"
-  #   time_limit: 300
-  #   background_color: [0, 0, 0]
-
-  #   # # Different spawn for level 1-2
-  #   # spawn:
-  #   #   x: 50.0
-  #   #   y: 500.0
-
-  #   # physics:
-  #   #   gravity: 500.0
-
-  #   # dynamics:
-  #   #   enemies:
-  #   #     - type: "Enemy"
-  #   #       x: 400
-  #   #       y: 300
-
-  # "1-8":
-  #   file: "stage_8.txt"
-  #   time_limit: 300
-  #   background_color: [0, 0, 0]
-
-  #   # Different spawn for level 1-2
-  #   # spawn:
-  #   #   x: 50.0
-  #   #   y: 500.0
-
-  #   # physics:
-  #   #   gravity: 500.0
-
-  #   # dynamics:
-  #   #   enemies:
-  #   #     - type: "Enemy"
-  #   #       x: 400
-  #   #       y: 300
-
-  # "1-9":
-  #   file: "stage_9.txt"
-  #   time_limit: 300
-  #   background_color: [0, 0, 0]
-
-  #   # # Different spawn for level 1-2
-  #   # spawn:
-  #   #   x: 50.0
-  #   #   y: 500.0
-
-  #   # physics:
-  #   #   gravity: 500.0
-
-  #   # dynamics:
-  #   #   enemies:
-  #   #     - type: "Enemy"
-  #   #       x: 400
-  #   #       y: 300

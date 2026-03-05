@@ -140,7 +140,14 @@ class GameEnv(gym.Env):
 
         # Lazy-init screen for any mode that needs a surface
         if self.screen is None:
-            if os.environ.get("DISPLAY", "") == "":
+            # Only force headless on Linux when no X display is available AND
+            # the caller didn't explicitly request a visible window.
+            # DISPLAY is a Linux/X11 env-var — it's never set on Windows,
+            # so the old check always forced dummy driver on Windows too.
+            import sys as _sys
+            if (_sys.platform.startswith("linux")
+                    and os.environ.get("DISPLAY", "") == ""
+                    and render_mode not in ("human", "random")):
                 os.environ["SDL_VIDEODRIVER"] = "dummy"
             pygame.init()
             # Use the game's total width (includes debug panel in human mode)
