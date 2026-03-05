@@ -4,6 +4,7 @@ from .GameObject import GameObject
 import pygame
 from typing import Dict, List, Any, Optional
 from enum import Enum, auto
+from ..Stats.StatsObserver import track
 
 # Imports from sibling packages
 from ..Parameters import Movement_parameters as MP
@@ -127,12 +128,11 @@ class Player():
         # Hand the state (int) to the handler
         self.anim_handler.set_state(target_state.value)
 
-    def handle_input(self, a: int):    
-        agent_left = (a in (1,6))
-        agent_right = (a in (2,4,5,7))
-        agent_jump = (a in (3,4,6,7))
-        agent_run = (a in (5,7))
-        
+    @track("horizontal_velocity")
+    def set_horizontal_velocity(self, vx):
+        self.vx = vx
+
+    def check_input(self, a: int):        
         kb_left = kb_right = kb_jump = kb_run = False
         
         if pygame.get_init():
@@ -141,7 +141,16 @@ class Player():
             kb_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
             kb_jump = keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]
             kb_run = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
-        
+
+        self.handle_input(a, kb_left, kb_right, kb_jump, kb_run)
+
+    @track("input")
+    def handle_input(self, a:int, kb_left, kb_right, kb_jump, kb_run):
+        agent_left = (a in (1,6))
+        agent_right = (a in (2,4,5,7))
+        agent_jump = (a in (3,4,6,7))
+        agent_run = (a in (5,7))
+                
         is_left = agent_left or kb_left
         is_right = agent_right or kb_right
         self.jump_pressed = agent_jump or kb_jump
@@ -154,6 +163,7 @@ class Player():
             
         if self.jump_pressed:
             self.jump_buffer = 6 
+
 
     def apply_physics(self, dt: float, ctx: PhysicsContext):
         if self.run_held:
@@ -171,14 +181,14 @@ class Player():
             skidding = (self.vx > 0 and self.input_dir < 0) or (self.vx < 0 and self.input_dir > 0)
             
             if self.on_ground and skidding:
-                self.vx += (self.input_dir * ctx.SKID_DECEL * dt)
+                self.set_horizontal_velocity(self.vx + (self.input_dir * ctx.SKID_DECEL * dt))
             else:
-                if self.input_dir > 0: self.vx = min(self.vx + (accel_rate * dt), target_max)
-                else: self.vx = max(self.vx - (accel_rate * dt), -target_max)
+                if self.input_dir > 0: self.set_horizontal_velocity(min(self.vx + (accel_rate * dt), target_max))
+                else: self.set_horizontal_velocity(max(self.vx - (accel_rate * dt), -target_max))
         else:
             friction = (ctx.GROUND_FRICTION if self.on_ground else ctx.AIR_FRICTION) * dt
-            if self.vx > 0: self.vx = max(0, self.vx - friction)
-            elif self.vx < 0: self.vx = min(0, self.vx + friction)
+            if self.vx > 0: self.set_horizontal_velocity(max(0, self.vx - friction))
+            elif self.vx < 0: self.set_horizontal_velocity(min(0, self.vx + friction))
 
         self.handle_jump(dt, ctx)
 
@@ -190,19 +200,27 @@ class Player():
         if self.jump_buffer > 0: self.jump_buffer -= 1
 
         if (self.coyote > 0) and (self.jump_hold == 0) and (self.jump_buffer > 0):
-            base = ctx.JUMP_VEL_MIN
-            bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
-            self.vy = base - bonus 
-            self.on_ground = False
-            self.coyote = 0
-            self.jump_hold = ctx.JUMP_HOLD_FRAMES
-            self.jump_buffer = 0
+            self.start_jump(ctx)
 
         if self.jump_hold > 0:
             if self.jump_pressed:
                 self.vy -= 0.30 * (dt * 60) 
             self.jump_hold -= 1
-                
+
+    @track("jump")
+    def start_jump(self, ctx: PhysicsContext):
+        base = ctx.JUMP_VEL_MIN
+        bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
+        self.vy = base - bonus 
+        self.on_ground = False
+        self.coyote = 0
+        self.jump_hold = ctx.JUMP_HOLD_FRAMES
+        self.jump_buffer = 0
+
+# Player config
+# Tracking true or false 
+# What to track
+
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
         # 1. Get Sprite from Handler
         sprite = None

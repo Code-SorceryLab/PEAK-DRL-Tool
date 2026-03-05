@@ -1,0 +1,5 @@
+ACTION_NAMES = {
+    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
+    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP", 
+    8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
+}

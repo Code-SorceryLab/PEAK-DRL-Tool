@@ -13,6 +13,7 @@ from .SpatialHash import SpatialHash
 from ..Objects.Coin import Coin
 from ..Objects.Powerup import Powerup
 from ..Objects.GameObject import GameObject
+from ..Stats.StatsObserver import track
 
 @dataclass
 class PhysicsContext:
@@ -469,38 +470,45 @@ class PhysicsManager:
         # Check if we are above the enemy center and moving down (stomping)
         if player_bottom < enemy_center + 10 and moving_down:
             # Platformer jumped on enemy
-            enemy.gObj.active = False
+            self.player_kill_enemy(core, enemy)
             # Bounce player
             player.vy = JUMP_VEL_MIN * 0.6 
             self.context.score = getattr(core, 'score', 0) + 100 # Safety attr check
-            core.score += 100
-            
-            if hasattr(core, 'kills_step'): core.kills_step += 1
-            
+                        
         elif player.invincible_timer > 0:
             # Star power
-            enemy.gObj.active = False
-            core.score += 100
-            if hasattr(core, 'kills_step'): core.kills_step += 1
+            self.player_kill_enemy(core, enemy)
+
         else:
             # Lost powerup or Died
             if player.powered_up:
                 player.powered_up = False
                 player.invincible_timer = 60
             else:
-                core._handle_death()
+                core._handle_death(cause= "enemy")
                 return
+
+    @track("enemies_killed")
+    def player_kill_enemy(self, core, enemy):
+        enemy.gObj.active = False
+        core.score += 100     
+        if hasattr(core, 'kills_step'): core.kills_step += 1
 
     def _handle_player_coin(self, core, player, coin):
         """
         Collects coin, increments score and coin counters.
         """
         if not coin.collected:
+            self._collect_coin(core, coin)
+
+    @track("coins_collected")
+    def _collect_coin(self, core, coin):
             coin.gObj.active = False
             coin.collected = True
             core.score += 10
             core.coins_step += 1
             core.coins_total += 1
+
 
     def _handle_player_powerup(self, core, player, powerup):
         """

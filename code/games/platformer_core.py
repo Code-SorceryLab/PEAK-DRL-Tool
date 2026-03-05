@@ -10,6 +10,7 @@ import time
 import gymnasium
 from gymnasium import spaces
 import psutil
+from .modules.Stats.StatsObserver import statisticsObserver, track
 
 from code.games.modules.System import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
@@ -36,6 +37,7 @@ from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATF
     COLOR_POWERUP_MUSH, COLOR_POWERUP_STAR, COLOR_COIN, COLOR_HITBOX,
     COLOR_SENSOR, COLOR_AGENT_PANEL, COLOR_STREAK, TILE_SIZE)
 
+from .action_map import ACTION_NAMES
 
 # =============================================================================
 # Screen / Tile geometry
@@ -44,11 +46,6 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 32, 32
 
 # Action Map for Debug Display
-ACTION_NAMES = {
-    0: "IDLE", 1: "LEFT", 2: "RIGHT", 3: "JUMP",
-    4: "RIGHT+JUMP", 5: "RUN+RIGHT", 6: "LEFT+JUMP", 7: "RUN+RIGHT+JUMP", 
-    8: "RUN+LEFT", 9: "RUN+LEFT+JUMP"
-}
 
 class PlatformerCore(gymnasium.Env):
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
@@ -155,7 +152,10 @@ class PlatformerCore(gymnasium.Env):
         # SPRITE MANAGER
         core_dir = os.path.dirname(os.path.abspath(__file__))
         assets_dir = os.path.join(core_dir, "assets")
-    
+
+        #init statistics Observer levels
+        statisticsObserver.init_level_observers(self.level_order)
+        statisticsObserver.set_current_level(self.world)
 #        print(f"[DEBUG] Loading Assets from: {assets_dir}") 
 #        self.sprite_manager = SpriteManager(assets_dir, sprite_width=32, sprite_height=32, scale=1.5)
         
@@ -172,6 +172,7 @@ class PlatformerCore(gymnasium.Env):
     def get_action_space(self): return self._act_space
     def get_observation_space(self): return self._obs_space
 
+    track("horizontal_speed")
     def step(self, action: int):
         if not self.alive:
             return self._obs(), 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
@@ -213,9 +214,9 @@ class PlatformerCore(gymnasium.Env):
         
         # 2. Player Input
         if not self.debug_manager.free_cam_active:
-             self.player.handle_input(a = int(action))
+             self.player.check_input(a = int(action))
         else:
-            self.player.vx = 0; self.player.jump_hold = 0
+            self.player.set_horizontal_velocity(0); self.player.jump_hold = 0
 
         # 3. Physics System Update
         self.physics_manager.update_system(self.dt, self)
@@ -265,6 +266,8 @@ class PlatformerCore(gymnasium.Env):
         return self._obs(), self._info()
 
     def load_level(self):
+        statisticsObserver.print_all()
+        statisticsObserver.reset()
         self.alive = True
         self.frame = 0
         self.game_over = False
@@ -334,9 +337,11 @@ class PlatformerCore(gymnasium.Env):
             print("all levels done") # As requested
             self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
+        statisticsObserver.set_current_level(self.world)
         self.load_level()
     
-    def _handle_death(self):
+    @track("death")
+    def _handle_death(self, cause = "cause"):
         self.lives -= 1
         if self.lives > 0:
             self._soft_reset()
@@ -430,12 +435,12 @@ class PlatformerCore(gymnasium.Env):
         
         # 1. TIME LIMIT
         if self.use_timer and self.timer <= 0:
-            self._handle_death()
+            self._handle_death(cause = "Time Limit")
             return True 
 
         # 2. PIT DEATH (Y-limit)
         if player.gObj.y > self.level_data.height:
-            self._handle_death()
+            self._handle_death(cause= "Pit")
             return True
         
         # 3. GOAL & SPIKES (Hitbox Precision)
@@ -456,7 +461,7 @@ class PlatformerCore(gymnasium.Env):
             # Check intersection
             if p_rect.colliderect(tile.gObj.get_rect()):
                 if tid == EntityType.SPIKE:
-                    self._handle_death()
+                    self._handle_death(cause = "spike")
                     return True
                 
                 elif tid == EntityType.GOAL:
@@ -473,7 +478,7 @@ class PlatformerCore(gymnasium.Env):
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
             # print("Agent killed for stalling (camping).")
-            self._handle_death()
+            self._handle_death(cause= "stall")
             return True
 
         return False
