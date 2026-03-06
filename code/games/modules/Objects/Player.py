@@ -289,7 +289,7 @@ class Player():
             )
             if debug:
                 self._debug(surface, sx, sy)
-            if self.run_pressed and abs(self.vx) > 100:
+            if self.run_held and abs(self.vx) > 100:
                 n = 3; spacing = 6; length = 10
                 for i in range(n):
                     offset = (i + 1) * spacing

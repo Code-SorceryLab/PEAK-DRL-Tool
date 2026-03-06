@@ -762,7 +762,7 @@ def main(cfg: DictConfig):
             else:
                 raw_env = DummyVecEnv([make_env()])
 
-            env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+            env = VecNormalize(raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
             def make_monitored_env(render_mode=None):
                 """Factory that wraps the env with Monitor for proper eval logging."""
@@ -774,9 +774,9 @@ def main(cfg: DictConfig):
                 return _init
 
             eval_raw_env = DummyVecEnv([make_monitored_env()])
-            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
-            eval_env.training = False
-            eval_env.norm_reward = False
+            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+            eval_env.training = False   # freeze running stats during eval
+            eval_env.norm_reward = False  # don't normalise eval rewards (for unbiased EvalCallback scores)
 
             for skill, total_timesteps in selected_skills.items():
                 run_count += 1

@@ -838,7 +838,7 @@ class PhysicsManager:
         tid passed downstream must be:
           EntityType.SPIKE  — so _resolve_player_world death-check fires
           TILE_QBLOCK (int) — so _hit_qblock fires
-          TILE_PLATFORM (int) — so one-way pass-through fires
+          TILE_PLATFORM (int) — treated as fully solid on all sides (same as TILE_GROUND)
           anything else     — treated as solid ground
         """
         nearby_objects = level_data.static_hash.query(obj)

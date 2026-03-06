@@ -331,14 +331,14 @@ class PlatformerCore(gymnasium.Env):
             # low=-1.0 because channel 4 spans [-1, 1]; channels 0-3 are binary {0, 1}.
             "grids": spaces.Box(low=-1.0, high=1.0, shape=(5, self.obs_height, self.obs_width), dtype=np.float32),
 
-            # Scalars: 18 (Player=5, Tracking=13)
+            # Scalars: 12 (Player=5, Tracking=7)
             "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
 
             # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
             # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
         })
 
-        # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
+        # Action Space is 20 to match ACTION_NAMES (0 through 19, including 10 fire variants)
         self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
@@ -1070,189 +1070,189 @@ class PlatformerCore(gymnasium.Env):
         return hazard_grid, collect_grid, player_grid, solid_grid, map_row_start, map_col_start
 
     def _dijkstra_obs_window(self, map_row_start: int, map_col_start: int) -> np.ndarray:
-            """
-            Returns a (obs_height, obs_width) float32 advantage map in [-1, 1].
+        """
+        Returns a (obs_height, obs_width) float32 advantage map in [-1, 1].
 
-            Each cell encodes how much closer (positive) or further (negative) that
-            tile is from the goal compared to the player's current tile:
+        Each cell encodes how much closer (positive) or further (negative) that
+        tile is from the goal compared to the player's current tile:
 
-                delta[r, c] = player_dist - window_dist
-                            = player_tile_cost - neighbour_tile_cost
+            delta[r, c] = player_dist - window_dist
+                        = player_tile_cost - neighbour_tile_cost
 
-            Interpretation for the CNN:
-            +1.0  → tile is much closer to the goal than the player  (go here)
-            0.0  → same distance as player, or unreachable tile     (neutral)
-            -1.0  → tile is much further from the goal than player   (avoid)
+        Interpretation for the CNN:
+        +1.0  → tile is much closer to the goal than the player  (go here)
+        0.0  → same distance as player, or unreachable tile     (neutral)
+        -1.0  → tile is much further from the goal than player   (avoid)
 
-            All patching (moving-platform compensation) is done in raw cost space.
-            Normalisation and clipping to [-1, 1] happen exactly once at the end.
+        All patching (moving-platform compensation) is done in raw cost space.
+        Normalisation and clipping to [-1, 1] happen exactly once at the end.
 
-            Tiles with inf cost (walls, unreachable air pockets) are set to 0 so
-            they are neutral rather than misleadingly negative.
-            """
-            zero = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        Tiles with inf cost (walls, unreachable air pockets) are set to 0 so
+        they are neutral rather than misleadingly negative.
+        """
+        zero = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
 
-            if self.dijkstra is None or not self.player:
-                return zero
+        if self.dijkstra is None or not self.player:
+            return zero
 
-            # Player tile cost — if unreachable (inf), the whole window is meaningless
-            px_tile = int(self.player.gObj.x // TILE_SIZE)
-            py_tile = int(self.player.gObj.y // TILE_SIZE)
-            player_dist = self.dijkstra.dist_map[py_tile, px_tile] \
-                if (0 <= py_tile < self.level_data.rows and 0 <= px_tile < self.level_data.cols) \
-                else np.inf
+        # Player tile cost — if unreachable (inf), the whole window is meaningless
+        px_tile = int(self.player.gObj.x // TILE_SIZE)
+        py_tile = int(self.player.gObj.y // TILE_SIZE)
+        player_dist = self.dijkstra.dist_map[py_tile, px_tile] \
+            if (0 <= py_tile < self.level_data.rows and 0 <= px_tile < self.level_data.cols) \
+            else np.inf
 
-            if not np.isfinite(player_dist):
-                # Player is on an unreachable tile (e.g. first frame before physics
-                # settles). Return neutral zeros — don't emit misleading gradients.
-                return zero
+        if not np.isfinite(player_dist):
+            # Player is on an unreachable tile (e.g. first frame before physics
+            # settles). Return neutral zeros — don't emit misleading gradients.
+            return zero
 
-            # Clamp window to valid map bounds.
-            # map_row_start can be negative when the player is near the top/left edge.
-            r0 = max(0, map_row_start)
-            c0 = max(0, map_col_start)
-            r1 = min(self.level_data.rows, map_row_start + self.obs_height)
-            c1 = min(self.level_data.cols, map_col_start + self.obs_width)
+        # Clamp window to valid map bounds.
+        # map_row_start can be negative when the player is near the top/left edge.
+        r0 = max(0, map_row_start)
+        c0 = max(0, map_col_start)
+        r1 = min(self.level_data.rows, map_row_start + self.obs_height)
+        c1 = min(self.level_data.cols, map_col_start + self.obs_width)
 
-            # How many rows/cols of the output window are actually inside the map
-            valid_rows = r1 - r0
-            valid_cols = c1 - c0
+        # How many rows/cols of the output window are actually inside the map
+        valid_rows = r1 - r0
+        valid_cols = c1 - c0
 
-            if valid_rows <= 0 or valid_cols <= 0:
-                return zero
+        if valid_rows <= 0 or valid_cols <= 0:
+            return zero
 
-            # Direct numpy slice — no Python loop over tiles.
-            # PERF: No .copy() needed here — the subtraction below (player_dist - dist_slice)
-            # produces a new array without modifying dist_map in-place.
-            dist_slice = self.dijkstra.dist_map[r0:r1, c0:c1]
+        # Direct numpy slice — no Python loop over tiles.
+        # PERF: No .copy() needed here — the subtraction below (player_dist - dist_slice)
+        # produces a new array without modifying dist_map in-place.
+        dist_slice = self.dijkstra.dist_map[r0:r1, c0:c1]
 
-            # Compute raw relative advantage (NOT normalised yet).
-            # Positive = closer to goal than player, negative = further.
-            delta = player_dist - dist_slice
+        # Compute raw relative advantage (NOT normalised yet).
+        # Positive = closer to goal than player, negative = further.
+        delta = player_dist - dist_slice
 
-            # Walls / unreachable tiles have cost=inf → delta = -inf → set to 0 (neutral).
-            # Done BEFORE writing to out so inf values never enter the output array.
-            delta[~np.isfinite(delta)] = 0.0
+        # Walls / unreachable tiles have cost=inf → delta = -inf → set to 0 (neutral).
+        # Done BEFORE writing to out so inf values never enter the output array.
+        delta[~np.isfinite(delta)] = 0.0
 
-            # Place the valid slice into the full output window, leaving edge-padding
-            # as zeros when the window extends outside the map.
-            out = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-            out_r0 = r0 - map_row_start   # offset into output array
-            out_c0 = c0 - map_col_start
-            out[out_r0 : out_r0 + valid_rows, out_c0 : out_c0 + valid_cols] = delta
+        # Place the valid slice into the full output window, leaving edge-padding
+        # as zeros when the window extends outside the map.
+        out = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        out_r0 = r0 - map_row_start   # offset into output array
+        out_c0 = c0 - map_col_start
+        out[out_r0 : out_r0 + valid_rows, out_c0 : out_c0 + valid_cols] = delta
 
-            # -----------------------------------------------------------------
-            # Moving-platform compensation (raw cost space)
-            # -----------------------------------------------------------------
-            # Mirrors the DijkstraSolver's treatment of static solid tiles:
-            #   - Platform surface tiles → 0.0 (impassable, same as walls)
-            #   - 1 tile above → ground-proximity discount -0.6
-            #   - 2 tiles above → -0.25
-            #   - 3 tiles above → -0.1
-            #
-            # For tiles that are unreachable in the static map (inf cost),
-            # we interpolate from the nearest reachable tile in the same row
-            # so the gradient connects across the gap the platform bridges.
-            # -----------------------------------------------------------------
-            if self.level_data.moving_platforms:
-                wx = map_col_start * TILE_SIZE
-                wy = map_row_start * TILE_SIZE
-                ww = self.obs_width  * TILE_SIZE
-                wh = self.obs_height * TILE_SIZE
+        # -----------------------------------------------------------------
+        # Moving-platform compensation (raw cost space)
+        # -----------------------------------------------------------------
+        # Mirrors the DijkstraSolver's treatment of static solid tiles:
+        #   - Platform surface tiles → 0.0 (impassable, same as walls)
+        #   - 1 tile above → ground-proximity discount -0.6
+        #   - 2 tiles above → -0.25
+        #   - 3 tiles above → -0.1
+        #
+        # For tiles that are unreachable in the static map (inf cost),
+        # we interpolate from the nearest reachable tile in the same row
+        # so the gradient connects across the gap the platform bridges.
+        # -----------------------------------------------------------------
+        if self.level_data.moving_platforms:
+            wx = map_col_start * TILE_SIZE
+            wy = map_row_start * TILE_SIZE
+            ww = self.obs_width  * TILE_SIZE
+            wh = self.obs_height * TILE_SIZE
 
-                nearby_plats = self.physics_manager.platform_hash.query_rect(
-                    wx, wy, ww, wh
-                )
+            nearby_plats = self.physics_manager.platform_hash.query_rect(
+                wx, wy, ww, wh
+            )
 
-                if nearby_plats:
-                    HORIZ_COST = 2.0
-                    MAX_SCAN   = self.obs_width * 2
-                    dm         = self.dijkstra.dist_map
-                    dm_rows, dm_cols = dm.shape
+            if nearby_plats:
+                HORIZ_COST = 2.0
+                MAX_SCAN   = self.obs_width * 2
+                dm         = self.dijkstra.dist_map
+                dm_rows, dm_cols = dm.shape
 
-                    # (rows_above_surface, discount) — matches compute_map exactly
-                    PROXIMITY = [(1, 0.6), (2, 0.25), (3, 0.1)]
+                # (rows_above_surface, discount) — matches compute_map exactly
+                PROXIMITY = [(1, 0.6), (2, 0.25), (3, 0.1)]
 
-                    for plat in nearby_plats:
-                        if not plat.gObj.active:
+                for plat in nearby_plats:
+                    if not plat.gObj.active:
+                        continue
+
+                    pc0       = int(plat.gObj.x // TILE_SIZE)
+                    pc1       = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
+                    p_top_row = int(plat.gObj.y // TILE_SIZE)
+
+                    # --- Platform surface: impassable (same as walls) ---
+                    for pc in range(pc0, pc1):
+                        ly = p_top_row - map_row_start
+                        lx = pc - map_col_start
+                        if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
+                            out[ly, lx] = 0.0
+
+                    # --- Tiles above: ground-proximity discounts ---
+                    for offset, discount in PROXIMITY:
+                        patch_row = p_top_row - offset
+                        if patch_row < 0 or patch_row >= dm_rows:
                             continue
 
-                        pc0       = int(plat.gObj.x // TILE_SIZE)
-                        pc1       = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
-                        p_top_row = int(plat.gObj.y // TILE_SIZE)
-
-                        # --- Platform surface: impassable (same as walls) ---
                         for pc in range(pc0, pc1):
-                            ly = p_top_row - map_row_start
+                            ly = patch_row - map_row_start
+                            lx = pc - map_col_start
+                            if not (0 <= ly < self.obs_height and 0 <= lx < self.obs_width):
+                                continue
+
+                            if 0 <= pc < dm_cols:
+                                raw_cost = float(dm[patch_row, pc])
+                            else:
+                                raw_cost = np.inf
+
+                            if np.isfinite(raw_cost):
+                                # Tile reachable in static map but missing the
+                                # ground-proximity discount. Recalculate advantage.
+                                patched_cost = max(1.0, raw_cost - discount)
+                                out[ly, lx] = player_dist - patched_cost
+                            else:
+                                # Tile unreachable — interpolate from nearest
+                                # reachable tile in the same row of full dist_map.
+                                best_est = np.inf
+                                for dc in range(1, MAX_SCAN + 1):
+                                    for sign in (-1, 1):
+                                        nc = pc + dc * sign
+                                        if 0 <= nc < dm_cols:
+                                            anchor = float(dm[patch_row, nc])
+                                            if np.isfinite(anchor):
+                                                est = anchor + dc * HORIZ_COST - discount
+                                                if est < best_est:
+                                                    best_est = est
+                                    if np.isfinite(best_est):
+                                        break
+
+                                if np.isfinite(best_est):
+                                    best_est = max(1.0, best_est)
+                                    out[ly, lx] = player_dist - best_est
+                                    
+                    # --- Secondary proximity boosts (2 and 3 tiles above) ---
+                    for offset, discount in [(2, 0.25), (3, 0.1)]:
+                        boost_row = p_top_row - offset
+                        if boost_row < 0:
+                            continue
+                        for pc in range(pc0, pc1):
+                            ly = boost_row - map_row_start
                             lx = pc - map_col_start
                             if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                out[ly, lx] = 0.0
+                                out[ly, lx] += discount
 
-                        # --- Tiles above: ground-proximity discounts ---
-                        for offset, discount in PROXIMITY:
-                            patch_row = p_top_row - offset
-                            if patch_row < 0 or patch_row >= dm_rows:
-                                continue
-
-                            for pc in range(pc0, pc1):
-                                ly = patch_row - map_row_start
-                                lx = pc - map_col_start
-                                if not (0 <= ly < self.obs_height and 0 <= lx < self.obs_width):
-                                    continue
-
-                                if 0 <= pc < dm_cols:
-                                    raw_cost = float(dm[patch_row, pc])
-                                else:
-                                    raw_cost = np.inf
-
-                                if np.isfinite(raw_cost):
-                                    # Tile reachable in static map but missing the
-                                    # ground-proximity discount. Recalculate advantage.
-                                    patched_cost = max(1.0, raw_cost - discount)
-                                    out[ly, lx] = player_dist - patched_cost
-                                else:
-                                    # Tile unreachable — interpolate from nearest
-                                    # reachable tile in the same row of full dist_map.
-                                    best_est = np.inf
-                                    for dc in range(1, MAX_SCAN + 1):
-                                        for sign in (-1, 1):
-                                            nc = pc + dc * sign
-                                            if 0 <= nc < dm_cols:
-                                                anchor = float(dm[patch_row, nc])
-                                                if np.isfinite(anchor):
-                                                    est = anchor + dc * HORIZ_COST - discount
-                                                    if est < best_est:
-                                                        best_est = est
-                                        if np.isfinite(best_est):
-                                            break
-
-                                    if np.isfinite(best_est):
-                                        best_est = max(1.0, best_est)
-                                        out[ly, lx] = player_dist - best_est
-                                        
-                        # --- Secondary proximity boosts (2 and 3 tiles above) ---
-                        for offset, discount in [(2, 0.25), (3, 0.1)]:
-                            boost_row = p_top_row - offset
-                            if boost_row < 0:
-                                continue
-                            for pc in range(pc0, pc1):
-                                ly = boost_row - map_row_start
-                                lx = pc - map_col_start
-                                if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                    out[ly, lx] += discount
-
-            # --- Single normalisation pass (after ALL patches) ---
-            max_cost = max(
-                (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
-                (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
-            )
-            np.clip(out / max_cost, -1.0, 1.0, out=out)
-            self._dijkstra_window_cache = out  # cache for debugging visualization
-            return out.astype(np.float32)
+        # --- Single normalisation pass (after ALL patches) ---
+        max_cost = max(
+            (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
+            (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
+        )
+        np.clip(out / max_cost, -1.0, 1.0, out=out)
+        self._dijkstra_window_cache = out  # cache for debugging visualization
+        return out.astype(np.float32)
 
     def _tracking_obs(self) -> np.ndarray:
         """
-        Returns 13 scalar features used by the MLP branch of the extractor.
+        Returns 7 scalar features used by the MLP branch of the extractor.
         """
         p = self.player
         if not p: return np.zeros(7, dtype=np.float32)  # FIXED: 7 active scalars
