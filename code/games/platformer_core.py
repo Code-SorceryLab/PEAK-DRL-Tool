@@ -598,7 +598,7 @@ class PlatformerCore(gymnasium.Env):
         self.frame = 0
         self.game_over = False
         self.reached_goal = False
-
+        
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
 
@@ -1513,7 +1513,7 @@ class PlatformerCore(gymnasium.Env):
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
     def _draw_ui(self, surface: pygame.Surface):
-        status = "STAR" if (self.player and self.player.invincible_timer > 0) else ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
+        status = "STAR" if (self.player and self.player.star_timer > 0) else ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
         text = self.ui_font.render(
             f"Lives:{self.lives}  Score:{self.score}  Coins:{self.coins_total}  {status}  Time:{int(self.timer)}",
             True, COLOR_WHITE

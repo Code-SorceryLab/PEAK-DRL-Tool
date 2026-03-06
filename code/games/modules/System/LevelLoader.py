@@ -16,6 +16,7 @@ from ..Objects.Spike import Spike
 from ..Objects.MovingPlatform import MovingPlatform
 from ..Objects.GameObject import GameObject
 from ..Objects.Enemy import Enemy
+from ..Objects.Koopa import Koopa        # ← add this
 from ..Objects.Coin import Coin
 from ..Objects.QuestionBlock import QuestionBlock
 from ..Objects.Mushroom import Mushroom
@@ -233,6 +234,16 @@ class LevelLoader:
                     e = Enemy(GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 25, 20, True), vx=-60.0)
                     e.gObj.type_id = EntityType.ENEMY
                     data.enemies.append(e)
+
+                elif ascii_char == 'k':
+                    k = Koopa(gObj=GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 22, 30, True))
+                    k.gObj.type_id = EntityType.ENEMY
+                    data.enemies.append(k)
+
+                elif ascii_char == 'K':
+                    k = Koopa(gObj=GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 22, 30, True), flying=True)
+                    k.gObj.type_id = EntityType.ENEMY
+                    data.enemies.append(k)
                 
                 elif ascii_char == 'P':
                     data.player_start = (float(col * TILE_SIZE), float(row * TILE_SIZE))

@@ -640,20 +640,37 @@ class PhysicsManager:
         Handles logic when Player hits an Enemy.
 
         Resolution order:
-          1. Stomp    — player was falling AND feet above enemy centre → kill enemy, bounce player.
-          2. Star     — player.power_machine.is_invincible → kill enemy, no damage to player.
-          3. Damage   — player.power_machine.take_hit():
-                          True  → survived (downgraded or i-frames absorbed)
-                          False → dead, core._handle_death() already called by machine
-                                  (or we call it here if on_death was not set on machine)
+          0. State-machine enemies (e.g. Koopa) -- duck-typed via on_stomp / on_touch.
+             These handle their own scoring, bouncing, and damage internally.
+          1. Stomp    -- player was falling AND feet above enemy centre -> kill enemy, bounce player.
+          2. Star     -- player.power_machine.is_star_active -> kill enemy, no damage to player.
+          3. Damage   -- player.power_machine.take_hit():
+                          True  -> survived (downgraded or i-frames absorbed)
+                          False -> dead, core._handle_death() called by PhysicsManager
         """
         if not enemy.gObj.active:
+            return
+
+        # 0. Duck-type dispatch for state-machine enemies (Koopa etc.)
+        #    on_stomp / on_touch own all logic for these enemies -- do not fall through.
+        if hasattr(enemy, 'on_stomp'):
+            player_bottom = player.gObj.y + player.gObj.height
+            enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
+            # A flying enemy can rise INTO the player rather than the player falling
+            # onto it. In that case player_was_falling is False even though the player
+            # is clearly above the enemy. Treat upward enemy movement as equivalent to
+            # the player falling for the purposes of stomp detection.
+            enemy_rising  = hasattr(enemy, 'vy') and enemy.vy < 0
+            if (player_was_falling or enemy_rising) and player_bottom < enemy_center + 10:
+                enemy.on_stomp(player, core)
+            else:
+                enemy.on_touch(player, core)
             return
 
         player_bottom = player.gObj.y + player.gObj.height
         enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
 
-        # 1. Stomp — falling and feet above enemy midpoint
+        # 1. Stomp -- falling and feet above enemy midpoint
         if player_was_falling and player_bottom < enemy_center + 10:
             enemy.gObj.active = False
             player.vy = JUMP_VEL_MIN * 0.6   # bounce
@@ -662,8 +679,8 @@ class PhysicsManager:
                 core.kills_step += 1
             return
 
-        # 2. Star — kill enemy without taking damage
-        if player.power_machine.is_invincible:
+        # 2. Star -- kill enemy without taking damage
+        if player.power_machine.is_star_active:
             enemy.gObj.active = False
             core.score += 100
             if hasattr(core, 'kills_step'):
@@ -673,7 +690,6 @@ class PhysicsManager:
         # 3. Take a hit through the state machine
         survived = player.power_machine.take_hit()
         if not survived:
-            # on_death may not be wired on the machine — call core directly
             core._handle_death("Enemy")
 
     def _handle_player_coin(self, core, player, coin):

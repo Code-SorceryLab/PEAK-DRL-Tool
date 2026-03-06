@@ -35,7 +35,8 @@ class Player():
     eye_radius = 3
     on_ground: bool = False
     facing_right: bool = True
-
+    star_timer:   float = 0.0
+    iframes_timer: float = 0.0
     # --- POWER STATE ---
     # powered_up and invincible_timer are kept as plain fields because the rest
     # of the codebase (platformer_core rendering, PhysicsManager) reads them
