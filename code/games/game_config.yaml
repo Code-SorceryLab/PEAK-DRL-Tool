@@ -1,58 +1,44 @@
-# ==========================================
-# PEAK PLATFORMER — game_config.yaml
-# ==========================================
-
-# ── Engine / environment ──────────────────
 game:
-  title: "PEAK Platformer"
+  title: PEAK Platformer
   screen_width: 800
   screen_height: 600
   fps: 60
-  render_mode: "human"
-
+  render_mode: human
 env_cls: PlatformerCore
 module: code.games.platformer_core
 max_steps: 10000
-
 observation_space:
   type: Box
-  shape: [36]
+  shape:
+  - 36
   low: -500.0
   high: 500.0
-
 action_space:
-  type: Discrete   # Discrete | MultiBinary | MultiDiscrete
+  type: Discrete
   n: 8
-
 reward:
   type: progress_flag
   shaping:
     step: 0.01
     goal: 1.0
     fall: -1.0
-
 episode:
   max_steps: 1000
-
 init:
   seed: 42
-  level: easy   # easy | medium | hard
-
+  level: easy
 persona: null
-
 metrics:
-  - episode_reward
-  - episode_length
-
+- episode_reward
+- episode_length
 render:
-  window_size: [640, 480]
+  window_size:
+  - 640
+  - 480
   show_fps: false
   debug_overlay: false
-
 logging:
   tensorboard: true
-
-# ── Physics / player defaults ─────────────
 defaults:
   physics:
     gravity: 1300
@@ -62,43 +48,15 @@ defaults:
       air: 250
     max_fall_speed: 550
     max_run_speed: 150
-
   player:
     lives: 3
-    dimensions: {width: 20, height: 32}
+    dimensions:
+      width: 20
+      height: 32
     movement:
       walk_accel: 1000.0
       max_run_speed: 340.0
     jump:
       max_velocity: -600.0
-
-# ── Levels ───────────────────────────────
 levels:
-  # "Mario_1-1":
-    # file: "world1_1.txt"
-    # time_limit: 300
-    # background_color: [0, 0, 0]
-  "1-2":
-    file: "stage_1.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-  "All Features":
-    file: "testlevel.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-  "1-1":
-    file: "stage_4.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-  "Path Finding":
-    file: "stage_7.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-  "Mario1-2":
-    file: "world1_2.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
-  "Long Level":
-    file: "stage_13.txt"
-    time_limit: 300
-    background_color: [0, 0, 0]
+

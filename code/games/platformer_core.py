@@ -236,8 +236,7 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
-        _default_world = self.level_order[0] if self.level_order else "1-1"
-        self.world = str(kwargs.pop("world", _default_world))
+        self.world = str(kwargs.pop("world", "1-1")).lower()
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
@@ -260,17 +259,6 @@ class PlatformerCore(gymnasium.Env):
 
         self.max_lives = 3
         self.lives = self.max_lives
-
-        # ── Curriculum sampling ───────────────────────────────────────────────
-        # sticky_prob: chance of staying on the same level after an episode ends.
-        # max_consecutive: hard cap — after this many episodes in a row on the
-        #   same level the env MUST switch, preventing any env from locking onto
-        #   one level forever (critical when n_envs > 1).
-        self.sticky_prob       = float(kwargs.pop("sticky_prob", 0.50))
-        self.max_consecutive   = int(kwargs.pop("max_consecutive", 4))
-        self._consecutive_same = 0          # episodes on current level in a row
-        self._level_visits     = {lvl: 0 for lvl in self.level_order}
-        self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
         # Camera
         self.camera_x = 0.0
@@ -434,6 +422,8 @@ class PlatformerCore(gymnasium.Env):
                 self.physics_manager.hazard_hash.insert(enemy)
         for spike in self._cached_spikes:
             self.physics_manager.hazard_hash.insert(spike)
+        for pit in self.level_data.pits:
+            self.physics_manager.hazard_hash.insert(pit)
 
         # --- platform_hash: moving platforms ---
         # Rebuilt every frame because platforms move.
@@ -548,48 +538,19 @@ class PlatformerCore(gymnasium.Env):
         """
         super().reset(seed=seed)
 
-        # Full reset: restore lives/score, then pick the next training level.
-        #
-        # Strategy — sticky + performance-weighted + forced rotation:
-        #   1. If consecutive episodes on this level < max_consecutive AND
-        #      random roll < sticky_prob  → stay (agent gets repeated practice).
-        #   2. Otherwise                 → performance-weighted random switch.
-        #      Levels with lower win-rates get higher sampling weight so the
-        #      agent focuses effort where it's actually struggling.
-        #   3. Locked level (editor playtest) always overrides everything.
+        # Full reset: restore lives, score, return to level 0 (or locked level)
         self.reset_metrics()
         if self.locked_level:
             self.world = self.locked_level
-            if self.locked_level in self.level_order:
-                self.current_index_world = self.level_order.index(self.locked_level)
+            # Keep current_index_world consistent
+            lo_lower = [l.lower() for l in self.level_order]
+            if self.locked_level.lower() in lo_lower:
+                self.current_index_world = lo_lower.index(self.locked_level.lower())
             else:
                 self.current_index_world = 0
-            self._consecutive_same = 0
-        elif self.level_order:
-            force_switch = self._consecutive_same >= self.max_consecutive
-            if not force_switch and random.random() < self.sticky_prob:
-                # Stay on the same level
-                self._consecutive_same += 1
-            else:
-                # Performance-weighted pick from the OTHER levels
-                # weight = 1 - win_rate  (struggling levels weighted higher)
-                # Unvisited levels get weight 1.0 (worst possible score assumed)
-                idxs = [i for i in range(len(self.level_order))
-                        if i != self.current_index_world]
-                if idxs:
-                    weights = []
-                    for i in idxs:
-                        lvl = self.level_order[i]
-                        v = self._level_visits.get(lvl, 0)
-                        w = self._level_wins.get(lvl, 0)
-                        win_rate = w / v if v > 0 else 0.0
-                        weights.append(max(0.1, 1.0 - win_rate))
-                    total = sum(weights)
-                    probs = [x / total for x in weights]
-                    self.current_index_world = random.choices(idxs, weights=probs, k=1)[0]
-                self._consecutive_same = 0
+        else:
+            self.current_index_world = 0
             self.world = self.level_order[self.current_index_world]
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
 
@@ -600,13 +561,39 @@ class PlatformerCore(gymnasium.Env):
         self.reached_goal = False
 
         config = self.config_manager.get_level_config(self.world)
+
+        # Guard: if the level has no 'file' entry, fall back to the first valid level
+        if not config.get('file', ''):
+            level_order = self.config_manager.get_level_order()
+            fallback = next(
+                (lid for lid in level_order
+                 if self.config_manager.get_level_config(lid).get('file', '')),
+                None
+            )
+            if fallback:
+                resolved = self.config_manager._resolve_level_id(self.world)
+                if resolved != self.world:
+                    # The ID was just a casing mismatch — update world to the real key
+                    self.world = resolved
+                    config = self.config_manager.get_level_config(self.world)
+                else:
+                    print(f"[PlatformerCore] Warning: Level '{self.world}' has no 'file' in config. "
+                          f"Falling back to '{fallback}'.")
+                    self.world = fallback
+                    config = self.config_manager.get_level_config(self.world)
+            else:
+                raise RuntimeError(
+                    f"[PlatformerCore] Level '{self.world}' has no 'file' in game_config.yaml. "
+                    f"Add a 'file:' field to the level config."
+                )
+
         self.level_data = self.loader.load_level(config)
 
         # Clear any fireballs from the previous level — they belong to the old
         # world and should not carry over or linger across level transitions.
         self.level_data.projectiles = []
 
-        # --- Cache spike objects for hazard_hash ---
+        # --- Cache spike + pit objects for hazard_hash ---
         # Spikes are static tiles created by LevelLoader and stored only in
         # level_data.tiles / static_hash. We cache references here so step()
         # can insert them into hazard_hash every frame without scanning the
@@ -724,15 +711,13 @@ class PlatformerCore(gymnasium.Env):
 
         The episode continues into the next level; only lives = 0 ends it.
         """
-        # Record the win for the level just completed
-        self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
-
-        # Advance to the next level in order; wrap at the end so long episodes
-        # cycle through the full curriculum without ending prematurely.
-        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
+        # Random walk: +-1 from current index (curriculum learning)
+        self.current_index_world = max(
+            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
+        )
+        if self.current_index_world >= len(self.level_order):
+            self.current_index_world = len(self.level_order) - 1
         self.world = self.level_order[self.current_index_world]
-        # Count the new level visit immediately so win-rates stay accurate mid-episode
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
 
         # Signal step() to load the next level after _info() runs this frame.
         self._needs_level_transition = True
@@ -850,6 +835,13 @@ class PlatformerCore(gymnasium.Env):
         # 2. PIT DEATH
         if player.gObj.y > self.level_data.height:
             return self._handle_death("Pit")
+
+        # 3. PIT TILE DEATH — player is standing on / overlapping a 'O' pit tile
+        player_rect = self.player.gObj.get_rect()
+        for pit in self.level_data.pits:
+            pit_rect = pit.get_rect()
+            if player_rect.colliderect(pit_rect):
+                return self._handle_death("Pit")
 
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:

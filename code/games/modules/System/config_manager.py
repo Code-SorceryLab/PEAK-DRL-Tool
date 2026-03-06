@@ -59,12 +59,26 @@ class ConfigManager:
                 print(f"Error parsing YAML: {exc}")
                 return {}
 
+    def _resolve_level_id(self, level_id):
+        """Case-insensitive lookup of a level ID in the YAML levels dict.
+        Returns the actual key as stored in the config, or the original if not found."""
+        levels = self.yaml_data.get('levels') or {}
+        if level_id in levels:
+            return level_id
+        lower = level_id.lower()
+        for key in levels:
+            if key.lower() == lower:
+                return key
+        return level_id
+
     def get_level_config(self, level_id):
+        resolved_id = self._resolve_level_id(level_id)
         final_config = copy.deepcopy(self.base_config)
         if 'defaults' in self.yaml_data:
             self._deep_update(final_config, self.yaml_data['defaults'])
-        if 'levels' in self.yaml_data and (self.yaml_data['levels'] or {}).get(level_id):
-            self._deep_update(final_config, self.yaml_data['levels'][level_id])
+        levels = self.yaml_data.get('levels') or {}
+        if resolved_id in levels and levels[resolved_id]:
+            self._deep_update(final_config, levels[resolved_id])
         return final_config
 
     def _deep_update(self, d, u):
