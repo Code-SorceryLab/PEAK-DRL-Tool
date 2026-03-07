@@ -7,7 +7,7 @@ from typing import List, Tuple, Dict, Any, Union
 from .EntityType import EntityType
 
 from ..Parameters.Map_parameters import (
-    TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
+    TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK, TILE_PIT,
     COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE, 
     COLOR_QBLOCK, TILE_SIZE
 )
@@ -45,6 +45,7 @@ class LevelData:
     qblocks:          List[QuestionBlock]      = field(default_factory=list)
     powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
+    pits:             List[Any]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
@@ -118,12 +119,18 @@ class LevelLoader:
 
         # 2. Build full path (dict source only — str source sets txt_path above)
         if isinstance(source, dict):
+            if not filename:
+                print(f"[LevelLoader] Error: Level config has no 'file' entry — cannot load. Check game_config.yaml.")
+                return data
             txt_path = os.path.join(self.level_path, filename)
 
-        if os.path.exists(txt_path):
+        # Guard: never try to open a directory as a file
+        if os.path.isfile(txt_path):
             self._parse_ascii_map(txt_path, data)
+        elif os.path.isdir(txt_path):
+            print(f"[LevelLoader] Error: '{txt_path}' is a directory, not a level file. The level is missing a 'file:' entry in game_config.yaml.")
         else:
-            print(f"[LevelLoader] Warning: Level file {txt_path} not found.")
+            print(f"[LevelLoader] Warning: Level file '{txt_path}' not found.")
 
         # 3. Load sidecar YAML ([level_name].yaml next to the .txt)
         sidecar_path = txt_path.rsplit('.', 1)[0] + '.yaml'
@@ -251,6 +258,19 @@ class LevelLoader:
                 elif ascii_char == 'G':
                     g = Goal(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True))
                     data.goals.append(g)
+
+                elif ascii_char == 'O':
+                    # PIT: non-solid kill zone. Transparent in game, visible in editor.
+                    # Not inserted into static_hash (no collision blocking) — inserted
+                    # into hazard_hash by platformer_core.load_level() so the observation
+                    # hazard channel picks it up, and PhysicsManager triggers death on overlap.
+                    pit_obj = GameObject(
+                        float(col * TILE_SIZE), float(row * TILE_SIZE),
+                        TILE_SIZE, TILE_SIZE, False  # solid=False
+                    )
+                    pit_obj.type_id = EntityType.PIT
+                    data.grid[row][col] = TILE_PIT
+                    data.pits.append(pit_obj)
 
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """

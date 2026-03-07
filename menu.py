@@ -555,36 +555,23 @@ def train_all_models_for_game():
         return
 
     skills = ["Novice", "Expert"]
-    total_runs = len(selected_algos) * len(personas) * len(skills)
+    archs  = get_available_architectures_from_grid()
+    total_runs = len(selected_algos) * len(archs) * len(personas) * len(skills)
 
     # Show summary
     print(f"\nTraining {total_runs} model(s) for '{game}':")
-    print(f"  Algorithms: {len(selected_algos)}")
-    print(f"  Personas: {len(personas)}")
-    print(f"  Skills: {len(skills)}")
+    print(f"  Algorithms    : {len(selected_algos)}  {selected_algos}")
+    print(f"  Architectures : {len(archs)}  {archs}  (all)")
+    print(f"  Personas      : {len(personas)}")
+    print(f"  Skills        : {len(skills)}")
 
-    # Architecture selection
-    archs = get_available_architectures_from_grid()
-    print("\nAvailable architectures:")
-    for i, a in enumerate(archs, 1):
-        name, desc = _ARCH_INFO.get(a, (a, ""))
-        print(f"  {i}. {a:<6}  {name:<28} {desc}")
-    arch_pick = input(f"Select architecture (1-{len(archs)}) or Enter for [slim]: ").strip()
-    if arch_pick == "":
-        arch_choice = "slim" if "slim" in archs else archs[0]
-    else:
-        try:
-            arch_choice = archs[int(arch_pick) - 1]
-        except (ValueError, IndexError):
-            print("Invalid, defaulting to slim.")
-            arch_choice = "slim" if "slim" in archs else archs[0]
-
-    confirm = input(f"\nProceed with {total_runs} training runs using [{arch_choice}] architecture? [y/N]: ").strip().lower()
+    confirm = input(f"\nProceed with all {total_runs} runs? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
 
-    # Execute training
+    # Execute training — train.py handles the arch loop internally via grid.yaml
+    # Passing no +architecture= flag lets it iterate all architectures automatically.
     completed = 0
     failed = 0
 
@@ -594,16 +581,17 @@ def train_all_models_for_game():
                 for skill in skills:
                     completed += 1
                     print("\n" + "=" * 60)
-                    print(f"Progress: {completed}/{total_runs}")
-                    print(f"Training: {game} | {algo} | {persona} | {skill} | arch: {arch_choice}")
+                    print(f"Progress: {completed}/{len(selected_algos)*len(personas)*len(skills)}")
+                    print(f"Training: {game} | {algo} | {persona} | {skill} | archs: {archs}")
                     print("=" * 60)
 
-                    success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
+                    # No architecture= arg → train.py sweeps all archs from grid.yaml
+                    success = execute_training_run(game, algo, persona, skill, architecture=None)
                     if not success:
                         failed += 1
     except KeyboardInterrupt:
         print("\n\n Training interrupted by user.")
-        print(f"Completed: {completed - 1}/{total_runs}")
+        print(f"Completed: {completed - 1}/{len(selected_algos)*len(personas)*len(skills)}")
         print(f"Failed: {failed}")
         return
 
@@ -630,14 +618,16 @@ def train_complete_grid():
     total_runs = 0
     breakdown = []
 
+    archs = get_available_architectures_from_grid()
+
     for game in games:
         personas = get_personas_for_game(game)
         if not personas:
             continue
 
-        runs_for_game = len(algos) * len(personas) * 2
+        runs_for_game = len(algos) * len(archs) * len(personas) * 2
         total_runs += runs_for_game
-        breakdown.append(f"  • {game}: {len(personas)} persona(s) × {len(algos)} algo(s) × 2 skills = {runs_for_game} runs")
+        breakdown.append(f"  • {game}: {len(personas)} persona(s) × {len(algos)} algo(s) × {len(archs)} arch(s) × 2 skills = {runs_for_game} runs")
 
     if total_runs == 0:
         print("\n❌ No valid training configurations found.")
@@ -645,40 +635,28 @@ def train_complete_grid():
 
     # Show summary
     print(f"\nThis will train {total_runs} total model(s):")
-    print(f"\nGames: {len(games)}")
-    print(f"Algorithms: {len(algos)}")
-    print(f"Skills: 2 (Novice, Expert)")
-    print("\nBreakdown by game:")
+    print(f"  Games         : {len(games)}")
+    print(f"  Algorithms    : {len(algos)}")
+    print(f"  Architectures : {len(archs)}  {archs}  (all)")
+    print(f"  Skills        : 2 (Novice, Expert)")
+    print(f"\nBreakdown by game:")
     for line in breakdown:
         print(line)
+    print(f"\nLogs will be saved to: {DEFAULT_TB_ROOT}/")
 
-    print(f"Logs will be saved to: {DEFAULT_TB_ROOT}/")
-
-    # Architecture selection
-    archs = get_available_architectures_from_grid()
-    print("\nAvailable architectures:")
-    for i, a in enumerate(archs, 1):
-        name, desc = _ARCH_INFO.get(a, (a, ""))
-        print(f"  {i}. {a:<6}  {name:<28} {desc}")
-    arch_pick = input(f"Select architecture (1-{len(archs)}) or Enter for [slim]: ").strip()
-    if arch_pick == "":
-        arch_choice = "slim" if "slim" in archs else archs[0]
-    else:
-        try:
-            arch_choice = archs[int(arch_pick) - 1]
-        except (ValueError, IndexError):
-            print("Invalid, defaulting to slim.")
-            arch_choice = "slim" if "slim" in archs else archs[0]
-
-    confirm = input(f"\nProceed with {total_runs} training runs using [{arch_choice}] architecture? [y/N]: ").strip().lower()
+    confirm = input(f"\nProceed with all {total_runs} runs (all architectures)? [y/N]: ").strip().lower()
     if confirm not in ('y', 'yes'):
         print("Aborted.")
         return
 
-    # Execute training grid
+    # Execute training grid — no +architecture= flag, train.py sweeps all archs
     skills = ["Novice", "Expert"]
     completed = 0
     failed = 0
+    outer_runs = sum(
+        len(algos) * len(get_personas_for_game(g) or []) * len(skills)
+        for g in games
+    )
 
     try:
         for game in games:
@@ -691,16 +669,17 @@ def train_complete_grid():
                     for skill in skills:
                         completed += 1
                         print("\n" + "=" * 60)
-                        print(f"Progress: {completed}/{total_runs}")
-                        print(f"Training: {game} | {algo} | {persona} | {skill} | arch: {arch_choice}")
+                        print(f"Progress: {completed}/{outer_runs}  (×{len(archs)} archs each)")
+                        print(f"Training: {game} | {algo} | {persona} | {skill} | archs: {archs}")
                         print("=" * 60)
 
-                        success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
+                        # No architecture= → train.py iterates all archs automatically
+                        success = execute_training_run(game, algo, persona, skill, architecture=None)
                         if not success:
                             failed += 1
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
-        print(f"Completed: {completed - 1}/{total_runs}")
+        print(f"Completed: {completed - 1}/{outer_runs}")
         print(f"Failed: {failed}")
         return
 

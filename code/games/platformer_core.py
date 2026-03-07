@@ -236,8 +236,10 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
-        _default_world = self.level_order[0] if self.level_order else "1-1"
-        self.world = str(kwargs.pop("world", _default_world))
+        # random_start_world: pick a uniformly random level at each episode reset
+        # so training time is spread equally across all levels regardless of win rate.
+        self.random_start_world = bool(kwargs.pop("random_start_world", True))
+        self.world = str(kwargs.pop("world", "1-1")).lower()
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
@@ -260,17 +262,6 @@ class PlatformerCore(gymnasium.Env):
 
         self.max_lives = 3
         self.lives = self.max_lives
-
-        # ── Curriculum sampling ───────────────────────────────────────────────
-        # sticky_prob: chance of staying on the same level after an episode ends.
-        # max_consecutive: hard cap — after this many episodes in a row on the
-        #   same level the env MUST switch, preventing any env from locking onto
-        #   one level forever (critical when n_envs > 1).
-        self.sticky_prob       = float(kwargs.pop("sticky_prob", 0.50))
-        self.max_consecutive   = int(kwargs.pop("max_consecutive", 4))
-        self._consecutive_same = 0          # episodes on current level in a row
-        self._level_visits     = {lvl: 0 for lvl in self.level_order}
-        self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
         # Camera
         self.camera_x = 0.0
@@ -439,6 +430,8 @@ class PlatformerCore(gymnasium.Env):
                 self.physics_manager.hazard_hash.insert(enemy)
         for spike in self._cached_spikes:
             self.physics_manager.hazard_hash.insert(spike)
+        for pit in self.level_data.pits:
+            self.physics_manager.hazard_hash.insert(pit)
 
         # --- platform_hash: moving platforms ---
         # Rebuilt every frame because platforms move.
@@ -527,35 +520,24 @@ class PlatformerCore(gymnasium.Env):
         """
         super().reset(seed=seed)
 
+        # Full reset: restore lives, score, return to level 0 (or locked level)
         self.reset_metrics()
         if self.locked_level:
             self.world = self.locked_level
+            # Keep current_index_world consistent
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-            self._consecutive_same = 0
-        elif self.level_order:
-            force_switch = self._consecutive_same >= self.max_consecutive
-            if not force_switch and random.random() < self.sticky_prob:
-                self._consecutive_same += 1
-            else:
-                idxs = [i for i in range(len(self.level_order))
-                        if i != self.current_index_world]
-                if idxs:
-                    weights = []
-                    for i in idxs:
-                        lvl = self.level_order[i]
-                        v = self._level_visits.get(lvl, 0)
-                        w = self._level_wins.get(lvl, 0)
-                        win_rate = w / v if v > 0 else 0.0
-                        weights.append(max(0.1, 1.0 - win_rate))
-                    total = sum(weights)
-                    probs = [x / total for x in weights]
-                    self.current_index_world = random.choices(idxs, weights=probs, k=1)[0]
-                self._consecutive_same = 0
-            self.world = self.level_order[self.current_index_world]
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+        else:
+            if self.level_order:
+                if self.random_start_world and len(self.level_order) > 1:
+                    # Uniform random — ensures every level gets equal training time
+                    # even when the agent rarely wins (so complete_level() never fires)
+                    self.current_index_world = random.randint(0, len(self.level_order) - 1)
+                else:
+                    self.current_index_world = 0
+                self.world = self.level_order[self.current_index_world]
         self.load_level()
         return self._obs(), self._info()
 
@@ -571,7 +553,12 @@ class PlatformerCore(gymnasium.Env):
         # Clear any fireballs from the previous level.
         self.level_data.projectiles = []
 
-        # --- Cache spike objects for hazard_hash ---
+        # --- Cache spike + pit objects for hazard_hash ---
+        # Spikes are static tiles created by LevelLoader and stored only in
+        # level_data.tiles / static_hash. We cache references here so step()
+        # can insert them into hazard_hash every frame without scanning the
+        # full tile grid. The list is rebuilt on every load_level() call
+        # (new level or soft-reset) so it always matches the current map.
         self._cached_spikes = []
         for row in range(self.level_data.rows):
             for col in range(self.level_data.cols):
@@ -662,10 +649,15 @@ class PlatformerCore(gymnasium.Env):
         Called by PhysicsManager the moment the player touches the goal tile.
         Signals step() to load the next level after _info() captures the WIN event.
         """
-        self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
-        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
+        # Random walk: +-1 from current index (curriculum learning)
+        self.current_index_world = max(
+            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
+        )
+        if self.current_index_world >= len(self.level_order):
+            self.current_index_world = len(self.level_order) - 1
         self.world = self.level_order[self.current_index_world]
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+
+        # Signal step() to load the next level after _info() runs this frame.
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
@@ -765,6 +757,14 @@ class PlatformerCore(gymnasium.Env):
         if player.gObj.y > self.level_data.height:
             return self._handle_death("Pit")
 
+        # 3. PIT TILE DEATH — player is standing on / overlapping a 'O' pit tile
+        player_rect = self.player.gObj.get_rect()
+        for pit in self.level_data.pits:
+            pit_rect = pit.get_rect()
+            if player_rect.colliderect(pit_rect):
+                return self._handle_death("Pit")
+
+        # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
             return self._handle_death("Stall")
 
@@ -873,20 +873,20 @@ class PlatformerCore(gymnasium.Env):
         Returns (solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start).
 
         solid_grid   — binary {0.0, 1.0}
-                       ground, static platforms, question blocks, moving platforms
+                    ground, static platforms, question blocks, moving platforms
 
         collect_grid — importance-weighted float, single channel:
-                       goal    = 1.0   (level exit — highest priority)
-                       powerup = 0.69  (changes player capability)
-                       coin    = 0.35  (bonus reward)
-                       empty   = 0.0
-                       If two entities share a tile, the higher value wins.
+                    goal    = 1.0   (level exit — highest priority)
+                    powerup = 0.69  (changes player capability)
+                    coin    = 0.35  (bonus reward)
+                    empty   = 0.0
+                    If two entities share a tile, the higher value wins.
 
         hazard_grid  — sign encodes the agent's viable response:
-                       enemy  = +1.0  (defeatable by stomp or fireball)
-                       spike  = -1.0  (always lethal, never safe to touch)
-                       empty  =  0.0
-                       If spike and enemy share a tile, spike wins (more dangerous).
+                    enemy  = +1.0  (defeatable by stomp or fireball)
+                    spike  = -1.0  (always lethal, never safe to touch)
+                    empty  =  0.0
+                    If spike and enemy share a tile, spike wins (more dangerous).
 
         map_row_start / map_col_start: unpadded map tile coordinates of the
         top-left corner of the 21×21 window centered on the player. Passed
@@ -1394,7 +1394,7 @@ class PlatformerCore(gymnasium.Env):
 
     def _draw_ui(self, surface: pygame.Surface):
         status = "STAR" if (self.player and self.player.star_timer > 0) else \
-                 ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
+                ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
         text = self.ui_font.render(
             f"Lives:{self.lives}  Score:{self.score}  Coins:{self.coins_total}  {status}  Time:{int(self.timer)}",
             True, COLOR_WHITE
