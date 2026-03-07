@@ -662,222 +662,227 @@ def main(cfg: DictConfig):
         if key not in selected_skills:
             raise ValueError(f"skill='{key}' not in cfg.skills {list(selected_skills.keys())}")
         selected_skills = {key: selected_skills[key]}
+    # ── Architecture sweep ──────────────────────────────────────────────────
+    # grid.yaml lists all architectures; +architecture=<tag> narrows to one.
+    _ALL_ARCHS = ["light", "slim", "peak"]
+    selected_architectures = [a.strip().lower() for a in list(cfg.get("architectures", _ALL_ARCHS))]
+    if "architecture" in cfg and cfg.architecture:
+        override_arch = str(cfg.architecture).strip().lower()
+        if override_arch not in _ALL_ARCHS:
+            raise ValueError(f"architecture='{override_arch}' unknown. Choose from {_ALL_ARCHS}")
+        selected_architectures = [override_arch]
+
+    total_jobs = (len(selected_models) * len(selected_architectures)
+                  * len(selected_personas) * len(selected_skills))
+    print(f"\n{'='*60}")
+    print(f"  PEAK TRAINING GRID")
+    print(f"  Models        : {selected_models}")
+    print(f"  Architectures : {selected_architectures}")
+    print(f"  Personas      : {selected_personas}")
+    print(f"  Skills        : {list(selected_skills.keys())}")
+    print(f"  Total runs    : {total_jobs}")
+    print(f"{'='*60}\n")
 
     run_count = 0
     for model_name in selected_models:
         algo_conf = _load_yaml(conf_root, "algo", model_name)
-        Algo = get_algo(algo_conf.get("name", model_name))
-        policy = algo_conf.get("policy", "MlpPolicy")
+        Algo      = get_algo(algo_conf.get("name", model_name))
+        policy    = algo_conf.get("policy", "MlpPolicy")
+        algo_kwargs_base   = {k: v for k, v in algo_conf.items()
+                              if k not in {"_target_", "name", "policy", "policy_kwargs"}}
+        policy_kwargs_base = algo_conf.get("policy_kwargs", None)
 
-        policy_kwargs = algo_conf.get("policy_kwargs", None)
-        algo_kwargs   = {k: v for k, v in algo_conf.items()
-                         if k not in {"_target_", "name", "policy", "policy_kwargs"}}
+        # ── Architecture loop ──────────────────────────────────────────────
+        for arch_tag in selected_architectures:
+            # Fresh copies per arch so mutations don't bleed across iterations
+            policy_kwargs = dict(policy_kwargs_base) if policy_kwargs_base else None
+            algo_kwargs   = dict(algo_kwargs_base)
 
-        extractor_tag = "mlp"  # default for non-MultiInputPolicy
-        if policy == "MultiInputPolicy":
-            if policy_kwargs is None:
-                policy_kwargs = {}
+            extractor_tag = "mlp"  # default for non-MultiInputPolicy
+            if policy == "MultiInputPolicy":
+                if policy_kwargs is None:
+                    policy_kwargs = {}
 
-            # ── Architecture selection ────────────────────────────────────────
-            # Priority order:
-            #   1. +architecture=<tag>  CLI/menu override  (light | slim | peak)
-            #   2. use_light_extractor / use_full_peak flags in the algo YAML
-            #   3. Hardcoded default: slim
-            #
-            # Architectures:
-            #   light → LightCombinedExtractor  ~18K params   no channel split, fast
-            #   slim  → SlimPEAKExtractor        ~77K params   channel split, no SEBlock
-            #   peak  → PEAKExtractor            ~922K params  full SEBlock + deep branch
-            arch_override = str(cfg.get("architecture", "") or "").strip().lower()
+                # Architectures:
+                #   light → LightCombinedExtractor  ~18K params  no channel split, fast
+                #   slim  → SlimPEAKExtractor        ~77K params  channel split, no SEBlock
+                #   peak  → PEAKExtractor            ~922K params full SEBlock + deep branch
+                if arch_tag == "light":
+                    policy_kwargs["features_extractor_class"] = LightCombinedExtractor
+                    extractor_tag = "light"
+                    print("[ARCH] light — LightCombinedExtractor (~18K params)")
+                elif arch_tag == "peak":
+                    policy_kwargs["features_extractor_class"] = PEAKExtractor
+                    policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
+                    extractor_tag = "peak"
+                    print("[ARCH] peak  — PEAKExtractor (~922K params)")
+                else:  # slim (default)
+                    policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
+                    policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
+                    extractor_tag = "slim"
+                    print("[ARCH] slim  — SlimPEAKExtractor (~77K params)")
 
-            if arch_override == "light":
-                use_light = True
-                use_peak  = False
-            elif arch_override == "peak":
-                use_light = False
-                use_peak  = True
-            elif arch_override == "slim":
-                use_light = False
-                use_peak  = False
-            else:
-                # Fall back to YAML flags; default to slim if neither flag is set
-                use_light = bool(algo_conf.get("use_light_extractor", False))
-                use_peak  = bool(algo_conf.get("use_full_peak",       False))
+            if policy_kwargs and "activation_fn" in policy_kwargs:
+                act_fn = policy_kwargs["activation_fn"]
+                if isinstance(act_fn, str):
+                    activation_fn_map = {
+                        "ReLU": torch.nn.ReLU, "Tanh": torch.nn.Tanh,
+                        "LeakyReLU": torch.nn.LeakyReLU, "ELU": torch.nn.ELU, "GELU": torch.nn.GELU,
+                    }
+                    policy_kwargs["activation_fn"] = activation_fn_map.get(act_fn, torch.nn.ReLU)
 
-            if use_light:
-                policy_kwargs["features_extractor_class"] = LightCombinedExtractor
-                extractor_tag = "light"
-                print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
-            elif use_peak:
-                policy_kwargs["features_extractor_class"] = PEAKExtractor
-                policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
-                extractor_tag = "peak"
-                print("[INFO] Using PEAKExtractor (~922K params, full architecture).")
-            else:
-                policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
-                policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
-                extractor_tag = "slim"
-                print("[INFO] Using SlimPEAKExtractor (~77K params, channel split, no SEBlock).")
+            if policy_kwargs is not None:
+                algo_kwargs["policy_kwargs"] = policy_kwargs
 
-        if policy_kwargs and "activation_fn" in policy_kwargs:
-            act_fn = policy_kwargs["activation_fn"]
-            if isinstance(act_fn, str):
-                activation_fn_map = {
-                    "ReLU": torch.nn.ReLU, "Tanh": torch.nn.Tanh,
-                    "LeakyReLU": torch.nn.LeakyReLU, "ELU": torch.nn.ELU, "GELU": torch.nn.GELU,
-                }
-                policy_kwargs["activation_fn"] = activation_fn_map.get(act_fn, torch.nn.ReLU)
+            for persona in selected_personas:
+                env_kwargs = base_env_kwargs.copy()
+                env_kwargs['persona'] = persona
 
-        if policy_kwargs is not None:
-            algo_kwargs["policy_kwargs"] = policy_kwargs
-
-        for persona in selected_personas:
-            env_kwargs = base_env_kwargs.copy()
-            env_kwargs['persona'] = persona
-
-            active_reward_fn = None
-            if hasattr(reward_module, persona):
-                active_reward_fn = getattr(reward_module, persona)
-                print(f"[INFO] Loaded reward persona: {persona}")
-            else:
-                print(f"[WARNING] Persona '{persona}' not found! Using default.")
-                active_reward_fn = reward_module.default
-
-            def make_env(render_mode=None):
-                """
-                Factory that returns an _init callable.
-                render_mode overrides base_env_kwargs['render_mode'] so the
-                visualisation callback can request rgb_array independently.
-                """
-                kw = env_kwargs.copy()
-                if render_mode is not None:
-                    kw['render_mode'] = render_mode
-                def _init():
-                    return GameEnv(game_cls, reward_fn=active_reward_fn, **kw)
-                return _init
-
-            n_envs = int(cfg.get("n_envs", 1))
-            if n_envs > 1:
-                raw_env = SubprocVecEnv([make_env() for _ in range(n_envs)])
-            else:
-                raw_env = DummyVecEnv([make_env()])
-
-            env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
-
-            def make_monitored_env(render_mode=None):
-                """Factory that wraps the env with Monitor for proper eval logging."""
-                kw = env_kwargs.copy()
-                if render_mode is not None:
-                    kw['render_mode'] = render_mode
-                def _init():
-                    return Monitor(GameEnv(game_cls, reward_fn=active_reward_fn, **kw))
-                return _init
-
-            eval_raw_env = DummyVecEnv([make_monitored_env()])
-            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
-            eval_env.training = False
-            eval_env.norm_reward = False
-
-            for skill, total_timesteps in selected_skills.items():
-                run_count += 1
-                tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
-                os.makedirs(tb_dir, exist_ok=True)
-
-                log_name = f"training_log_{game_name}_{persona}.csv"
-                csv_dir = repo_root / "csv"
-                csv_dir.mkdir(parents=True, exist_ok=True)
-                csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
-
-                is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
-
-                # Build a unique run ID that includes the extractor tag
-                # Format: {game}_{algo}_{persona}_{skill}_{extractor}
-                run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
-
-                if is_recurrent_model:
-                    eval_cb = RecurrentEvalCallback(
-                        eval_env,
-                        best_model_save_path=str(models_dir / "best" / run_id),
-                        log_path=str(models_dir / "eval_logs" / run_id),
-                        eval_freq=eval_freq, n_eval_episodes=5,
-                        deterministic=True, render=False, verbose=1,
-                    )
+                active_reward_fn = None
+                if hasattr(reward_module, persona):
+                    active_reward_fn = getattr(reward_module, persona)
+                    print(f"[INFO] Loaded reward persona: {persona}")
                 else:
-                    eval_cb = EvalCallback(
-                        eval_env,
-                        best_model_save_path=str(models_dir / "best" / run_id),
-                        log_path=str(models_dir / "eval_logs" / run_id),
-                        eval_freq=eval_freq,
-                        deterministic=True, render=False,
+                    print(f"[WARNING] Persona '{persona}' not found! Using default.")
+                    active_reward_fn = reward_module.default
+
+                def make_env(render_mode=None):
+                    """
+                    Factory that returns an _init callable.
+                    render_mode overrides base_env_kwargs['render_mode'] so the
+                    visualisation callback can request rgb_array independently.
+                    """
+                    kw = env_kwargs.copy()
+                    if render_mode is not None:
+                        kw['render_mode'] = render_mode
+                    def _init():
+                        return GameEnv(game_cls, reward_fn=active_reward_fn, **kw)
+                    return _init
+
+                n_envs = int(cfg.get("n_envs", 1))
+                if n_envs > 1:
+                    raw_env = SubprocVecEnv([make_env() for _ in range(n_envs)])
+                else:
+                    raw_env = DummyVecEnv([make_env()])
+
+                env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+
+                def make_monitored_env(render_mode=None):
+                    """Factory that wraps the env with Monitor for proper eval logging."""
+                    kw = env_kwargs.copy()
+                    if render_mode is not None:
+                        kw['render_mode'] = render_mode
+                    def _init():
+                        return Monitor(GameEnv(game_cls, reward_fn=active_reward_fn, **kw))
+                    return _init
+
+                eval_raw_env = DummyVecEnv([make_monitored_env()])
+                eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+                eval_env.training = False
+                eval_env.norm_reward = False
+
+                for skill, total_timesteps in selected_skills.items():
+                    run_count += 1
+                    tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
+                    os.makedirs(tb_dir, exist_ok=True)
+
+                    log_name = f"training_log_{game_name}_{persona}.csv"
+                    csv_dir = repo_root / "csv"
+                    csv_dir.mkdir(parents=True, exist_ok=True)
+                    csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
+
+                    is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
+
+                    # Build a unique run ID that includes the extractor tag
+                    # Format: {game}_{algo}_{persona}_{skill}_{extractor}
+                    run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
+
+                    if is_recurrent_model:
+                        eval_cb = RecurrentEvalCallback(
+                            eval_env,
+                            best_model_save_path=str(models_dir / "best" / run_id),
+                            log_path=str(models_dir / "eval_logs" / run_id),
+                            eval_freq=eval_freq, n_eval_episodes=5,
+                            deterministic=True, render=False, verbose=1,
+                        )
+                    else:
+                        eval_cb = EvalCallback(
+                            eval_env,
+                            best_model_save_path=str(models_dir / "best" / run_id),
+                            log_path=str(models_dir / "eval_logs" / run_id),
+                            eval_freq=eval_freq,
+                            deterministic=True, render=False,
+                        )
+
+                    ckpt_cb = CheckpointCallback(
+                        save_freq=save_freq,
+                        save_path=str(models_dir / "checkpoints"),
+                        name_prefix=run_id,
                     )
 
-                ckpt_cb = CheckpointCallback(
-                    save_freq=save_freq,
-                    save_path=str(models_dir / "checkpoints"),
-                    name_prefix=run_id,
-                )
+                    # Wrap eval_cb: saves vecnorm + opens pygame preview on each new best
+                    _best_path = models_dir / "best" / run_id
+                    eval_cb = EvalPreviewCallback(
+                        eval_cb              = eval_cb,
+                        vecnorm_env          = env,
+                        best_model_save_path = _best_path,
+                        make_env_fn          = make_env,
+                        repo_root            = repo_root,
+                        fps                  = viz_fps,
+                        n_preview_episodes   = viz_preview_episodes if viz_enabled else 0,
+                        verbose              = 1,
+                    )
+                    if viz_enabled:
+                        print("[INFO] Preview ON — window opens on each new best.")
 
-                # Wrap eval_cb: saves vecnorm + opens pygame preview on each new best
-                _best_path = models_dir / "best" / run_id
-                eval_cb = EvalPreviewCallback(
-                    eval_cb              = eval_cb,
-                    vecnorm_env          = env,
-                    best_model_save_path = _best_path,
-                    make_env_fn          = make_env,
-                    repo_root            = repo_root,
-                    fps                  = viz_fps,
-                    n_preview_episodes   = viz_preview_episodes if viz_enabled else 0,
-                    verbose              = 1,
-                )
-                if viz_enabled:
-                    print("[INFO] Preview ON — window opens on each new best.")
+                    current_callbacks = [eval_cb, ckpt_cb, csv_logger]
 
-                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
+                    train_kwargs = dict(algo_kwargs)
+                    train_kwargs["tensorboard_log"] = tb_dir
+                    train_kwargs["device"] = device
 
-                train_kwargs = dict(algo_kwargs)
-                train_kwargs["tensorboard_log"] = tb_dir
-                train_kwargs["device"] = device
+                    model = Algo(policy, env, **train_kwargs)
+                    tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
 
-                model = Algo(policy, env, **train_kwargs)
-                tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
+                    model.learn(
+                        total_timesteps=int(total_timesteps),
+                        callback=current_callbacks,
+                        tb_log_name=tb_run_name,
+                        progress_bar=True,
+                    )
 
-                model.learn(
-                    total_timesteps=int(total_timesteps),
-                    callback=current_callbacks,
-                    tb_log_name=tb_run_name,
-                    progress_bar=True,
-                )
+                    filename = f"{run_id}.zip"
+                    save_path = models_dir / filename
+                    model.save(save_path)
 
-                filename = f"{run_id}.zip"
-                save_path = models_dir / filename
-                model.save(save_path)
+                    norm_path = models_dir / f"{run_id}_vecnorm.pkl"
+                    env.save(str(norm_path))
 
-                norm_path = models_dir / f"{run_id}_vecnorm.pkl"
-                env.save(str(norm_path))
+                    # Write model_info.json alongside best_model.zip so metadata
+                    # is readable without parsing the folder name
+                    import json as _json, datetime as _dt
+                    _best_path.mkdir(parents=True, exist_ok=True)
+                    (_best_path / "model_info.json").write_text(_json.dumps({
+                        "game":      game_name,
+                        "algo":      model_name,
+                        "persona":   persona,
+                        "skill":     str(skill).lower(),
+                        "extractor": extractor_tag,
+                        "trained":   _dt.datetime.now().isoformat(timespec="seconds"),
+                        "timesteps": int(total_timesteps),
+                    }, indent=2))
 
-                # Write model_info.json alongside best_model.zip so metadata
-                # is readable without parsing the folder name
-                import json as _json, datetime as _dt
-                _best_path.mkdir(parents=True, exist_ok=True)
-                (_best_path / "model_info.json").write_text(_json.dumps({
-                    "game":      game_name,
-                    "algo":      model_name,
-                    "persona":   persona,
-                    "skill":     str(skill).lower(),
-                    "extractor": extractor_tag,
-                    "trained":   _dt.datetime.now().isoformat(timespec="seconds"),
-                    "timesteps": int(total_timesteps),
-                }, indent=2))
+                    print(f"[{run_count}] saved → {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
+                    print(f"       VecNorm → {norm_path}  (required for watch_agent.py)")
+                    print(f"       Extractor tag: [{extractor_tag}]")
 
-                print(f"[{run_count}] saved → {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
-                print(f"       VecNorm → {norm_path}  (required for watch_agent.py)")
-                print(f"       Extractor tag: [{extractor_tag}]")
+                try:
+                    env.close()
+                    eval_env.close()
+                except Exception:
+                    pass
 
-            try:
-                env.close()
-                eval_env.close()
-            except Exception:
-                pass
+        # end for arch_tag
 
     print(f"Done. Trained {run_count} models for game='{game_name}'. Models at: {models_dir}")
 
