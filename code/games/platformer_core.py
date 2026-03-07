@@ -113,7 +113,7 @@ class DijkstraSolver:
                 if dy < 0:          # moving UP — requires a jump
                     step_cost = 3.5
                 elif dy > 0:        # moving DOWN — gravity-assisted
-                    step_cost = 1.2
+                    step_cost = 1.5
                 else:               # horizontal
                     step_cost = 2.0
 
@@ -130,11 +130,11 @@ class DijkstraSolver:
 
                 # --- Ground-proximity discount (independent if-checks, not elif) ---
                 if ny + 1 < self.rows and self.grid[ny + 1][nx] in SOLID:
-                    step_cost -= 0.6
+                    step_cost -= 1.0
                 if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
-                    step_cost -= 0.25
+                    step_cost -= 0.5
                 if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
-                    step_cost -= 0.1
+                    step_cost -= 0.25
 
                 # --- Floating-tile penalty for upward steps ---
                 # If moving up and there is no solid surface within jump height
