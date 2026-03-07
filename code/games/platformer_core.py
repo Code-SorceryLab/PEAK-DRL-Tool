@@ -236,6 +236,9 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
+        # random_start_world: pick a uniformly random level at each episode reset
+        # so training time is spread equally across all levels regardless of win rate.
+        self.random_start_world = bool(kwargs.pop("random_start_world", True))
         self.world = str(kwargs.pop("world", "1-1")).lower()
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
@@ -543,14 +546,19 @@ class PlatformerCore(gymnasium.Env):
         if self.locked_level:
             self.world = self.locked_level
             # Keep current_index_world consistent
-            lo_lower = [l.lower() for l in self.level_order]
-            if self.locked_level.lower() in lo_lower:
-                self.current_index_world = lo_lower.index(self.locked_level.lower())
+            if self.locked_level in self.level_order:
+                self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
         else:
-            self.current_index_world = 0
-            self.world = self.level_order[self.current_index_world]
+            if self.level_order:
+                if self.random_start_world and len(self.level_order) > 1:
+                    # Uniform random — ensures every level gets equal training time
+                    # even when the agent rarely wins (so complete_level() never fires)
+                    self.current_index_world = random.randint(0, len(self.level_order) - 1)
+                else:
+                    self.current_index_world = 0
+                self.world = self.level_order[self.current_index_world]
         self.load_level()
         return self._obs(), self._info()
 
@@ -561,32 +569,6 @@ class PlatformerCore(gymnasium.Env):
         self.reached_goal = False
 
         config = self.config_manager.get_level_config(self.world)
-
-        # Guard: if the level has no 'file' entry, fall back to the first valid level
-        if not config.get('file', ''):
-            level_order = self.config_manager.get_level_order()
-            fallback = next(
-                (lid for lid in level_order
-                 if self.config_manager.get_level_config(lid).get('file', '')),
-                None
-            )
-            if fallback:
-                resolved = self.config_manager._resolve_level_id(self.world)
-                if resolved != self.world:
-                    # The ID was just a casing mismatch — update world to the real key
-                    self.world = resolved
-                    config = self.config_manager.get_level_config(self.world)
-                else:
-                    print(f"[PlatformerCore] Warning: Level '{self.world}' has no 'file' in config. "
-                          f"Falling back to '{fallback}'.")
-                    self.world = fallback
-                    config = self.config_manager.get_level_config(self.world)
-            else:
-                raise RuntimeError(
-                    f"[PlatformerCore] Level '{self.world}' has no 'file' in game_config.yaml. "
-                    f"Add a 'file:' field to the level config."
-                )
-
         self.level_data = self.loader.load_level(config)
 
         # Clear any fireballs from the previous level — they belong to the old

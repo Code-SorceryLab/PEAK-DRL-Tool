@@ -9,12 +9,26 @@ from ..Parameters import Jump_parameters as JP
 class ConfigManager:
     def __init__(self, config_filename="game_config.yaml"):
         # Go up 3 levels: System -> modules -> games -> [Root]
-        base_dir = os.path.dirname(os.path.abspath(__file__)) # System
-        modules_dir = os.path.dirname(base_dir) # modules
-        games_dir = os.path.dirname(modules_dir) # games
-        full_path = os.path.join(games_dir, config_filename)
-        
-        self.yaml_data = self._load_yaml(full_path)
+        base_dir  = os.path.dirname(os.path.abspath(__file__)) # System
+        modules_dir = os.path.dirname(base_dir)                # modules
+        games_dir   = os.path.dirname(modules_dir)             # games
+        repo_root   = os.path.dirname(os.path.dirname(games_dir))  # repo root
+
+        # Search order: games/, repo root, cwd, cwd/code/games/
+        # Robust against subprocess spawn (Windows) where cwd may differ.
+        search_paths = [
+            os.path.join(games_dir,  config_filename),
+            os.path.join(repo_root,  config_filename),
+            os.path.join(os.getcwd(), config_filename),
+            os.path.join(os.getcwd(), "code", "games", config_filename),
+            config_filename,   # bare name → cwd
+        ]
+        full_path = next((p for p in search_paths if os.path.isfile(p)), None)
+        if full_path is None:
+            print(f"[ConfigManager] WARNING: '{config_filename}' not found in any search path. "
+                  f"Checked: {search_paths}")
+
+        self.yaml_data = self._load_yaml(full_path) if full_path else {}
         
         # Base Configuration (Layer 3: The Python Constants)
         self.base_config = {
@@ -45,29 +59,30 @@ class ConfigManager:
         }
 
     def _load_yaml(self, path):
-        if not os.path.exists(path):
-             # Try current working directory as fallback
-             if os.path.exists("game_config.yaml"):
-                 path = "game_config.yaml"
-             else:
-                 print(f"Warning: Config file {path} not found! Using code defaults.")
-                 return {}
-        with open(path, 'r') as f:
-            try:
-                return yaml.safe_load(f) or {}
-            except yaml.YAMLError as exc:
-                print(f"Error parsing YAML: {exc}")
-                return {}
+        if not path or not os.path.isfile(path):
+            print(f"[ConfigManager] Warning: Config file not found: {path!r}. Using code defaults.")
+            return {}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+            if not data.get('levels'):
+                print(f"[ConfigManager] Warning: No 'levels' found in {path}. Check game_config.yaml.")
+            return data
+        except yaml.YAMLError as exc:
+            print(f"[ConfigManager] YAML parse error in {path}: {exc}")
+            return {}
+        except Exception as exc:
+            print(f"[ConfigManager] Failed to read {path}: {exc}")
+            return {}
 
     def _resolve_level_id(self, level_id):
-        """Case-insensitive lookup of a level ID in the YAML levels dict.
-        Returns the actual key as stored in the config, or the original if not found."""
+        """Case-insensitive lookup — returns actual YAML key or original if not found."""
         levels = self.yaml_data.get('levels') or {}
         if level_id in levels:
             return level_id
         lower = level_id.lower()
         for key in levels:
-            if key.lower() == lower:
+            if str(key).lower() == lower:
                 return key
         return level_id
 
