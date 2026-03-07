@@ -4,7 +4,7 @@ from .GameObject import GameObject
 import pygame
 from typing import Dict, List, Any, Optional
 from enum import Enum, auto
-
+import numpy as np
 # Imports from sibling packages
 from ..Parameters import Movement_parameters as MP
 from ..Parameters import Jump_parameters as JP
@@ -312,3 +312,54 @@ class Player():
             (int(sx + self.gObj.width / 2), int(sy + self.gObj.height / 2)),
             v_end, 2
         )
+        
+    def obs_vector(self, max_run_speed: float, max_fall_speed: float) -> np.ndarray:
+        """
+        Returns a flat float32 array of all player state relevant to the obs.
+
+        Designed to be called by platformer_core._player_obs() so the obs
+        construction always stays in sync with the Player fields.
+
+        Layout (13 values):
+        [0]  x position          in tiles, unbounded (consistent across all level sizes)
+        [1]  y position          in tiles, unbounded (consistent across all level sizes)
+        [2]  velocity x          normalised [-1, 1]
+        [3]  velocity y          normalised [-1, 1]
+        [4]  on_ground           binary {0, 1}
+        [5]  powered_up          binary {0, 1}  (SUPER or FIRE state)
+        [6]  can_fire            binary {0, 1}  (FIRE state specifically)
+        [7]  invincible          binary {0, 1}  (star or i-frames active)
+        [8]  facing_right        binary {0, 1}
+        [9]  fire_cooldown       normalised [0, 1]  (0 = ready, 1 = just fired)
+        [10] invincible_timer    normalised [0, 1]  (fraction of max star duration)
+        [11] coyote_active       binary {0, 1}  (can still jump after walking off edge)
+        [12] jump_extendable     binary {0, 1}  (variable jump still accepting hold)
+        """
+
+        state = self.power_machine.state
+        is_fire       = (state == PowerState.FIRE)
+        is_powered_up = self.powered_up                         # True for SUPER and FIRE
+        is_invincible = self.invincible_timer > 0.0
+
+        # Cooldown fraction: 1.0 = just fired (full cooldown), 0.0 = ready to fire
+        cooldown_frac = np.clip(self._fire_cooldown / max(_FIRE_COOLDOWN, 1e-6), 0.0, 1.0)
+
+        # Star timer normalised — 10 s is the typical max star duration
+        _MAX_STAR = 10.0
+        inv_frac = np.clip(self.invincible_timer / _MAX_STAR, 0.0, 1.0)
+
+        return np.array([
+            self.gObj.x,                           # [0]  x pos in tiles
+            self.gObj.y,                           # [1]  y pos in tiles
+            np.clip(self.vx / max_run_speed,  -1.0,  1.0),    # [2]  vx
+            np.clip(self.vy / max_fall_speed, -1.0,  1.0),    # [3]  vy
+            1.0 if self.on_ground    else 0.0,                 # [4]  on_ground
+            1.0 if is_powered_up     else 0.0,                 # [5]  powered_up
+            1.0 if is_fire           else 0.0,                 # [6]  can_fire
+            1.0 if is_invincible     else 0.0,                 # [7]  invincible
+            1.0 if self.facing_right else 0.0,                 # [8]  facing_right
+            cooldown_frac,                                     # [9]  fire_cooldown
+            inv_frac,                                          # [10] invincible_timer
+            1.0 if self.coyote > 0   else 0.0,                 # [11] coyote_active
+            1.0 if self.jump_hold > 0 else 0.0,               # [12] jump_extendable
+        ], dtype=np.float32)

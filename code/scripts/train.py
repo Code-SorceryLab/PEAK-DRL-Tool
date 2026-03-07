@@ -141,29 +141,40 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
     Observation space
     -----------------
-      grids  : Box(-1, 1, shape=(5, H, W))
-                 ch 0  — Player        binary {0,1}
-                 ch 1  — Solids        binary {0,1}
-                 ch 2  — Collectibles  binary {0,1}
-                 ch 3  — Hazards       binary {0,1}
-                 ch 4  — Dijkstra      continuous [-1, 1]
-      scalars: Box(-inf, inf, shape=(12,))
+      grids  : Box(-1, 1, shape=(4, H, W))
+                 ch 0  — Solids        binary {0, 1}  (ground, platforms, qblocks)
+                 ch 1  — Collectibles  value-encoded  {0.0, 0.35, 0.69, 1.0}
+                                       coin=0.35 / powerup=0.69 / goal=1.0
+                 ch 2  — Hazards       sign-encoded   {-1.0, 0.0, +1.0}
+                                       spike=-1.0 (always lethal) / enemy=+1.0 (defeatable)
+                 ch 3  — Dijkstra      continuous [-1, 1]  (relative advantage map)
+      scalars: Box(-inf, inf, shape=(20,))
+               Player=13 (from obs_vector) + Tracking=7 (from _tracking_obs)
 
     Architecture
     ------------
-    Branch A  Semantic CNN  (ch 0-3, 4×H×W)
-              Conv(4→32, k=3) → GroupNorm(8,32) → ReLU → SEBlock(32)
+    Branch A  Semantic CNN  (ch 0-2, 3×H×W)
+              Conv(3→32, k=3) → GroupNorm(8,32) → ReLU → SEBlock(32)
               Conv(32→64, k=3) → GroupNorm(16,64) → ReLU
               Conv(64→64, k=3) → GroupNorm(16,64) → ReLU
               AdaptiveAvgPool(4×4) → Flatten(1024) → Linear(1024→256) → LayerNorm → ReLU
 
-    Branch B  Dijkstra CNN  (ch 4, 1×H×W)
-              Conv(1→16, k=3) → GroupNorm(4,16) → ReLU
-              Conv(16→32, k=3) → GroupNorm(8,32) → ReLU
-              AdaptiveAvgPool(3×3) → Flatten(288) → Linear(288→64) → LayerNorm → ReLU
+    Branch B  Dijkstra CNN  (ch 3, 1×H×W)
+              Conv(1→8,  k=3) → GroupNorm(4,8)  → ReLU
+              AvgPool2d(3)                          [21×21 → 7×7, preserves gradient]
+              Conv(8→16, k=3) → GroupNorm(4,16) → ReLU
+              AdaptiveAvgPool(3×3) → Flatten(144) → Linear(144→64) → LayerNorm → ReLU
 
-    Branch C  Scalar MLP   (12,)
-              Linear(12→64) → LayerNorm → ReLU
+              Why AvgPool over MaxPool for Dijkstra:
+              The Dijkstra channel is a smooth continuous gradient [-1, 1].
+              MaxPool would select the peak value in each 2×2 window, artificially
+              dilating the path and destroying the slope. AvgPool acts as a gentle
+              blur, preserving the physical shape of the distance gradient so the
+              second conv can learn directional patterns ("gradient pointing right")
+              before the final adaptive pool collapses to a compact summary.
+
+    Branch C  Scalar MLP   (20,)
+              Linear(20→64) → LayerNorm → ReLU
               Linear(64→64) → LayerNorm → ReLU
 
     Fusion    Cat(256+64+64=384) → Linear(384→256) → LayerNorm → ReLU
@@ -178,20 +189,20 @@ class PEAKExtractor(BaseFeaturesExtractor):
 
     SEBlock retained in Branch A: channel attention helps the network
     suppress irrelevant semantic channels per-frame (e.g. collectible
-    channel when no coins are visible).
+    channel when no coins are visible, hazard channel when no enemies nearby).
     """
 
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 256):
         super().__init__(observation_space, features_dim=features_dim)
 
-        grid_shape   = observation_space["grids"].shape    # (5, H, W)
-        scalar_shape = observation_space["scalars"].shape  # (12,)
+        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        scalar_shape = observation_space["scalars"].shape  # (20,)
 
-        n_channels = grid_shape[0]    # 5
-        n_scalars  = scalar_shape[0]  # 12
+        n_channels = grid_shape[0]    # 4
+        n_scalars  = scalar_shape[0]  # 20 — read dynamically, not hardcoded
         H, W       = grid_shape[1], grid_shape[2]
 
-        n_semantic = n_channels - 1   # 4 (all except Dijkstra)
+        n_semantic = n_channels - 1   # 3 (all except Dijkstra)
 
         # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
         self.semantic_cnn = nn.Sequential(
@@ -218,15 +229,20 @@ class PEAKExtractor(BaseFeaturesExtractor):
         )
 
         # ── Branch B: Dijkstra CNN (last channel only) ───────────────────────
+        # Staged reduction: 21×21 → 7×7 → 3×3
+        # AvgPool2d(3) at first reduction preserves the smooth gradient slope.
+        # MaxPool would select peak values per patch, dilating the path signal
+        # and destroying the directional continuity the second conv needs to read.
         self.dijkstra_cnn = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 16),
+            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 8),             # 8 ch / 4 groups = 2 ch per group
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(8, 32),
+            nn.AvgPool2d(3),                # 21×21 → 7×7 (smooth, gradient-preserving)
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 16),            # 16 ch / 4 groups = 4 ch per group
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),   # any H×W → 3×3
-            nn.Flatten()                    # 32×3×3 = 288
+            nn.AdaptiveAvgPool2d((3, 3)),   # 7×7 → 3×3 (final compact summary)
+            nn.Flatten()                    # 16×3×3 = 144
         )
         with torch.no_grad():
             dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
@@ -257,15 +273,62 @@ class PEAKExtractor(BaseFeaturesExtractor):
         self._features_dim = features_dim
 
     def forward(self, observations: dict) -> torch.Tensor:
-        grids   = observations["grids"]    # (B, 5, H, W)
-        scalars = observations["scalars"]  # (B, 12)
+        grids   = observations["grids"]    # (B, 4, H, W)
+        scalars = observations["scalars"]  # (B, 20)
 
-        # ch 0-3: semantic binary channels  |  ch 4: Dijkstra continuous
+        # ch 0-2: semantic channels  |  ch 3: Dijkstra continuous
         sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))   # (B, 256)
         dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))   # (B,  64)
         scal = self.scalar_mlp(scalars)                                    # (B,  64)
 
         return self.fusion(torch.cat([sem, dij, scal], dim=1))             # (B, 256)
+
+
+# =========================================================================
+# SpatialSelfAttention — lightweight spatial attention block
+# =========================================================================
+class SpatialSelfAttention(nn.Module):
+    """
+    Applies multi-head self-attention across spatial positions of a feature map.
+
+    Input:  (B, C, H, W)
+    Output: (B, C, H, W)  — same shape, residual connection included
+
+    Steps:
+      1. Flatten spatial dims → (B, H*W, C)  [each pixel = one token]
+      2. LayerNorm → MultiheadAttention       [tokens attend to each other]
+      3. Residual add                         [preserves CNN features]
+      4. Reshape back → (B, C, H, W)
+
+    Kept lightweight intentionally:
+      - num_heads=2, operates on C=16 after first conv+pool
+      - No FF sublayer (that's the job of the next Conv2d)
+      - batch_first=True requires PyTorch >= 1.9
+    """
+    def __init__(self, channels: int, num_heads: int = 2):
+        super().__init__()
+        self.norm  = nn.LayerNorm(channels)
+        self.attn  = nn.MultiheadAttention(
+            embed_dim   = channels,
+            num_heads   = num_heads,
+            batch_first = True,
+            bias        = True,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, C, H, W = x.shape
+
+        # (B, C, H, W) → (B, H*W, C)
+        tokens = x.permute(0, 2, 3, 1).reshape(B, H * W, C)
+
+        normed = self.norm(tokens)
+        attended, _ = self.attn(normed, normed, normed)
+
+        # Residual — keeps the CNN's local features intact
+        tokens = tokens + attended
+
+        # (B, H*W, C) → (B, C, H, W)
+        return tokens.reshape(B, H, W, C).permute(0, 3, 1, 2).contiguous()
 
 
 # =========================================================================
@@ -282,43 +345,74 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
 
     Observation space
     -----------------
-      grids  : Box(-1, 1, shape=(5, 11, 11))
-                 ch 0  — Player        binary {0,1}
-                 ch 1  — Solids        binary {0,1}  (ground, platforms, qblocks)
-                 ch 2  — Collectibles  binary {0,1}
-                 ch 3  — Hazards       binary {0,1}
-                 ch 4  — Dijkstra      continuous [-1, 1]  ← separated branch
+      grids  : Box(-1, 1, shape=(4, H, W))
+                 ch 0  — Solids        binary {0, 1}  (ground, platforms, qblocks)
+                 ch 1  — Collectibles  value-encoded  {0.0, 0.35, 0.69, 1.0}
+                                       coin=0.35 / powerup=0.69 / goal=1.0
+                 ch 2  — Hazards       sign-encoded   {-1.0, 0.0, +1.0}
+                                       spike=-1.0 (always lethal) / enemy=+1.0 (defeatable)
+                 ch 3  — Dijkstra      continuous [-1, 1]  ← separated branch
+      scalars: Box(-inf, inf, shape=(20,))
+               Player=13 (from obs_vector) + Tracking=7 (from _tracking_obs)
 
-    Branch A  Semantic CNN  (ch 0-3, 4×11×11)
-              Conv(4→16, k=3, pad=1) → ReLU
-              MaxPool(2)                          [11×11 → 5×5]
-              Conv(16→32, k=3, pad=1) → ReLU
-              AdaptiveAvgPool(3×3)                [5×5  → 3×3]
-              Flatten(288) → Linear(288→128) → ReLU
+    Architecture
+    ------------
+    Branch A  Semantic CNN + Spatial Attention  (ch 0-2, 3×H×W)
+              Conv(3→16, k=3, pad=1) → GroupNorm(4,16) → ReLU
+              MaxPool(2)                          [21×21 → 10×10]
+              SpatialSelfAttention(16, heads=2)  [tokens attend across 10×10]
+              Conv(16→32, k=3, pad=1) → GroupNorm(8,32) → ReLU
+              AdaptiveAvgPool(3×3)                [10×10 → 3×3]
+              Flatten(288) → Linear(288→128) → LayerNorm → ReLU
 
-    Branch B  Dijkstra CNN  (ch 4, 1×11×11)
-              Conv(1→16, k=3, pad=1) → ReLU
-              AdaptiveAvgPool(3×3)                [11×11 → 3×3]
-              Flatten(144) → Linear(144→32) → ReLU
+    Branch B  Dijkstra CNN  (ch 3, 1×H×W)
+              Conv(1→8,  k=3, pad=1) → GroupNorm(4,8)  → ReLU
+              AvgPool2d(3)                          [21×21 → 7×7]
+              Conv(8→16, k=3, pad=1) → GroupNorm(4,16) → ReLU
+              AdaptiveAvgPool(3×3)                  [7×7 → 3×3]
+              Flatten(144) → Linear(144→32) → LayerNorm → ReLU
 
-    Branch C  Scalar MLP   (12,)
-              Linear(12→64) → ReLU
+              Why AvgPool2d (not MaxPool2d) for Dijkstra:
+              The Dijkstra channel is a smooth continuous gradient [-1, 1].
+              MaxPool selects the peak value in each patch, which artificially
+              dilates the path and destroys the slope of the distance gradient.
+              AvgPool blurs gently, preserving the spatial structure so the second
+              conv can learn directional patterns ("gradient flows right") before
+              AdaptiveAvgPool compresses to a compact 3×3 summary.
 
-    Fusion    Cat(128+32+64=224) → Linear(224→128) → ReLU
+              The staged reduction (21→7→3) also avoids the 49× one-shot
+              compression of the original single-pool design, giving both conv
+              layers real spatial extent to learn from.
+
+    Branch C  Scalar MLP   (20,)
+              Linear(20→64) → LayerNorm → ReLU
+
+    Fusion    Cat(128+32+64=224) → Linear(224→128) → LayerNorm → ReLU
               → features_dim = 128
 
     Parameter count:
-      Branch A CNN:  ~5K   (vs 646K in full PEAK)
-      Branch A FC:   ~37K
-      Branch B:      ~5K   (vs 39K in full PEAK)
-      Scalar MLP:    ~1K
-      Fusion:        ~29K
-      Total:         ~77K  (vs 922K PEAK, vs 18K Light)
+      Branch A CNN:   ~5K
+      Branch A Attn:  ~1K   (16*16*3 weights + proj ≈ 1.1K)
+      Branch A FC:    ~37K
+      Branch B:       ~5K   (two conv layers + fc)
+      Scalar MLP:     ~1K
+      Fusion:         ~29K
+      Total:          ~78K
+
+    Why attention after first conv+pool (not before, not after second pool):
+      MaxPool2d(2) reduces 21×21 → 10×10 — still 100 spatial tokens with
+      enough resolution to reason about relative positions. Attention at this
+      stage lets distant tiles influence each other before the second conv and
+      final pool destroy spatial extent. After AdaptiveAvgPool(3×3) it's too
+      late — spatial info is already collapsed to 9 cells.
 
     Keeps what matters:
       ✓ Dijkstra channel isolated from binary semantic channels
       ✓ Dedicated scalar MLP branch
       ✓ Fusion layer before policy head
+      ✓ Spatial self-attention on semantic branch
+      ✓ Staged gradient-preserving reduction for Dijkstra (AvgPool → second conv)
+      ✓ GroupNorm + LayerNorm throughout for RL stability
     Drops what's expensive:
       ✗ SEBlock
       ✗ Deep semantic conv stack (3 conv layers → 2)
@@ -328,30 +422,40 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 128):
         super().__init__(observation_space, features_dim=features_dim)
 
-        grid_shape   = observation_space["grids"].shape    # (5, H, W)
-        scalar_shape = observation_space["scalars"].shape  # (12,)
+        grid_shape   = observation_space["grids"].shape    # (4, H, W)
+        scalar_shape = observation_space["scalars"].shape  # (20,)
 
-        n_channels = grid_shape[0]    # 5
-        n_scalars  = scalar_shape[0]  # 12
-        H, W       = grid_shape[1], grid_shape[2]  # 21,21
+        n_channels = grid_shape[0]    # 4
+        n_scalars  = scalar_shape[0]  # 20 — read dynamically, not hardcoded
+        H, W       = grid_shape[1], grid_shape[2]  # 21, 21
 
         # Number of semantic channels = all except the last (Dijkstra)
-        n_semantic = n_channels - 1   # 4
+        n_semantic = n_channels - 1   # 3
 
-        # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
-        self.semantic_cnn = nn.Sequential(
+        # ── Branch A: Semantic CNN + Spatial Attention ───────────────────────
+        self.sem_conv1 = nn.Sequential(
             nn.Conv2d(n_semantic, 16, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 16),  # GroupNorm with num_groups=4 (1 group per channel) is a lightweight alternative to BatchNorm/SEBlock
+            nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.MaxPool2d(2),                              # 21×21 → 10×10
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(8, 32),  # num_groups=8 for 32 channels
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),                 # 10×10 → 3×3
-            nn.Flatten()                                  # 32×3×3 = 288
+            nn.MaxPool2d(2),          # 21×21 → 10×10
         )
+
+        # Attention operates on the 10×10 feature map (100 tokens of dim 16)
+        self.sem_attn = SpatialSelfAttention(channels=16, num_heads=2)
+
+        self.sem_conv2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(8, 32),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((3, 3)),   # 10×10 → 3×3
+            nn.Flatten()                    # 32×3×3 = 288
+        )
+
         with torch.no_grad():
-            sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
+            _x       = torch.zeros(1, n_semantic, H, W)
+            _x       = self.sem_conv1(_x)
+            _x       = self.sem_attn(_x)
+            sem_flat = self.sem_conv2(_x).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 128),
@@ -359,33 +463,42 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (last channel only) ──────────────────────
+        # ── Branch B: Dijkstra CNN (last channel only) ───────────────────────
+        # Staged reduction: 21×21 → 7×7 → 3×3
+        # First reduction uses AvgPool2d to preserve the smooth gradient slope.
+        # Two conv layers ensure the network can learn directional patterns
+        # ("gradient flows toward the goal") before the final spatial collapse.
         self.dijkstra_cnn = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 16),  # num_groups=4 for 16 channels
+            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 8),             # 8 ch / 4 groups = 2 ch per group
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),                 # 21×21 → 3×3
-            nn.Flatten()                                  # 16×3×3 = 144
+            nn.AvgPool2d(3),                # 21×21 → 7×7  (smooth, preserves gradient)
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
+            nn.GroupNorm(4, 16),            # 16 ch / 4 groups = 4 ch per group
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((3, 3)),   # 7×7 → 3×3  (final compact summary)
+            nn.Flatten()                    # 16×3×3 = 144
         )
+
         with torch.no_grad():
             dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
 
         self.dijkstra_fc = nn.Sequential(
             nn.Linear(dij_flat, 32),
-            nn.LayerNorm(32),
+            nn.LayerNorm(32),               # keeps Dijkstra features on same scale as Branch A+C
             nn.ReLU()
         )
 
         # ── Branch C: Scalar MLP ─────────────────────────────────────────────
         self.scalar_mlp = nn.Sequential(
             nn.Linear(n_scalars, 64),
-            nn.LayerNorm(64),  # num_groups=4 for 64 channels
+            nn.LayerNorm(64),
             nn.ReLU()
         )
 
         # ── Fusion ────────────────────────────────────────────────────────────
         self.fusion = nn.Sequential(
-            nn.Linear(128 + 32 + 64, features_dim),      # 224 → 128
+            nn.Linear(128 + 32 + 64, features_dim),   # 224 → 128
             nn.LayerNorm(features_dim),
             nn.ReLU()
         )
@@ -393,15 +506,22 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         self._features_dim = features_dim
 
     def forward(self, observations: dict) -> torch.Tensor:
-        grids   = observations["grids"]    # (B, 5, H, W)
-        scalars = observations["scalars"]  # (B, 12)
+        grids   = observations["grids"]    # (B, 4, H, W)
+        scalars = observations["scalars"]  # (B, 20)
 
-        # ch 0-3: semantic binary channels  |  ch 4: Dijkstra continuous
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))  # (B, 128)
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))  # (B,  32)
-        scal = self.scalar_mlp(scalars)                                   # (B,  64)
+        # Branch A: conv1 → attention → conv2 → fc
+        x   = self.sem_conv1(grids[:, :-1, :, :])   # (B, 16, 10, 10)
+        x   = self.sem_attn(x)                       # (B, 16, 10, 10)
+        sem = self.semantic_fc(self.sem_conv2(x))    # (B, 128)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))            # (B, 128)
+        # Branch B: Dijkstra — staged AvgPool reduction
+        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))   # (B, 32)
+
+        # Branch C: scalars
+        scal = self.scalar_mlp(scalars)                                    # (B, 64)
+
+        return self.fusion(torch.cat([sem, dij, scal], dim=1))             # (B, 128)
+
 
 # =========================================================================
 # LightCombinedExtractor — fast sweep option (use_light_extractor: true)
@@ -413,17 +533,17 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
     Architecture
     ------------
-    Layer 1:  Conv(5→16) + BatchNorm + ReLU → MaxPool(2)     [11×11 → 5×5]
-    Layer 2:  Depthwise(16) + Pointwise(16→32) + BatchNorm   [5×5  → 5×5]
+    Layer 1:  Conv(n_ch→16) + BatchNorm + ReLU → MaxPool(2)  [21×21 → 10×10]
+    Layer 2:  Depthwise(16) + Pointwise(16→32) + BatchNorm   [10×10 → 10×10]
     Summary:  AdaptiveAvgPool(3×3) → Flatten(288)
     FC:       Linear(288→128) + LayerNorm + ReLU
-    Scalars:  Linear(12→64) + LayerNorm + ReLU
+    Scalars:  Linear(20→64) + LayerNorm + ReLU
     features_dim = 192  (128 grids + 64 scalars)
 
-    NOTE: Does NOT split the Dijkstra channel — all 5 channels share the
-    same conv stack (n_ch is read dynamically from the observation space).
-    Use PEAKExtractor (default) for full training runs where the Dijkstra
-    channel split matters.
+    NOTE: Does NOT split the Dijkstra channel — all 4 channels share the same
+    conv stack (n_ch is read dynamically from the observation space).
+    Use SlimPEAKExtractor (default) or PEAKExtractor for full training runs
+    where the Dijkstra channel split matters.
     ~18K params in grids branch, 3-5× faster CPU inference than PEAKExtractor.
     """
 
@@ -435,14 +555,14 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
         for key, subspace in observation_space.spaces.items():
             if key == "grids":
-                n_ch = subspace.shape[0]  # 5 channels
+                n_ch = subspace.shape[0]  # 4 channels
 
                 # --- Layer 1: standard conv ---
                 l1 = nn.Sequential(
                     nn.Conv2d(n_ch, 16, kernel_size=3, stride=1, padding=1),
                     nn.BatchNorm2d(16),
                     nn.ReLU(),
-                    nn.MaxPool2d(2),          # 11×11 → 5×5
+                    nn.MaxPool2d(2),          # 21×21 → 10×10
                 )
 
                 # --- Layer 2: depthwise + pointwise (MobileNet-style) ---
@@ -454,7 +574,7 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
                 )
 
                 # --- Compact spatial summary ---
-                pool = nn.AdaptiveAvgPool2d((3, 3))   # 5×5 → 3×3
+                pool = nn.AdaptiveAvgPool2d((3, 3))   # 10×10 → 3×3
 
                 # --- Dynamically compute flattened size ---
                 with torch.no_grad():
@@ -491,30 +611,19 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 # ─────────────────────────────────────────────────────────────────────────────
 # EvalPreviewCallback
 # ─────────────────────────────────────────────────────────────────────────────
-# Wraps EvalCallback (or RecurrentEvalCallback).
-# Every time a new best model is saved it:
-#   1. Saves the VecNormalize stats alongside best_model.zip
-#   2. Opens a live pygame window, plays 2 episodes, then closes it
-#
-# Why synchronous / in-process?
-#   Training is already PAUSED while EvalCallback runs its eval episodes.
-#   The preview just uses that idle window. No subprocess, no thread,
-#   no Windows flash-and-close, no SDL conflicts.
-# ─────────────────────────────────────────────────────────────────────────────
 class EvalPreviewCallback(BaseCallback):
     def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
                  make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
         super().__init__(verbose)
         self.eval_cb              = eval_cb
-        self._vecnorm_env         = vecnorm_env          # training VecNormalize
+        self._vecnorm_env         = vecnorm_env
         self.best_model_save_path = Path(best_model_save_path)
-        self.make_env_fn          = make_env_fn           # kept for API compat
+        self.make_env_fn          = make_env_fn
         self.repo_root            = Path(repo_root)
         self.fps                  = fps
         self.n_preview_episodes   = n_preview_episodes
         self._last_best           = float("-inf")
 
-    # Wire the inner eval_cb so it has model / logger access
     def _init_callback(self):
         self.eval_cb.parent = self
         self.eval_cb.init_callback(self.model)
@@ -534,7 +643,6 @@ class EvalPreviewCallback(BaseCallback):
     def _on_training_end(self):
         self.eval_cb.on_training_end()
 
-    # ── Save vecnorm next to best_model.zip ───────────────────────────────
     def _save_vecnorm(self):
         out = self.best_model_save_path / "best_model_vecnorm.pkl"
         try:
@@ -545,12 +653,6 @@ class EvalPreviewCallback(BaseCallback):
         except Exception as e:
             print(f"[EvalPreview] vecnorm save failed: {e}")
 
-    # ── Launch watch_agent.py as a SUBPROCESS ─────────────────────────────
-    # Why subprocess?
-    #   In-process pygame init/quit cycles leak Windows GDI handles.
-    #   After enough eval cycles the OS limit (10,000) is hit and
-    #   "Couldn't create window" errors appear. A subprocess gets its
-    #   own handle space; when it exits the OS reclaims everything.
     def _run_preview(self):
         model_zip   = self.best_model_save_path / "best_model.zip"
         vecnorm_pkl = self.best_model_save_path / "best_model_vecnorm.pkl"
@@ -573,12 +675,9 @@ class EvalPreviewCallback(BaseCallback):
                   f"({self.n_preview_episodes} ep @ {self.fps} FPS)...")
 
         try:
-            # Run from repo root so "code.*" imports resolve.
-            # Timeout = 120s safety net (preview should finish well before).
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(self.repo_root),
-                # Inherit stdout/stderr so preview logs are visible
                 stdout=None, stderr=None,
             )
             proc.wait(timeout=120)
@@ -611,13 +710,11 @@ def main(cfg: DictConfig):
     eval_freq = int(cfg.get("eval_freq", 20_000))
     save_freq = int(cfg.get("save_freq", 50_000))
 
-    # CHANGE 3: Live visualisation config (spawns a real pygame window)
     viz_enabled          = bool(cfg.get("viz_enabled", False))
     viz_freq             = int(cfg.get("viz_freq", 50_000))
     viz_preview_episodes = int(cfg.get("viz_preview_episodes", 1))
     viz_fps              = int(cfg.get("viz_fps", 30))
 
-    # Path to watch_agent.py — in the repo root
     watch_agent_script = repo_root / "watch_agent.py"
 
     game_name = str(cfg.game)
@@ -686,7 +783,7 @@ def main(cfg: DictConfig):
             #
             # Architectures:
             #   light → LightCombinedExtractor  ~18K params   no channel split, fast
-            #   slim  → SlimPEAKExtractor        ~77K params   channel split, no SEBlock
+            #   slim  → SlimPEAKExtractor        ~78K params   channel split + attention
             #   peak  → PEAKExtractor            ~922K params  full SEBlock + deep branch
             arch_override = str(cfg.get("architecture", "") or "").strip().lower()
 
@@ -717,7 +814,7 @@ def main(cfg: DictConfig):
                 policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
                 extractor_tag = "slim"
-                print("[INFO] Using SlimPEAKExtractor (~77K params, channel split, no SEBlock).")
+                print("[INFO] Using SlimPEAKExtractor (~78K params, channel split + attention).")
 
         if policy_kwargs and "activation_fn" in policy_kwargs:
             act_fn = policy_kwargs["activation_fn"]
@@ -744,11 +841,6 @@ def main(cfg: DictConfig):
                 active_reward_fn = reward_module.default
 
             def make_env(render_mode=None):
-                """
-                Factory that returns an _init callable.
-                render_mode overrides base_env_kwargs['render_mode'] so the
-                visualisation callback can request rgb_array independently.
-                """
                 kw = env_kwargs.copy()
                 if render_mode is not None:
                     kw['render_mode'] = render_mode
@@ -765,7 +857,6 @@ def main(cfg: DictConfig):
             env = VecNormalize(raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
             def make_monitored_env(render_mode=None):
-                """Factory that wraps the env with Monitor for proper eval logging."""
                 kw = env_kwargs.copy()
                 if render_mode is not None:
                     kw['render_mode'] = render_mode
@@ -775,8 +866,8 @@ def main(cfg: DictConfig):
 
             eval_raw_env = DummyVecEnv([make_monitored_env()])
             eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
-            eval_env.training = False   # freeze running stats during eval
-            eval_env.norm_reward = False  # don't normalise eval rewards (for unbiased EvalCallback scores)
+            eval_env.training = False
+            eval_env.norm_reward = False
 
             for skill, total_timesteps in selected_skills.items():
                 run_count += 1
@@ -790,8 +881,6 @@ def main(cfg: DictConfig):
 
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
 
-                # Build a unique run ID that includes the extractor tag
-                # Format: {game}_{algo}_{persona}_{skill}_{extractor}
                 run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
 
                 if is_recurrent_model:
@@ -817,7 +906,6 @@ def main(cfg: DictConfig):
                     name_prefix=run_id,
                 )
 
-                # Wrap eval_cb: saves vecnorm + opens pygame preview on each new best
                 _best_path = models_dir / "best" / run_id
                 eval_cb = EvalPreviewCallback(
                     eval_cb              = eval_cb,
@@ -855,8 +943,6 @@ def main(cfg: DictConfig):
                 norm_path = models_dir / f"{run_id}_vecnorm.pkl"
                 env.save(str(norm_path))
 
-                # Write model_info.json alongside best_model.zip so metadata
-                # is readable without parsing the folder name
                 import json as _json, datetime as _dt
                 _best_path.mkdir(parents=True, exist_ok=True)
                 (_best_path / "model_info.json").write_text(_json.dumps({
