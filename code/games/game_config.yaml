@@ -21,8 +21,8 @@ observation_space:
   high: 500.0
 
 action_space:
-  type: Discrete   # Discrete | MultiBinary | MultiDiscrete
-  n: 8
+  type: MultiDiscrete   # Discrete | MultiBinary | MultiDiscrete
+  n: 20            # 10 base actions + 10 fire variants (see ACTION_NAMES)
 
 reward:
   type: progress_flag

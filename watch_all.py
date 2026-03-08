@@ -201,6 +201,15 @@ class ModelSlot:
         self.steps = 0
         self.ok = True
 
+        # QoL: Lifetime stats across all episodes
+        self.total_wins = 0
+        self.total_deaths = 0
+        self.total_stalls = 0
+        self.total_coins = 0
+        self.total_kills = 0
+        self.scores_history = []   # score per completed episode
+        self.current_level = ""
+
     def reset(self):
         """Reset the environment and episode counters."""
         if not self.ok:
@@ -256,12 +265,31 @@ class ModelSlot:
             self.score = info.get("score", self.score) if isinstance(info, dict) else self.score
             self.steps += 1
 
+            # QoL: Track lifetime stats from info dict
+            if isinstance(info, dict):
+                # Track per-step events
+                self.total_coins = info.get("coins_collected", self.total_coins)
+                self.total_kills += int(info.get("enemies_killed_step", 0))
+                self.current_level = str(info.get("level", ""))
+
+                # Track terminal events
+                event = info.get("event", "")
+                if event == "WIN":
+                    self.total_wins += 1
+                cause = info.get("cause", "")
+                if cause == "Stall":
+                    self.total_stalls += 1
+
             # Force camera update (game core skips this in non-human mode)
             self._force_camera_update()
 
             if ep_done:
                 self.ep_count += 1
                 self.done = True
+                self.scores_history.append(self.score)
+                # Count deaths (episode ended without a win on final step)
+                if isinstance(info, dict) and info.get("event", "") == "DIED":
+                    self.total_deaths += 1
                 return True
         except Exception as e:
             self.error = f"Step error: {e}"
@@ -299,7 +327,7 @@ class ModelSlot:
             game.camera_y += (target_y - game.camera_y) * smoothing
             game.camera_y = max(0, min(game.camera_y, max(0, level_h - GAME_H)))
 
-    def render_to_surface(self, show_hitboxes=False, show_grid=False):
+    def render_to_surface(self, show_hitboxes=False, show_grid=False, show_radar=False):
         """Draw the current game state onto self.game_surf, with optional overlays."""
         if not self.ok:
             return
@@ -317,8 +345,101 @@ class ModelSlot:
                         dm.grid_overlay.render(self.game_surf, game)
                     if show_hitboxes and hasattr(dm, 'hitbox_overlay'):
                         dm.hitbox_overlay.render(self.game_surf, game)
+
+                # ── Per-model Dijkstra radar overlay ──
+                if show_radar:
+                    self._render_radar(game)
+
         except Exception:
             self.game_surf.fill((40, 10, 30))
+
+    def _render_radar(self, game):
+        """Draw a small Dijkstra advantage heatmap in the bottom-right corner."""
+        cache = getattr(game, '_dijkstra_window_cache', None)
+        if cache is None:
+            return
+        try:
+            h, w = cache.shape
+            RADAR_SCALE = 4   # each tile = 4×4 pixels
+            rw, rh = w * RADAR_SCALE, h * RADAR_SCALE
+
+            radar_surf = pygame.Surface((rw, rh), pygame.SRCALPHA)
+
+            for ry in range(h):
+                for rx in range(w):
+                    val = cache[ry, rx]
+                    if val > 0:
+                        # Closer to goal → green
+                        intensity = min(255, int(val * 255))
+                        color = (0, intensity, 0, 160)
+                    elif val < 0:
+                        # Further from goal → red
+                        intensity = min(255, int(-val * 255))
+                        color = (intensity, 0, 0, 120)
+                    else:
+                        color = (40, 40, 40, 80)
+                    pygame.draw.rect(radar_surf, color,
+                                     (rx * RADAR_SCALE, ry * RADAR_SCALE,
+                                      RADAR_SCALE, RADAR_SCALE))
+
+            # Mark player position (center of grid)
+            cx, cy = w // 2, h // 2
+            pygame.draw.rect(radar_surf, (255, 255, 0, 255),
+                             (cx * RADAR_SCALE, cy * RADAR_SCALE,
+                              RADAR_SCALE, RADAR_SCALE))
+
+            # Draw border
+            pygame.draw.rect(radar_surf, (200, 200, 200, 200),
+                             (0, 0, rw, rh), 1)
+
+            # Position: bottom-right corner of game surface, with 8px margin
+            dest_x = GAME_W - rw - 8
+            dest_y = GAME_H - rh - 8
+            self.game_surf.blit(radar_surf, (dest_x, dest_y))
+        except Exception:
+            pass
+
+    def get_radar_surface(self, size=(168, 168)):
+        """Return a standalone radar surface at a specified size for the big combined view."""
+        game = self.raw_env.game if hasattr(self.raw_env, 'game') else None
+        cache = getattr(game, '_dijkstra_window_cache', None) if game else None
+        surf = pygame.Surface(size, pygame.SRCALPHA)
+        surf.fill((20, 12, 30, 200))
+
+        if cache is None:
+            return surf
+
+        try:
+            h, w = cache.shape
+            scale_x = size[0] / w
+            scale_y = size[1] / h
+
+            for ry in range(h):
+                for rx in range(w):
+                    val = cache[ry, rx]
+                    if val > 0:
+                        intensity = min(255, int(val * 255))
+                        color = (0, intensity, 0, 200)
+                    elif val < 0:
+                        intensity = min(255, int(-val * 255))
+                        color = (intensity, 0, 0, 160)
+                    else:
+                        color = (30, 30, 30, 100)
+                    px = int(rx * scale_x)
+                    py = int(ry * scale_y)
+                    pw = max(1, int(scale_x))
+                    ph = max(1, int(scale_y))
+                    pygame.draw.rect(surf, color, (px, py, pw, ph))
+
+            # Player marker
+            cx = int((w // 2) * scale_x)
+            cy = int((h // 2) * scale_y)
+            pygame.draw.rect(surf, (255, 255, 0, 255),
+                             (cx, cy, max(2, int(scale_x)), max(2, int(scale_y))))
+            pygame.draw.rect(surf, (200, 200, 200, 200), (0, 0, *size), 1)
+        except Exception:
+            pass
+        return surf
 
     def close(self):
         try:
@@ -429,7 +550,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
 
     print(f"\n[GridViewer] Running — {max_episodes} episodes per agent @ {fps} FPS")
     print("  ESC = quit  |  SPACE = pause  |  R = reset all")
-    print("  H = hitboxes  |  G = grid  |  D = all debug\n")
+    print("  H = hitboxes  |  G = grid  |  N = radar  |  D = all debug\n")
 
     paused = False
     running = True
@@ -438,6 +559,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
     # ── Debug overlay toggles ──
     show_hitboxes = False
     show_grid     = False
+    show_radar    = False
 
     while running:
         # ── Events ──
@@ -462,6 +584,8 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                     all_on = show_hitboxes and show_grid
                     show_hitboxes = not all_on
                     show_grid     = not all_on
+                elif event.key == pygame.K_n:
+                    show_radar = not show_radar
 
         if not running:
             break
@@ -523,11 +647,55 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                 slot.render_to_surface(
                     show_hitboxes=show_hitboxes,
                     show_grid=show_grid,
+                    show_radar=show_radar,
                 )
 
                 # Scale the 800×600 game surface to fit the cell
                 scaled = pygame.transform.smoothscale(slot.game_surf, (cell_w, game_cell_h))
                 screen.blit(scaled, (x, y + LABEL_H))
+
+                # ── QoL: Stats overlay (bottom-left of game cell) ──
+                stats_parts = []
+                if slot.total_wins > 0:
+                    stats_parts.append(f"W:{slot.total_wins}")
+                if slot.total_deaths > 0:
+                    stats_parts.append(f"D:{slot.total_deaths}")
+                if slot.total_stalls > 0:
+                    stats_parts.append(f"S:{slot.total_stalls}")
+                if slot.total_coins > 0:
+                    stats_parts.append(f"C:{slot.total_coins}")
+                if slot.total_kills > 0:
+                    stats_parts.append(f"K:{slot.total_kills}")
+
+                if stats_parts:
+                    stats_txt = "  ".join(stats_parts)
+                    stats_surf = font_sub.render(stats_txt, True, (200, 220, 255))
+                    # Semi-transparent background
+                    sbg = pygame.Surface(
+                        (stats_surf.get_width() + 8, stats_surf.get_height() + 4),
+                        pygame.SRCALPHA
+                    )
+                    sbg.fill((0, 0, 0, 170))
+                    sx = x + 4
+                    sy = y + LABEL_H + game_cell_h - stats_surf.get_height() - 6
+                    screen.blit(sbg, (sx - 2, sy - 2))
+                    screen.blit(stats_surf, (sx + 2, sy))
+
+                    # Avg score (if we have completed episodes)
+                    if slot.scores_history:
+                        avg_score = sum(slot.scores_history) / len(slot.scores_history)
+                        avg_surf = font_sub.render(
+                            f"Avg:{avg_score:.0f}", True, (255, 210, 80)
+                        )
+                        abg = pygame.Surface(
+                            (avg_surf.get_width() + 8, avg_surf.get_height() + 4),
+                            pygame.SRCALPHA
+                        )
+                        abg.fill((0, 0, 0, 170))
+                        ax = x + cell_w - avg_surf.get_width() - 10
+                        ay = sy
+                        screen.blit(abg, (ax - 2, ay - 2))
+                        screen.blit(avg_surf, (ax + 2, ay))
 
                 # Border color: green if running, red if done
                 border_col = BORDER_DONE if (slot.done and slot.ep_count >= max_episodes) else BORDER_ACTIVE
@@ -538,6 +706,47 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                 err_surf = font_sub.render(f"ERROR: {slot.error[:50]}", True, (255, 80, 80))
                 screen.blit(err_surf, (x + 6, y + 3))
                 pygame.draw.rect(screen, BORDER_DONE, pygame.Rect(x, y + LABEL_H, cell_w, game_cell_h))
+
+        # ── Big combined radar panel (when radar is on) ──
+        if show_radar:
+            # Draw a larger combined radar in the top-right corner showing all agents
+            ok_slots = [s for s in slots if s.ok and not s.done]
+            if ok_slots:
+                COMBINED_SIZE = 168
+                # Compute combined panel size
+                n_ok = len(ok_slots)
+                r_cols = math.ceil(math.sqrt(n_ok))
+                r_rows = math.ceil(n_ok / r_cols)
+                mini_w = COMBINED_SIZE // r_cols
+                mini_h = COMBINED_SIZE // r_rows
+
+                panel_w = COMBINED_SIZE + 12
+                panel_h = COMBINED_SIZE + 28
+                panel_x = screen_w - panel_w - 8
+                panel_y = 8
+
+                # Background
+                panel_bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+                panel_bg.fill((10, 6, 16, 220))
+                pygame.draw.rect(panel_bg, (80, 60, 120, 200), (0, 0, panel_w, panel_h), 1)
+                screen.blit(panel_bg, (panel_x, panel_y))
+
+                # Title
+                title_surf = font_sub.render("NAV RADAR", True, (160, 170, 200))
+                screen.blit(title_surf, (panel_x + 6, panel_y + 3))
+
+                # Render each agent's radar as a mini tile
+                for i, slot in enumerate(ok_slots):
+                    rc = i % r_cols
+                    rr = i // r_cols
+                    mini_surf = slot.get_radar_surface((mini_w, mini_h))
+                    mx = panel_x + 6 + rc * mini_w
+                    my = panel_y + 20 + rr * mini_h
+                    screen.blit(mini_surf, (mx, my))
+
+                    # Small label
+                    lbl = font_sub.render(slot.label[:12], True, (140, 150, 170))
+                    screen.blit(lbl, (mx + 2, my + 1))
 
         # Pause overlay
         if paused:
@@ -564,6 +773,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
             ("R", "reset",      None),
             ("H", "hitboxes",   show_hitboxes),
             ("G", "grid",       show_grid),
+            ("N", "radar",      show_radar),
             ("D", "all debug",  show_hitboxes and show_grid),
         ]
         hx = 12

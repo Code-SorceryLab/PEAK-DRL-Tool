@@ -440,7 +440,7 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
                 # --- Layer 1: standard conv ---
                 l1 = nn.Sequential(
                     nn.Conv2d(n_ch, 16, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(16),
+                    nn.GroupNorm(4, 16),   # FIX: GroupNorm for RL
                     nn.ReLU(),
                     nn.MaxPool2d(2),          # 11×11 → 5×5
                 )
@@ -449,7 +449,7 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
                 l2 = nn.Sequential(
                     nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1, groups=16),  # depthwise
                     nn.Conv2d(16, 32, kernel_size=1),                                   # pointwise
-                    nn.BatchNorm2d(32),
+                    nn.GroupNorm(8, 32),    # FIX: GroupNorm for RL
                     nn.ReLU(),
                 )
 
@@ -503,12 +503,10 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 # ─────────────────────────────────────────────────────────────────────────────
 class EvalPreviewCallback(BaseCallback):
     def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
-                 make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1,
-                 eval_env=None):
+                 make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
         super().__init__(verbose)
         self.eval_cb              = eval_cb
         self._vecnorm_env         = vecnorm_env          # training VecNormalize
-        self._eval_env            = eval_env             # eval VecNormalize (for obs_rms sync)
         self.best_model_save_path = Path(best_model_save_path)
         self.make_env_fn          = make_env_fn           # kept for API compat
         self.repo_root            = Path(repo_root)
@@ -522,20 +520,6 @@ class EvalPreviewCallback(BaseCallback):
         self.eval_cb.init_callback(self.model)
 
     def _on_step(self):
-        # ── Sync obs_rms from training env → eval env before each eval fires ──
-        # The eval env starts with default stats (mean=0, var=1) and training=False
-        # so it never self-updates. Without syncing, the model sees a completely
-        # different observation scale during evaluation vs training, making eval
-        # rewards unreliable and corrupting best-model selection.
-        if self._eval_env is not None and self._vecnorm_env is not None:
-            try:
-                self._eval_env.obs_rms = self._vecnorm_env.obs_rms
-                if hasattr(self._vecnorm_env, "ret_rms"):
-                    self._eval_env.ret_rms = self._vecnorm_env.ret_rms
-            except Exception as _e:
-                if self.verbose:
-                    print(f"[EvalPreview] obs_rms sync warning: {_e}")
-
         result = self.eval_cb.on_step()
         current_best = getattr(self.eval_cb, "best_mean_reward", float("-inf"))
         if current_best > self._last_best:
@@ -652,6 +636,17 @@ def main(cfg: DictConfig):
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
         max_steps=None if str(cfg.max_steps).lower() == "none" else int(cfg.max_steps),
+        # Pre-unlock all levels so training workers sample across the full
+        # level set from the start (random_start_world behaviour).
+        # The curriculum can still fall back to earlier levels if needed.
+        start_unlocked=999,
+        # ── Batch Curriculum (Kevin's design) ─────────────────────────────
+        # Evaluates rolling windows of N episodes per level.
+        # Win rate >= advance → progress | Win rate <= fallback → bump down
+        batch_window=10,                # episodes per evaluation window
+        advance_threshold=0.30,         # 3/10 wins to advance
+        fallback_threshold=0.20,        # ≤2/10 wins to regress (Kev's 1/5)
+        max_stay_windows=3,             # force fallback if stuck this many windows
     )
 
     os.makedirs(models_dir / "best", exist_ok=True)
@@ -693,22 +688,38 @@ def main(cfg: DictConfig):
         if policy == "MultiInputPolicy":
             if policy_kwargs is None:
                 policy_kwargs = {}
-            # Extractor selection (set in algo yaml):
-            #   Default                → SlimPEAKExtractor   ~77K params, features_dim=128
-            #                            Dijkstra channel split preserved, no SEBlock.
-            #                            Best balance of quality vs CPU/GPU speed.
-            #   use_full_peak: true    → PEAKExtractor       ~922K params, features_dim=256
-            #                            Full SEBlock + deep semantic branch.
-            #                            Use only if training on GPU with plenty of time.
-            #   use_light_extractor: true → LightCombinedExtractor  ~18K params
-            #                            No channel split. Use for rapid sweeps only.
-            # obs shape: grids (5,11,11) + scalars (12,) — verified against platformer_core.py
-            # Channel order: 0=Player, 1=Solids, 2=Collectible, 3=Hazard, 4=Dijkstra
-            if algo_conf.get("use_light_extractor", True):
+
+            # ── Architecture selection ────────────────────────────────────────
+            # Priority order:
+            #   1. +architecture=<tag>  CLI/menu override  (light | slim | peak)
+            #   2. use_light_extractor / use_full_peak flags in the algo YAML
+            #   3. Hardcoded default: slim
+            #
+            # Architectures:
+            #   light → LightCombinedExtractor  ~18K params   no channel split, fast
+            #   slim  → SlimPEAKExtractor        ~77K params   channel split, no SEBlock
+            #   peak  → PEAKExtractor            ~922K params  full SEBlock + deep branch
+            arch_override = str(cfg.get("architecture", "") or "").strip().lower()
+
+            if arch_override == "light":
+                use_light = True
+                use_peak  = False
+            elif arch_override == "peak":
+                use_light = False
+                use_peak  = True
+            elif arch_override == "slim":
+                use_light = False
+                use_peak  = False
+            else:
+                # Fall back to YAML flags; default to slim if neither flag is set
+                use_light = bool(algo_conf.get("use_light_extractor", False))
+                use_peak  = bool(algo_conf.get("use_full_peak",       False))
+
+            if use_light:
                 policy_kwargs["features_extractor_class"] = LightCombinedExtractor
                 extractor_tag = "light"
                 print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
-            elif algo_conf.get("use_full_peak", False):
+            elif use_peak:
                 policy_kwargs["features_extractor_class"] = PEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
                 extractor_tag = "peak"
@@ -762,7 +773,13 @@ def main(cfg: DictConfig):
             else:
                 raw_env = DummyVecEnv([make_env()])
 
-            env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+            env = VecNormalize(
+                raw_env,
+                norm_obs=True,
+                norm_reward=False,
+                clip_obs=10.0,
+                norm_obs_keys=["scalars"],   # FIX: leave grids untouched
+            )
 
             def make_monitored_env(render_mode=None):
                 """Factory that wraps the env with Monitor for proper eval logging."""
@@ -774,7 +791,13 @@ def main(cfg: DictConfig):
                 return _init
 
             eval_raw_env = DummyVecEnv([make_monitored_env()])
-            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+            eval_env = VecNormalize(
+                eval_raw_env,
+                norm_obs=True,
+                norm_reward=False,
+                clip_obs=10.0,
+                norm_obs_keys=["scalars"],   # must match training env
+            )
             eval_env.training = False
             eval_env.norm_reward = False
 
@@ -822,7 +845,6 @@ def main(cfg: DictConfig):
                 eval_cb = EvalPreviewCallback(
                     eval_cb              = eval_cb,
                     vecnorm_env          = env,
-                    eval_env             = eval_env,
                     best_model_save_path = _best_path,
                     make_env_fn          = make_env,
                     repo_root            = repo_root,

@@ -51,34 +51,24 @@ def _platformer_action(keys: pygame.key.ScancodeWrapper) -> int:
         # Player Movement: WASD + Space
         # Debug Camera: Arrow Keys (handled internally by Core/DebugManager)
         
-        # ARROW KEYS REMOVED from movement logic
         left  = k[pygame.K_a]
         right = k[pygame.K_d]
         jump  = k[pygame.K_SPACE] or k[pygame.K_w]
         run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
 
-        # IMPORTANT: run is a modifier; by itself it does nothing
-        if right and run and jump: 
-            return 7  # Run+Right+Jump
-        if right and run:          
-            return 5  # Run+Right
-        if right and jump:         
-            return 4  # Right+Jump
-        if left  and jump:         
-            return 6  # Left+Jump
-        if jump:                   
-            return 3  # Jump only
-        if right:                  
-            return 2  # Right
-        if left:                   
-            return 1 # left
-        if left and run and jump:
-            return 7
-        if left and run:          
-            return 5  # Run+left
-        if left and jump:         
-            return 4  # left+Jump
-        return 0                   # Noop
+        # FIX: Check compound combos BEFORE simple ones — most specific first.
+        # The old code checked bare `left` before `left+run`, making the
+        # left+run branches unreachable dead code.
+        if right and run and jump: return 7   # RUN+RIGHT+JUMP
+        if left  and run and jump: return 9   # RUN+LEFT+JUMP
+        if right and run:          return 5   # RUN+RIGHT
+        if left  and run:          return 8   # RUN+LEFT
+        if right and jump:         return 4   # RIGHT+JUMP
+        if left  and jump:         return 6   # LEFT+JUMP
+        if jump:                   return 3   # JUMP
+        if right:                  return 2   # RIGHT
+        if left:                   return 1   # LEFT
+        return 0                               # IDLE
 
 ACTION_MAPPING = {
     "platformer": _platformer_action,
@@ -106,7 +96,11 @@ if level_file:
     print(f"[Play] Loading level file: {level_file}")
 env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps, **env_kwargs)
 
-# Helper to find the actual game core instance through wrappers
+# FIX: Force lock_level for manual play so complete_level() doesn't
+# auto-advance to the next level.  In training the episode continues
+# through multiple levels, but in human play that's confusing.
+# We override complete_level to soft-reset the same level instead.
+
 def find_core_game(env_instance):
     curr = env_instance
     while hasattr(curr, 'env'):
@@ -119,7 +113,27 @@ def find_core_game(env_instance):
 
 core_game = find_core_game(env)
 
-# ── Handle level_id override ──────────────────────────────────────
+# FIX: Override complete_level() for human play.
+# In training, completing a level silently loads the next one so the episode
+# continues uninterrupted. In manual play that's confusing — the player
+# expects to see "LEVEL COMPLETE" and then replay or stay on the same level.
+# We monkey-patch complete_level to just reload the current level.
+if core_game:
+    _original_complete = core_game.complete_level
+
+    def _manual_complete_level():
+        """Manual play: record the win but stay on the same level."""
+        core_game._level_wins[core_game.world] = core_game._level_wins.get(core_game.world, 0) + 1
+        core_game.reached_goal = True
+        # Don't advance world — just signal a reload of the same level
+        core_game._needs_level_transition = True
+
+    core_game.complete_level = _manual_complete_level
+    # Also force locked_level so reset() stays here too
+    if not core_game.locked_level:
+        core_game.locked_level = core_game.world
+
+
 if level_id and core_game and hasattr(core_game, 'world'):
     if core_game.world.lower() != level_id.lower():
         core_game.world = level_id.lower()

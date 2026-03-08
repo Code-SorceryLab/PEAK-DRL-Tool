@@ -261,14 +261,36 @@ class PlatformerCore(gymnasium.Env):
         self.max_lives = 3
         self.lives = self.max_lives
 
-        # ── Curriculum sampling ───────────────────────────────────────────────
-        # sticky_prob: chance of staying on the same level after an episode ends.
-        # max_consecutive: hard cap — after this many episodes in a row on the
-        #   same level the env MUST switch, preventing any env from locking onto
-        #   one level forever (critical when n_envs > 1).
-        self.sticky_prob       = float(kwargs.pop("sticky_prob", 0.50))
-        self.max_consecutive   = int(kwargs.pop("max_consecutive", 4))
-        self._consecutive_same = 0          # episodes on current level in a row
+        # ── Batch Curriculum (Kevin's design) ─────────────────────────────────
+        # Evaluates rolling windows of N episodes per level.
+        #   Win rate >= advance_threshold  → progress to next level
+        #   Win rate <= fallback_threshold → bump down one level
+        #   Otherwise                      → stay and keep practicing
+        #
+        # Anti-oscillation: tracks consecutive fallbacks per level.
+        #   After 2 consecutive fallbacks on the same level, the advance
+        #   threshold is widened (made easier) to prevent ping-pong.
+        #
+        # Anti-stagnation: "long stay" counter.
+        #   If the agent stays on the same level for `max_stay_windows`
+        #   consecutive evaluation windows without advancing, force a
+        #   fallback so it gets more practice on easier levels.
+        #
+        # _curriculum_position: index into level_order (which level we start on)
+        # _batch_results: list of bools for current evaluation window
+        # _episode_won_current_level: set True by complete_level() if the
+        #   agent beats the level it STARTED the episode on.
+        self._batch_window            = int(kwargs.pop("batch_window", 10))
+        self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))   # 3/10
+        self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))  # ≤2/10 → regress (Kev: 1/5)
+        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 3))
+        self._curriculum_position     = 0
+        self._batch_results: list     = []
+        self._episode_won_current     = False   # did this episode beat the starting level?
+        self._windows_on_level        = 0       # consecutive eval windows on this level
+        self._consecutive_fallbacks   = {}      # {level_idx: count} — oscillation detection
+
+        # Legacy tracking (still used by dashboard, watch_all, etc.)
         self._level_visits     = {lvl: 0 for lvl in self.level_order}
         self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
@@ -542,56 +564,123 @@ class PlatformerCore(gymnasium.Env):
           - lives = 0 (terminated=True from _handle_death)
           - max_steps hit (truncated=True)
 
-        Level completion no longer calls reset() -- the episode continues
-        with the next level loaded inline in step(). The was_win branch
-        is therefore dead code and has been removed.
+        Records the episode result into the batch curriculum and, when
+        the evaluation window is full, decides whether to advance,
+        regress, or stay on the current level.
         """
         super().reset(seed=seed)
 
-        # Full reset: restore lives/score, then pick the next training level.
-        #
-        # Strategy — sticky + performance-weighted + forced rotation:
-        #   1. If consecutive episodes on this level < max_consecutive AND
-        #      random roll < sticky_prob  → stay (agent gets repeated practice).
-        #   2. Otherwise                 → performance-weighted random switch.
-        #      Levels with lower win-rates get higher sampling weight so the
-        #      agent focuses effort where it's actually struggling.
-        #   3. Locked level (editor playtest) always overrides everything.
+        # ── Record episode result into the batch ──────────────────────────
+        # _episode_won_current is set True by complete_level() if the agent
+        # beat the level it STARTED the episode on.  It's False if the agent
+        # died before ever reaching the goal on that starting level.
+        if self.level_order and not self.locked_level:
+            self._batch_results.append(self._episode_won_current)
+
+        # ── Evaluate batch when window is full ────────────────────────────
+        if len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
+            self._evaluate_curriculum_batch()
+
+        # ── Pick the level for the new episode ────────────────────────────
         self.reset_metrics()
+        self._episode_won_current = False   # fresh episode, no win yet
+
         if self.locked_level:
+            # Editor playtest — always stay on the locked level
             self.world = self.locked_level
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-            self._consecutive_same = 0
         elif self.level_order:
-            force_switch = self._consecutive_same >= self.max_consecutive
-            if not force_switch and random.random() < self.sticky_prob:
-                # Stay on the same level
-                self._consecutive_same += 1
-            else:
-                # Performance-weighted pick from the OTHER levels
-                # weight = 1 - win_rate  (struggling levels weighted higher)
-                # Unvisited levels get weight 1.0 (worst possible score assumed)
-                idxs = [i for i in range(len(self.level_order))
-                        if i != self.current_index_world]
-                if idxs:
-                    weights = []
-                    for i in idxs:
-                        lvl = self.level_order[i]
-                        v = self._level_visits.get(lvl, 0)
-                        w = self._level_wins.get(lvl, 0)
-                        win_rate = w / v if v > 0 else 0.0
-                        weights.append(max(0.1, 1.0 - win_rate))
-                    total = sum(weights)
-                    probs = [x / total for x in weights]
-                    self.current_index_world = random.choices(idxs, weights=probs, k=1)[0]
-                self._consecutive_same = 0
+            # Curriculum picks the level
+            self._curriculum_position = max(0, min(
+                self._curriculum_position, len(self.level_order) - 1))
+            self.current_index_world = self._curriculum_position
             self.world = self.level_order[self.current_index_world]
+
         self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
+
+    def _evaluate_curriculum_batch(self):
+        """
+        Evaluate the current batch window and decide: advance / regress / stay.
+
+        Kevin's design:
+          - batch of N=10 episodes on the same level
+          - win 3/10 (30%) → advance to next level
+          - win ≤ 2/10 (20%) → bump down one level
+          - otherwise → stay and try another window
+
+        Anti-oscillation (from Claude/Kev discussion):
+          - Track consecutive fallbacks per level position
+          - After 2 consecutive fallbacks on the same level, widen the advance
+            threshold by 10% (make it easier to stay / advance)
+
+        Anti-stagnation:
+          - If the agent stays on the same level for max_stay_windows consecutive
+            evaluation windows without advancing, force a fallback so it gets
+            more practice on the level below.
+        """
+        wins = sum(1 for r in self._batch_results if r)
+        total = len(self._batch_results)
+        win_rate = wins / total if total > 0 else 0.0
+
+        pos = self._curriculum_position
+        level_name = self.level_order[pos] if pos < len(self.level_order) else "?"
+        consec_fb = self._consecutive_fallbacks.get(pos, 0)
+
+        # Anti-oscillation: after 2 consecutive fallbacks on this level,
+        # lower the advance threshold by 10% (easier to stay / advance)
+        effective_advance = self._batch_advance_threshold
+        if consec_fb >= 2:
+            effective_advance = max(0.10, effective_advance - 0.10)
+
+        action = "STAY"
+
+        # ── Advance? ──
+        if win_rate >= effective_advance and pos < len(self.level_order) - 1:
+            action = "ADVANCE"
+            self._curriculum_position += 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = 0   # reset fallback streak
+            print(f"  🎓 [Curriculum] ADVANCE → Level {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"(won {wins}/{total} = {win_rate:.0%}, "
+                  f"threshold {effective_advance:.0%})")
+
+        # ── Fallback? ──
+        elif win_rate <= self._batch_fallback_threshold and pos > 0:
+            action = "FALLBACK"
+            self._curriculum_position -= 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = consec_fb + 1
+            print(f"  ⬇️  [Curriculum] FALLBACK → Level {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"(won {wins}/{total} = {win_rate:.0%}, "
+                  f"threshold ≤{self._batch_fallback_threshold:.0%}, "
+                  f"consec_fb={consec_fb + 1})")
+
+        # ── Stay ──
+        else:
+            self._windows_on_level += 1
+            # Anti-stagnation: force fallback if stuck too long
+            if self._windows_on_level >= self._max_stay_windows and pos > 0:
+                action = "FORCE_FALLBACK"
+                self._curriculum_position -= 1
+                self._windows_on_level = 0
+                print(f"  ⏳ [Curriculum] FORCE FALLBACK → Level {self._curriculum_position} "
+                      f"'{self.level_order[self._curriculum_position]}' "
+                      f"(stuck for {self._max_stay_windows} windows, "
+                      f"won {wins}/{total} = {win_rate:.0%})")
+            else:
+                print(f"  ➡️  [Curriculum] STAY on Level {pos} '{level_name}' "
+                      f"(won {wins}/{total} = {win_rate:.0%}, "
+                      f"window {self._windows_on_level}/{self._max_stay_windows})")
+
+        # Clear the batch for the next window
+        self._batch_results.clear()
 
     def load_level(self, preserve_power: bool = False):
         self.alive = True
@@ -718,14 +807,24 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         """
         Called by PhysicsManager the moment the player touches the goal tile.
-        Selects the next level using a random curriculum walk but does NOT load
-        it yet -- that happens inline in step() after _info() has captured the
-        WIN event for this frame.
+        Records the win for curriculum tracking, selects the next level for
+        continued play, but does NOT load it yet — that happens inline in
+        step() after _info() has captured the WIN event for this frame.
 
         The episode continues into the next level; only lives = 0 ends it.
         """
-        # Record the win for the level just completed
+        # Record the win for the level just completed (legacy stats)
         self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
+
+        # ── Batch curriculum: mark win if this is the starting level ──────
+        # The agent's "starting level" for this episode is level_order[_curriculum_position].
+        # If it completes THAT level, the episode counts as a win for curriculum purposes.
+        # Completing subsequent levels (after advancing mid-episode) doesn't count —
+        # those are bonus practice, not the curriculum test.
+        if self._curriculum_position < len(self.level_order):
+            starting_level = self.level_order[self._curriculum_position]
+            if self.world == starting_level:
+                self._episode_won_current = True
 
         # Advance to the next level in order; wrap at the end so long episodes
         # cycle through the full curriculum without ending prematurely.
@@ -1229,17 +1328,6 @@ class PlatformerCore(gymnasium.Env):
                                     if np.isfinite(best_est):
                                         best_est = max(1.0, best_est)
                                         out[ly, lx] = player_dist - best_est
-                                        
-                        # --- Secondary proximity boosts (2 and 3 tiles above) ---
-                        for offset, discount in [(2, 0.25), (3, 0.1)]:
-                            boost_row = p_top_row - offset
-                            if boost_row < 0:
-                                continue
-                            for pc in range(pc0, pc1):
-                                ly = boost_row - map_row_start
-                                lx = pc - map_col_start
-                                if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                    out[ly, lx] += discount
 
             # --- Single normalisation pass (after ALL patches) ---
             max_cost = max(
@@ -1252,7 +1340,8 @@ class PlatformerCore(gymnasium.Env):
 
     def _tracking_obs(self) -> np.ndarray:
         """
-        Returns 13 scalar features used by the MLP branch of the extractor.
+        Returns 7 scalar features used by the MLP branch of the extractor.
+        Combined with 5 from _player_obs → 12 total scalars.
         """
         p = self.player
         if not p: return np.zeros(7, dtype=np.float32)  # FIXED: 7 active scalars
@@ -1418,6 +1507,11 @@ class PlatformerCore(gymnasium.Env):
             "on_ground": p.on_ground,
             "step_dx":   self._step_dx,
             "step_dy":   self._step_dy,
+            # Batch curriculum state
+            "curriculum_position": self._curriculum_position,
+            "batch_progress": f"{len(self._batch_results)}/{self._batch_window}",
+            "batch_wins": sum(1 for r in self._batch_results if r),
+            "windows_on_level": self._windows_on_level,
             **self._obs_stats
         }
 
