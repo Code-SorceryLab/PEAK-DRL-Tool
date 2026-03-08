@@ -5,10 +5,10 @@ defaults:
 # lists of experiment dimensions
 games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
-architectures: [light, slim, peak]  # light=~18K, slim=~77K (default), peak=~922K
+architectures: [light, slim, ]  # light=~18K, slim=~77K (default), peak=~922K
 personas: [
   platformer_simple,
-  #platformer_dijkstra,
+  platformer_dijkstra,
   #platformer_coin_hunter,
   #platformer_enemy_hunter,
   #platformer_speedrunner,
@@ -17,9 +17,8 @@ personas: [
 
 # skill -> training steps
 skills:
-  Novice: 2_000_000
-  Expert: 10_000_000
-
+  Novice: 8_000_000
+  Expert: 16_000_000
 
 # generic env params
 seed: 1234
@@ -32,7 +31,7 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 24 # 1 for cpu or 16 gpu , or whatever you want
+n_envs: 10 # 1 for cpu or 16 gpu , or whatever you want
 
 
 # null values mean "no override"

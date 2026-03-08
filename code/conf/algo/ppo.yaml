@@ -1,23 +1,20 @@
 _target_: algos.get_algo
-name: ppo               # looked up inside get_algo → PPO class
+name: ppo
 policy: MultiInputPolicy
 
-# --- Exploration & Memory Settings ---
-n_steps: 4096
-ent_coef: 0.02
-
-# --- Standard PPO Settings ---
-batch_size: 512
-n_epochs: 6
-learning_rate: 0.0003
+n_steps: 2048          # was 4096 — faster update cycle, better for noisy rewards
+batch_size: 256        # was 512 — scale down with n_steps
+n_epochs: 8            # was 6 — slightly more passes since batches are smaller
+learning_rate: 0.0003  # keep for now, add schedule after reward fix
 gae_lambda: 0.95
 gamma: 0.99
 clip_range: 0.2
+ent_coef: 0.01         # was 0.02 — reduce once reward signal is stronger
+vf_coef: 0.25          # was implicit 0.5 — reduce while value loss is high
 verbose: 1
 
 policy_kwargs:
   optimizer_kwargs:
     weight_decay: 1e-8
 
-
-device: cpu      # cpu / cuda
+device: cpu

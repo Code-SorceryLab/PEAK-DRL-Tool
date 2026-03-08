@@ -113,7 +113,7 @@ class DijkstraSolver:
                 if dy < 0:          # moving UP — requires a jump
                     step_cost = 3.5
                 elif dy > 0:        # moving DOWN — gravity-assisted
-                    step_cost = 1.5
+                    step_cost = 1.2
                 else:               # horizontal
                     step_cost = 2.0
 
@@ -134,7 +134,7 @@ class DijkstraSolver:
                 if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
                     step_cost -= 0.5
                 if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
-                    step_cost -= 0.25
+                    step_cost -= 0.2
 
                 # --- Floating-tile penalty for upward steps ---
                 # If moving up and there is no solid surface within jump height
@@ -236,12 +236,51 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
-        # random_start_world: pick a uniformly random level at each episode reset
-        # so training time is spread equally across all levels regardless of win rate.
-        self.random_start_world = bool(kwargs.pop("random_start_world", True))
         self.world = str(kwargs.pop("world", "1-1")).lower()
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
+
+        # ── Mastery-gated curriculum ──────────────────────────────────────────
+        # Each level keeps a sliding window of the last N episode outcomes (1=win,
+        # 0=loss). At every episode boundary the win rate over that window drives
+        # the level selection decision:
+        #
+        #   win_rate >= ADVANCE_THRESHOLD  → move forward one level
+        #   win_rate <= FALLBACK_THRESHOLD → step back one level (if not at 0)
+        #   otherwise                      → stay and keep practising
+        #
+        # EXPLORE_PROB: with this probability the curriculum is ignored entirely
+        # and a uniformly random level is picked. Prevents the agent from
+        # catastrophically forgetting earlier levels once they are "mastered",
+        # and ensures all levels see at least some training traffic.
+        #
+        # Knobs exposed as kwargs so they can be tuned from the config YAML
+        # without touching this file.
+        self._curriculum_window_size  = int(kwargs.pop("curriculum_window",   5))
+        self._advance_threshold       = float(kwargs.pop("advance_threshold", 0.6))
+        self._fallback_threshold      = float(kwargs.pop("fallback_threshold", 0.2))
+        self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
+
+        # Per-level outcome windows — persist across episodes, never reset.
+        self._level_window = {
+            lvl: deque(maxlen=self._curriculum_window_size)
+            for lvl in self.level_order
+        }
+
+        # ── Progressive level unlocking ───────────────────────────────────────
+        # _max_unlocked_index is the highest level index the agent is currently
+        # allowed to visit. Starts at 0 (only the first level available) and
+        # advances when the agent masters the current frontier.
+        #
+        # Exploration is capped to [0, _max_unlocked_index] so random picks
+        # never send the agent to levels it has no chance of completing.
+        # A new level is unlocked only when the agent masters the current
+        # hardest available level (current_index == _max_unlocked_index and
+        # win_rate >= advance_threshold).
+        #
+        # start_unlocked: pre-unlock N levels at init (useful for resuming a
+        # run or skipping trivial early levels). Default 0 = start from level 1.
+        self._max_unlocked_index = int(kwargs.pop("start_unlocked", 0))
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -517,27 +556,99 @@ class PlatformerCore(gymnasium.Env):
         Called by SB3 only when the episode truly ends:
           - lives = 0 (terminated=True from _handle_death)
           - max_steps hit (truncated=True)
+
+        Mastery-gated curriculum with progressive unlocking
+        ---------------------------------------------------
+        Wins are recorded by complete_level() mid-episode.
+        Losses (episode-ending deaths) are recorded here.
+        Curriculum decisions ONLY fire when the window is full
+        (len >= window_size), guaranteeing the agent always plays
+        a minimum of window_size episodes on each level before
+        the curriculum can advance, fallback, or explore.
+
+        Decision tree (only when window is full):
+          1. Locked level → always override.
+          2. Record terminal loss into the window.
+          3. Window full + win_rate >= advance_threshold
+               → if at frontier: unlock next level
+               → advance current_index forward
+          4. Window full + win_rate <= fallback_threshold
+               → step back one level (floor = 0)
+          5. Window full + in stay band
+               → exploration tax: random within unlocked pool
+          6. Window not yet full → stay on current level, no decision.
         """
         super().reset(seed=seed)
 
-        # Full reset: restore lives, score, return to level 0 (or locked level)
+        # ── 1. Record terminal loss (wins already recorded by complete_level) ─
+        # reached_goal is always False here — the agent ran out of lives or
+        # hit max_steps. A win mid-episode resets reached_goal via load_level()
+        # so the terminal level is always a loss from reset()'s perspective.
+        if self.level_order and not self.locked_level:
+            if self.world in self._level_window:
+                self._level_window[self.world].append(0)
+
+        # ── 2. Wipe per-episode metrics (must happen AFTER recording outcome) ─
         self.reset_metrics()
+
+        # ── 3. Choose the next level ─────────────────────────────────────────
         if self.locked_level:
             self.world = self.locked_level
-            # Keep current_index_world consistent
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-        else:
-            if self.level_order:
-                if self.random_start_world and len(self.level_order) > 1:
-                    # Uniform random — ensures every level gets equal training time
-                    # even when the agent rarely wins (so complete_level() never fires)
-                    self.current_index_world = random.randint(0, len(self.level_order) - 1)
+
+        elif self.level_order:
+            window  = self._level_window.get(self.world, deque())
+            max_idx = len(self.level_order) - 1
+
+            # Only make curriculum decisions when the window is full.
+            # Before that the agent stays on the current level — no advance,
+            # no fallback, no exploration. This guarantees a minimum of
+            # window_size episodes of data before any decision fires.
+            if len(window) >= self._curriculum_window_size:
+                win_rate = sum(window) / len(window)
+
+                if win_rate >= self._advance_threshold:
+                    # Mastered — unlock next level if at frontier
+                    if self.current_index_world >= self._max_unlocked_index:
+                        self._max_unlocked_index = min(
+                            self._max_unlocked_index + 1, max_idx
+                        )
+                    self.current_index_world = min(
+                        self.current_index_world + 1, self._max_unlocked_index
+                    )
+                    # Clear the window that just triggered the decision so the
+                    # agent plays a fresh 10-episode batch on the new level
+                    # before the next curriculum decision fires.
+                    # Clear BEFORE updating self.world so we wipe the old level.
+                    self._level_window[self.world].clear()
+
+                elif win_rate <= self._fallback_threshold:
+                    # Struggling — step back, never below level 0
+                    self.current_index_world = max(
+                        self.current_index_world - 1, 0
+                    )
+                    # Clear window — fresh batch on the previous level
+                    self._level_window[self.world].clear()
+
                 else:
-                    self.current_index_world = 0
-                self.world = self.level_order[self.current_index_world]
+                    # Stay band — clear window so the next evaluation uses a
+                    # fresh 10-episode batch, not a sliding window that
+                    # re-evaluates every episode after the window fills.
+                    self._level_window[self.world].clear()
+                    # Apply exploration tax within unlocked pool
+                    if random.random() < self._explore_prob:
+                        self.current_index_world = random.randint(
+                            0, self._max_unlocked_index
+                        )
+                    # else: stay on current level
+
+            # Window not full → stay (no change to current_index_world)
+
+            self.world = self.level_order[self.current_index_world]
+
         self.load_level()
         return self._obs(), self._info()
 
@@ -647,17 +758,33 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         """
         Called by PhysicsManager the moment the player touches the goal tile.
-        Signals step() to load the next level after _info() captures the WIN event.
-        """
-        # Random walk: +-1 from current index (curriculum learning)
-        self.current_index_world = max(
-            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
-        )
-        if self.current_index_world >= len(self.level_order):
-            self.current_index_world = len(self.level_order) - 1
-        self.world = self.level_order[self.current_index_world]
+        Signals step() to load the next level after _info() captures the WIN
+        event for this frame.
 
-        # Signal step() to load the next level after _info() runs this frame.
+        Responsibilities (strictly limited):
+          1. Record the win into the current level's mastery window.
+          2. Advance +1 within the already-UNLOCKED pool only.
+             Enables mid-episode chaining without bypassing the curriculum.
+
+        NOT responsible for:
+          - Unlocking new levels (_max_unlocked_index)     → reset() only
+          - Advance / stay / fallback decisions            → reset() only
+          - Exploration picks                              → reset() only
+
+        This separation ensures the curriculum always evaluates a full
+        window_size batch before making any decision. A single mid-episode
+        win is not enough signal.
+        """
+        # Record win for this level
+        if self.world in self._level_window:
+            self._level_window[self.world].append(1)
+
+        # Advance within already-unlocked pool only
+        # _max_unlocked_index is only expanded by reset() after a full window
+        self.current_index_world = min(
+            self.current_index_world + 1, self._max_unlocked_index
+        )
+        self.world = self.level_order[self.current_index_world]
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
@@ -1236,6 +1363,17 @@ class PlatformerCore(gymnasium.Env):
             step_dy,                                        # [6] best step Y
         ], dtype=np.float32)
 
+    def _curriculum_win_rate(self) -> float:
+        """
+        Returns the win rate over the current level's sliding window [0.0, 1.0].
+        Returns -1.0 if the window is empty (no data yet for this level).
+        Useful for TensorBoard and CSV logging via _info().
+        """
+        window = self._level_window.get(self.world, deque())
+        if not window:
+            return -1.0
+        return sum(window) / len(window)
+
     def _info(self) -> Dict:
         p = self.player
         ts = float(TILE_SIZE)
@@ -1262,6 +1400,9 @@ class PlatformerCore(gymnasium.Env):
                 "on_ground": False,
                 "step_dx":   0.0,
                 "step_dy":   0.0,
+                "curriculum_level_idx": self.current_index_world,
+                "curriculum_win_rate":  self._curriculum_win_rate(),
+                "curriculum_max_unlocked": self._max_unlocked_index,
                 **self._obs_stats
             }
 
@@ -1304,6 +1445,10 @@ class PlatformerCore(gymnasium.Env):
             "on_ground": p.on_ground,
             "step_dx":   self._step_dx,
             "step_dy":   self._step_dy,
+            # Curriculum diagnostics — useful for TensorBoard / CSV logging
+            "curriculum_level_idx": self.current_index_world,
+            "curriculum_win_rate":  self._curriculum_win_rate(),
+            "curriculum_max_unlocked": self._max_unlocked_index,
             **self._obs_stats
         }
 
