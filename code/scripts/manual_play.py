@@ -44,41 +44,32 @@ GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith
 pygame.init()
 clock = pygame.time.Clock()
 
-def _platformer_action(keys: pygame.key.ScancodeWrapper) -> int:
-        k = pygame.key.get_pressed()
-        
-        # STRICT CONTROL SCHEME:
-        # Player Movement: WASD + Space
-        # Debug Camera: Arrow Keys (handled internally by Core/DebugManager)
-        
-        # ARROW KEYS REMOVED from movement logic
-        left  = k[pygame.K_a]
-        right = k[pygame.K_d]
-        jump  = k[pygame.K_SPACE] or k[pygame.K_w]
-        run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+def _platformer_action(keys) -> list:
+    """
+    Return a MultiDiscrete action [move, jump, fire].
+      move : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      jump : 0=idle  1=jump
+      fire : 0=idle  1=fire   (Z key)
+    """
+    k = pygame.key.get_pressed()
 
-        # IMPORTANT: run is a modifier; by itself it does nothing
-        if right and run and jump: 
-            return 7  # Run+Right+Jump
-        if right and run:          
-            return 5  # Run+Right
-        if right and jump:         
-            return 4  # Right+Jump
-        if left  and jump:         
-            return 6  # Left+Jump
-        if jump:                   
-            return 3  # Jump only
-        if right:                  
-            return 2  # Right
-        if left:                   
-            return 1 # left
-        if left and run and jump:
-            return 7
-        if left and run:          
-            return 5  # Run+left
-        if left and jump:         
-            return 4  # left+Jump
-        return 0                   # Noop
+    left  = k[pygame.K_a]
+    right = k[pygame.K_d]
+    jump  = k[pygame.K_SPACE] or k[pygame.K_w]
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    fire  = k[pygame.K_z]
+
+    # Move axis
+    if left and right:
+        move = 0                        # cancel out
+    elif left:
+        move = 2 if run else 1          # sprint_left / left
+    elif right:
+        move = 4 if run else 3          # sprint_right / right
+    else:
+        move = 0
+
+    return [move, int(bool(jump)), int(bool(fire))]
 
 ACTION_MAPPING = {
     "platformer": _platformer_action,
@@ -192,7 +183,7 @@ while running:
     if core_game and hasattr(core_game, 'debug_manager'):
         # If the user has enabled Free Cam (F5), force the player action to IDLE (0).
         if core_game.debug_manager.free_cam_active:
-            action = 0 
+            action = [0, 0, 0]
 
     # Step the environment
     step_result = env.step(action)

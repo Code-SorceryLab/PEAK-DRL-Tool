@@ -169,31 +169,27 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 32, 32
 DEBUG_PANEL_WIDTH = 350  # Width of the side debug panel (shown only in human mode)
 
-# Action Map for Debug Display
-ACTION_NAMES = {
-    # ── Original 10 (no fire) ─────────────────────────────────────────
-    0:  "IDLE",
-    1:  "LEFT",
-    2:  "RIGHT",
-    3:  "JUMP",
-    4:  "RIGHT+JUMP",
-    5:  "RUN+RIGHT",
-    6:  "LEFT+JUMP",
-    7:  "RUN+RIGHT+JUMP",
-    8:  "RUN+LEFT",
-    9:  "RUN+LEFT+JUMP",
-    # ── Fire variants (offset +10) ────────────────────────────────────
-    10: "FIRE",
-    11: "LEFT+FIRE",
-    12: "RIGHT+FIRE",
-    13: "JUMP+FIRE",
-    14: "RIGHT+JUMP+FIRE",
-    15: "RUN+RIGHT+FIRE",
-    16: "LEFT+JUMP+FIRE",
-    17: "RUN+RIGHT+JUMP+FIRE",
-    18: "RUN+LEFT+FIRE",
-    19: "RUN+LEFT+JUMP+FIRE",
-}
+# MultiDiscrete action axes — [move, jump, fire]
+#   move : 0=IDLE  1=LEFT  2=SPRINT_LEFT  3=RIGHT  4=SPRINT_RIGHT
+#   jump : 0=IDLE  1=JUMP
+#   fire : 0=IDLE  1=FIRE
+MD_MOVE_NAMES = {0: "IDLE", 1: "LEFT", 2: "SPRINT_L", 3: "RIGHT", 4: "SPRINT_R"}
+MD_JUMP_NAMES = {0: "",     1: "JUMP"}
+MD_FIRE_NAMES = {0: "",     1: "FIRE"}
+
+def action_to_str(a) -> str:
+    """Convert a MultiDiscrete action [move, jump, fire] to a readable string."""
+    try:
+        move, jump, fire = int(a[0]), int(a[1]), int(a[2])
+        parts = [MD_MOVE_NAMES.get(move, "?")]
+        if jump: parts.append(MD_JUMP_NAMES[1])
+        if fire: parts.append(MD_FIRE_NAMES[1])
+        return "+".join(p for p in parts if p)
+    except Exception:
+        return str(a)
+
+# Keep for legacy / logging compat
+ACTION_NAMES = {i: action_to_str([i % 5, (i // 5) % 2, i // 10]) for i in range(20)}
 
 class PlatformerCore(gymnasium.Env):
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
@@ -382,7 +378,11 @@ class PlatformerCore(gymnasium.Env):
         })
 
         # Action Space is 20 to match ACTION_NAMES (0 through 19, including 10 fire variants)
-        self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
+        # self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
+
+        # MultiDiscrete: [move(5), jump(2), fire(2)]
+        self._act_space = spaces.MultiDiscrete([5, 2, 2])
+
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
@@ -401,7 +401,7 @@ class PlatformerCore(gymnasium.Env):
         self.game_over = False; self.reached_goal = False
         self.last_x = 0.0; self.last_score = 0; self.score_delta = 0
         self.kills_step = self.coins_step = self.powerups_step = 0
-        self._last_action = 0
+        self._last_action = [0, 0, 0]
         self.max_x_seen = 0.0; self.stall_timer = 0
         self.stall_windows_count = 0; self.stalled_this_frame = False
         self.progress_x_best = 0.0; self.progress_y_best = 0.0
@@ -440,13 +440,25 @@ class PlatformerCore(gymnasium.Env):
         if self.debug_manager.slow_motion:
             self.dt *= 0.5
 
-        self.frame += 1
+        # Normalise action — accept both MD arrays ([move, jump, fire]) and
+        # legacy flat ints (e.g. keyboard shortcuts, old test code).
+        _LEGACY_INT_TO_MD = {
+            0: [0,0,0], 1: [1,0,0], 2: [3,0,0], 3: [0,1,0],
+            4: [3,1,0], 5: [4,0,0], 6: [1,1,0], 7: [4,1,0],
+            8: [2,0,0], 9: [2,1,0],
+        }
+        if isinstance(action, (int, float)) or (
+                hasattr(action, '__len__') is False):
+            action = _LEGACY_INT_TO_MD.get(int(action), [0, 0, 0])
+        action = [int(action[0]), int(action[1]), int(action[2])]
+
+
 
         if self.use_timer: self.timer -= self.dt
         if self.render_mode == "human": self.debug_manager.update_input()
 
         # Step Metrics Reset
-        self._last_action = int(action)
+        self._last_action = action  # already normalised to [move, jump, fire] above
         self.last_x = self.player.gObj.x if self.player else 0.0
         self.kills_step = self.coins_step = self.powerups_step = 0
         self.stalled_this_frame = False
@@ -492,7 +504,7 @@ class PlatformerCore(gymnasium.Env):
 
         if self.player:
             if not self.debug_manager.free_cam_active:
-                self.player.handle_input(a = int(action))
+                self.player.handle_input(a=action)
             else:
                 self.player.vx = 0; self.player.jump_hold = 0
 
@@ -599,6 +611,7 @@ class PlatformerCore(gymnasium.Env):
             else:
                 self.current_index_world = 0
 
+
         elif self.level_order:
             window  = self._level_window.get(self.world, deque())
             max_idx = len(self.level_order) - 1
@@ -647,6 +660,11 @@ class PlatformerCore(gymnasium.Env):
 
             # Window not full → stay (no change to current_index_world)
 
+            self.world = self.level_order[self.current_index_world]
+
+
+        else:
+            self.current_index_world = 0
             self.world = self.level_order[self.current_index_world]
 
         self.load_level()
@@ -1392,7 +1410,7 @@ class PlatformerCore(gymnasium.Env):
                 "x_position": 0.0, "y_position": 0.0, "velocity_x": 0.0, "velocity_y": 0.0,
                 "coins_collected": self.coins_total, "enemies_killed_step": self.kills_step,
                 "powered_up": False, "terminated": not self.alive, "won": False,
-                "action": self._last_action, "time_left": math.ceil(self.timer),
+                "action": self._last_action, "action_name": action_to_str(self._last_action), "time_left": math.ceil(self.timer),
                 "max_x_seen": self.max_x_seen, "stall_windows": self.stall_windows_count,
                 "stalled": self.stalled_this_frame, "persona": self.persona,
                 "level": self.world, "goal_dist": 0.0, "lives": self.lives,
@@ -1431,6 +1449,7 @@ class PlatformerCore(gymnasium.Env):
             "terminated": not self.alive,
             "won": self.reached_goal,
             "action": self._last_action,
+            "action_name": action_to_str(self._last_action),
             "time_left": math.ceil(self.timer),
             "max_x_seen": self.max_x_seen,
             "stall_windows": self.stall_windows_count,

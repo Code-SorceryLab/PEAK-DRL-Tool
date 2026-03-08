@@ -106,9 +106,17 @@ class GameEnv(gym.Env):
         info["reward_breakdown"] = reward_breakdown
 
         # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
-        act_name = action
-        if hasattr(self.game, "ACTION_NAMES"):
-            act_name = self.game.ACTION_NAMES.get(int(action), action)
+        act_name = info.get("action_name")
+        if act_name is None:
+            if hasattr(self.game, "action_to_str"):
+                act_name = self.game.action_to_str(action)
+            elif hasattr(self.game, "ACTION_NAMES"):
+                try:
+                    act_name = self.game.ACTION_NAMES.get(int(action), str(action))
+                except (TypeError, ValueError):
+                    act_name = str(action)
+            else:
+                act_name = str(action)
 
 
         info["action_name"] = str(act_name)
