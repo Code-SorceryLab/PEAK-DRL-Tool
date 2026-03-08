@@ -252,8 +252,8 @@ class PlatformerCore(gymnasium.Env):
         #
         # Knobs exposed as kwargs so they can be tuned from the config YAML
         # without touching this file.
-        self._curriculum_window_size  = int(kwargs.pop("curriculum_window",   5))
-        self._advance_threshold       = float(kwargs.pop("advance_threshold", 0.6))
+        self._curriculum_window_size  =   int(kwargs.pop("curriculum_window" ,   5))
+        self._advance_threshold       = float(kwargs.pop("advance_threshold" , 0.6))
         self._fallback_threshold      = float(kwargs.pop("fallback_threshold", 0.2))
         self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
 
