@@ -185,7 +185,15 @@ def _print_comparison(summaries):
 # Main
 # ══════════════════════════════════════════════════════════════════════════════
 def analyze_agent():
-    print("\n=== Agent Performance Analyzer ===")
+    # ── inline theme helpers (subprocess, no import of menu.py) ─────────
+    import os as _os, sys as _sys
+    _col = lambda c, t: (f"\033[{c}m{t}\033[0m" if hasattr(_sys.stdout, "isatty") and _sys.stdout.isatty() else t)
+    _RED  = lambda t: _col("91", t); _WHT = lambda t: _col("97", t)
+    _DIM  = lambda t: _col("2",  t); _CYN = lambda t: _col("96", t)
+    _BOLD = lambda t: _col("1",  t)
+    print()
+    print(f"    {_RED('▌')} {_BOLD(_WHT('AGENT PERFORMANCE ANALYZER'))}")
+    print(f"    {_DIM('─' * 54)}")
     all_files = get_all_log_files()
     if not all_files:
         print("❌ No training logs found. Run training first.")
