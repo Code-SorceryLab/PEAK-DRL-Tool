@@ -43,11 +43,44 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-def get_latest_log_file():
+def get_all_log_files():
+    """Return all CSV log files, newest first."""
     files = []
-    for root_dir in [".", "mylogs", "runs"]:
+    for root_dir in [".", "csv", "mylogs", "runs"]:
         files.extend(glob.glob(os.path.join(root_dir, "**", "training_log*.csv"), recursive=True))
-    return max(files, key=os.path.getmtime) if files else None
+    # Deduplicate and sort by modification time (newest first)
+    seen = set()
+    unique = []
+    for f in files:
+        fp = os.path.abspath(f)
+        if fp not in seen:
+            seen.add(fp)
+            unique.append(f)
+    return sorted(unique, key=os.path.getmtime, reverse=True)
+
+def get_latest_log_file():
+    files = get_all_log_files()
+    return files[0] if files else None
+
+def parse_run_info_from_filename(filepath):
+    """Extract persona, skill, architecture from CSV filename."""
+    basename = os.path.basename(filepath).replace("training_log_", "").replace(".csv", "")
+    parts = basename.split("_")
+    _ARCH_TAGS = {"light", "slim", "peak", "mlp"}
+    arch = None
+    if parts and parts[-1].lower() in _ARCH_TAGS:
+        arch = parts[-1]
+        parts = parts[:-1]
+    # Format: game_algo_persona_skill  or  game_algo_game_persona_skill
+    info = {"persona": "unknown", "skill": "unknown", "arch": arch or "unknown"}
+    if len(parts) >= 4:
+        info["skill"] = parts[-1]
+        # persona is everything between algo and skill
+        info["persona"] = "_".join(parts[2:-1])
+        game = parts[0]
+        if info["persona"].startswith(f"{game}_"):
+            info["persona"] = info["persona"][len(game)+1:]
+    return info
 
 def downsample(df, max_pts=2000):
     """Reduce to at most max_pts rows, keeping first+last. Main crash fix."""
@@ -104,19 +137,35 @@ with st.sidebar:
 # ── Load data ──────────────────────────────────────────────────────────────────
 st.title("PEAK AGENT TRAINING ANALYSIS DASHBOARD")
 
-log_file = get_latest_log_file()
-if not log_file:
+all_logs = get_all_log_files()
+if not all_logs:
     st.warning("WAITING FOR SIGNAL...  (no training_log*.csv found yet)")
     if do_refresh:
         time.sleep(2)
         st.rerun()
     st.stop()
 
+# Let user pick which log to view
+if len(all_logs) > 1:
+    log_labels = []
+    for f in all_logs:
+        info = parse_run_info_from_filename(f)
+        label = f"{info['persona']} | {info['skill']} | {info['arch']}  ({os.path.basename(f)})"
+        log_labels.append(label)
+    selected_log_idx = st.selectbox("Select training run:", range(len(all_logs)),
+                                     format_func=lambda i: log_labels[i])
+    log_file = all_logs[selected_log_idx]
+else:
+    log_file = all_logs[0]
+
 try:
     df = pd.read_csv(log_file, low_memory=False)
 except Exception as e:
     st.error(f"Could not read log: {e}")
     st.stop()
+
+# Parse run info from filename
+run_info = parse_run_info_from_filename(log_file)
 
 if df.empty:
     st.info("BUFFERING...")
@@ -139,10 +188,11 @@ reward_cols = [c for c in df.columns
     and "unnamed" not in c.lower()]
 
 total_steps = len(df)
-col_i1, col_i2, col_i3 = st.columns(3)
+col_i1, col_i2, col_i3, col_i4 = st.columns(4)
 col_i1.caption(f"Log: `{os.path.basename(log_file)}`")
 col_i2.caption(f"Rows: **{total_steps:,}**")
-col_i3.caption(f"{'LIVE' if do_refresh else 'PAUSED'}")
+col_i3.caption(f"Arch: **{run_info.get('arch', '?')}** | Persona: **{run_info.get('persona', '?')}**")
+col_i4.caption(f"{'LIVE' if do_refresh else 'PAUSED'}")
 
 if do_refresh:
     selected_idx = total_steps - 1

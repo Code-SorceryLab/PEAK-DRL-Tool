@@ -5,7 +5,7 @@ defaults:
 # lists of experiment dimensions
 games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
-architectures: [light, slim, ]  # light=~18K, slim=~77K (default), peak=~922K
+architectures: [light, slim, balanced, peak]  # light=~18K, slim=~77K, balanced=~230K, peak=~922K
 personas: [
   platformer_simple,
   platformer_dijkstra,

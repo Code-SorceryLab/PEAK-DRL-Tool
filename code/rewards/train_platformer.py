@@ -138,19 +138,16 @@ class _ScoreTracker:
             self.last_dist     = None  # also reset euclidean anchor for same reason
 
         # 4. Frontier
-        # BUG FIX: max_x was reset to current_x on life loss, meaning the agent
-        # earned frontier reward again for ground it had already covered after
-        # respawning behind its previous furthest point. max(0.0, ...) already
-        # prevents negative deltas so the reset was redundant and harmful.
-        # max_x now only ever increases — frontier reward requires genuinely new ground.
         current_x = float(info.get("x_position", 0.0))
         if self.last_x is None:
             self.last_x = current_x
             self.max_x  = current_x
+        if life_lost:
+            self.max_x = current_x
         env_max = float(info.get("max_x_seen", 0.0))
         if env_max > 0:
             frontier_delta = max(0.0, env_max - self.max_x)
-            self.max_x = max(self.max_x, env_max)
+            self.max_x = env_max
         else:
             frontier_delta = max(0.0, current_x - self.max_x)
             self.max_x = max(self.max_x, current_x)
@@ -202,75 +199,35 @@ def _wrap_with_tracker(core_fn) -> Callable:
 @_wrap_with_tracker
 def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    DIJKSTRA: Primary signal is potential-based Dijkstra reward shaping.
+    DIJKSTRA: Follow the Dijkstra gradient toward the goal.
 
-    Designed to run after simple — the agent already knows how to move,
-    this persona teaches it to move *optimally* along the Dijkstra gradient.
+    FIX: Previous version had potential signal ~0.001/step which was too
+    weak to guide the agent reliably. Increased POTENTIAL_SCALE to 3.0
+    so each step of progress gives a clear reward.
 
-    Reward budget (approx, 3000-step winning episode):
-      The potential-based reward telescopes approximately to:
-        POTENTIAL_SCALE × [d_start + (1-γ) × avg_d × T]
-        = 1.0 × [0.9 + 0.01 × 0.5 × 3000]
-        = 1.0 × [0.9 + 15]
-        ≈ 16.0  (step potential, varies with level layout)
-      r_alignment ≈  0.5   (0.005 × 0.5 alignment × 60fps × moderate speed)
-      r_win       = 15.0
-      r_time      ≈ -1.5
-      ─────────────────
-      Total win   ≈ +30
+    FIX: Added platform patience bonus — the agent gets a small reward
+    for riding a moving platform instead of being punished by the time
+    penalty. Without this the agent learns "never wait" and jumps off
+    every platform.
 
-    Losing episode (1500 steps, gets to d≈0.3):
-      Step potential ≈ 1500 × 0.01 × 0.6 + 0.6 ≈ 9.6
-      r_time        ≈ -0.75
-      r_death       = -5.0
-      ─────────────────
-      Total loss    ≈ +3.85
-
-    Winning is clearly better (+30 vs +4). The value function has a clean
-    ~26-point gap to learn from, and episode variance will be much lower
-    than simple because potential reward is bounded and continuous.
-
-    Changes from original:
-      - POTENTIAL_SCALE: 10.0 → 1.0
-        Was producing 100-1500 in cumulative step potential, completely
-        swamping the win bonus and inflating episode variance to 5000+.
-        With scale=1.0 step potential contributes ~16 — meaningful but
-        not dominant, win bonus remains the strongest terminal signal.
-      - ALIGNMENT_SCALE: 0.05 → 0.005
-        At 60fps the old value contributed up to 3.0/sec at full speed,
-        comparable to potential. Now a supporting signal (~0.3/sec max)
-        that nudges direction without competing with potential for dominance.
-      - r_kill: 0.5 → 0.05   (incidental, don't let it distract navigation)
-      - r_coin: 0.2 → 0.02   (incidental)
-      - r_stall: -0.01 → -0.002
-      - r_win:   20.0 → 15.0  (consistent with simple for comparable curves)
-      - r_death: -15.0 → -5.0 (game over)
-      - r_life:  -1.0  → -0.5 (life lost — lighter, jumping risk is fine)
-      - POTENTIAL_GAMMA kept at 0.99 — must match PPO gamma in algo config.
-        If you change PPO gamma, update this constant to match.
+    FIX: Reduced time penalty — was competing with the potential signal
+    on levels where progress is slow (vertical, platforms).
     """
     kills     = int(info.get("enemies_killed_step", 0))
     coins     = int(info.get("coins_delta", 0))
     won       = info.get("won", False)
     life_lost = info.get("life_lost", False)
     dijkstra_valid = info.get("dijkstra_valid", False)
+    on_platform    = info.get("on_moving_platform", False)
 
-    r_gradient = 0.0  # disabled — superseded by r_potential below
+    r_gradient = 0.0  # disabled — r_potential replaces it
 
-    # =========================================================================
-    # Potential-Based Reward Shaping  (Ng et al. 1999)
-    # =========================================================================
-    # Φ(s) = -dijkstra_dist  (lower cost = closer to goal = higher potential)
-    # F(s,s') = γ·Φ(s') - Φ(s) = prev_d - γ·curr_d
-    #
-    # Telescopes over a full episode to approximately:
-    #   d_start + (1-γ)·sum(d_t)  ×  POTENTIAL_SCALE
-    # With γ=0.99 the (1-γ) leak adds a small "living near goal" bonus that
-    # is bounded and continuous — much lower variance than sparse win bonuses.
-    #
-    # POTENTIAL_GAMMA must match the PPO gamma in your algo config.
-    POTENTIAL_GAMMA = 0.99
-    POTENTIAL_SCALE = 1.0    # was 10.0 — see docstring for budget analysis
+    # ── Potential-Based Reward Shaping ────────────────────────────────────
+    # Φ(s) = -dijkstra_dist → shaped = prev - γ·curr
+    # SCALE=3.0 gives ~0.003-0.01 per step of progress, strong enough
+    # that the agent can see the gradient over 100+ steps.
+    POTENTIAL_GAMMA  = 0.99
+    POTENTIAL_SCALE  = 3.0
 
     r_potential = 0.0
     curr_dijkstra = float(info.get("dijkstra_dist", -1.0))
@@ -278,56 +235,51 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
 
     if dijkstra_valid and prev_dijkstra >= 0.0:
         r_potential = (prev_dijkstra - POTENTIAL_GAMMA * curr_dijkstra) * POTENTIAL_SCALE
-    # =========================================================================
-    # End Potential-Based Reward Shaping
-    # =========================================================================
 
-    # =========================================================================
-    # Velocity Alignment
-    # =========================================================================
-    # Bonus when movement direction aligns with cheapest reachable neighbour.
-    # step_dx/step_dy come from _tracking_obs (8-direction Dijkstra search).
-    # Guard: speed > 0.5 ignores jitter; dijkstra_valid ensures a valid path.
-    # ALIGNMENT_SCALE: 0.005 × 60fps ≈ 0.3 max reward/sec — supporting signal,
-    # intentionally weaker than r_potential.
-    ALIGNMENT_SCALE = 0.005   # was 0.05 — see docstring for budget analysis
+    # ── Velocity Alignment (only when NOT on a platform) ──────────────────
+    # On platforms player.vx ≈ 0 so alignment would always be 0.
+    # Skip it on platforms so the agent isn't penalized for patience.
+    ALIGNMENT_SCALE = 0.005
 
     r_alignment = 0.0
-    if dijkstra_valid:
+    if dijkstra_valid and not on_platform:
         vx    = float(info.get("velocity_x", 0.0))
         vy    = float(info.get("velocity_y", 0.0))
         speed = math.sqrt(vx * vx + vy * vy)
         if speed > 0.5:
-            step_dx   = float(info.get("step_dx", 0.0))
-            step_dy   = float(info.get("step_dy", 0.0))
-            alignment = (vx / speed) * step_dx + (vy / speed) * step_dy
+            step_dx = float(info.get("step_dx", 0.0))
+            step_dy = float(info.get("step_dy", 0.0))
+            alignment   = (vx / speed) * step_dx + (vy / speed) * step_dy
             r_alignment = max(0.0, alignment) * ALIGNMENT_SCALE
-    # =========================================================================
-    # End Velocity Alignment
-    # =========================================================================
 
-    r_coin  = 0.002 * coins   # incidental — navigation takes priority
-    r_kill  = 0.005 * kills   # incidental — don't let kills distract the gradient
+    # ── Platform patience bonus ───────────────────────────────────────────
+    # Small positive reward for riding a platform. Offsets the time penalty
+    # so the agent learns "waiting on a platform is productive, not wasteful."
+    r_patience = 0.001 if on_platform else 0.0
 
-    r_stall = -0.05 if bool(info.get("stalled", False)) else 0.0
+    r_coin = 0.05 * coins
+    r_kill = 0.08 * kills
+
+    r_stall = -0.002 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
-        r_win  = 1.50              # consistent with simple for comparable TB curves
+        r_win  = 3.0
     elif terminated:
-        r_death = -0.50             # game over
+        r_death = -2.0
     elif life_lost:
-        r_death = -0.05             # life lost — kept light so jumping risk is acceptable
+        r_death = -0.15
 
     return {
         "gradient":   r_gradient,
         "potential":  r_potential,
         "alignment":  r_alignment,
+        "patience":   r_patience,
         "stall":      r_stall,
         "coins":      r_coin,
         "kills":      r_kill,
         "win":        r_win,
-        "time":       -0.00005,     # -1.5 over 3000 steps — consistent with simple
+        "time":       -0.00002,     # Reduced — was competing with potential on slow levels
         "death":      r_death,
     }
 
@@ -335,78 +287,57 @@ def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) ->
 @_wrap_with_tracker
 def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    SIMPLE: Euclidean progress + frontier exploration bonus.
+    SIMPLE: Euclidean progress + frontier exploration.
 
-    Deliberately lightweight — good baseline and first training stage before
-    delta_dijkstra. All signals are rescaled so total episode returns land
-    in roughly [-5, +20], giving VecNormalize a stable distribution to work
-    with and keeping the win bonus clearly the dominant terminal signal.
+    FIX: Backtrack multiplier was 2.5x — too harsh for levels that require
+    going left (Path Finding, vertical levels). Reduced to 1.5x.
 
-    Reward budget (approx, 3000-step winning episode):
-      r_move     ≈  1.5   (0.02 × 0.05 tiles/step × 3000 × 50% moving)
-      r_frontier ≈  0.6   (dries up after early exploration)
-      r_win      = 15.0   (dominant terminal signal)
-      r_time     ≈ -1.5   (-0.0005 × 3000)
-      ─────────────────
-      Total win  ≈ +15.6
+    FIX: Stall penalty now suppressed on moving platforms — agent was being
+    punished for riding platforms because player.vx = 0 while carried.
 
-    Losing episode (1500 steps):
-      r_move     ≈  0.5
-      r_time     ≈ -0.75
-      r_death    = -5.0   (game over) or -1.5 (life lost × 3)
-      ─────────────────
-      Total loss ≈ -5.25
-
-    The ~20-point gap between winning and losing is large enough to give
-    the value function a clear signal while keeping variance manageable.
-
-    Changes from original:
-      - r_win:      200 → 15    (was dominating all step rewards by 100×)
-      - r_move:     ×0.15 → ×0.02
-      - r_frontier: ×0.2  → ×0.03
-      - r_coin:     ×0.05 → ×0.01
-      - r_kill:     ×0.5  → ×0.1
-      - r_death:    -15   → -5  (game over), -3 → -1.5 (life lost)
-      - r_time:     -0.002 → -0.0005  (was -6 over long episodes, > win bonus)
-      - Removed inline stall penalty (abs(progress)<0.5 branch) — this fired
-        on every jump frame and silently punished vertical movement. The env's
-        own anti-stall system already handles genuine stalling.
-      - Removed backtrack multiplier (progress<0 × 2.5) — the base negative
-        r_move already penalises backward movement; doubling it over-punished
-        legitimate repositioning (e.g. backing up to get a run-up).
+    FIX: Added platform patience bonus so agent learns to wait on platforms
+    instead of jumping off immediately.
     """
-    progress  = float(info.get("progress", 0.0))
-    frontier  = float(info.get("frontier_dx", 0.0))
-    kills     = int(info.get("enemies_killed_step", 0))
-    coins     = int(info.get("coins_delta", 0))
-    won       = info.get("won", False)
-    life_lost = info.get("life_lost", False)
+    progress    = float(info.get("progress", 0.0))
+    frontier    = float(info.get("frontier_dx", 0.0))
+    kills       = int(info.get("enemies_killed_step", 0))
+    coins       = int(info.get("coins_delta", 0))
+    won         = info.get("won", False)
+    life_lost   = info.get("life_lost", False)
+    on_platform = info.get("on_moving_platform", False)
 
-    # Forward/backward movement signal — linear, no multipliers
-    r_move = progress * 0.0015
+    # Forward progress — softer backtrack penalty
+    r_move = progress * 0.015
+    if progress < 0:
+        r_move *= 1.5       # Reduced from 2.5 — non-linear levels need backtracking
 
-    # Frontier: reward genuinely new ground only (bug-fixed in tracker)
-    r_frontier = frontier * 0.003
+    # Stall penalty — NOT on moving platforms
+    if not on_platform and abs(progress) < 0.5:
+        r_move -= 0.0008
 
-    r_coin = 0.001 * coins
-    r_kill = 0.010 * kills
-    r_stall = -0.05 if bool(info.get("stalled", False)) else 0.0
+    # Platform patience bonus
+    r_patience = 0.001 if on_platform else 0.0
+
+    r_frontier = frontier * 0.02
+    r_coin     = 0.01 * coins
+    r_kill     = 0.05 * kills
+
     r_win, r_death = 0.0, 0.0
     if won:
-        r_win  = 1.50              # Clearly dominant — winning must be the best outcome
+        r_win  = 3.0
     elif terminated:
-        r_death = -0.50             # Game over — meaningfully bad
+        r_death = -2.0
     elif life_lost:
-        r_death = -0.15             # Life lost — hurts but not catastrophic
+        r_death = -0.3
 
     return {
         "movement": r_move,
+        "patience": r_patience,
         "frontier": r_frontier,
         "coins":    r_coin,
         "kills":    r_kill,
         "win":      r_win,
-        "stall":    r_stall,
-        "time":     -0.0005,       # -1.5 over 3000 steps — modest pressure, won't dominate
+        "time":     -0.0001,
         "death":    r_death,
     }
 
@@ -433,31 +364,31 @@ def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
     life_lost = info.get("life_lost", False)
 
     # ── Primary signal: coins (the ONLY strong positive) ───────────────
-    r_coin = 5.0 * coins
+    r_coin = 0.5 * coins
 
     # ── Exploration: reward visiting new ground (where uncollected coins live)
     frontier = float(info.get("frontier_dx", 0.0))
-    r_frontier = frontier * 0.3
+    r_frontier = frontier * 0.03
 
     # ── Survival bonus: staying alive = more time to find coins ────────
-    r_alive = 0.002
+    r_alive = 0.0002
 
     # ── NO dijkstra potential — deliberately omitted ───────────────────
     # r_potential = 0.0  (not computed at all)
 
-    r_kill = 0.2 * kills           # Incidental, not a focus
+    r_kill = 0.02 * kills          # Incidental, not a focus
 
-    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+    r_stall = -0.002 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
         # Win bonus scales with coins collected — completing with 0 coins
-        # is worth almost nothing; completing with 20+ coins is huge.
-        r_win = 5.0 + min(total_coins, 30) * 1.0   # 5 base + up to 30 bonus
+        # is worth almost nothing; completing with 20+ coins is significant.
+        r_win = 0.5 + min(total_coins, 30) * 0.1   # 0.5 base + up to 3.0 bonus
     elif terminated:
-        r_death = -15.0
+        r_death = -1.5
     elif life_lost:
-        r_death = -2.0
+        r_death = -0.2
 
     return {
         "coins":     r_coin,
@@ -466,7 +397,7 @@ def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
         "kills":     r_kill,
         "stall":     r_stall,
         "win":       r_win,
-        "time":      -0.0001,      # Near-zero: don't pressure speed
+        "time":      -0.00001,     # Near-zero: don't pressure speed
         "death":     r_death,
     }
 
@@ -492,31 +423,31 @@ def enemy_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> D
     powered_up = bool(info.get("powered_up", False))
 
     # ── Primary signal: kills (the ONLY strong positive) ───────────────
-    r_kill = 8.0 * kills
+    r_kill = 0.8 * kills
 
     # ── Powerup bonus: being big = safer stomps ────────────────────────
-    r_powerup = 0.008 if powered_up else 0.0
+    r_powerup = 0.001 if powered_up else 0.0
 
     # ── Exploration: move forward to find new enemies ──────────────────
     frontier = float(info.get("frontier_dx", 0.0))
-    r_frontier = frontier * 0.25
+    r_frontier = frontier * 0.025
 
     # ── Survival bonus: alive = more chances to kill ───────────────────
-    r_alive = 0.001
+    r_alive = 0.0001
 
     # ── NO dijkstra potential — deliberately omitted ───────────────────
 
-    r_coin = 0.1 * coins           # Incidental
+    r_coin = 0.01 * coins          # Incidental
 
-    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+    r_stall = -0.002 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
-        r_win  = 10.0              # Moderate: finishing is fine but not the goal
+        r_win  = 1.0               # Moderate: finishing is fine but not the goal
     elif terminated:
-        r_death = -8.0             # Lighter: aggressive play = more deaths expected
+        r_death = -0.8             # Lighter: aggressive play = more deaths expected
     elif life_lost:
-        r_death = -0.5             # Very light: dying to attempt a kill is acceptable
+        r_death = -0.05            # Very light: dying to attempt a kill is acceptable
 
     return {
         "kills":     r_kill,
@@ -526,7 +457,7 @@ def enemy_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> D
         "coins":     r_coin,
         "stall":     r_stall,
         "win":       r_win,
-        "time":      -0.0001,      # Near-zero: no rush, find enemies
+        "time":      -0.00001,     # Near-zero: no rush, find enemies
         "death":     r_death,
     }
 
@@ -549,14 +480,14 @@ def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
 
     # ── Primary signal: rightward velocity ─────────────────────────────
     vx = float(info.get("velocity_x", 0.0))
-    r_velocity = max(0.0, vx) * 0.05    # Only reward rightward, ignore leftward
+    r_velocity = max(0.0, vx) * 0.005   # Only reward rightward, ignore leftward
     # Penalise standing still or moving left
     if vx < 0.5:
-        r_velocity -= 0.01
+        r_velocity -= 0.001
 
     # ── Moderate dijkstra potential for direction ──────────────────────
     POTENTIAL_GAMMA = 0.99
-    POTENTIAL_SCALE = 8.0
+    POTENTIAL_SCALE = 0.8
 
     r_potential = 0.0
     curr_d = float(info.get("dijkstra_dist", -1.0))
@@ -566,20 +497,20 @@ def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
 
     # ── Backtrack penalty ──────────────────────────────────────────────
     progress = float(info.get("progress", 0.0))
-    r_backtrack = min(0.0, progress) * 0.5  # Only when progress < 0
+    r_backtrack = min(0.0, progress) * 0.05 # Only when progress < 0
 
     r_coin = 0.0                   # Zero: don't waste time on coins
     r_kill = 0.0                   # Zero: don't waste time on enemies
 
-    r_stall = -0.04 if bool(info.get("stalled", False)) else 0.0
+    r_stall = -0.004 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
-        r_win  = 40.0              # Massive: the whole point
+        r_win  = 4.0               # Highest win bonus: the whole point
     elif terminated:
-        r_death = -10.0
+        r_death = -1.0
     elif life_lost:
-        r_death = -2.0
+        r_death = -0.2
 
     return {
         "velocity":  r_velocity,
@@ -587,7 +518,7 @@ def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
         "backtrack": r_backtrack,
         "stall":     r_stall,
         "win":       r_win,
-        "time":      -0.005,       # 10× vs dijkstra — brutal time pressure
+        "time":      -0.0005,      # 10× vs dijkstra — time pressure
         "death":     r_death,
     }
 
@@ -614,7 +545,7 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
 
     # ── Moderate dijkstra potential (same magnitude as coin/kill events) ─
     POTENTIAL_GAMMA = 0.99
-    POTENTIAL_SCALE = 6.0          # Weaker than dijkstra(10) / speedrunner(8)
+    POTENTIAL_SCALE = 0.6          # Weaker than dijkstra(1.0) / speedrunner(0.8)
 
     r_potential = 0.0
     curr_d = float(info.get("dijkstra_dist", -1.0))
@@ -623,20 +554,20 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
         r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
 
     # ── All objectives at meaningful weight ────────────────────────────
-    r_coin     = 3.0 * coins       # Strong (between dijkstra 0.2 and coin_hunter 5.0)
-    r_kill     = 4.0 * kills       # Strong (between dijkstra 0.5 and enemy_hunter 8.0)
-    r_frontier = float(info.get("frontier_dx", 0.0)) * 0.2
+    r_coin     = 0.3 * coins       # Between dijkstra (0.02) and coin_hunter (0.5)
+    r_kill     = 0.4 * kills       # Between dijkstra (0.05) and enemy_hunter (0.8)
+    r_frontier = float(info.get("frontier_dx", 0.0)) * 0.02
 
-    r_stall = -0.015 if bool(info.get("stalled", False)) else 0.0
+    r_stall = -0.002 if bool(info.get("stalled", False)) else 0.0
 
     r_win, r_death = 0.0, 0.0
     if won:
         # Bonus scales with how "complete" the run was
-        r_win = 15.0 + min(total_coins, 30) * 0.5
+        r_win = 1.5 + min(total_coins, 30) * 0.05
     elif terminated:
-        r_death = -20.0            # Harsh: completionists don't die
+        r_death = -2.0             # Harsh: completionists don't die
     elif life_lost:
-        r_death = -4.0             # Strictest life penalty
+        r_death = -0.4             # Strictest life penalty
 
     return {
         "potential": r_potential,
@@ -645,7 +576,7 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
         "frontier":  r_frontier,
         "stall":     r_stall,
         "win":       r_win,
-        "time":      -0.001,       # Moderate time pressure
+        "time":      -0.0001,      # Moderate time pressure
         "death":     r_death,
     }
 
@@ -659,4 +590,4 @@ platformer_coin_hunter = coin_hunter
 platformer_enemy_hunter = enemy_hunter
 platformer_speedrunner = speedrunner
 platformer_completionist = completionist
-default                = simple
+default                = simple 

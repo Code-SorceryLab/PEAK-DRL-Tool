@@ -320,6 +320,7 @@ class PhysicsManager:
                 player.vy       = 0
                 player.on_ground = True
                 player.jump_hold = 0
+                player._on_moving_platform = True
 
             else:
                 # ── Ceiling hit (jumping into underside) ──────────────────────
