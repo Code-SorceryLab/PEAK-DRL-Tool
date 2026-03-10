@@ -682,6 +682,7 @@ class Level:
     def __init__(self, rows=DEFAULT_ROWS, cols=DEFAULT_COLS):
         self.rows=rows; self.cols=cols; self.grid=[[' ']*cols for _ in range(rows)]
         self.platforms=[]; self.filename=None; self.level_id=None
+        self.physics_overrides={}; self.enemy_physics={}
     def get(self,r,c): return self.grid[r][c] if 0<=r<self.rows and 0<=c<self.cols else None
     def set(self,r,c,ch):
         if r<0 or c<0: return
@@ -723,6 +724,10 @@ class Level:
         if yaml is None: return
         yp=str(tp).rsplit('.',1)[0]+'.yaml'
         d={'dynamics':{'moving_platforms':[p.to_dict() for p in self.platforms]} if self.platforms else {}}
+        if self.physics_overrides:
+            d['physics']=self.physics_overrides
+        if self.enemy_physics:
+            d.setdefault('physics',{})['enemies']=self.enemy_physics
         with open(yp,'w') as f: yaml.dump(d,f,default_flow_style=False,sort_keys=False)
     def _load_yaml(self, tp):
         if yaml is None: return
@@ -732,11 +737,16 @@ class Level:
             with open(yp,'r') as f: data=yaml.safe_load(f) or {}
             for pd in (data.get('dynamics',{}) or {}).get('moving_platforms',[]):
                 self.platforms.append(PlatformDef.from_dict(pd))
+            ph=data.get('physics',{}) or {}
+            if ph:
+                self.physics_overrides={k:v for k,v in ph.items() if k!='enemies'}
+                self.enemy_physics=ph.get('enemies',{}) or {}
         except Exception as e: print(f"[Editor] YAML sidecar error: {e}")
     def clone(self):
         n=Level(self.rows,self.cols); n.grid=[r[:] for r in self.grid]
         n.filename=self.filename; n.level_id=self.level_id
         n.platforms=[PlatformDef(p.start[:],p.end[:],p.speed,p.width,p.height) for p in self.platforms]
+        n.physics_overrides=dict(self.physics_overrides); n.enemy_physics=dict(self.enemy_physics)
         return n
     @classmethod
     def from_ascii(cls, text):
@@ -803,6 +813,13 @@ class Editor:
             PhysicsSlider("Max Run","max_run",150,50,500,10),
             PhysicsSlider("Jump Vel","jump_vel",800,200,1500,25),
             PhysicsSlider("Max Fall","max_fall",550,200,1200,25),
+        ]
+        ep=(ph.get('enemies',{}) or {}) if ph else {}
+        self.enemy_sliders=[
+            PhysicsSlider("Walk Spd","enemy_speed",ep.get('walk_speed',60),10,300,5),
+            PhysicsSlider("Grav Mult","enemy_grav_pct",ep.get('gravity_mult',1.0)*100,10,300,10),
+            PhysicsSlider("Max Fall","enemy_max_fall",ep.get('max_fall_speed',550),100,1200,25),
+            PhysicsSlider("Patrol W","enemy_patrol_w",ep.get('patrol_width',96),16,512,16),
         ]
         self._center()
     def _center(self):
@@ -1172,6 +1189,24 @@ def draw_right_panel(surf,ed,sfont,mpos):
         if fw>0:pygame.draw.rect(surf,UI_ACCENT,(tr.x+2,tr.y+2,fw,4),border_radius=2)
         tx2=tr.x+2+int(fr*(sw-4));pygame.draw.rect(surf,UI_TEXT,(tx2-4,tr.y-2,8,12),border_radius=3)
         sl.rect=tr;y+=16
+    # Enemy Physics
+    pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
+    try:sfont.render_to(surf,(rx+pad,y),"ENEMY PHYSICS",fgcolor=(220,140,80),size=12)
+    except:pass
+    y+=14
+    for sl in ed.enemy_sliders:
+        val_str=f"{sl.value/100:.2f}x" if sl.key=="enemy_grav_pct" else f"{sl.value:.0f}"
+        try:
+            sfont.render_to(surf,(rx+pad+2,y),sl.label,fgcolor=UI_SUBTEXT,size=9)
+            vb=sfont.get_rect(val_str,size=9)
+            sfont.render_to(surf,(rx+cw-pad-vb.width-2,y),val_str,fgcolor=(220,180,120),size=9)
+        except:pass
+        y+=13;tr=pygame.Rect(rx+pad+2,y,sw,8)
+        pygame.draw.rect(surf,UI_PANEL2,tr,border_radius=4);pygame.draw.rect(surf,UI_BORDER,tr,1,border_radius=4)
+        fr=sl.fraction();fw=int(fr*(sw-4))
+        if fw>0:pygame.draw.rect(surf,(200,110,40),(tr.x+2,tr.y+2,fw,4),border_radius=2)
+        tx2=tr.x+2+int(fr*(sw-4));pygame.draw.rect(surf,(220,180,120),(tx2-4,tr.y-2,8,12),border_radius=3)
+        sl.rect=tr;y+=16
     ch=(y+ed.right_scroll)-ry;ed.right_max_scroll=max(0,ch-rh+16)
     ed.right_scroll=min(ed.right_scroll,ed.right_max_scroll);surf.set_clip(None)
     # Scrollbar
@@ -1307,7 +1342,15 @@ def do_action(result,ed,scr,sf):
             except Exception as e:print(f"[Editor] {e}")
     elif result=="SAVE":
         p=ed.level.filename or dlg_save(scr,sf)
-        if p:ed.level.save(p);ed.dirty=False;print(f"[Editor] Saved: {p}")
+        if p:
+            # Bake slider values back into the level before writing
+            ed.level.enemy_physics={
+                'walk_speed':   ed.enemy_sliders[0].value,
+                'gravity_mult': round(ed.enemy_sliders[1].value/100.0, 3),
+                'max_fall_speed': ed.enemy_sliders[2].value,
+                'patrol_width': ed.enemy_sliders[3].value,
+            }
+            ed.level.save(p); ed.dirty=False; print(f"[Editor] Saved: {p}")
     elif result=="RESIZE":
         r,c=dlg_resize(scr,sf,ed.level.rows,ed.level.cols)
         if r and c:ed.resize_grid(r,c);ed._center()
@@ -1417,6 +1460,9 @@ def main():
                             for sl in ed.phys_sliders:
                                 if sl.rect.collidepoint(ex,ey):sl.dragging=True;sl.set_from_fraction((ex-sl.rect.x)/max(1,sl.rect.width));h=True;break
                         if not h:
+                            for sl in ed.enemy_sliders:
+                                if sl.rect.collidepoint(ex,ey):sl.dragging=True;sl.set_from_fraction((ex-sl.rect.x)/max(1,sl.rect.width));h=True;break
+                        if not h:
                             if ed._spd_m.collidepoint(ex,ey):ed.plat_default_spd=max(10,ed.plat_default_spd-10)
                             elif ed._spd_p.collidepoint(ex,ey):ed.plat_default_spd=min(500,ed.plat_default_spd+10)
                     elif in_lp:
@@ -1461,12 +1507,15 @@ def main():
                     ed.painting=False;ed.last_cell=None;pstarted=False;ed.drag_handle=None
                     ed._sb_drag=False;ed._hs_drag=False
                     for sl in ed.phys_sliders:sl.dragging=False
+                    for sl in ed.enemy_sliders:sl.dragging=False
                 elif ev.button==2:ed.panning=False
             elif ev.type==pygame.MOUSEMOTION:
                 if ed._drag_lid:
                     sy2=my+ed.right_scroll-ed._lv_list_top
                     ed._drag_di=max(0,min(len(ed.gc.level_ids)-1,sy2//ed._lv_row_h));ed._drag_y=my
                 for sl in ed.phys_sliders:
+                    if sl.dragging:sl.set_from_fraction((ev.pos[0]-sl.rect.x)/max(1,sl.rect.width))
+                for sl in ed.enemy_sliders:
                     if sl.dragging:sl.set_from_fraction((ev.pos[0]-sl.rect.x)/max(1,sl.rect.width))
                 if ed._sb_drag:
                     dy=ev.pos[1]-ed._sb_dy;rh2=WINDOW_H-TOOLBAR_H-STATUS_H

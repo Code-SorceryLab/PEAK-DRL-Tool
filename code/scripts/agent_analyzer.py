@@ -184,16 +184,48 @@ def _print_comparison(summaries):
 # ══════════════════════════════════════════════════════════════════════════════
 # Main
 # ══════════════════════════════════════════════════════════════════════════════
+def _parse_run_id(filepath):
+    """Parse persona, skill, and architecture from CSV filename.
+    
+    New format: training_log_{game}_{algo}_{persona}_{skill}_{arch}.csv
+    Legacy format: training_log_{game}_{persona}.csv
+    """
+    basename = os.path.basename(filepath)
+    name = basename.replace("training_log_", "").replace(".csv", "")
+    parts = name.split("_")
+    
+    _ARCH_TAGS = {"light", "slim", "peak", "mlp"}
+    arch = None
+    if parts and parts[-1].lower() in _ARCH_TAGS:
+        arch = parts[-1]
+        parts = parts[:-1]
+    
+    _SKILL_TAGS = {"novice", "expert", "custom"}
+    skill = None
+    if parts and parts[-1].lower() in _SKILL_TAGS:
+        skill = parts[-1]
+        parts = parts[:-1]
+    
+    # Remaining: game_algo_persona or game_persona
+    if len(parts) >= 3:
+        game = parts[0]
+        persona = "_".join(parts[2:])
+        if persona.startswith(f"{game}_"):
+            persona = persona[len(game)+1:]
+    elif len(parts) >= 2:
+        persona = parts[1]
+    else:
+        persona = name
+    
+    # Build display label
+    label_parts = [persona]
+    if skill: label_parts.append(skill)
+    if arch:  label_parts.append(f"[{arch}]")
+    return " | ".join(label_parts)
+
+
 def analyze_agent():
-    # ── inline theme helpers (subprocess, no import of menu.py) ─────────
-    import os as _os, sys as _sys
-    _col = lambda c, t: (f"\033[{c}m{t}\033[0m" if hasattr(_sys.stdout, "isatty") and _sys.stdout.isatty() else t)
-    _RED  = lambda t: _col("91", t); _WHT = lambda t: _col("97", t)
-    _DIM  = lambda t: _col("2",  t); _CYN = lambda t: _col("96", t)
-    _BOLD = lambda t: _col("1",  t)
-    print()
-    print(f"    {_RED('▌')} {_BOLD(_WHT('AGENT PERFORMANCE ANALYZER'))}")
-    print(f"    {_DIM('─' * 54)}")
+    print("\n=== Agent Performance Analyzer ===")
     all_files = get_all_log_files()
     if not all_files:
         print("❌ No training logs found. Run training first.")
@@ -201,11 +233,9 @@ def analyze_agent():
 
     print(f"📂 Found {len(all_files)} CSV log(s):")
 
-    per_persona = {}
+    per_run = {}
     for f in all_files:
-        basename = os.path.basename(f)
-        parts = basename.replace("training_log_", "").replace(".csv", "").split("_", 1)
-        persona_name = parts[1] if len(parts) > 1 else basename
+        run_label = _parse_run_id(f)
         print(f"   • {f}", end="")
         try:
             df, total_rows = _load_csv_safe(f)
@@ -214,20 +244,20 @@ def analyze_agent():
                 continue
             sampled_note = f" (sampled to {len(df):,})" if len(df) < total_rows else ""
             print(f"  {total_rows:,} rows{sampled_note}")
-            per_persona[persona_name] = df
+            per_run[run_label] = df
         except Exception as e:
             print(f"  ⚠  Skipped: {e}")
 
-    if not per_persona:
+    if not per_run:
         print("❌ All files failed to load.")
         return
 
     print(f"\n{'═'*58}")
-    print(f"  🤖  PEAK AGENT PERFORMANCE REPORT  ({len(per_persona)} persona(s))")
+    print(f"  🤖  PEAK AGENT PERFORMANCE REPORT  ({len(per_run)} run(s))")
     print(f"{'═'*58}")
 
     summaries = {}
-    for name, df in per_persona.items():
+    for name, df in per_run.items():
         summaries[name] = _analyze_single(df, name)
 
     if len(summaries) > 1:

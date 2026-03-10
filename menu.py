@@ -246,7 +246,7 @@ def get_available_architectures_from_grid():
     cfg = load_grid_config()
     if cfg is not None and "architectures" in cfg and cfg.architectures:
         return list(cfg.architectures)
-    return ["light", "slim", "peak"]
+    return ["light", "slim", "balanced", "peak"]
 
 
 def get_trained_models_count():
@@ -302,127 +302,113 @@ def open_browser(url):
             pass
     print(f"If your browser did not open automatically, go to: {url}")
 
-
-# ── Shared theme helpers (defined here so they are available before LOGO) ──────
-_SUPPORTS_COLOR = (
-    hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-    and os.environ.get("NO_COLOR") is None
-)
-def _c(code, text):
-    return f"\033[{code}m{text}\033[0m" if _SUPPORTS_COLOR else text
-
-_DIM  = lambda t: _c("2",    t)
-_BOLD = lambda t: _c("1",    t)
-_CYAN = lambda t: _c("96",   t)
-_MAG  = lambda t: _c("95",   t)
-_YEL  = lambda t: _c("93",   t)
-_GRN  = lambda t: _c("92",   t)
-_RED  = lambda t: _c("91",   t)
-_WHT  = lambda t: _c("97",   t)
-
-
-def _sub_header(title: str):
-    """Themed section header for sub-menus."""
-    bar = "─" * 54
-    print()
-    print(f"    {_RED('▌')} {_BOLD(_WHT(title.upper()))}")
-    print(f"    {_DIM(bar)}")
-
-
-def _row(key: str, label: str, hint: str = "") -> str:
-    k = _YEL(f"  [{key:>2}]")
-    h = _DIM(f"  {hint}") if hint else ""
-    return f"{k}  {label}{h}"
-
-
-def _err(msg: str):
-    print(_RED(f"\n    ✖  {msg}"))
-
-
-def _ok(msg: str):
-    print(_GRN(f"\n    ✔  {msg}"))
-
-
 def ask_index(prompt, options, add_back=True, default=None):
-    """Themed numbered picker — returns chosen item or None for back."""
+    """Print numbered options and return the selected item (or None if back)"""
     if not options:
-        _err("No options available.")
+        print("No options available.")
         return None
 
-    print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(prompt)}")
+    print(prompt)
     for i, opt in enumerate(options, 1):
-        flag = _DIM("  (default)") if opt == default else ""
-        print(f"    {_YEL(f'[{i:>2}]')}  {opt}{flag}")
+        default_flag = " (default)" if opt == default else ""
+        print(f"  {i}. {opt}{default_flag}")
+
+    back_idx = len(options) + 1
     if add_back:
-        print(f"    {_YEL(f'[{len(options)+1:>2}]')}  {_DIM('Back')}")
+        print(f"  {back_idx}. Back")
 
-    hint = f" or Enter for [{default}]" if default else ""
-    raw = input(_BOLD(f"    ⟫{hint} ")).strip()
+    prompt_text = f"Select (1-{back_idx if add_back else len(options)})"
+    if default:
+        prompt_text += f" or Enter for [{default}]"
+    prompt_text += ": "
 
-    if raw == "" and default:
+    choice = input(prompt_text).strip()
+
+    if choice == "" and default:
         return default
+
     try:
-        n = int(raw)
-        if add_back and n == len(options) + 1:
+        num = int(choice)
+        if add_back and num == back_idx:
             return None
-        if 1 <= n <= len(options):
-            return options[n - 1]
+        if 1 <= num <= len(options):
+            return options[num - 1]
     except ValueError:
         pass
-    _err(f"Invalid selection: '{raw}'")
+
+    print("Invalid selection.")
     return None
-
-
-def _toggle_picker(prompt: str, options: list, defaults: list = None,
-                   labels: dict = None) -> list:
-    """
-    Interactive multi-select toggle picker.
-    Type numbers to toggle items on/off. Enter with no input confirms.
-    Returns list of selected items (may be empty).
-    """
-    selected = set(defaults or options)  # default: all on
-    labels = labels or {}
-
-    while True:
-        print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(prompt)}")
-        print(f"    {_DIM('Type numbers to toggle · Enter to confirm')}")
-        for i, opt in enumerate(options, 1):
-            tick  = _GRN("✓") if opt in selected else _DIM("○")
-            extra = _DIM(f"  {labels[opt]}") if opt in labels else ""
-            print(f"    {_YEL(f'[{i}]')}  {tick}  {opt}{extra}")
-
-        raw = input(_BOLD("    ⟫ ")).strip()
-        if raw == "":
-            break
-        if raw.lower() == "a":
-            selected = set(options)
-            continue
-        if raw.lower() == "n":
-            selected = set()
-            continue
-        for tok in raw.replace(",", " ").split():
-            try:
-                idx = int(tok) - 1
-                if 0 <= idx < len(options):
-                    opt = options[idx]
-                    if opt in selected:
-                        selected.discard(opt)
-                    else:
-                        selected.add(opt)
-            except ValueError:
-                pass
-
-    return [o for o in options if o in selected]
-
 
 def ensure_current_algo():
     """Ensure CURRENT_ALGO is set, defaulting to PPO if available"""
     global CURRENT_ALGO
+
     if CURRENT_ALGO is None:
         algos = get_available_algos_from_grid()
         if algos:
             CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
 
+def toggle_select(title, options, default_indices=None, min_select=1, show_desc=None):
+    """
+    Interactive toggle-style multi-select.
+    
+    Type a number to flip that item on/off.  Press Enter to confirm.
+    Returns a list of selected items, or None if the user backs out.
+    
+    show_desc: optional dict {option: description_string} for extra info per row.
+    """
+    selected = set(default_indices or [0])   # 0-based indices
+
+    while True:
+        print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}  {_DIM('(toggle · Enter to confirm)')}")
+        print(_DIM("    Type numbers to toggle  ·  Enter to confirm  ·  0 = Back"))
+        print()
+
+        for i, opt in enumerate(options):
+            tick = _GRN("✓") if i in selected else _DIM("o")
+            desc = ""
+            if show_desc:
+                d = show_desc.get(opt, "")
+                if d:
+                    desc = _DIM(f"  {d}")
+            print(f"    {_YEL(f'[{i+1}]')}  {tick}  {opt}{desc}")
+
+        print()
+        raw = input(_BOLD("    ⟫ ")).strip()
+
+        if raw == "":
+            if len(selected) >= min_select:
+                return [options[i] for i in sorted(selected)]
+            print(_RED(f"    Please select at least {min_select} item(s)."))
+            continue
+
+        if raw == "0":
+            return None
+
+        # Support comma-separated and range input: "1,3" or "1-3"
+        tokens = []
+        for part in raw.replace(" ", "").split(","):
+            if "-" in part:
+                try:
+                    a, b = part.split("-", 1)
+                    tokens.extend(range(int(a), int(b) + 1))
+                except ValueError:
+                    pass
+            else:
+                try:
+                    tokens.append(int(part))
+                except ValueError:
+                    pass
+
+        for n in tokens:
+            idx = n - 1
+            if 0 <= idx < len(options):
+                if idx in selected:
+                    selected.discard(idx)
+                else:
+                    selected.add(idx)
+            else:
+                print(_RED(f"    Invalid: {n}"))
 
 # ============================================================================
 # TRAINING EXECUTION - Core Logic (DRY refactor)
@@ -441,30 +427,32 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, ar
     if architecture:
         cmd.append(f"+architecture={architecture}")
 
-    print("\n    " + _DIM(">>> " + " ".join(cmd)))
+    print(">>> " + " ".join(cmd) + "\n")
+
+    # Runs the hydra CMD training script with specified parameters
     try:
         subprocess.run(cmd, check=True)
         return True
     except subprocess.CalledProcessError as e:
-        _err(f"Failed: {game} | {algo} | {persona} | {skill}  (exit {e.returncode})")
+        print(f"❌ Failed: {game} | {algo} | {persona} | {skill} (exit code {e.returncode})")
         return False
     except KeyboardInterrupt:
-        raise
-
+        raise  # Re-raise to be caught by caller
 
 def print_training_summary(total, successful, failed):
-    """Themed training summary."""
-    print()
-    print(f"    {_DIM('─' * 54)}")
-    print(f"    {_BOLD(_WHT('TRAINING COMPLETE'))}")
-    print(f"    {_GRN(f'✔  Successful: {successful}/{total}')}")
-    if failed:
-        print(f"    {_RED(f'✖  Failed:     {failed}/{total}')}")
-    print(f"    {_DIM(f'Logs   → {DEFAULT_TB_ROOT}/')}")
-    print(f"    {_DIM(f'Models → {MODELS_DIR}/best/')}")
-    print(f"    {_DIM('─' * 54)}")
+    """Print final training summary with sound notification"""
+    print("\n" + "=" * 60)
+    print("TRAINING COMPLETE")
+    print("=" * 60)
+    print(f"✓ Successful: {successful}/{total}")
+    if failed > 0:
+        print(f"❌ Failed: {failed}/{total}")
+    print(f"Logs saved to: {DEFAULT_TB_ROOT}/")
+    print(f"Models saved to: {MODELS_DIR}/best/")
+
     if HAS_WINSOUND and failed == 0:
         winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
+
     print()
 
 # ============================================================================
@@ -472,210 +460,309 @@ def print_training_summary(total, successful, failed):
 # ============================================================================
 
 def run_training():
-    """Single training run — toggle personas, skills, architectures."""
+    """Training run — multi-toggle selectors for algo, persona, skill, architecture."""
     global CURRENT_ALGO
-    _sub_header("Train Single Run")
 
+    clear_cli()
+    _print_header(
+        get_available_games(), get_available_algos_from_grid(),
+        get_trained_games_from_models_flat(), get_trained_models_count()
+    )
+    _section("TRAIN  ›  Configure Run")
+
+    # ── Game (single select via toggle) ───────────────────────────
     games = get_available_games()
     if not games:
-        _err("No games found in grid.yaml"); return
-    game = ask_index("Game", games)
-    if game is None: return
+        print(_RED("  No game configurations found in grid.yaml"))
+        return
+    game_sel = toggle_select("Game", games, default_indices=[0], min_select=1)
+    if game_sel is None:
+        return
+    game = game_sel[0]      # single game for now
 
+    # ── Algorithm ─────────────────────────────────────────────────
     algos = get_available_algos_from_grid()
     if not algos:
-        _err("No algorithms found in grid.yaml"); return
-    default_algo = CURRENT_ALGO if CURRENT_ALGO in algos else ("ppo" if "ppo" in algos else algos[0])
-    algo_choice = ask_index("Algorithm", algos, default=default_algo)
-    if algo_choice is None: return
-    CURRENT_ALGO = algo_choice
+        print(_RED("  No algorithm configurations found"))
+        return
+    def_algo_idx = next((i for i, a in enumerate(algos) if a == CURRENT_ALGO), 0)
+    algo_sel = toggle_select("Algorithm", algos, default_indices=[def_algo_idx], min_select=1)
+    if algo_sel is None:
+        return
+    CURRENT_ALGO = algo_sel[0]
 
+    # ── Personas ──────────────────────────────────────────────────
     personas = get_personas_for_game(game)
     if not personas:
-        _err(f"No personas found for game='{game}'"); return
+        print(_RED(f"  No personas found for game='{game}'"))
+        return
+    persona_sel = toggle_select("Personas", personas, default_indices=[0])
+    if persona_sel is None:
+        return
 
-    selected_personas = _toggle_picker(
-        "Personas  (toggle · Enter to confirm)",
-        personas,
-        defaults=personas[:1],          # first one on by default
-    )
-    if not selected_personas:
-        _err("No personas selected."); return
+    # ── Skills ────────────────────────────────────────────────────
+    skills_opts = ["Novice", "Expert", "Custom steps"]
+    skill_sel = toggle_select("Skills", skills_opts, default_indices=[0])
+    if skill_sel is None:
+        return
 
-    selected_skills = _toggle_picker(
-        "Skills  (toggle · Enter to confirm)",
-        ["Novice", "Expert"],
-        defaults=["Novice"],
-    )
-    if not selected_skills:
-        _err("No skills selected."); return
+    # Custom steps shortcut — if selected, prompt once
+    custom_steps = None
+    if "Custom steps" in skill_sel:
+        steps_str = input(_BOLD("\n    ⟫ Custom total steps (e.g. 300000): ")).strip()
+        try:
+            custom_steps = int(steps_str)
+        except ValueError:
+            print(_RED("  Invalid number."))
+            return
+        skill_sel = [s for s in skill_sel if s != "Custom steps"]
 
-    arch_labels = {a: _ARCH_INFO[a][1] if a in _ARCH_INFO else "" for a in get_available_architectures_from_grid()}
-    selected_archs = _toggle_picker(
-        "Architectures  (toggle · Enter to confirm)",
-        get_available_architectures_from_grid(),
-        defaults=["slim"],
-        labels=arch_labels,
-    )
-    if not selected_archs:
-        _err("No architectures selected."); return
+    # ── Architectures ─────────────────────────────────────────────
+    archs = get_available_architectures_from_grid()
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
+    arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
+    arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
+                             show_desc=arch_desc)
+    if arch_sel is None:
+        return
+    arch_choice = arch_sel[0]     # one arch per run
 
-    total = len(selected_personas) * len(selected_skills) * len(selected_archs)
+    # ── TensorBoard root ──────────────────────────────────────────
+    tb_root = input(_DIM(f"\n    TensorBoard root [{DEFAULT_TB_ROOT}] (Enter to keep): ")).strip() or DEFAULT_TB_ROOT
+
+    # ── Summary ───────────────────────────────────────────────────
+    run_skills = list(skill_sel)
+    if custom_steps is not None:
+        run_skills.append("Custom")
+
+    total = len(algo_sel) * len(persona_sel) * max(len(run_skills), 1)
     print()
-    print(f"    {_DIM('─' * 54)}")
-    print(f"    {_BOLD(_WHT('Run Summary'))}")
-    print(f"    Game        : {_YEL(game)}  |  Algo: {_YEL(algo_choice)}")
-    print(f"    Personas    : {_GRN(', '.join(selected_personas))}")
-    print(f"    Skills      : {_GRN(', '.join(selected_skills))}")
-    print(f"    Archs       : {_GRN(', '.join(selected_archs))}")
-    print(f"    Total runs  : {_WHT(str(total))}")
-    print(f"    {_DIM('─' * 54)}")
+    print(_BOLD("    ── Run Summary ──────────────────────────────────────"))
+    print(f"    Game      : {_WHT(game)}")
+    print(f"    Algos     : {_GRN(', '.join(algo_sel))}")
+    print(f"    Personas  : {_GRN(', '.join(persona_sel))}")
+    print(f"    Skills    : {_GRN(', '.join(run_skills if run_skills else ['Custom']))}")
+    print(f"    Arch      : {_GRN(arch_choice)}")
+    print(f"    Runs      : {_WHT(str(total))}")
+    print(_BOLD("    ─────────────────────────────────────────────────────"))
+    print()
+    confirm = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
+    if confirm in ("n", "no"):
+        print("  Aborted.")
+        return
 
-    confirm = input(_BOLD("    Proceed? [y/N] ⟫ ")).strip().lower()
-    if confirm not in ('y', 'yes'):
-        print(_DIM("    Aborted.")); return
-
-    completed, failed = 0, 0
+    # ── Execute ───────────────────────────────────────────────────
+    completed = 0; failed = 0
     try:
-        for persona in selected_personas:
-            for skill in selected_skills:
-                for arch in selected_archs:
+        for algo in algo_sel:
+            for persona in persona_sel:
+                if custom_steps is not None:
                     completed += 1
-                    print(f"\n    {_CYAN(f'[{completed}/{total}]')}  {game} | {algo_choice} | {persona} | {skill} | {arch}")
-                    ok = execute_training_run(game, algo_choice, persona, skill, architecture=arch)
-                    if not ok: failed += 1
+                    print(f"\n  Progress {completed}/{total}  |  {game} | {algo} | {persona} | Custom {custom_steps}")
+                    cmd = [
+                        sys.executable, "-m", "code.scripts.train",
+                        f"+game={game}", f"+model={algo}", f"+persona={persona}",
+                        "skill=Custom", f"+skills.Custom={custom_steps}",
+                        f"tb_root={tb_root}", f"+architecture={arch_choice}",
+                    ]
+                    print(">>> " + " ".join(cmd))
+                    try:
+                        subprocess.run(cmd, check=True)
+                    except subprocess.CalledProcessError:
+                        failed += 1
+                for skill in skill_sel:
+                    completed += 1
+                    print(f"\n  Progress {completed}/{total}  |  {game} | {algo} | {persona} | {skill}")
+                    ok = execute_training_run(game, algo, persona, skill, tb_root, arch_choice)
+                    if not ok:
+                        failed += 1
     except KeyboardInterrupt:
-        print(_RED("\n    Interrupted."))
+        print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total}"))
+        return
 
     print_training_summary(total, completed - failed, failed)
-    if HAS_WINSOUND and failed == 0:
-        winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
-
 
 def train_all_models_for_game():
-    """Train all architectures × algos × personas × skills for ONE game."""
+    """Train all selected (algo x persona x skill) for ONE game — toggle selectors."""
     global CURRENT_ALGO
-    _sub_header("Train All — One Game")
 
+    clear_cli()
+    _print_header(
+        get_available_games(), get_available_algos_from_grid(),
+        get_trained_games_from_models_flat(), get_trained_models_count()
+    )
+    _section("TRAIN ALL  ›  One Game")
+
+    # ── Game ──────────────────────────────────────────────────────
     games = get_available_games()
     if not games:
-        _err("No games found in grid.yaml"); return
-    game = ask_index("Game", games)
-    if game is None: return
+        print(_RED("  No game configurations found in grid.yaml"))
+        return
+    game_sel = toggle_select("Game", games, default_indices=[0], min_select=1)
+    if game_sel is None:
+        return
+    game = game_sel[0]
 
+    # ── Algorithms ────────────────────────────────────────────────
     algos = get_available_algos_from_grid()
     if not algos:
-        _err("No algorithms found"); return
+        print(_RED("  No algorithm configurations found"))
+        return
     ensure_current_algo()
+    def_algo_idx = next((i for i, a in enumerate(algos) if a == CURRENT_ALGO), 0)
+    algo_sel = toggle_select("Algorithms", algos,
+                             default_indices=list(range(len(algos))))  # all ON by default
+    if algo_sel is None:
+        return
+    CURRENT_ALGO = algo_sel[0]
 
-    # Algorithm toggle
-    selected_algos = _toggle_picker("Algorithms", algos, defaults=algos)
-    if not selected_algos:
-        _err("No algorithms selected."); return
-
+    # ── Personas ──────────────────────────────────────────────────
     personas = get_personas_for_game(game)
     if not personas:
-        _err(f"No personas for game='{game}'"); return
+        print(_RED(f"  No personas for game '{game}'"))
+        return
+    persona_sel = toggle_select("Personas", personas,
+                                default_indices=list(range(len(personas))))
+    if persona_sel is None:
+        return
 
-    skills = ["Novice", "Expert"]
-    archs  = get_available_architectures_from_grid()
-    total  = len(selected_algos) * len(archs) * len(personas) * len(skills)
+    # ── Skills ────────────────────────────────────────────────────
+    skills_opts = ["Novice", "Expert"]
+    skill_sel = toggle_select("Skills", skills_opts,
+                              default_indices=[0, 1])   # both ON by default
+    if skill_sel is None:
+        return
 
+    # ── Architecture ──────────────────────────────────────────────
+    archs = get_available_architectures_from_grid()
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
+    arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
+    arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
+                             show_desc=arch_desc)
+    if arch_sel is None:
+        return
+    arch_choice = arch_sel[0]
+
+    # ── Summary + confirm ─────────────────────────────────────────
+    total_runs = len(algo_sel) * len(persona_sel) * len(skill_sel)
     print()
-    print(f"    {_DIM('─' * 54)}")
-    print(f"    {_BOLD(_WHT('Sweep Summary'))}")
-    print(f"    Game          : {_YEL(game)}")
-    print(f"    Algorithms    : {_GRN(', '.join(selected_algos))}")
-    print(f"    Architectures : {_GRN(', '.join(archs))}  {_DIM('(all — from grid.yaml)')}")
-    print(f"    Personas      : {_GRN(str(len(personas)))} persona(s)")
-    print(f"    Skills        : {_GRN('Novice + Expert')}")
-    print(f"    Total runs    : {_WHT(str(total))}")
-    print(f"    {_DIM('─' * 54)}")
+    print(_BOLD("    ── Run Summary ──────────────────────────────────────"))
+    print(f"    Game      : {_WHT(game)}")
+    print(f"    Algos     : {_GRN(', '.join(algo_sel))}")
+    print(f"    Personas  : {_GRN(str(len(persona_sel)))}  {_DIM('(' + ', '.join(persona_sel) + ')')}")
+    print(f"    Skills    : {_GRN(', '.join(skill_sel))}")
+    print(f"    Arch      : {_GRN(arch_choice)}")
+    print(f"    Total runs: {_WHT(str(total_runs))}")
+    print(_BOLD("    ─────────────────────────────────────────────────────"))
+    confirm = input(_BOLD("\n    ⟫ Proceed? [Y/n]: ")).strip().lower()
+    if confirm in ("n", "no"):
+        print("  Aborted.")
+        return
 
-    confirm = input(_BOLD("    Proceed? [y/N] ⟫ ")).strip().lower()
-    if confirm not in ('y', 'yes'):
-        print(_DIM("    Aborted.")); return
-
-    outer = len(selected_algos) * len(personas) * len(skills)
-    completed, failed = 0, 0
+    # ── Execute ───────────────────────────────────────────────────
+    completed = 0; failed = 0
     try:
-        for algo in selected_algos:
-            for persona in personas:
-                for skill in skills:
+        for algo in algo_sel:
+            for persona in persona_sel:
+                for skill in skill_sel:
                     completed += 1
-                    print(f"\n    {_CYAN(f'[{completed}/{outer}]')} (×{len(archs)} archs)  {game} | {algo} | {persona} | {skill}")
-                    ok = execute_training_run(game, algo, persona, skill, architecture=None)
-                    if not ok: failed += 1
+                    print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch_choice}")
+                    ok = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
+                    if not ok:
+                        failed += 1
     except KeyboardInterrupt:
-        print(_RED("\n    Interrupted."))
+        print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total_runs}"))
+        return
 
-    print_training_summary(total, completed - failed, failed)
-
+    print_training_summary(total_runs, completed - failed, failed)
 
 def train_complete_grid():
-    """Train ALL games × algos × architectures × personas × skills."""
-    _sub_header("Train Complete Grid")
+    """Train ALL (game x algo x persona x skill) combinations"""
+    clear_cli()
+    _print_header(
+        get_available_games(), get_available_algos_from_grid(),
+        get_trained_games_from_models_flat(), get_trained_models_count()
+    )
+    _section("TRAIN FULL GRID  ›  All Games × Algos × Personas")
 
     games = get_available_games()
     algos = get_available_algos_from_grid()
-    archs = get_available_architectures_from_grid()
 
-    if not games: _err("No games found."); return
-    if not algos: _err("No algorithms found."); return
+    if not games:
+        print(_RED("  No game configurations found in grid.yaml"))
+        return
 
+    if not algos:
+        print(_RED("  No algorithm configurations found in grid.yaml"))
+        return
+
+    # Calculate total runs
+    total_runs = 0
     breakdown = []
-    total = 0
+
     for game in games:
         personas = get_personas_for_game(game)
-        if not personas: continue
-        n = len(algos) * len(archs) * len(personas) * 2
-        total += n
-        breakdown.append((game, personas, n))
+        if not personas:
+            continue
 
-    if total == 0:
-        _err("No valid training configurations found."); return
+        runs_for_game = len(algos) * len(personas) * 2
+        total_runs += runs_for_game
+        breakdown.append(f"    {_WHT(game)}: {len(personas)} persona(s) × {len(algos)} algo(s) × 2 skills = {_GRN(str(runs_for_game))} runs")
 
+    if total_runs == 0:
+        print(_RED("\n  No valid training configurations found."))
+        return
+
+    print(f"\n    Total runs: {_WHT(str(total_runs))}  across {_WHT(str(len(games)))} game(s)")
     print()
-    print(f"    {_DIM('─' * 54)}")
-    print(f"    {_BOLD(_WHT('Full Grid Summary'))}")
-    print(f"    Algorithms    : {_GRN(', '.join(algos))}")
-    print(f"    Architectures : {_GRN(', '.join(archs))}  {_DIM('(all)')}")
-    print(f"    Skills        : {_GRN('Novice + Expert')}")
-    print()
-    for game, personas, n in breakdown:
-        print(f"    {_YEL(f'  {game:<16}')} {len(personas)} persona(s) × {len(algos)} algo(s) × {len(archs)} arch(s) × 2 skills = {_WHT(str(n))}")
-    print(f"    {_DIM('─' * 54)}")
-    print(f"    Total runs    : {_WHT(str(total))}")
-    print(f"    {_DIM('─' * 54)}")
+    for line in breakdown:
+        print(line)
 
-    confirm = input(_BOLD("    Proceed? [y/N] ⟫ ")).strip().lower()
-    if confirm not in ('y', 'yes'):
-        print(_DIM("    Aborted.")); return
+    # Architecture toggle
+    archs = get_available_architectures_from_grid()
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
+    arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
+    arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
+                             show_desc=arch_desc)
+    if arch_sel is None:
+        return
+    arch_choice = arch_sel[0]
 
-    outer = sum(len(algos) * len(get_personas_for_game(g) or []) * 2 for g in games)
-    completed, failed = 0, 0
+    confirm = input(_BOLD(f"\n    ⟫ Proceed with {total_runs} runs using [{arch_choice}]? [Y/n]: ")).strip().lower()
+    if confirm in ("n", "no"):
+        print("  Aborted.")
+        return
+
+    # Execute training grid
     skills = ["Novice", "Expert"]
+    completed = 0
+    failed = 0
+
     try:
         for game in games:
             personas = get_personas_for_game(game)
-            if not personas: continue
+            if not personas:
+                continue
+
             for algo in algos:
                 for persona in personas:
                     for skill in skills:
                         completed += 1
-                        print(f"\n    {_CYAN(f'[{completed}/{outer}]')} (×{len(archs)} archs)  {game} | {algo} | {persona} | {skill}")
-                        ok = execute_training_run(game, algo, persona, skill, architecture=None)
-                        if not ok: failed += 1
+                        print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch_choice}")
+                        success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
+                        if not success:
+                            failed += 1
     except KeyboardInterrupt:
-        print(_RED("\n    Interrupted."))
+        print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total_runs}"))
+        return
 
-    print_training_summary(total, completed - failed, failed)
+    print_training_summary(total_runs, completed - failed, failed)
 
 
 # Currently NOT IN USE - needs adaptation
 def run_evaluation():
     """Evaluate all trained models for a selected game"""
-    _sub_header("Evaluation")
+    print("\n===== Evaluation =====")
 
     BEST_DIR = MODELS_DIR / "best"
     if not BEST_DIR.exists():
@@ -726,19 +813,23 @@ def run_evaluation():
 
 
 def parse_model_metadata(model_path: Path):
-    """
-    Take folder name and parse out game, algo, persona, skill.
-    Returns a dict with keys: game, algo, persona, skill (values or None).
-    """
+    """Parse game, algo, persona, skill, architecture from model folder name."""
     folder = model_path.parent.name
     parts = folder.split("_")
-
+    _ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
+    arch = None
+    if len(parts) >= 2 and parts[-1].lower() in _ARCH_TAGS:
+        arch = parts[-1].lower()
+        parts = parts[:-1]
     meta = {
-        "game": parts[0] if len(parts) >= 1 else None,
-        "algo": parts[1] if len(parts) >= 2 else None,
-        "persona": parts[3] if len(parts) >= 4 else None,
-        "skill": parts[4] if len(parts) >= 5 else None,
+        "game":    parts[0] if len(parts) >= 1 else None,
+        "algo":    parts[1] if len(parts) >= 2 else None,
+        "persona": "_".join(parts[2:-1]) if len(parts) >= 4 else (parts[2] if len(parts) >= 3 else None),
+        "skill":   parts[-1] if len(parts) >= 4 else None,
+        "arch":    arch,
     }
+    if meta["persona"] and meta["game"] and meta["persona"].startswith(f"{meta['game']}_"):
+        meta["persona"] = meta["persona"][len(meta["game"])+1:]
     return meta
 
 def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
@@ -863,7 +954,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
 
 def run_agent_analyzer():
     """Run the CSV log analyzer script"""
-    _sub_header("Agent Performance Analyzer")
+    print("\n=== Agent Performance Analyzer ===")
     script_path = Path("code/scripts/agent_analyzer.py")
 
     # Check if it exists in code/scripts or root
@@ -872,14 +963,14 @@ def run_agent_analyzer():
     elif Path("agent_analyzer.py").exists():
         cmd = [sys.executable, "agent_analyzer.py"]
     else:
-        _err("Cannot find agent_analyzer.py — check root or code/scripts/")
+        print("❌ Cannot find 'agent_analyzer.py'. Make sure it's in the root or code/scripts/ folder.")
         return
 
     try:
         subprocess.run(cmd)
     except KeyboardInterrupt:
         pass
-    _ok("Analysis complete.")
+    print("\nAnalysis complete.\n")
 
 def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
     """
@@ -969,7 +1060,7 @@ def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
 
 def watch_trained_agent():
     """Select a trained model, watch it play in a pygame window, optionally record that exact session."""
-    _sub_header("Watch Trained Agent Play")
+    print("\n=== Watch Trained Agent Play ===")
 
     model_folders = get_model_folders()
     if not model_folders:
@@ -982,10 +1073,19 @@ def watch_trained_agent():
 
     for folder in model_folders:
         parts = folder.name.split("_")
+        _ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
 
-        if len(parts) >= 5:
+        if len(parts) >= 6 and parts[-1].lower() in _ARCH_TAGS:
+            game, algo = parts[0], parts[1]
+            arch = parts[-1]
+            skill = parts[-2]
+            persona = "_".join(parts[2:-2])
+            if persona.startswith(f"{game}_"):
+                persona = persona[len(game)+1:]
+            display = f"{game:<12} | {algo:<4} | {persona:<16} | {skill:<8} | {arch}"
+        elif len(parts) >= 5:
             game, algo, _, persona, skill = parts[:5]
-            display = f"{game:<8} | {algo:<4} | {persona:<12} | {skill:<8}"
+            display = f"{game:<12} | {algo:<4} | {persona:<16} | {skill:<8}"
         else:
             display = folder.name
 
@@ -1002,7 +1102,7 @@ def watch_trained_agent():
         model_idx = display_options.index(selected)
         model_path = paths[model_idx]
     except (ValueError, IndexError):
-        _err("Invalid selection.")
+        print("Invalid selection.")
         return
 
     # Infer metadata
@@ -1013,23 +1113,25 @@ def watch_trained_agent():
     skill = (meta["skill"] or "").lower()
 
     if not game or not algo_name:
-        _err("Could not infer game/algo from model path.")
+        print("Could not infer game/algo from model path.")
         return
 
     algo_cls = ALGO_CLASS_MAP.get(algo_name)
 
     if algo_cls is None:
-        _err(f"Unsupported/unknown algo '{algo_name}'.")
+        print(f"Unsupported/unknown algo '{algo_name}'.")
         return
 
     # FPS + episode cap
-    fps_input = input(_BOLD("    FPS [30] ⟫ ")).strip()
+    fps_input = input("Rendering FPS? [30]: ").strip()
     fps = int(fps_input) if fps_input.isdigit() and int(fps_input) > 0 else 30
 
-    max_ep_input = input(_BOLD("    Max episodes (0 = run until ESC) [10] ⟫ ")).strip()
+    max_ep_input = input("Max episodes to play before auto-exit? [10]: ").strip()
     max_episodes = int(max_ep_input) if max_ep_input.isdigit() and int(max_ep_input) >= 0 else 10
+    # Note: 0 = no auto-stop (ESC/close only)
 
-    rec_choice = input(_BOLD("    Record to videos/ as MP4+GIF? [y/N] ⟫ ")).strip().lower()
+    # Prompt for recording
+    rec_choice = input("Record this session to videos/ as MP4 + GIF? [y/N]: ").strip().lower()
 
     if rec_choice in ("y", "yes"):
         # INLINE MODE (Visual + Record)
@@ -1196,33 +1298,33 @@ def watch_trained_agent():
         except subprocess.CalledProcessError as e:
             print(f"\nViewer exited with error code {e.returncode}")
         except KeyboardInterrupt:
-            print(_DIM("\n    Viewer stopped."))
+            print("\nViewer stopped by user.")
 
-    _ok("Visualization completed.")
+    print("\nVisualization completed.\n")
 
 def watch_all_models():
     """Launch the grid viewer to watch ALL trained models simultaneously."""
-    _sub_header("Watch All Models (Grid View)")
+    print("\n=== Watch All Models (Grid View) ===")
 
     # Quick check for models
     from pathlib import Path as _P
     best_dir = _P("models/best")
     if not best_dir.exists():
-        _err("No models/best/ directory found. Train some models first.")
+        print("No models/best/ directory found. Train some models first.")
         return
 
     folders = [f for f in best_dir.iterdir()
                if f.is_dir() and (f / "best_model.zip").exists()]
     if not folders:
-        _err("No trained models found in models/best/.")
+        print("No trained models found in models/best/.")
         return
 
-    print(f"    {_GRN(str(len(folders)))} trained model(s) found.")
+    print(f"Found {len(folders)} trained model(s).")
 
-    fps_input = input(_BOLD("    FPS [20] ⟫ ")).strip()
+    fps_input = input("Rendering FPS? [20]: ").strip()
     fps = int(fps_input) if fps_input.isdigit() and int(fps_input) > 0 else 20
 
-    ep_input = input(_BOLD("    Episodes per agent [5] ⟫ ")).strip()
+    ep_input = input("Episodes per agent? [5]: ").strip()
     episodes = int(ep_input) if ep_input.isdigit() and int(ep_input) >= 0 else 5
 
     env_vars = os.environ.copy()
@@ -1234,22 +1336,21 @@ def watch_all_models():
         "--episodes", str(episodes),
     ]
 
-    cmd_str = " ".join(cmd)
-    print(f"\n    {_DIM('>>>')} {_DIM(cmd_str)}")
+    print(f"\nLaunching grid viewer ({len(folders)} models, {fps} FPS)...")
+    print(">>>", " ".join(cmd), "\n")
 
     try:
         subprocess.run(cmd, check=True, env=env_vars)
     except subprocess.CalledProcessError as e:
-        _err(f"Grid viewer exited with code {e.returncode}")
+        print(f"\nGrid viewer exited with error code {e.returncode}")
     except KeyboardInterrupt:
-        print(_DIM("\n    Grid viewer stopped."))
+        print("\nGrid viewer stopped by user.")
 
-    _ok("Grid view completed.")
+    print("\nGrid view completed.\n")
 
 def run_tensorboard():
     """Launch TensorBoard with auto-open browser"""
-    _sub_header("TensorBoard")
-    _ = None  # (auto-open, blocking) ===")
+    print("\n=== TensorBoard (auto-open, blocking) ===")
     root = Path(DEFAULT_TB_ROOT)
     if not root.exists():
         print(f"No '{DEFAULT_TB_ROOT}/' folder found yet. Train first or change tb_root in train.")
@@ -1303,13 +1404,14 @@ def run_tensorboard():
 
 def delete_logs_and_models():
     """Permanently delete TensorBoard logs and all trained models"""
-    _sub_header("⚠  Delete All Logs & Models")
-    print(f"    {_RED('WARNING: This permanently deletes all training data!')}")
-    print(f"    {_DIM(f'Targets: {DEFAULT_TB_ROOT}/  ·  {MODELS_DIR}/')}")
-    confirm = input(_BOLD("    Type DELETE to confirm, or Enter to cancel ⟫ ")).strip()
+    print("\n=== Delete TensorBoard Logs and Models ===")
+    confirm = input(
+        f"This will permanently delete '{DEFAULT_TB_ROOT}/' and '{MODELS_DIR}/'.\n"
+        "Are you sure you want to continue? [y/N]: "
+    ).strip().lower()
 
-    if confirm != "DELETE":
-        print(_DIM("    Aborted. Nothing was deleted."))
+    if confirm not in ("y", "yes"):
+        print("Aborted. Nothing was deleted.")
         return
 
     def safe_clear_dir(path: Path):
@@ -1321,32 +1423,50 @@ def delete_logs_and_models():
                 break
             except Exception as e:
                 if attempt == 2:
-                    _err(f"Failed to delete {path}: {e}")
+                    print(f"Failed to delete {path}: {e}")
                     return
-                print(f"    {_YEL(f'{path} in use, retrying...')}")
+                print(f"{path} might be in use. Retrying in 1s…")
                 time.sleep(1)
         try:
             path.mkdir(parents=True, exist_ok=True)
-            print(f"    {_GRN('✔')}  Cleared → {path}")
+            print(f"✓ Cleared and recreated {path}")
         except Exception as e:
-            print(f"    {_DIM(f'Deleted {path} but failed to recreate: {e}')}")
+            print(f"Deleted {path} but failed to recreate it: {e}")
 
     safe_clear_dir(Path(DEFAULT_TB_ROOT))
     safe_clear_dir(MODELS_DIR)
     safe_clear_dir(Path("csv"))
 
-    _ok("All logs and models deleted.")
+    print("\n🧹 All logs and models deleted successfully.\n")
 
 def run_manual_play():
     """Manual gameplay interface"""
-    _sub_header("Play Manually")
+    print("\n=== Manual Play Options ===")
 
     available_games = get_available_games()
     if not available_games:
-        _err("No game configurations found in grid.yaml"); return
+        print("No game configurations found in grid.yaml or code/conf/game/")
+        return
 
-    selected_game = ask_index("Game", available_games)
-    if selected_game is None: return
+    print("Available games:")
+    for i, game in enumerate(available_games, 1):
+        print(f"  {i}. Play {game}")
+    print(f"  {len(available_games) + 1}. Back to main menu")
+
+    choice = input(f"Select game to play (1-{len(available_games) + 1}): ").strip()
+    try:
+        idx = int(choice)
+    except ValueError:
+        print("Invalid selection.")
+        return
+
+    if idx == len(available_games) + 1:
+        return
+    if not (1 <= idx <= len(available_games)):
+        print("Invalid selection.")
+        return
+
+    selected_game = available_games[idx - 1]
 
     env = os.environ.copy()
 
@@ -1354,86 +1474,143 @@ def run_manual_play():
     if "SDL_VIDEODRIVER" in env:
         env.pop("SDL_VIDEODRIVER")
 
-    print(f"\n    {_DIM('Playing')} {_YEL(selected_game)} {_DIM('— ESC to quit')}") 
+    print(f"\n=== Playing {selected_game} manually ===")
+    print("Use game controls (e.g., spacebar for Flappy Bird). Press ESC to quit.")
 
     script_path = Path("code/scripts/manual_play.py")
     if not script_path.exists():
-        _err("Manual play script not found at code/scripts/manual_play.py")
+        print("Manual play script not found at code/scripts/manual_play.py")
         return
 
     subprocess.run([sys.executable, "-m", "code.scripts.manual_play", "--game", selected_game, "--fps", "30"], env=env)
 
 
 def show_project_status():
-    """Themed project status display."""
-    _sub_header("Project Status")
+    """
+    Display comprehensive project status
+        - Shows how many models of each combination of games_algo_persona
+    """
+    print("\n=== Project Status ===")
+    games = get_available_games()
+    algos = get_available_algos_from_grid()
+    trained = get_trained_games_from_models_flat()
 
-    games         = get_available_games()
-    algos         = get_available_algos_from_grid()
-    archs         = get_available_architectures_from_grid()
-    trained       = get_trained_games_from_models_flat()
-    model_folders = get_model_folders()
-    model_count   = get_trained_models_count()
-
-    print(f"    {_BOLD(_CYAN('▸ Games'))}  ({len(games)} configured)")
+    print(f"Available game configurations (from grid.yaml): {len(games)}")
     for g in games:
-        flag = _GRN("✔  trained") if g in trained else _DIM("○  not trained")
-        print(f"    {_YEL('   ·')}  {g:<20}  {flag}")
+        flag = "✓ Trained" if g in trained else "○ Not trained"
+        print(f"   {g}: {flag}")
 
-    print(f"\n    {_BOLD(_CYAN('▸ Algorithms'))}  ({len(algos)} available)")
-    for a in algos:
-        cur = _YEL("  ← current") if a == CURRENT_ALGO else ""
-        print(f"    {_YEL('   ·')}  {a}{cur}")
+    print(f"\nAvailable algorithms (from grid.yaml): {len(algos)}")
+    for algo in algos:
+        current_flag = " (current)" if algo == CURRENT_ALGO else ""
+        print(f"   {algo}{current_flag}")
 
-    print(f"\n    {_BOLD(_CYAN('▸ Architectures'))}  ({len(archs)} available)")
-    for a in archs:
-        name, desc = _ARCH_INFO.get(a, (a, ""))
-        print(f"    {_YEL('   ·')}  {a:<6}  {_DIM(name)}  {_DIM(desc)}")
+    if MODELS_DIR.exists():
+        model_count = get_trained_models_count()
+        print(f"\nTotal trained models: {model_count}")
 
-    print(f"\n    {_BOLD(_CYAN('▸ Trained Models'))}  ({model_count} total)")
-    if model_folders:
+        model_folders = get_model_folders()
         algo_counts = {}
-        for f in model_folders:
-            parts = f.name.split("_")
-            k = parts[1] if len(parts) >= 2 else "?"
-            algo_counts[k] = algo_counts.get(k, 0) + 1
-        for algo, cnt in sorted(algo_counts.items()):
-            bar = _GRN("█" * min(cnt, 20)) + _DIM("░" * (20 - min(cnt, 20)))
-            print(f"    {_YEL('   ·')}  {algo:<8}  {bar}  {cnt}")
+        for folder in model_folders:
+            parts = folder.name.split("_")
+            if len(parts) >= 2:
+                algo = parts[1]
+                algo_counts[algo] = algo_counts.get(algo, 0) + 1
+
+        if algo_counts:
+            print("\nModels by algorithm:")
+            for algo, count in sorted(algo_counts.items()):
+                print(f"   {algo}: {count}")
     else:
-        print(f"    {_DIM('   No models trained yet.')}")
+        print("\n✗ No models directory found")
 
     if CONF_ROOT.exists():
-        n_algo = len(list((CONF_ROOT / "algo").glob("*.yaml"))) if (CONF_ROOT / "algo").exists() else 0
-        print(f"\n    {_BOLD(_CYAN('▸ Config'))}  algo: {n_algo} YAML files")
+        print("\nConfiguration status:")
+        for sub in ["algo"]:
+            p = CONF_ROOT / sub
+            n = len(list(p.glob("*.yaml"))) if p.exists() else 0
+            print(f"   {sub}: {n} configs")
+    else:
+        print("\n✗ Configuration directory not found")
     print()
 
+# # depretiatied
+# def change_algorithm():
+#     """Manually change the currently selected algorithm"""
+#     global CURRENT_ALGO
+
+#     print("\n=== Change Current Algorithm ===")
+#     algos = get_available_algos_from_grid()
+#     if not algos:
+#         print("No algorithm configurations found in grid.yaml with matching YAML files")
+#         return
+
+#     ensure_current_algo()
+
+#     print(f"\nCurrent algorithm: {CURRENT_ALGO}")
+#     print("\nAvailable algorithms:")
+#     for i, algo in enumerate(algos, 1):
+#         current_flag = " (current)" if algo == CURRENT_ALGO else ""
+#         print(f"  {i}. {algo}{current_flag}")
+#     print(f"  {len(algos) + 1}. Back")
+
+#     choice = input(f"Select new algorithm (1-{len(algos) + 1}): ").strip()
+
+#     try:
+#         num = int(choice)
+#         if num == len(algos) + 1:
+#             return
+#         if 1 <= num <= len(algos):
+#             new_algo = algos[num - 1]
+#             CURRENT_ALGO = new_algo
+#             print(f"\n✓ Algorithm changed to: {CURRENT_ALGO}\n")
+#         else:
+#             print("Invalid selection.")
+#     except ValueError:
+#         print("Invalid selection.")
 
 def watch_random_agent():
     """Watch a random agent; optionally record the actual interactive session."""
-    _sub_header("Watch Random Agent")
+    print("\n=== Watch Random Agent Play ===")
 
     available_games = get_available_games()
     if not available_games:
-        _err("No game configurations found in grid.yaml")
+        print("No game configurations found in grid.yaml or code/conf/game/")
         return
 
-    selected_game = ask_index("Game", available_games)
-    if selected_game is None: return
+    print("Available games:")
+    for i, game in enumerate(available_games, 1):
+        print(f"  {i}. {game}")
+    print(f"  {len(available_games) + 1}. Back to main menu")
 
-    print(f"\n    {_DIM('Watching random agent in')} {_YEL(selected_game)}")
+    choice = input(f"Select game to watch (1-{len(available_games) + 1}): ").strip()
+    try:
+        idx = int(choice)
+    except ValueError:
+        print("Invalid selection.")
+        return
 
-    fps_input = input(_BOLD("    FPS [30] ⟫ ")).strip()
+    if idx == len(available_games) + 1:
+        return
+    if not (1 <= idx <= len(available_games)):
+        print("Invalid selection.")
+        return
+
+    selected_game = available_games[idx - 1]
+    print(f"\n=== Watching random agent in {selected_game} ===")
+
+    fps_input = input("Rendering FPS? [30]: ").strip()
     fps = int(fps_input) if fps_input.isdigit() and int(fps_input) > 0 else 30
 
-    max_ep_input = input(_BOLD("    Max episodes (0 = run until ESC) [0] ⟫ ")).strip()
+    max_ep_input = input("Max episodes to play before auto-exit? [0 = only when you exit manually]: ").strip()
     max_episodes = int(max_ep_input) if max_ep_input.isdigit() and int(max_ep_input) >= 0 else 0
 
+    # Recording?
     record = False
     frames = []
     mpy = None
 
-    rec_choice = input(_BOLD("    Record to videos/ as MP4+GIF? [y/N] ⟫ ")).strip().lower()
+    rec_choice = input("Record this session to videos/ as MP4 + GIF? [y/N]: ").strip().lower()
     if rec_choice in ("y", "yes"):
         mpy = get_moviepy_editor()
         if mpy is None:
@@ -1537,10 +1714,170 @@ def clear_cli():
     """Clear the terminal screen cross-platform."""
     os.system("cls" if sys.platform == "win32" else "clear")
 
+def _toggle_level_in_config(config_path, lid, enable):
+    """Comment out or uncomment a level block in game_config.yaml."""
+    import re
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+
+    lines = text.split('\n')
+    nl = []
+    in_block = False
+    base_indent = 0
+
+    if enable:
+        # Uncomment the block
+        for line in lines:
+            s = line.lstrip()
+            if not in_block:
+                # Match:  # "key":  OR  # 'key':  OR  # key:
+                if s.startswith('#'):
+                    inner = s.lstrip('#').lstrip()
+                    for pat in [f'"{lid}":', f"'{lid}':", f'{lid}:']:
+                        if inner.startswith(pat):
+                            in_block = True
+                            nl.append(line.replace('# ', '', 1) if '# ' in line else line.replace('#', '', 1))
+                            break
+                    else:
+                        nl.append(line)
+                else:
+                    nl.append(line)
+            else:
+                if s.startswith('#') and (len(s) > 1 and (s[1:].startswith('  ') or s[1:].startswith(' '))):
+                    nl.append(line.replace('# ', '', 1) if '# ' in line else line.replace('#', '', 1))
+                else:
+                    in_block = False
+                    nl.append(line)
+    else:
+        # Comment out the block
+        for line in lines:
+            s = line.lstrip()
+            ind = len(line) - len(s)
+            if not in_block:
+                for pat in [f'"{lid}":', f"'{lid}':", f'{lid}:']:
+                    if s.startswith(pat):
+                        in_block = True
+                        base_indent = ind
+                        nl.append(' ' * ind + '# ' + s)
+                        break
+                else:
+                    nl.append(line)
+            else:
+                if s and ind > base_indent:
+                    nl.append(' ' * ind + '# ' + s)
+                else:
+                    in_block = False
+                    nl.append(line)
+    try:
+        config_path.write_text('\n'.join(nl), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def run_toggle_levels():
+    """Enable or disable levels in game_config.yaml from the CLI."""
+    import re
+    try:
+        import yaml
+    except ImportError:
+        print("\n  PyYAML is not installed — cannot read game_config.yaml")
+        return
+
+    # Locate game_config.yaml
+    candidates = [
+        Path("game_config.yaml"),
+        Path("code/games/platformer/game_config.yaml"),
+        Path("code/games/game_config.yaml"),
+    ]
+    config_path = None
+    for p in candidates:
+        if p.exists():
+            config_path = p
+            break
+
+    if config_path is None:
+        print("\n  Could not find game_config.yaml")
+        print("  Checked: " + ", ".join(str(c) for c in candidates))
+        return
+
+    _LEVEL_SUBKEYS = {
+        'file', 'time_limit', 'background_color', 'time', 'physics',
+        'gravity', 'friction', 'max_fall_speed', 'max_run_speed',
+        'dynamics', 'enemies', 'coins', 'powerups', 'moving_platforms',
+        'player', 'render', 'reward', 'observation', 'seed',
+    }
+
+    while True:
+        # Re-read on every iteration so changes are reflected immediately
+        try:
+            text = config_path.read_text(encoding="utf-8")
+            data = yaml.safe_load(text) or {}
+        except Exception as e:
+            print(f"\n  Error reading config: {e}")
+            return
+
+        active = data.get('levels', {}) or {}
+        active_ids = list(active.keys())
+
+        # Find commented-out (disabled) levels
+        disabled_ids = []
+        for m in re.finditer(
+            r'^\s*#\s*(?:"([^"]+)"|\'([^\']+)\'|([^\s:][^:]*?)):\s*$',
+            text, re.MULTILINE
+        ):
+            lid = (m.group(1) or m.group(2) or m.group(3) or "").strip()
+            if lid and lid not in active and lid not in _LEVEL_SUBKEYS:
+                if lid not in disabled_ids:
+                    disabled_ids.append(lid)
+
+        print(_BOLD("\n  ═══ Level Toggle ═══"))
+        print(f"  Config: {_DIM(str(config_path))}\n")
+
+        if active_ids:
+            print(f"  {_GRN('ENABLED')}  ({len(active_ids)})")
+            for i, lid in enumerate(active_ids, 1):
+                fn = active[lid].get('file', '???') if isinstance(active[lid], dict) else '???'
+                print(f"    {_YEL(f'{i:>3}.')}  {_GRN('[ON ]')}  {_WHT(lid):<20}  {_DIM(fn)}")
+        else:
+            print(f"  {_DIM('(no active levels)')}")
+
+        start = len(active_ids)
+        if disabled_ids:
+            print(f"\n  {_RED('DISABLED')}  ({len(disabled_ids)})")
+            for j, lid in enumerate(disabled_ids, start + 1):
+                print(f"    {_YEL(f'{j:>3}.')}  {_RED('[OFF]')}  {_DIM(lid)}")
+
+        all_ids = active_ids + disabled_ids
+        back_n = len(all_ids) + 1
+        print(f"\n    {_YEL(f'{back_n:>3}.')}  {_RED('Back')}")
+        print()
+
+        pick = input(_BOLD("    ⟫ Toggle # ")).strip()
+        try:
+            n = int(pick)
+            if n == back_n:
+                return
+            if 1 <= n <= len(all_ids):
+                lid = all_ids[n - 1]
+                is_active = n <= len(active_ids)
+                ok = _toggle_level_in_config(config_path, lid, enable=not is_active)
+                if ok:
+                    state = _GRN("enabled") if not is_active else _RED("disabled")
+                    print(f"\n  ✓  '{lid}' {state}\n")
+                else:
+                    print(_RED(f"\n  ✖  Failed to toggle '{lid}'\n"))
+            else:
+                print(_RED("  Invalid selection."))
+        except ValueError:
+            print(_RED("  Invalid input."))
+
+
 def run_level_editor():
     """Launch the PEAK level editor (pygame-based tile painter)."""
-    _sub_header("Level Editor")
-    print(f"    {_DIM('Launching PEAK Level Editor...')}") 
+    print("\n  Launching PEAK Level Editor...")
 
     # Locate the script — check both code/scripts and project root
     candidates = [
@@ -1565,13 +1902,13 @@ def run_level_editor():
     level_files = sorted(levels_dir.glob("*.txt")) if levels_dir.exists() else []
 
     if level_files:
-        print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD('Existing levels')}")
-        print(f"    {_YEL('[  0]')}  New blank level")
+        print("\n  Existing levels:")
+        print("    0. New blank level")
         for i, lf in enumerate(level_files, 1):
-            print(f"    {_YEL(f'[{i:>3}]')}  {lf.name}")
-        print(f"    {_YEL(f'[{len(level_files)+1:>3}]')}  {_DIM('Back')}")
+            print(f"    {i}. {lf.name}")
+        print(f"    {len(level_files) + 1}. Back")
 
-        pick = input(_BOLD(f"\n    Open level (0–{len(level_files)+1}) ⟫ ")).strip()
+        pick = input(f"\n  Open level (0-{len(level_files) + 1}): ").strip()
         try:
             n = int(pick)
             if n == len(level_files) + 1:
@@ -1606,7 +1943,28 @@ def run_level_editor():
 # MAIN MENU — PEAK ENGINE
 # ============================================================================
 
-# (ANSI helpers defined earlier — shared across all menus)
+# ── ANSI helpers ──────────────────────────────────────────────────────────────
+_SUPPORTS_COLOR = (
+    hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+    and os.environ.get("NO_COLOR") is None
+)
+
+def _c(code: str, text: str) -> str:
+    """Wrap *text* in an ANSI escape if the terminal supports it."""
+    if not _SUPPORTS_COLOR:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+# Palette
+_DIM     = lambda t: _c("2",    t)
+_BOLD    = lambda t: _c("1",    t)
+_CYAN    = lambda t: _c("96",   t)
+_MAG     = lambda t: _c("95",   t)
+_YEL     = lambda t: _c("93",   t)
+_GRN     = lambda t: _c("92",   t)
+_RED     = lambda t: _c("91",   t)
+_WHT     = lambda t: _c("97",   t)
+_BGDARK  = lambda t: _c("48;5;233", t)
 
 LOGO = ("""
     ██████╗ ███████╗ █████╗ ██╗  ██╗
@@ -1674,9 +2032,10 @@ def main():
         "7":  ("watch_all",            watch_all_models),
         "8":  ("watch_random",         watch_random_agent),
         "9":  ("level_editor",         run_level_editor),
-        "10": ("tensorboard",          run_tensorboard),
-        "11": ("analyzer",             run_agent_analyzer),
-        "12": ("delete_all",           delete_logs_and_models),
+        "10": ("toggle_levels",        run_toggle_levels),
+        "11": ("tensorboard",          run_tensorboard),
+        "12": ("analyzer",             run_agent_analyzer),
+        "13": ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
     }
@@ -1694,8 +2053,8 @@ def main():
 
         _section("TRAIN")
         print(_menu_item("1",  "Project Status"))
-        print(_menu_item("2",  "Train Single",        "game / algo / persona / skill"))
-        print(_menu_item("3",  "Train All (1 game)",  "every combo for one game"))
+        print(_menu_item("2",  "Train Single",        "toggle: game / algo / personas / skills / arch"))
+        print(_menu_item("3",  "Train All (1 game)",  "toggle: algos / personas / skills"))
         print(_menu_item("4",  "Train Full Grid",     "all games × algos × personas"))
 
         _section("PLAY")
@@ -1706,9 +2065,10 @@ def main():
 
         _section("TOOLS")
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
-        print(_menu_item("10", "TensorBoard",          "mylogs/"))
-        print(_menu_item("11", "Analyze Performance",  "CSV log deep-dive"))
-        print(_menu_item("12", "Delete Logs & Models", "nuclear option"))
+        print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
+        print(_menu_item("11", "TensorBoard",          "mylogs/"))
+        print(_menu_item("12", "Analyze Performance",  "CSV log deep-dive"))
+        print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
         print()

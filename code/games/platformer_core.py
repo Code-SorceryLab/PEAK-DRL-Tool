@@ -236,10 +236,8 @@ class PlatformerCore(gymnasium.Env):
         # Default world and speed multiplier
         self.level_order = self.config_manager.get_level_order()
         self.current_index_world = 0
-        # random_start_world: pick a uniformly random level at each episode reset
-        # so training time is spread equally across all levels regardless of win rate.
-        self.random_start_world = bool(kwargs.pop("random_start_world", True))
-        self.world = str(kwargs.pop("world", "1-1")).lower()
+        _default_world = self.level_order[0] if self.level_order else "1-1"
+        self.world = str(kwargs.pop("world", _default_world))
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
@@ -262,6 +260,19 @@ class PlatformerCore(gymnasium.Env):
 
         self.max_lives = 3
         self.lives = self.max_lives
+
+        # ── Batch Curriculum ───────────────────────────────────────────────
+        self._batch_window            = int(kwargs.pop("batch_window", 10))
+        self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
+        self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
+        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 3))
+        self._curriculum_position     = 0
+        self._batch_results: list     = []
+        self._episode_won_current     = False
+        self._windows_on_level        = 0
+        self._consecutive_fallbacks   = {}
+        self._level_visits     = {lvl: 0 for lvl in self.level_order}
+        self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
         # Camera
         self.camera_x = 0.0
@@ -401,6 +412,9 @@ class PlatformerCore(gymnasium.Env):
         self.last_x = self.player.gObj.x if self.player else 0.0
         self.kills_step = self.coins_step = self.powerups_step = 0
         self.stalled_this_frame = False
+        # Reset per-frame platform flag — PhysicsManager sets it True if riding one
+        if self.player:
+            self.player._on_moving_platform = False
 
         # PHYSICS & LOGIC
         # All three dynamic spatial hashes are rebuilt every frame.
@@ -530,37 +544,70 @@ class PlatformerCore(gymnasium.Env):
 
 
     def reset(self, seed=None, options=None) -> np.ndarray:
-        """
-        Called by SB3 only when the episode truly ends:
-          - lives = 0 (terminated=True from _handle_death)
-          - max_steps hit (truncated=True)
-
-        Level completion no longer calls reset() -- the episode continues
-        with the next level loaded inline in step(). The was_win branch
-        is therefore dead code and has been removed.
-        """
         super().reset(seed=seed)
 
-        # Full reset: restore lives, score, return to level 0 (or locked level)
+        # Record episode result into batch
+        if self.level_order and not self.locked_level:
+            self._batch_results.append(self._episode_won_current)
+
+        # Evaluate batch when window is full
+        if len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
+            self._evaluate_curriculum_batch()
+
         self.reset_metrics()
+        self._episode_won_current = False
+
         if self.locked_level:
             self.world = self.locked_level
-            # Keep current_index_world consistent
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-        else:
-            if self.level_order:
-                if self.random_start_world and len(self.level_order) > 1:
-                    # Uniform random — ensures every level gets equal training time
-                    # even when the agent rarely wins (so complete_level() never fires)
-                    self.current_index_world = random.randint(0, len(self.level_order) - 1)
-                else:
-                    self.current_index_world = 0
-                self.world = self.level_order[self.current_index_world]
+        elif self.level_order:
+            self._curriculum_position = max(0, min(
+                self._curriculum_position, len(self.level_order) - 1))
+            self.current_index_world = self._curriculum_position
+            self.world = self.level_order[self.current_index_world]
+
+        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
+
+    def _evaluate_curriculum_batch(self):
+        wins = sum(1 for r in self._batch_results if r)
+        total = len(self._batch_results)
+        win_rate = wins / total if total > 0 else 0.0
+        pos = self._curriculum_position
+        level_name = self.level_order[pos] if pos < len(self.level_order) else "?"
+        consec_fb = self._consecutive_fallbacks.get(pos, 0)
+
+        effective_advance = self._batch_advance_threshold
+        if consec_fb >= 2:
+            effective_advance = max(0.10, effective_advance - 0.10)
+
+        if win_rate >= effective_advance and pos < len(self.level_order) - 1:
+            self._curriculum_position += 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = 0
+            print(f"  🎓 [Curriculum] ADVANCE → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"({wins}/{total} = {win_rate:.0%})")
+        elif win_rate <= self._batch_fallback_threshold and pos > 0:
+            self._curriculum_position -= 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = consec_fb + 1
+            print(f"  ⬇️  [Curriculum] FALLBACK → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"({wins}/{total} = {win_rate:.0%}, fb={consec_fb + 1})")
+        else:
+            self._windows_on_level += 1
+            if self._windows_on_level >= self._max_stay_windows and pos > 0:
+                self._curriculum_position -= 1
+                self._windows_on_level = 0
+                print(f"  ⏳ [Curriculum] FORCE FALLBACK → Lvl {self._curriculum_position} "
+                      f"(stuck {self._max_stay_windows} windows)")
+
+        self._batch_results.clear()
 
     def load_level(self, preserve_power: bool = False):
         self.alive = True
@@ -575,7 +622,7 @@ class PlatformerCore(gymnasium.Env):
         # world and should not carry over or linger across level transitions.
         self.level_data.projectiles = []
 
-        # --- Cache spike + pit objects for hazard_hash ---
+        # --- Cache spike objects for hazard_hash ---
         # Spikes are static tiles created by LevelLoader and stored only in
         # level_data.tiles / static_hash. We cache references here so step()
         # can insert them into hazard_hash every frame without scanning the
@@ -685,23 +732,16 @@ class PlatformerCore(gymnasium.Env):
         self.dijkstra.compute_map(goal_positions, coin_positions)
 
     def complete_level(self):
-        """
-        Called by PhysicsManager the moment the player touches the goal tile.
-        Selects the next level using a random curriculum walk but does NOT load
-        it yet -- that happens inline in step() after _info() has captured the
-        WIN event for this frame.
+        self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
 
-        The episode continues into the next level; only lives = 0 ends it.
-        """
-        # Random walk: +-1 from current index (curriculum learning)
-        self.current_index_world = max(
-            0, min(self.current_index_world + 1, random.randint(self.current_index_world - 1, self.current_index_world + 2) )
-        )
-        if self.current_index_world >= len(self.level_order):
-            self.current_index_world = len(self.level_order) - 1
+        # Batch curriculum: mark win if this is the starting level
+        if self._curriculum_position < len(self.level_order):
+            if self.world == self.level_order[self._curriculum_position]:
+                self._episode_won_current = True
+
+        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
         self.world = self.level_order[self.current_index_world]
-
-        # Signal step() to load the next level after _info() runs this frame.
+        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
@@ -779,11 +819,19 @@ class PlatformerCore(gymnasium.Env):
         return min_d
 
     def _update_stall_metrics(self):
-        """FIX: Stall logic now uses X-distance to goal."""
+        """Stall detection — suppressed when riding a moving platform."""
         if not self.player: return
 
         if self.player.gObj.x > self.max_x_seen:
             self.max_x_seen = self.player.gObj.x
+
+        # FIX: If riding a moving platform, reset stall timer — the player
+        # IS making progress, just not under their own velocity. Without this,
+        # the agent gets stall-killed for being patient on platforms.
+        if getattr(self.player, '_on_moving_platform', False):
+            self.stall_timer = 0
+            self.stalled_this_frame = False
+            return
 
         # PERF: Read from cache set at the top of step() instead of recomputing.
         current_dist = getattr(self, '_goal_dist_cache', self._get_dist_to_goal())
@@ -1225,9 +1273,7 @@ class PlatformerCore(gymnasium.Env):
             return out.astype(np.float32)
 
     def _tracking_obs(self) -> np.ndarray:
-        """
-        Returns 13 scalar features used by the MLP branch of the extractor.
-        """
+        """Returns 7 scalar features (+ 5 from _player_obs = 12 total)."""
         p = self.player
         if not p: return np.zeros(7, dtype=np.float32)  # FIXED: 7 active scalars
 
@@ -1390,6 +1436,7 @@ class PlatformerCore(gymnasium.Env):
             "cause": cause,
             "dijkstra_dist": dijkstra_dist,
             "on_ground": p.on_ground,
+            "on_moving_platform": getattr(p, '_on_moving_platform', False),
             "step_dx":   self._step_dx,
             "step_dy":   self._step_dy,
             **self._obs_stats

@@ -57,13 +57,6 @@ BORDER_DONE    = (120, 40, 40)
 SCORE_COLOR    = (255, 210, 80)
 PAUSED_COLOR   = (255, 80, 80)
 
-# Radar chart settings
-RADAR_COLORS   = [
-    (255, 100, 120), (80, 200, 255), (140, 255, 120),
-    (255, 200, 60),  (200, 120, 255), (255, 160, 60),
-    (60, 230, 200),  (255, 80, 200),
-]
-
 
 # ---------------------------------------------------------------------------
 # Model metadata parsing (mirrors watch_agent.py)
@@ -170,14 +163,6 @@ class ModelSlot:
                 persona=self.persona,
                 **({"reward_fn": reward_fn} if reward_fn else {}),
             )
-            # CRITICAL: disable free_cam so handle_input() is never suppressed.
-            # When render_mode="none", DebugManager(default_active=False) leaves
-            # free_cam_active=True, which triggers the guard in platformer_core.step():
-            #   if not debug_manager.free_cam_active: player.handle_input(a=action)
-            # With free_cam_active=True the player velocity is zeroed every frame.
-            _game = getattr(self.raw_env, "game", None)
-            if _game and hasattr(_game, "debug_manager"):
-                _game.debug_manager.free_cam_active = False
         except Exception as e:
             self.error = f"Env create: {e}"
             return
@@ -214,13 +199,15 @@ class ModelSlot:
         self.score = 0
         self.ep_count = 0
         self.steps = 0
-        # Per-episode performance tracking (for radar chart)
-        self.ep_scores:   list = []
-        self.ep_steps:    list = []
-        self.ep_goals:    list = []   # 1.0 = won, 0.0 = died
-        self.ep_coins:    list = []
-        self.ep_progress: list = []   # max_x_seen normalised [0,1]
         self.ok = True
+
+        # Lifetime stats for radar plot
+        self.total_wins = 0
+        self.total_deaths = 0
+        self.total_stalls = 0
+        self.total_coins = 0
+        self.total_kills = 0
+        self.scores_history = []
 
     def reset(self):
         """Reset the environment and episode counters."""
@@ -240,15 +227,10 @@ class ModelSlot:
         self.done = False
         self.score = 0
         self.steps = 0
-        self._last_info: dict = {}
 
         # Reset camera so it snaps to player start position
         game = self.raw_env.game if hasattr(self.raw_env, 'game') else None
         if game:
-            # Re-apply free_cam=False after every game reset (game.reset() may
-            # re-initialise DebugManager state and restore free_cam_active=True).
-            if hasattr(game, "debug_manager"):
-                game.debug_manager.free_cam_active = False
             game.camera_x = 0.0
             game.camera_y = 0.0
             self._force_camera_update()
@@ -281,8 +263,15 @@ class ModelSlot:
 
             self.score = info.get("score", self.score) if isinstance(info, dict) else self.score
             self.steps += 1
+
+            # Track stats from info
             if isinstance(info, dict):
-                self._last_info = info
+                self.total_coins = info.get("coins_collected", self.total_coins)
+                self.total_kills += int(info.get("enemies_killed_step", 0))
+                if info.get("event", "") == "WIN":
+                    self.total_wins += 1
+                if info.get("cause", "") == "Stall":
+                    self.total_stalls += 1
 
             # Force camera update (game core skips this in non-human mode)
             self._force_camera_update()
@@ -290,17 +279,9 @@ class ModelSlot:
             if ep_done:
                 self.ep_count += 1
                 self.done = True
-                # Record episode metrics for radar
-                game = self.raw_env.game if hasattr(self.raw_env, 'game') else None
-                info_d = self._last_info
-                self.ep_scores.append(float(self.score))
-                self.ep_steps.append(float(self.steps))
-                self.ep_goals.append(1.0 if info_d.get("won", False) else 0.0)
-                self.ep_coins.append(float(info_d.get("coins_collected", 0)))
-                raw_max_x = info_d.get("max_x_seen", 0.0)
-                # Normalise progress by level width (fallback to 1)
-                level_w = (game.level_data.width if game and hasattr(game, 'level_data') else 1) or 1
-                self.ep_progress.append(float(raw_max_x) / float(level_w))
+                self.scores_history.append(self.score)
+                if isinstance(info, dict) and info.get("event", "") == "DIED":
+                    self.total_deaths += 1
                 return True
         except Exception as e:
             self.error = f"Step error: {e}"
@@ -368,224 +349,89 @@ class ModelSlot:
         except Exception:
             pass
 
+    def get_radar_metrics(self):
+        """Return normalised metrics dict for the radar plot."""
+        ep = max(1, self.ep_count)
+        return {
+            "Win Rate":   self.total_wins / ep,
+            "Survival":   1.0 - (self.total_deaths / ep),
+            "Coins":      min(1.0, self.total_coins / max(1, ep * 10)),
+            "Kills":      min(1.0, self.total_kills / max(1, ep * 3)),
+            "Avg Score":  min(1.0, (sum(self.scores_history) / max(1, len(self.scores_history))) / 500),
+            "Anti-Stall": 1.0 - min(1.0, self.total_stalls / max(1, ep * 3)),
+        }
+
 
 # ---------------------------------------------------------------------------
-# Radar chart rendering
+# Radar (Spider) Chart Drawing
 # ---------------------------------------------------------------------------
+def draw_radar_chart(surface, center, radius, metrics: dict, label: str,
+                     font, color=(80, 200, 120), bg_alpha=200):
+    """
+    Draw a spider/radar chart onto a pygame surface.
 
-# Fixed absolute scales per axis — chart only fills fully at peak performance.
-# (score, survival_steps, goal_rate_0to1, coins, progress_0to1)
-RADAR_AXIS_SCALES = [
-    # (label, unit_str, max_value, ring_labels)
-    ("Score",     "",    2000.0, ["500", "1000", "1500", "2000"]),
-    ("Survival",  "steps", 1800.0, ["450", "900",  "1350", "1800"]),
-    ("Goal Rate", "%",   1.0,   ["25%", "50%",  "75%",  "100%"]),
-    ("Coins",     "",    20.0,  ["5",   "10",   "15",   "20"  ]),
-    ("Progress",  "%",   1.0,   ["25%", "50%",  "75%",  "100%"]),
-]
-RADAR_METRICS = [s[0] for s in RADAR_AXIS_SCALES]
-
-
-def _slot_radar_values(slot) -> list:
-    """Return raw averaged values per axis (un-normalised)."""
-    def _safe_avg(lst): return float(sum(lst) / len(lst)) if lst else 0.0
-    return [
-        _safe_avg(slot.ep_scores),
-        _safe_avg(slot.ep_steps),
-        _safe_avg(slot.ep_goals),       # already 0-1
-        _safe_avg(slot.ep_coins),
-        _safe_avg(slot.ep_progress),    # already 0-1
-    ]
-
-
-def _render_text(fonts, key, text, color, fallback_size=16):
-    try:
-        return fonts[key].render(text, True, color)
-    except Exception:
-        return pygame.font.Font(None, fallback_size).render(text, True, color)
-
-
-def draw_radar_overlay(screen, slots, fonts):
-    """Draw a full-screen radar chart with fixed absolute scales."""
+    metrics: dict of {axis_name: value} where value is 0.0–1.0
+    """
     import math as _math
 
-    sw, sh = screen.get_size()
-    ok_slots = [s for s in slots if s.ok and s.ep_count > 0]
-    if not ok_slots:
+    n = len(metrics)
+    if n < 3:
         return
 
-    raw   = [_slot_radar_values(s) for s in ok_slots]
-    n_axes = len(RADAR_AXIS_SCALES)
+    names = list(metrics.keys())
+    values = [max(0.0, min(1.0, metrics[k])) for k in names]
+    cx, cy = center
+    angle_step = 2 * _math.pi / n
 
-    # Clamp & normalise against FIXED scales (not peer-relative)
-    normed = []
-    for rvals in raw:
-        row = []
-        for ax, (_, _, ax_max, _) in enumerate(RADAR_AXIS_SCALES):
-            row.append(min(1.0, max(0.0, rvals[ax] / ax_max)))
-        normed.append(row)
+    # Background circle
+    bg_surf = pygame.Surface((radius * 2 + 40, radius * 2 + 40), pygame.SRCALPHA)
+    bx, by = radius + 20, radius + 20
+    pygame.draw.circle(bg_surf, (10, 6, 18, bg_alpha), (bx, by), radius + 10)
+    surface.blit(bg_surf, (cx - bx, cy - by))
 
-    # ── Background dim ───────────────────────────────────────────────────────
-    dim = pygame.Surface((sw, sh), pygame.SRCALPHA)
-    dim.fill((0, 0, 0, 190))
-    screen.blit(dim, (0, 0))
+    # Grid rings (25%, 50%, 75%, 100%)
+    for ring in (0.25, 0.5, 0.75, 1.0):
+        r = int(radius * ring)
+        pygame.draw.circle(surface, (50, 40, 65), (cx, cy), r, 1)
 
-    # ── Layout ───────────────────────────────────────────────────────────────
-    legend_w    = 300
-    radar_area_w = sw - legend_w - 40
-    cx = radar_area_w // 2 + 20
-    cy = sh // 2 + 10
-    radius = int(min(radar_area_w * 0.44, sh * 0.40))
+    # Axis lines + labels
+    axis_points = []
+    for i in range(n):
+        angle = -_math.pi / 2 + i * angle_step  # start from top
+        ex = cx + int(radius * _math.cos(angle))
+        ey = cy + int(radius * _math.sin(angle))
+        axis_points.append((angle, ex, ey))
+        pygame.draw.line(surface, (50, 40, 65), (cx, cy), (ex, ey), 1)
 
-    N_RINGS = 4
+        # Label
+        lbl = font.render(names[i], True, (160, 170, 200))
+        lx = cx + int((radius + 14) * _math.cos(angle)) - lbl.get_width() // 2
+        ly = cy + int((radius + 14) * _math.sin(angle)) - lbl.get_height() // 2
+        surface.blit(lbl, (lx, ly))
 
-    # ── Grid rings with labels ────────────────────────────────────────────────
-    ring_surf = pygame.Surface((sw, sh), pygame.SRCALPHA)
-    for ring in range(1, N_RINGS + 1):
-        r   = int(radius * ring / N_RINGS)
-        frac = ring / N_RINGS
-        # Darken inner rings, brighten outer
-        alpha_fill  = 30 + ring * 8
-        alpha_line  = 70 + ring * 15
-        pts = []
-        for ax in range(n_axes):
-            ang = _math.pi / 2 + 2 * _math.pi * ax / n_axes
-            pts.append((cx + r * _math.cos(ang), cy - r * _math.sin(ang)))
-        if len(pts) >= 3:
-            pygame.draw.polygon(ring_surf, (60, 40, 90, alpha_fill), pts, 0)
-            pygame.draw.polygon(ring_surf, (140, 100, 180, alpha_line), pts, 1)
-    screen.blit(ring_surf, (0, 0))
+    # Data polygon
+    data_pts = []
+    for i in range(n):
+        angle = -_math.pi / 2 + i * angle_step
+        v = values[i]
+        dx = cx + int(radius * v * _math.cos(angle))
+        dy = cy + int(radius * v * _math.sin(angle))
+        data_pts.append((dx, dy))
 
-    # ── Axes & labels ────────────────────────────────────────────────────────
-    for ax, (lbl, unit, ax_max, ring_lbls) in enumerate(RADAR_AXIS_SCALES):
-        ang = _math.pi / 2 + 2 * _math.pi * ax / n_axes
-        ex = cx + radius * _math.cos(ang)
-        ey = cy - radius * _math.sin(ang)
-        pygame.draw.line(screen, (100, 80, 140), (cx, cy), (int(ex), int(ey)), 1)
+    # Filled polygon (semi-transparent)
+    if len(data_pts) >= 3:
+        poly_surf = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        pygame.draw.polygon(poly_surf, (*color, 60), data_pts)
+        pygame.draw.polygon(poly_surf, (*color, 200), data_pts, 2)
+        surface.blit(poly_surf, (0, 0))
 
-        # Axis tip label (metric name + max)
-        lbl_str = f"{lbl}"
-        lbl_surf = _render_text(fonts, 'label', lbl_str, (220, 210, 255), 18)
-        tip_x = cx + (radius + 36) * _math.cos(ang) - lbl_surf.get_width() // 2
-        tip_y = cy - (radius + 36) * _math.sin(ang) - lbl_surf.get_height() // 2
-        screen.blit(lbl_surf, (int(tip_x), int(tip_y)))
+    # Data points
+    for pt in data_pts:
+        pygame.draw.circle(surface, color, pt, 3)
 
-        # Max value label just inside tip
-        max_str = f"max {int(ax_max) if ax_max >= 10 else ax_max}{unit}"
-        max_surf = _render_text(fonts, 'sub', max_str, (130, 110, 160), 14)
-        mx = cx + (radius + 14) * _math.cos(ang) - max_surf.get_width() // 2
-        my = cy - (radius + 14) * _math.sin(ang) - max_surf.get_height() // 2
-        screen.blit(max_surf, (int(mx), int(my)))
-
-        # Ring scale labels on first axis (top = Score)
-        if ax == 0:
-            for ring_i, rlbl in enumerate(ring_lbls, 1):
-                r_pos = radius * ring_i / N_RINGS
-                r_ang  = ang
-                rx = cx + r_pos * _math.cos(r_ang) + 4
-                ry = cy - r_pos * _math.sin(r_ang) - 4
-                rs = _render_text(fonts, 'sub', rlbl, (120, 100, 150), 13)
-                screen.blit(rs, (int(rx), int(ry)))
-
-    # ── Agent polygons ───────────────────────────────────────────────────────
-    agent_surf = pygame.Surface((sw, sh), pygame.SRCALPHA)
-    for i, (slot, nvals) in enumerate(zip(ok_slots, normed)):
-        col_rgb  = RADAR_COLORS[i % len(RADAR_COLORS)]
-        col_fill = col_rgb + (40,)
-        col_line = col_rgb + (210,)
-
-        pts = []
-        for ax in range(n_axes):
-            ang = _math.pi / 2 + 2 * _math.pi * ax / n_axes
-            r   = radius * max(0.01, nvals[ax])
-            pts.append((cx + r * _math.cos(ang), cy - r * _math.sin(ang)))
-
-        if len(pts) >= 3:
-            pygame.draw.polygon(agent_surf, col_fill, pts, 0)
-            pygame.draw.polygon(agent_surf, col_line, pts, 2)
-        for px, py in pts:
-            pygame.draw.circle(agent_surf, col_line, (int(px), int(py)), 5)
-
-        # Value labels directly on the polygon vertices
-        for ax, (px, py) in enumerate(pts):
-            rvals_ax  = raw[i][ax]
-            _, unit, ax_max, _ = RADAR_AXIS_SCALES[ax]
-            if ax in (2, 4):  # goal rate, progress → show as %
-                v_str = f"{rvals_ax * 100:.0f}%"
-            elif ax_max < 5:
-                v_str = f"{rvals_ax:.2f}"
-            else:
-                v_str = f"{rvals_ax:.0f}"
-            v_surf = _render_text(fonts, 'sub', v_str, col_rgb, 13)
-            # Offset label outward from centre
-            ang = _math.pi / 2 + 2 * _math.pi * ax / n_axes
-            ox = int(px + 10 * _math.cos(ang) - v_surf.get_width() // 2)
-            oy = int(py - 10 * _math.sin(ang) - v_surf.get_height() // 2)
-            agent_surf.blit(v_surf, (ox, oy))
-
-    screen.blit(agent_surf, (0, 0))
-
-    # ── Title ────────────────────────────────────────────────────────────────
-    title_surf = _render_text(fonts, 'label', "Agent Performance  [P to hide]", (230, 220, 255), 20)
-    screen.blit(title_surf, (cx - title_surf.get_width() // 2, 14))
-
-    # ── Legend panel ─────────────────────────────────────────────────────────
-    lx0 = sw - legend_w - 12
-    ly0 = 50
-    leg_h = min(sh - ly0 - 16, 30 + len(ok_slots) * 62)
-    leg_bg = pygame.Surface((legend_w + 8, leg_h), pygame.SRCALPHA)
-    leg_bg.fill((14, 6, 26, 215))
-    screen.blit(leg_bg, (lx0 - 4, ly0 - 4))
-
-    # Header
-    hdr = _render_text(fonts, 'label', "PERFORMANCE SUMMARY", (180, 160, 230), 16)
-    screen.blit(hdr, (lx0, ly0))
-    ly0 += hdr.get_height() + 8
-
-    for i, (slot, rvals) in enumerate(zip(ok_slots, raw)):
-        col = RADAR_COLORS[i % len(RADAR_COLORS)]
-
-        # Agent name row
-        pygame.draw.rect(screen, col, pygame.Rect(lx0, ly0 + 2, 12, 12))
-        name_surf = _render_text(fonts, 'score', slot.label[:22], (220, 210, 240), 15)
-        screen.blit(name_surf, (lx0 + 18, ly0))
-        ly0 += name_surf.get_height() + 3
-
-        # Metric rows with mini bar graphs
-        metric_data = [
-            ("Score",    rvals[0], 2000.0, f"{rvals[0]:.0f}"),
-            ("Survival", rvals[1], 1800.0, f"{rvals[1]:.0f} steps"),
-            ("Goal Rate",rvals[2], 1.0,    f"{rvals[2]*100:.0f}%"),
-            ("Coins",    rvals[3], 20.0,   f"{rvals[3]:.1f} avg"),
-            ("Progress", rvals[4], 1.0,    f"{rvals[4]*100:.0f}%"),
-        ]
-        bar_w = 90
-        for mname, mval, mmax, mstr in metric_data:
-            # Label
-            ml = _render_text(fonts, 'sub', f"  {mname}:", (140, 130, 160), 13)
-            screen.blit(ml, (lx0, ly0))
-            # Mini bar
-            fill_frac = min(1.0, mval / mmax if mmax > 0 else 0)
-            bar_x = lx0 + 76
-            bar_y = ly0 + 3
-            bar_h = 9
-            pygame.draw.rect(screen, (40, 28, 55), pygame.Rect(bar_x, bar_y, bar_w, bar_h))
-            if fill_frac > 0:
-                # Colour: green > 60%, yellow > 30%, red otherwise
-                if fill_frac > 0.6:
-                    bc = (60, 200, 100)
-                elif fill_frac > 0.3:
-                    bc = (210, 180, 50)
-                else:
-                    bc = (200, 70, 70)
-                pygame.draw.rect(screen, bc, pygame.Rect(bar_x, bar_y, int(bar_w * fill_frac), bar_h))
-            pygame.draw.rect(screen, (80, 60, 100), pygame.Rect(bar_x, bar_y, bar_w, bar_h), 1)
-            # Value text
-            vl = _render_text(fonts, 'sub', mstr, (200, 190, 215), 13)
-            screen.blit(vl, (bar_x + bar_w + 4, ly0))
-            ly0 += ml.get_height() + 1
-
-        ly0 += 8   # gap between agents
+    # Title label
+    title = font.render(label, True, (220, 230, 255))
+    surface.blit(title, (cx - title.get_width() // 2, cy + radius + 22))
 
 
 # ---------------------------------------------------------------------------
@@ -664,7 +510,6 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
         font_sub   = pygame.font.Font(None, 15)
         font_score = pygame.font.Font(None, 16)
         font_big   = pygame.font.Font(None, 30)
-    fonts_dict = {'label': font_label, 'sub': font_sub, 'score': font_score, 'big': font_big}
 
     # Load models
     print("[GridViewer] Loading models...")
@@ -688,16 +533,16 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
 
     print(f"\n[GridViewer] Running — {max_episodes} episodes per agent @ {fps} FPS")
     print("  ESC = quit  |  SPACE = pause  |  R = reset all")
-    print("  H = hitboxes  |  G = grid  |  D = all debug\n")
+    print("  H = hitboxes  |  G = grid  |  N = radar plots  |  D = all debug\n")
 
     paused = False
     running = True
     frame_count = 0
-    show_radar = False
 
     # ── Debug overlay toggles ──
     show_hitboxes = False
     show_grid     = False
+    show_radar    = False
 
     while running:
         # ── Events ──
@@ -722,7 +567,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                     all_on = show_hitboxes and show_grid
                     show_hitboxes = not all_on
                     show_grid     = not all_on
-                elif event.key == pygame.K_p:
+                elif event.key == pygame.K_n:
                     show_radar = not show_radar
 
         if not running:
@@ -744,13 +589,10 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                     all_done = False
 
             if all_done and max_episodes > 0:
-                # All agents finished — show radar, hold briefly, then exit
-                show_radar = True
-                if not getattr(run_grid, '_radar_timer_start', None):
-                    import time as _t
-                    run_grid._radar_timer_start = _t.time()
-                elif _t.time() - run_grid._radar_timer_start > 10:
-                    running = False
+                # All agents finished all episodes — hold for 3 seconds then exit
+                time.sleep(3)
+                running = False
+                continue
 
         # ── Render grid ──
         screen.fill(BG_COLOR)
@@ -798,11 +640,67 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                 border_col = BORDER_DONE if (slot.done and slot.ep_count >= max_episodes) else BORDER_ACTIVE
                 pygame.draw.rect(screen, border_col, pygame.Rect(x-1, y-1, cell_w+2, cell_h+2), 2)
 
+                # Stats bar at bottom of cell
+                stats = []
+                if slot.total_wins > 0:   stats.append(f"W:{slot.total_wins}")
+                if slot.total_deaths > 0: stats.append(f"D:{slot.total_deaths}")
+                if slot.total_coins > 0:  stats.append(f"C:{slot.total_coins}")
+                if stats:
+                    stat_txt = font_sub.render("  ".join(stats), True, (200, 220, 255))
+                    sbg = pygame.Surface((stat_txt.get_width() + 8, stat_txt.get_height() + 4), pygame.SRCALPHA)
+                    sbg.fill((0, 0, 0, 170))
+                    screen.blit(sbg, (x + 2, y + LABEL_H + game_cell_h - stat_txt.get_height() - 6))
+                    screen.blit(stat_txt, (x + 6, y + LABEL_H + game_cell_h - stat_txt.get_height() - 4))
+
             else:
                 # Error slot — show error
                 err_surf = font_sub.render(f"ERROR: {slot.error[:50]}", True, (255, 80, 80))
                 screen.blit(err_surf, (x + 6, y + 3))
                 pygame.draw.rect(screen, BORDER_DONE, pygame.Rect(x, y + LABEL_H, cell_w, game_cell_h))
+
+        # ── Radar Plot Overlay (N key) ──
+        if show_radar:
+            ok_slots = [s for s in slots if s.ok and s.ep_count > 0]
+            if ok_slots:
+                # Assign a color to each model
+                radar_colors = [
+                    (80, 200, 120), (200, 80, 120), (80, 120, 200),
+                    (200, 200, 80), (200, 120, 80), (120, 200, 200),
+                    (180, 80, 200), (80, 200, 200),
+                ]
+
+                n_charts = len(ok_slots)
+                # Layout: up to 4 per row, size adapts to screen
+                chart_cols = min(4, n_charts)
+                chart_rows = math.ceil(n_charts / chart_cols)
+                chart_r = min(80, (screen_w - 40) // (chart_cols * 3),
+                              (screen_h - 100) // (chart_rows * 3))
+
+                panel_w = chart_cols * (chart_r * 2 + 60) + 20
+                panel_h = chart_rows * (chart_r * 2 + 60) + 40
+                panel_x = (screen_w - panel_w) // 2
+                panel_y = (screen_h - panel_h) // 2
+
+                # Dark background panel
+                panel_bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+                panel_bg.fill((8, 4, 14, 230))
+                pygame.draw.rect(panel_bg, (80, 60, 120, 200), (0, 0, panel_w, panel_h), 2)
+                screen.blit(panel_bg, (panel_x, panel_y))
+
+                # Title
+                title = font_big.render("RADAR PLOTS  (N to close)", True, (200, 210, 230))
+                screen.blit(title, (panel_x + 10, panel_y + 6))
+
+                # Draw one spider chart per model
+                for i, slot in enumerate(ok_slots):
+                    rc = i % chart_cols
+                    rr = i // chart_cols
+                    cx = panel_x + 30 + chart_r + rc * (chart_r * 2 + 60)
+                    cy = panel_y + 50 + chart_r + rr * (chart_r * 2 + 60)
+                    color = radar_colors[i % len(radar_colors)]
+                    metrics = slot.get_radar_metrics()
+                    draw_radar_chart(screen, (cx, cy), chart_r, metrics,
+                                     slot.label[:20], font_sub, color=color)
 
         # Pause overlay
         if paused:
@@ -829,8 +727,8 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
             ("R", "reset",      None),
             ("H", "hitboxes",   show_hitboxes),
             ("G", "grid",       show_grid),
+            ("N", "radar",      show_radar),
             ("D", "all debug",  show_hitboxes and show_grid),
-            ("P", "radar",      show_radar),
         ]
         hx = 12
         for key, label, active in hud_items:
@@ -847,9 +745,6 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
             lbl_surf = font_sub.render(label, True, lbl_col)
             screen.blit(lbl_surf, (hx, bar_y + 5))
             hx += lbl_surf.get_width() + 16
-
-        if show_radar:
-            draw_radar_overlay(screen, slots, fonts_dict)
 
         pygame.display.flip()
         clock.tick(fps)
