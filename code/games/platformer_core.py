@@ -265,10 +265,12 @@ class PlatformerCore(gymnasium.Env):
         self._batch_window            = int(kwargs.pop("batch_window", 10))
         self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
         self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
-        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 3))
+        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))  # reduced from 3
+        self._review_prob             = float(kwargs.pop("review_prob", 0.25))
         self._curriculum_position     = 0
         self._batch_results: list     = []
         self._episode_won_current     = False
+        self._is_review_episode       = False
         self._windows_on_level        = 0
         self._consecutive_fallbacks   = {}
         self._level_visits     = {lvl: 0 for lvl in self.level_order}
@@ -439,8 +441,6 @@ class PlatformerCore(gymnasium.Env):
                 self.physics_manager.hazard_hash.insert(enemy)
         for spike in self._cached_spikes:
             self.physics_manager.hazard_hash.insert(spike)
-        for pit in self.level_data.pits:
-            self.physics_manager.hazard_hash.insert(pit)
 
         # --- platform_hash: moving platforms ---
         # Rebuilt every frame because platforms move.
@@ -546,8 +546,9 @@ class PlatformerCore(gymnasium.Env):
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
 
-        # Record episode result into batch
-        if self.level_order and not self.locked_level:
+        # Record episode result into batch — only if it was a curriculum episode
+        # (NOT a review episode, which played a different level)
+        if self.level_order and not self.locked_level and not self._is_review_episode:
             self._batch_results.append(self._episode_won_current)
 
         # Evaluate batch when window is full
@@ -556,6 +557,7 @@ class PlatformerCore(gymnasium.Env):
 
         self.reset_metrics()
         self._episode_won_current = False
+        self._is_review_episode = False
 
         if self.locked_level:
             self.world = self.locked_level
@@ -566,7 +568,18 @@ class PlatformerCore(gymnasium.Env):
         elif self.level_order:
             self._curriculum_position = max(0, min(
                 self._curriculum_position, len(self.level_order) - 1))
-            self.current_index_world = self._curriculum_position
+
+            # ── Review rotation: 25% chance to play a random earlier level ──
+            # Keeps skills sharp on mastered levels, distributes visits,
+            # prevents catastrophic forgetting. Results don't count for batch.
+            if (self._curriculum_position > 0
+                    and random.random() < self._review_prob):
+                review_idx = random.randint(0, self._curriculum_position - 1)
+                self.current_index_world = review_idx
+                self._is_review_episode = True
+            else:
+                self.current_index_world = self._curriculum_position
+
             self.world = self.level_order[self.current_index_world]
 
         self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
@@ -865,13 +878,6 @@ class PlatformerCore(gymnasium.Env):
         # 2. PIT DEATH
         if player.gObj.y > self.level_data.height:
             return self._handle_death("Pit")
-
-        # 3. PIT TILE DEATH — player is standing on / overlapping a 'O' pit tile
-        player_rect = self.player.gObj.get_rect()
-        for pit in self.level_data.pits:
-            pit_rect = pit.get_rect()
-            if player_rect.colliderect(pit_rect):
-                return self._handle_death("Pit")
 
         # 4. STALL DEATH
         if self.anti_stall and self.stall_windows_count >= self.stall_kill_windows:
@@ -1251,17 +1257,6 @@ class PlatformerCore(gymnasium.Env):
                                     if np.isfinite(best_est):
                                         best_est = max(1.0, best_est)
                                         out[ly, lx] = player_dist - best_est
-                                        
-                        # --- Secondary proximity boosts (2 and 3 tiles above) ---
-                        for offset, discount in [(2, 0.25), (3, 0.1)]:
-                            boost_row = p_top_row - offset
-                            if boost_row < 0:
-                                continue
-                            for pc in range(pc0, pc1):
-                                ly = boost_row - map_row_start
-                                lx = pc - map_col_start
-                                if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                    out[ly, lx] += discount
 
             # --- Single normalisation pass (after ALL patches) ---
             max_cost = max(

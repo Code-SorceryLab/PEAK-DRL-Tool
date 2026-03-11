@@ -1436,6 +1436,7 @@ def delete_logs_and_models():
     safe_clear_dir(Path(DEFAULT_TB_ROOT))
     safe_clear_dir(MODELS_DIR)
     safe_clear_dir(Path("csv"))
+    safe_clear_dir(Path("sessions"))
 
     print("\n🧹 All logs and models deleted successfully.\n")
 
