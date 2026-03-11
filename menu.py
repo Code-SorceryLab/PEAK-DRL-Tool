@@ -525,7 +525,6 @@ def run_training():
                              show_desc=arch_desc)
     if arch_sel is None:
         return
-    arch_choice = arch_sel[0]     # one arch per run
 
     # ── TensorBoard root ──────────────────────────────────────────
     tb_root = input(_DIM(f"\n    TensorBoard root [{DEFAULT_TB_ROOT}] (Enter to keep): ")).strip() or DEFAULT_TB_ROOT
@@ -533,18 +532,21 @@ def run_training():
     # ── Summary ───────────────────────────────────────────────────
     run_skills = list(skill_sel)
     if custom_steps is not None:
-        run_skills.append("Custom")
+        run_skills.append(f"Custom({custom_steps})")
 
-    total = len(algo_sel) * len(persona_sel) * max(len(run_skills), 1)
+    total = len(arch_sel) * len(algo_sel) * len(persona_sel) * max(len(run_skills), 1)
+
     print()
-    print(_BOLD("    ── Run Summary ──────────────────────────────────────"))
-    print(f"    Game      : {_WHT(game)}")
-    print(f"    Algos     : {_GRN(', '.join(algo_sel))}")
-    print(f"    Personas  : {_GRN(', '.join(persona_sel))}")
-    print(f"    Skills    : {_GRN(', '.join(run_skills if run_skills else ['Custom']))}")
-    print(f"    Arch      : {_GRN(arch_choice)}")
-    print(f"    Runs      : {_WHT(str(total))}")
-    print(_BOLD("    ─────────────────────────────────────────────────────"))
+    print(f"    {_BOLD(_CYAN('▸'))} {_BOLD('Run Summary')}")
+    print(f"    {_DIM('─' * 50)}")
+    print(f"    {_DIM('Game      :')}  {_WHT(game)}")
+    print(f"    {_DIM('Algos     :')}  {_GRN(', '.join(algo_sel))}")
+    personas_short = ', '.join(p.replace(f'{game}_', '') for p in persona_sel)
+    print(f"    {_DIM('Personas  :')}  {_GRN(personas_short)}  {_DIM(f'({len(persona_sel)})')}")
+    print(f"    {_DIM('Skills    :')}  {_GRN(', '.join(run_skills))}")
+    print(f"    {_DIM('Archs     :')}  {_GRN(', '.join(arch_sel))}")
+    print(f"    {_DIM('Total runs:')}  {_WHT(str(total))}")
+    print(f"    {_DIM('─' * 50)}")
     print()
     confirm = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
@@ -554,28 +556,29 @@ def run_training():
     # ── Execute ───────────────────────────────────────────────────
     completed = 0; failed = 0
     try:
-        for algo in algo_sel:
-            for persona in persona_sel:
-                if custom_steps is not None:
-                    completed += 1
-                    print(f"\n  Progress {completed}/{total}  |  {game} | {algo} | {persona} | Custom {custom_steps}")
-                    cmd = [
-                        sys.executable, "-m", "code.scripts.train",
-                        f"+game={game}", f"+model={algo}", f"+persona={persona}",
-                        "skill=Custom", f"+skills.Custom={custom_steps}",
-                        f"tb_root={tb_root}", f"+architecture={arch_choice}",
-                    ]
-                    print(">>> " + " ".join(cmd))
-                    try:
-                        subprocess.run(cmd, check=True)
-                    except subprocess.CalledProcessError:
-                        failed += 1
-                for skill in skill_sel:
-                    completed += 1
-                    print(f"\n  Progress {completed}/{total}  |  {game} | {algo} | {persona} | {skill}")
-                    ok = execute_training_run(game, algo, persona, skill, tb_root, arch_choice)
-                    if not ok:
-                        failed += 1
+        for arch in arch_sel:
+            for algo in algo_sel:
+                for persona in persona_sel:
+                    if custom_steps is not None:
+                        completed += 1
+                        print(_DIM(f"\n  [{completed}/{total}]") + f"  {game} | {algo} | {persona} | Custom {custom_steps} | {arch}")
+                        cmd = [
+                            sys.executable, "-m", "code.scripts.train",
+                            f"+game={game}", f"+model={algo}", f"+persona={persona}",
+                            "skill=Custom", f"+skills.Custom={custom_steps}",
+                            f"tb_root={tb_root}", f"+architecture={arch}",
+                        ]
+                        print(">>> " + " ".join(cmd))
+                        try:
+                            subprocess.run(cmd, check=True)
+                        except subprocess.CalledProcessError:
+                            failed += 1
+                    for skill in skill_sel:
+                        completed += 1
+                        print(_DIM(f"\n  [{completed}/{total}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
+                        ok = execute_training_run(game, algo, persona, skill, tb_root, arch)
+                        if not ok:
+                            failed += 1
     except KeyboardInterrupt:
         print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total}"))
         return
@@ -641,19 +644,20 @@ def train_all_models_for_game():
                              show_desc=arch_desc)
     if arch_sel is None:
         return
-    arch_choice = arch_sel[0]
 
     # ── Summary + confirm ─────────────────────────────────────────
-    total_runs = len(algo_sel) * len(persona_sel) * len(skill_sel)
+    total_runs = len(arch_sel) * len(algo_sel) * len(persona_sel) * len(skill_sel)
     print()
-    print(_BOLD("    ── Run Summary ──────────────────────────────────────"))
-    print(f"    Game      : {_WHT(game)}")
-    print(f"    Algos     : {_GRN(', '.join(algo_sel))}")
-    print(f"    Personas  : {_GRN(str(len(persona_sel)))}  {_DIM('(' + ', '.join(persona_sel) + ')')}")
-    print(f"    Skills    : {_GRN(', '.join(skill_sel))}")
-    print(f"    Arch      : {_GRN(arch_choice)}")
-    print(f"    Total runs: {_WHT(str(total_runs))}")
-    print(_BOLD("    ─────────────────────────────────────────────────────"))
+    print(f"    {_BOLD(_CYAN('▸'))} {_BOLD('Run Summary')}")
+    print(f"    {_DIM('─' * 50)}")
+    print(f"    {_DIM('Game      :')}  {_WHT(game)}")
+    print(f"    {_DIM('Algos     :')}  {_GRN(', '.join(algo_sel))}")
+    personas_short = ', '.join(p.replace(f'{game}_', '') for p in persona_sel)
+    print(f"    {_DIM('Personas  :')}  {_GRN(personas_short)}  {_DIM(f'({len(persona_sel)})')}")
+    print(f"    {_DIM('Skills    :')}  {_GRN(', '.join(skill_sel))}")
+    print(f"    {_DIM('Archs     :')}  {_GRN(', '.join(arch_sel))}")
+    print(f"    {_DIM('Total runs:')}  {_WHT(str(total_runs))}")
+    print(f"    {_DIM('─' * 50)}")
     confirm = input(_BOLD("\n    ⟫ Proceed? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
         print("  Aborted.")
@@ -662,14 +666,15 @@ def train_all_models_for_game():
     # ── Execute ───────────────────────────────────────────────────
     completed = 0; failed = 0
     try:
-        for algo in algo_sel:
-            for persona in persona_sel:
-                for skill in skill_sel:
-                    completed += 1
-                    print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch_choice}")
-                    ok = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
-                    if not ok:
-                        failed += 1
+        for arch in arch_sel:
+            for algo in algo_sel:
+                for persona in persona_sel:
+                    for skill in skill_sel:
+                        completed += 1
+                        print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
+                        ok = execute_training_run(game, algo, persona, skill, architecture=arch)
+                        if not ok:
+                            failed += 1
     except KeyboardInterrupt:
         print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total_runs}"))
         return
@@ -726,9 +731,9 @@ def train_complete_grid():
                              show_desc=arch_desc)
     if arch_sel is None:
         return
-    arch_choice = arch_sel[0]
 
-    confirm = input(_BOLD(f"\n    ⟫ Proceed with {total_runs} runs using [{arch_choice}]? [Y/n]: ")).strip().lower()
+    total_runs *= len(arch_sel)
+    confirm = input(_BOLD(f"\n    ⟫ Proceed with {total_runs} runs using [{', '.join(arch_sel)}]? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
         print("  Aborted.")
         return
@@ -739,19 +744,20 @@ def train_complete_grid():
     failed = 0
 
     try:
-        for game in games:
-            personas = get_personas_for_game(game)
-            if not personas:
-                continue
+        for arch in arch_sel:
+            for game in games:
+                personas = get_personas_for_game(game)
+                if not personas:
+                    continue
 
-            for algo in algos:
-                for persona in personas:
-                    for skill in skills:
-                        completed += 1
-                        print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch_choice}")
-                        success = execute_training_run(game, algo, persona, skill, architecture=arch_choice)
-                        if not success:
-                            failed += 1
+                for algo in algos:
+                    for persona in personas:
+                        for skill in skills:
+                            completed += 1
+                            print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
+                            success = execute_training_run(game, algo, persona, skill, architecture=arch)
+                            if not success:
+                                failed += 1
     except KeyboardInterrupt:
         print(_RED(f"\n  Interrupted.  Completed {completed-1}/{total_runs}"))
         return

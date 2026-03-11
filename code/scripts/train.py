@@ -756,8 +756,7 @@ def main(cfg: DictConfig):
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
         max_steps=None if str(cfg.max_steps).lower() == "none" else int(cfg.max_steps),
-        batch_window=10, advance_threshold=0.30, fallback_threshold=0.20,
-        max_stay_windows=2, review_prob=0.25,
+        batch_window=10, advance_threshold=0.30, fallback_threshold=0.20, max_stay_windows=3,
     )
 
     os.makedirs(models_dir / "best", exist_ok=True)
@@ -921,16 +920,16 @@ def main(cfg: DictConfig):
                 tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
                 os.makedirs(tb_dir, exist_ok=True)
 
-                log_name = f"training_log_{run_id}.csv"
-                csv_dir = repo_root / "csv"
-                csv_dir.mkdir(parents=True, exist_ok=True)
-                csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
-
                 is_recurrent_model = (model_name.lower() in ['rppo', 'recurrent_ppo'])
 
                 # Build a unique run ID that includes the extractor tag
                 # Format: {game}_{algo}_{persona}_{skill}_{extractor}
                 run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
+
+                log_name = f"training_log_{run_id}.csv"
+                csv_dir = repo_root / "csv"
+                csv_dir.mkdir(parents=True, exist_ok=True)
+                csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
 
                 if is_recurrent_model:
                     eval_cb = RecurrentEvalCallback(
