@@ -176,7 +176,6 @@ if df.empty:
 
 standard_cols = {'step','total_reward','action','level','levels_completed','x','y','vx','vy','goal_dist','event','cause'}
 _OBS_SANITY_COLS = {
-    'grid_player_mean','grid_player_std','grid_player_min','grid_player_max',
     'grid_solid_mean','grid_solid_std','grid_solid_min','grid_solid_max',
     'grid_hazard_mean','grid_hazard_std','grid_hazard_min','grid_hazard_max',
     'grid_collectible_mean','grid_collectible_std','grid_collectible_min','grid_collectible_max',
@@ -376,7 +375,7 @@ if obs_cols:
     else:
         st.success("All channels OK")
 
-    grid_channels=["player","solid","hazard","collectible","dijkstra"]
+    grid_channels=["solid","hazard","collectible","dijkstra"]
     has_grid_data=any(f"grid_{ch}_mean" in df.columns for ch in grid_channels)
     if has_grid_data:
         obs_rows=[]
@@ -384,7 +383,7 @@ if obs_cols:
             mean_v=row.get(f"grid_{ch}_mean",0.0); std_v=row.get(f"grid_{ch}_std",0.0)
             min_v=row.get(f"grid_{ch}_min",0.0);  max_v=row.get(f"grid_{ch}_max",0.0)
             status="OK"
-            if isinstance(std_v,(int,float)) and std_v<1e-6 and ch in ("player","hazard"): status="DEAD"
+            if isinstance(std_v,(int,float)) and std_v<1e-6 and ch == "solid": status="DEAD"
             elif ch != "dijkstra" and isinstance(max_v,(int,float)) and max_v>1.01: status="OVERFLOW"
             obs_rows.append({"CHANNEL":ch.upper(),
                 "MEAN":f"{float(mean_v):.4f}" if isinstance(mean_v,(int,float)) else "NULL",

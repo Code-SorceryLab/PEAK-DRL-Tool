@@ -85,16 +85,24 @@ print(f"\n=== MANUAL PLAY: {args.game} ===")
 print(f"{controls}")
 print("=================================")
 
-# --- Build env
+# --- Validate level_file early
+TEMP_ID = '__editor_test__'
+if level_file:
+    _fp = Path(level_file).resolve()
+    if not _fp.exists():
+        print(f"[Play] ERROR: level file not found: {level_file}")
+        level_file = None
+    else:
+        level_file = str(_fp)  # normalise to absolute string
+
+# --- Build env (let it load the default first level on __init__)
 env_kwargs = {}
 if level_id:
     env_kwargs['world'] = level_id
-    env_kwargs['lock_level'] = True   # stay on this level on every reset
+    env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
-if level_file:
-    env_kwargs['level_file'] = level_file
-    env_kwargs['lock_level'] = True   # always replay the same file
-    print(f"[Play] Loading level file: {level_file}")
+# NOTE: do NOT pass world='__editor_test__' here — it doesn't exist in config
+# yet so platformer_core.__init__ -> reset() would load an empty level.
 env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps, **env_kwargs)
 
 # Helper to find the actual game core instance through wrappers
@@ -120,44 +128,24 @@ if level_id and core_game and hasattr(core_game, 'world'):
         print(f"[Play] Forced level override: {level_id}")
 
 # ── Handle raw file path (unlisted level) ────────────────────────
+# Strategy: inject the entry directly into the live config_manager instance
+# (post-construction), then call load_level() to switch to the editor file.
+# LevelLoader supports absolute paths in the 'file' field, so no file copying.
 if level_file and core_game:
     fp = Path(level_file)
-    if not fp.exists():
-        print(f"[Play] ERROR: file not found: {level_file}")
-    else:
-        # Inject a synthetic config entry so the existing load pipeline works.
-        # The LevelLoader builds path as: levels_dir / basename, so we must
-        # ensure the file is accessible there — either it's already in levels/,
-        # or we inject the FULL path into yaml_data so loader can find it.
-        import shutil as _shutil
-        levels_dir = Path(core_game.loader.level_path)
-        dest = levels_dir / fp.name
-        if not dest.exists() or dest.resolve() != fp.resolve():
-            try:
-                _shutil.copy2(str(fp), str(dest))
-                print(f"[Play] Copied {fp.name} → {dest}")
-            except Exception as _e:
-                print(f"[Play] Could not copy file: {_e}")
-        # Register as '__editor_test__' in the config manager's in-memory dict
-        TEMP_ID = '__editor_test__'
-        if 'levels' not in core_game.config_manager.yaml_data:
-            core_game.config_manager.yaml_data['levels'] = {}
-        core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
-            'file': fp.name,
-            'time_limit': 300,
-        }
-        if TEMP_ID not in core_game.config_manager.get_level_order():
-            core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
-                'file': fp.name, 'time_limit': 300
-            }
-        # Update level_order in-place if it is cached
-        if hasattr(core_game, 'level_order') and TEMP_ID not in core_game.level_order:
-            core_game.level_order.append(TEMP_ID)
-        core_game.world = TEMP_ID
-        core_game.locked_level = TEMP_ID
-        if hasattr(core_game, 'load_level'):
-            core_game.load_level()
-        print(f"[Play] Loaded file: {fp.name} as '{TEMP_ID}'")
+    cm = core_game.config_manager
+    if 'levels' not in cm.yaml_data:
+        cm.yaml_data['levels'] = {}
+    cm.yaml_data['levels'][TEMP_ID] = {
+        'file': str(fp),   # absolute path — LevelLoader handles this directly
+        'time_limit': 300,
+    }
+    if hasattr(core_game, 'level_order') and TEMP_ID not in core_game.level_order:
+        core_game.level_order.append(TEMP_ID)
+    core_game.world = TEMP_ID
+    core_game.locked_level = TEMP_ID
+    core_game.load_level()
+    print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
 obs, _ = env.reset()
 running = True

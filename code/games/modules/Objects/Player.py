@@ -8,7 +8,7 @@ import numpy as np
 # Imports from sibling packages
 from ..Parameters import Movement_parameters as MP
 from ..Parameters import Jump_parameters as JP
-from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR
+from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR, TILE_SIZE
 from ..System.PhysicsManager import PhysicsContext
 from ..System.AnimationHandler import AnimationHandler
 from ..System.PlayerStateMachine import PlayerStateMachine
@@ -365,8 +365,8 @@ class Player():
         inv_frac = np.clip(self.invincible_timer / _MAX_STAR, 0.0, 1.0)
 
         return np.array([
-            self.gObj.x,                           # [0]  x pos in tiles
-            self.gObj.y,                           # [1]  y pos in tiles
+            self.gObj.x / TILE_SIZE,               # [0]  x pos in tiles
+            self.gObj.y / TILE_SIZE,               # [1]  y pos in tiles
             np.clip(self.vx / max_run_speed,  -1.0,  1.0),    # [2]  vx
             np.clip(self.vy / max_fall_speed, -1.0,  1.0),    # [3]  vy
             1.0 if self.on_ground    else 0.0,                 # [4]  on_ground

@@ -1292,19 +1292,19 @@ def draw_status(surf,ed,sfont):
 # ─── Playtest ─────────────────────────────────────────────────────
 def launch_play(ed,scr,sf):
     lv=ed.level
+    # Bake current slider values into the level before saving (same as SAVE action)
+    lv.enemy_physics={
+        'walk_speed':   ed.enemy_sliders[0].value,
+        'gravity_mult': round(ed.enemy_sliders[1].value/100.0, 3),
+        'max_fall_speed': ed.enemy_sliders[2].value,
+        'patrol_width': ed.enemy_sliders[3].value,
+    }
     if lv.filename:lv.save(lv.filename);ed.dirty=False
     else:
-        p=dlg_save(scr,sf);
+        p=dlg_save(scr,sf)
         if not p:return
         lv.save(p);ed.dirty=False
-    lid=lv.level_id or ed.browser_level_id
-    # Don't use a commented-out (disabled) level ID — it has no file path in config
-    if lid and lid not in ed.gc.levels:
-        lid = None
-    if not lid and lv.filename and ed.gc.level_ids:
-        ln=Path(lv.filename).name
-        for l2 in ed.gc.level_ids:
-            if ed.gc.levels.get(l2,{}).get('file','')==ln:lid=l2;break
+    if not lv.filename:return
     def fpr(s):
         c=s.resolve()
         for _ in range(10):
@@ -1317,10 +1317,9 @@ def launch_play(ed,scr,sf):
     ps=next((str(p) for p in [sd/'manual_play.py',pr/'code'/'scripts'/'manual_play.py',pr/'manual_play.py'] if Path(p).exists()),None)
     if not ps:print("[Editor] manual_play.py not found");return
     env=os.environ.copy();env['PYTHONPATH']=(str(pr)+os.pathsep+env.get('PYTHONPATH','')).rstrip(os.pathsep)
-    if lid:env['PEAK_PLAY_LEVEL']=str(lid)
-    cmd=[sys.executable,ps,'--game','platformer']
-    if lid:cmd+=['--level',str(lid)]
-    elif lv.filename:cmd+=['--file',str(Path(lv.filename).resolve())]
+    # Always pass --file so manual_play loads exactly the file being edited,
+    # regardless of whether it's registered in game_config.yaml.
+    cmd=[sys.executable,ps,'--game','platformer','--file',str(Path(lv.filename).resolve())]
     subprocess.Popen(cmd,env=env,cwd=str(pr))
 
 # ─── Toolbar action dispatcher ───────────────────────────────────

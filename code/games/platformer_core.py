@@ -389,8 +389,8 @@ class PlatformerCore(gymnasium.Env):
             # All channels span [-1, 1] so low=-1.0 covers spikes and Dijkstra.
             "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
 
-            # Scalars: 12  (Player=5: x,y,vx,vy,on_ground  +  Tracking=7: e_dist,goal_dist,timer,dir_y,dijkstra,step_dx,step_dy)
-            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
+            # Scalars: 20  (Player=13: obs_vector  +  Tracking=7: e_dist,goal_dist,timer,dir_y,dijkstra,step_dx,step_dy)
+            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(20,), dtype=np.float32),
 
             # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
             # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
@@ -427,6 +427,7 @@ class PlatformerCore(gymnasium.Env):
         self.lives = self.max_lives  # restore lives on every full episode reset
         self.best_dist_to_goal = float('inf')  # stall tracker anchor
         self._needs_level_transition = False   # set True when goal reached mid-episode
+        self._pending_next_level_index = None  # set by complete_level, applied after _info()
         # --- Velocity Alignment (cached from _tracking_obs each step) ---
         self._step_dx = 0.0   # unit vector toward cheapest reachable 8-direction tile, X
         self._step_dy = 0.0   # unit vector toward cheapest reachable 8-direction tile, Y
@@ -569,8 +570,14 @@ class PlatformerCore(gymnasium.Env):
         info = self._info()
 
         # Inline level transition on win.
+        # Advance self.world AFTER _info() so WIN is logged on the right level.
         if self._needs_level_transition:
             self._needs_level_transition = False
+            if self._pending_next_level_index is not None:
+                self.current_index_world = self._pending_next_level_index
+                self.world = self.level_order[self.current_index_world]
+                self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+                self._pending_next_level_index = None
             self.load_level(preserve_power=True)
 
         if terminated:
@@ -767,14 +774,16 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
 
-        # Batch curriculum: mark win if this is the starting level
+        # Batch curriculum: mark win if this is the current curriculum level
         if self._curriculum_position < len(self.level_order):
             if self.world == self.level_order[self._curriculum_position]:
                 self._episode_won_current = True
 
-        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
-        self.world = self.level_order[self.current_index_world]
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+        # Store next level index but do NOT advance self.world yet.
+        # self.world must stay as the completed level until _info() is called
+        # so the WIN event is logged against the correct level.
+        next_idx = (self.current_index_world + 1) % len(self.level_order)
+        self._pending_next_level_index = next_idx
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
@@ -1280,14 +1289,14 @@ class PlatformerCore(gymnasium.Env):
                                         best_est = max(1.0, best_est)
                                         out[ly, lx] = player_dist - best_est
 
-            # --- Single normalisation pass (after ALL patches) ---
-            max_cost = max(
-                (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
-                (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
-            )
-            np.clip(out / max_cost, -1.0, 1.0, out=out)
-            self._dijkstra_window_cache = out  # cache for debugging visualization
-            return out.astype(np.float32)
+        # --- Single normalisation pass (after ALL patches) ---
+        max_cost = max(
+            (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
+            (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
+        )
+        np.clip(out / max_cost, -1.0, 1.0, out=out)
+        self._dijkstra_window_cache = out  # cache for debugging visualization
+        return out.astype(np.float32)
 
     def _tracking_obs(self) -> np.ndarray:
         """Returns 7 scalar features (+ 5 from _player_obs = 12 total)."""
@@ -1336,7 +1345,7 @@ class PlatformerCore(gymnasium.Env):
         dx = closest_goal_x - p.gObj.x
         dy = closest_goal_y - p.gObj.y
         dir_x       = np.sign(dx)
-        dist_y_norm = np.clip(dy / self.level_data.height, -1.0, 1.0)
+        dist_y_norm = np.clip(dy / self.level_data.height, -1.0, 1.0) if self.level_data.height > 0 else 0.0
 
         dijkstra_dist = 1.0
         if self.dijkstra:

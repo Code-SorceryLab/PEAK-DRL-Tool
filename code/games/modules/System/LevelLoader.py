@@ -122,7 +122,12 @@ class LevelLoader:
             if not filename:
                 print(f"[LevelLoader] Error: Level config has no 'file' entry — cannot load. Check game_config.yaml.")
                 return data
-            txt_path = os.path.join(self.level_path, filename)
+            # If raw_file is an absolute path that exists, use it directly.
+            # This allows editor play-test injection without copying files.
+            if os.path.isabs(raw_file) and os.path.exists(raw_file):
+                txt_path = raw_file
+            else:
+                txt_path = os.path.join(self.level_path, filename)
 
         # Guard: never try to open a directory as a file
         if os.path.isfile(txt_path):
