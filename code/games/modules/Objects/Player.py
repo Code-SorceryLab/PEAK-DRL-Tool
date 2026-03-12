@@ -82,18 +82,25 @@ class Player():
         self._fire_cooldown: float = 0.0
 
         # 3. Animation paths
-        default_asset = 'code/games/assets/player1.png'
+        default_asset = 'code/games/assets/idle1.png'
 
         anim_paths = {
             PlayerAnim.IDLE: [
-                'code/games/assets/player1.png',
-                'code/games/assets/player2.png',
-                'code/games/assets/player3.png',
-                'code/games/assets/player4.png'
+                'code/games/assets/idle1.png',
+                'code/games/assets/idle2.png',
+                'code/games/assets/idle3.png',
+                'code/games/assets/idle4.png',
+                'code/games/assets/idle5.png',
+                'code/games/assets/idle6.png',
             ],
-            PlayerAnim.RUN:  [default_asset],
-            PlayerAnim.JUMP: [default_asset],
-            PlayerAnim.FALL: [default_asset]
+            PlayerAnim.RUN:  [
+                'code/games/assets/run (1).png',
+                'code/games/assets/run (2).png',
+                'code/games/assets/run (3).png',
+                'code/games/assets/run (4).png'
+            ],
+            PlayerAnim.JUMP: ['code/games/assets/jump.png'],
+            PlayerAnim.FALL: ['code/games/assets/fall.png']
         }
 
         int_keyed_paths = {state.value: paths for state, paths in anim_paths.items()}
@@ -289,9 +296,13 @@ class Player():
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
         sprite = None
         if self.anim_handler:
-            sprite = self.anim_handler.get_sprite(not self.facing_right)
+            sprite = self.anim_handler.get_sprite(self.facing_right)
 
         if sprite:
+            # Scale sprite to match current gObj dimensions (handles power-up size changes)
+            current_size = (int(self.gObj.width), int(self.gObj.height))
+            if (sprite.get_width(), sprite.get_height()) != current_size:
+                sprite = pygame.transform.scale(sprite, current_size)
             y_offset = sprite.get_height() - self.gObj.height
             surface.blit(sprite, (int(sx), int(sy - y_offset)))
             if debug:
