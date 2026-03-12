@@ -13,12 +13,15 @@ class CsvLoggerCallback(BaseCallback):
         print(f"[DEBUG] Logger target: {self.log_path}")
 
     def _on_training_start(self):
+        import datetime as _dt
         if os.path.exists(self.log_path):
             try:
-                os.remove(self.log_path)
-                print(f"[INFO] Cleared old log file: {self.log_path}")
+                ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup = self.log_path.replace(".csv", f"_backup_{ts}.csv")
+                os.rename(self.log_path, backup)
+                print(f"[INFO] Previous log preserved → {backup}")
             except Exception as e:
-                print(f"[WARN] Could not delete old log: {e}")
+                print(f"[WARN] Could not rename old log: {e}")
 
         os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
         self.file_handle = open(self.log_path, 'w', newline='')
@@ -42,6 +45,7 @@ class CsvLoggerCallback(BaseCallback):
         vx = info.get("velocity_x", 0.0)
         vy = info.get("velocity_y", 0.0)
         goal_dist = info.get("goal_dist", 0.0)
+        first_completion_step = info.get("first_completion_step", -1)
 
         # Events (Now explicitly passed from Core)
         event = info.get("event", "")
@@ -76,6 +80,7 @@ class CsvLoggerCallback(BaseCallback):
             'vx': vx,
             'vy': vy,
             'goal_dist': goal_dist,
+            'first_completion_step': first_completion_step,
             'event': event,
             'cause': cause,
             **reward_breakdown,

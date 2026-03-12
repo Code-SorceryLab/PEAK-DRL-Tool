@@ -81,7 +81,10 @@ class GameEnv(gym.Env):
                 action = int(action)
 
         obs, base, terminated, truncated, info = self.game.step(action)
-        truncated = bool(self.max_steps and self._step_count >= self.max_steps)
+        # FIX: OR with game's own truncated rather than overwriting it entirely.
+        # If the game sets truncated=True (e.g. internal timer), the wrapper was
+        # previously silently discarding it.
+        truncated = truncated or bool(self.max_steps and self._step_count >= self.max_steps)
 
         # --- REWARD PROCESSING (THE FIX) ---
         # 1. Get raw reward from Persona (Could be Float OR Dict)

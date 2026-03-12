@@ -853,7 +853,12 @@ def main(cfg: DictConfig):
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
         max_steps=None if str(cfg.max_steps).lower() == "none" else int(cfg.max_steps),
-        batch_window=10, advance_threshold=0.30, fallback_threshold=0.20, max_stay_windows=3,
+        batch_window=10,
+        advance_threshold=0.30,
+        fallback_threshold=0.20,
+        max_stay_windows=3,
+        curriculum_advance_step=2,   # levels to skip forward on mastery
+        curriculum_fallback_step=2,  # levels to drop back on failure
     )
 
     os.makedirs(models_dir / "best", exist_ok=True)
@@ -975,17 +980,20 @@ def main(cfg: DictConfig):
                 print(f"[WARNING] Persona '{persona}' not found! Using default.")
                 active_reward_fn = reward_module.default
 
-            def make_env(render_mode=None):
+            def make_env(render_mode=None, _fn=active_reward_fn, _kw=None):
                 """
                 Factory that returns an _init callable.
                 render_mode overrides base_env_kwargs['render_mode'] so the
                 visualisation callback can request rgb_array independently.
+                FIX: _fn and _kw captured as default args to avoid late-binding
+                closure bug — if the persona loop ever iterates, all envs share
+                the last persona's reward_fn without this guard.
                 """
-                kw = env_kwargs.copy()
+                kw = (_kw if _kw is not None else env_kwargs).copy()
                 if render_mode is not None:
                     kw['render_mode'] = render_mode
                 def _init():
-                    return GameEnv(game_cls, reward_fn=active_reward_fn, **kw)
+                    return GameEnv(game_cls, reward_fn=_fn, **kw)
                 return _init
 
             n_envs = int(cfg.get("n_envs", 1))
@@ -1009,7 +1017,13 @@ def main(cfg: DictConfig):
             eval_raw_env = DummyVecEnv([make_monitored_env()])
             eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0,
                                     norm_obs_keys=["scalars"])
-            eval_env.training = False
+            # FIX: sync running obs statistics from the training wrapper so the
+            # eval agent sees identical normalised observations. Without this,
+            # eval_env accumulates its own obs_rms from scratch and best_model
+            # scores are measured against a different normalisation than training.
+            eval_env.obs_rms    = env.obs_rms
+            eval_env.ret_rms    = env.ret_rms
+            eval_env.training   = False
             eval_env.norm_reward = False
 
             for skill, total_timesteps in selected_skills.items():
