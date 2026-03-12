@@ -10,7 +10,7 @@ import time
 import gymnasium
 from gymnasium import spaces
 import psutil
-from .modules.Stats.StatsObserver import statisticsObserver, track
+from .modules.Stats.StatsObserver import statsObserver, track
 
 from code.games.modules.System import EntityType
 # --- CORRECTED IMPORTS FOR NEW FOLDER STRUCTURE ---
@@ -154,8 +154,7 @@ class PlatformerCore(gymnasium.Env):
         assets_dir = os.path.join(core_dir, "assets")
 
         #init statistics Observer levels
-        statisticsObserver.init_level_observers(self.level_order)
-        statisticsObserver.set_current_level(self.world)
+        statsObserver.reset(self.world)
 #        print(f"[DEBUG] Loading Assets from: {assets_dir}") 
 #        self.sprite_manager = SpriteManager(assets_dir, sprite_width=32, sprite_height=32, scale=1.5)
         
@@ -252,8 +251,8 @@ class PlatformerCore(gymnasium.Env):
         if terminated: info["episode_end"] = True
         return self._obs(), 0.0, bool(terminated), bool(truncated), info
 
+
     def reset(self, seed=None, options=None) -> np.ndarray:
-        
         super().reset(seed=seed)
         
         if not self.reached_goal:   
@@ -261,13 +260,10 @@ class PlatformerCore(gymnasium.Env):
             self.score = 0
             self.coins_total = 0
         self.load_level()
-        
-        
+                
         return self._obs(), self._info()
 
     def load_level(self):
-        statisticsObserver.print_all()
-        statisticsObserver.reset()
         self.alive = True
         self.frame = 0
         self.game_over = False
@@ -337,10 +333,10 @@ class PlatformerCore(gymnasium.Env):
             print("all levels done") # As requested
             self.current_index_world = 0
         self.world = self.level_order[self.current_index_world]
-        statisticsObserver.set_current_level(self.world)
         self.load_level()
+        statsObserver.write_to_csv()
+        statsObserver.reset(self.world)
     
-    @track("death")
     def _handle_death(self, cause = "cause"):
         self.lives -= 1
         if self.lives > 0:
@@ -348,6 +344,10 @@ class PlatformerCore(gymnasium.Env):
         else:
             self.alive = False
             self.game_over = True
+
+        statsObserver.write_to_csv(cause)
+        statsObserver.reset(self.world)
+
 
     def _soft_reset(self):
         current_lives = self.lives

@@ -1,14 +1,17 @@
 from ...action_map import ACTION_NAMES
+import csv
+import os
 
 class LevelStatsObserver:
-    def __init__(self):
-        self.deaths = {}
+    def __init__(self, levelName):
+        self.deathCause = "Success" 
         self.jumps = 0
         self.coins_collected = 0
         self.enemies_killed = 0
         self.actions = {i: 0 for i in ACTION_NAMES}
         self.sum_vx = 0.0
         self.count_vx = 0
+        self.levelName = levelName
 
     def record(self, event_type, **data):
         handler_name = f"record_{event_type}"
@@ -21,7 +24,7 @@ class LevelStatsObserver:
         self.jumps += 1
 
     def record_death(self, cause, **data):
-        self.deaths[cause] = self.deaths.get(cause, 0) + 1
+        self.deathCause = cause
 
     def record_coins_collected(self, **data):
         self.coins_collected += 1
@@ -78,25 +81,30 @@ class LevelStatsObserver:
         else:
             return self.sum_vx / self.count_vx
 
-    def print(self):
-        print(f"Jumps  : {self.jumps}")
-        print(f"Coins Collected  : {self.coins_collected}")
-        print(f"Enemies Killed  : {self.enemies_killed}")
-        print(f"Elapsed Time  : {self.elapsed_time:.2f}")
-        print(f"Average Horizontal Velocity : {self.get_average_vx():.2f}")
-        print("\nActions:")
-        for action_id, count in sorted(self.actions.items()):
-            if count > 0:
-                print(f"  {ACTION_NAMES[action_id]:<18} {count}")
-            
-        print("\nDeaths :")
-        if not self.deaths:
-            print("  None")
-        else:
-            for cause, count in sorted(self.deaths.items()):
-                print(f"  {cause} {count}")
+    def write_to_csv(self, filename):
+        file_exists = os.path.isfile(filename)
 
-        print("=" * 30 + "\n")
+        row = {
+            "level": self.levelName,
+            "jumps": self.jumps,
+            "coins_collected": self.coins_collected,
+            "enemies_killed": self.enemies_killed,
+            "elapsed_time": round(self.elapsed_time, 2),
+            "avg_horizontal_velocity": round(self.get_average_vx(), 2),
+            "cause_of_death": self.deathCause
+        }
+
+        for action_id, count in self.actions.items():
+            row[f"action_{ACTION_NAMES[action_id]}"] = count
+
+        with open(filename, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=row.keys())
+
+            # Write header only if file doesn't exist yet
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow(row)
         
     def reset(self):
         exclude = {"deaths"}  # keep elapsed time

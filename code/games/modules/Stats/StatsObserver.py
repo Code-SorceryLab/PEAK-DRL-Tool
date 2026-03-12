@@ -6,35 +6,23 @@ import time
 class StatsObserver:    
     def __init__(self):
         self.last_reset_time = time.time()
-    
-    def init_level_observers(self, level_order):
-        self.levelObservers = {level: LevelStatsObserver() for level in level_order}
 
-    def set_current_level(self, world):
-        self.currentLevel = world
-
-    def get_current_level_observer(self):
-        return self.levelObservers[self.currentLevel]
-    
     def record(self, event_type, **data):
-         self.get_current_level_observer().record(event_type, **data)
+         self.currentAttempt.record(event_type, **data)
 
     def get_elapsed_time(self):
         return time.time() - self.last_reset_time
 
-    def print_all(self):
-        print("\n" + "=" * 30)
-        print("        GAME STATISTICS")
-        print("=" * 30)
+    def write_to_csv(self, deathReason = "Success", filename="stats.csv"):
+        self.currentAttempt.deathCause = deathReason
+        self.currentAttempt.set_elapsed_time(self.get_elapsed_time())
+        self.currentAttempt.write_to_csv(filename)
         
-        self.get_current_level_observer().set_elapsed_time(self.get_elapsed_time())
-        self.get_current_level_observer().print()
-        
-    def reset(self):
-        self.get_current_level_observer().reset()
+    def reset(self, world):
+        self.currentAttempt = LevelStatsObserver(world)
         self.last_reset_time = time.time()
 
-statisticsObserver = StatsObserver()
+statsObserver = StatsObserver()
 
 def track(event_type):
     def decorator(func):
@@ -51,7 +39,7 @@ def track(event_type):
             arguments = dict(bound.arguments)
             arguments.pop("self", None)
 
-            statisticsObserver.record(event_type, **arguments)
+            statsObserver.record(event_type, **arguments)
 
             return result
         return wrapper
