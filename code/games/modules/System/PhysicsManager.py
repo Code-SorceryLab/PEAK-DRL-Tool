@@ -204,6 +204,14 @@ class PhysicsManager:
         self.update_list(dt, level_data.moving_platforms)
         self.update_list(dt, level_data.projectiles)
 
+        # ── Pit / out-of-bounds death ─────────────────────────────────────────
+        # Checked here (inside the physics step) rather than in
+        # _check_termination so death fires on the same frame the player
+        # crosses the kill plane, before the observation is built.
+        # This also handles high-speed falls that could overshoot the boundary
+        # check in _check_termination by an arbitrary amount.
+        self._check_oob(core, level_data)
+
     def update_list(self, dt: float, objects: List[Any]):
         """
         Helper to iterate through a list of objects and call their update method
@@ -217,6 +225,46 @@ class PhysicsManager:
                     obj.update(dt, ctx)
                 except TypeError:
                     obj.update(dt)
+
+    def _check_oob(self, core, level_data):
+        """
+        Out-of-bounds / pit kill plane — owned by the physics manager.
+
+        Kill plane geometry
+        ───────────────────
+        Bottom:  player bottom edge > level_data.height + PIT_GRACE_PX
+                 Grace buffer absorbs sub-pixel overshoot at high fall speeds
+                 without adding visible delay at normal speeds.
+
+        Left/Right: player exits the map horizontally by more than one tile.
+                 Platforms that extend slightly beyond the grid don't kill;
+                 the extra-tile margin absorbs normal edge cases.
+
+        Enemies that fall off the map are silently deactivated (no death event
+        needed — they simply disappear, consistent with classic platformer feel).
+        """
+        # ── Player ───────────────────────────────────────────────────────────
+        player = core.player
+        if player and player.gObj.active and core.alive:
+            PIT_GRACE_PX  = 48          # pixels below level bottom before kill fires
+            OOB_MARGIN_PX = level_data.tile_size if hasattr(level_data, 'tile_size') else 32
+
+            fell_out    = player.gObj.y > level_data.height + PIT_GRACE_PX
+            left_out    = player.gObj.x + player.gObj.width < -OOB_MARGIN_PX
+            right_out   = player.gObj.x > level_data.width  + OOB_MARGIN_PX
+
+            if fell_out or left_out or right_out:
+                cause = "Pit" if fell_out else "OOB"
+                core._handle_death(cause)
+                return   # no further physics this frame
+
+        # ── Enemies ──────────────────────────────────────────────────────────
+        # Enemies that walk off ledges or get knocked below the map are deactivated
+        # so they don't accumulate as invisible, still-collidable phantoms.
+        kill_y = level_data.height + 64
+        for enemy in level_data.enemies:
+            if enemy.gObj.active and enemy.gObj.y > kill_y:
+                enemy.gObj.active = False
 
     # =========================================================================
     # COLLISION RESOLUTION LOOP

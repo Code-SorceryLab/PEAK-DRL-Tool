@@ -336,17 +336,8 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
 @_wrap_with_tracker
 def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
     """
-    COIN HUNTER: Maximise coin collection.
-
-    KEY DESIGN: NO dijkstra potential. The goal gradient is removed so the
-    agent cannot "cheat" by just running to the goal. The ONLY consistent
-    positive signal comes from collecting coins.
-
-    Without a goal gradient, the agent must learn to navigate by following
-    the coin channel in its observation grid. Frontier reward provides a
-    weak nudge to explore new territory (where uncollected coins are).
-    A small survival bonus keeps the agent alive long enough to find coins.
-    Win bonus scales with total coins collected.
+    COIN HUNTER (legacy): Maximise coin collection.
+    Preserved for backwards compatibility — new runs should use coin_collector.
     """
     kills     = int(info.get("enemies_killed_step", 0))
     coins     = int(info.get("coins_delta", 0))
@@ -354,15 +345,10 @@ def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
     won       = info.get("won", False)
     life_lost = info.get("life_lost", False)
 
-    # ── Primary signal: coins (the ONLY strong positive) ───────────────
     r_coin = 0.3 * coins
-
     r_alive = 0.0005
-
     r_kill = 0.02 * kills
-
     r_stall = -0.003 if bool(info.get("stalled", False)) else 0.0
-
     r_win, r_death = 0.0, 0.0
     if won:
         r_win = 3.0 + min(total_coins, 30) * 0.15
@@ -380,6 +366,206 @@ def coin_hunter(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
         "time":      -0.00003,
         "death":     r_death,
     }
+
+
+# =============================================================================
+# COIN COLLECTOR — modular reward shaping (Features 2 & 3)
+# =============================================================================
+
+class _CoinCollectorWeights:
+    """
+    All tunable scalars in one place.  Edit here to tune without touching logic.
+    """
+    # ── Feature 2: Coin-collection signals ────────────────────────────────────
+    COIN_PICKUP       = 2.0      # reward per coin collected this step
+    COIN_PROXIMITY    = 0.12     # scale of 1/dist proximity gradient
+    PROXIMITY_MIN_DIST= 0.5      # floor distance (tiles) to avoid div-by-zero
+    TIME_PENALTY      = -0.01    # per-step time cost (pushes agent to act fast)
+
+    # Combo multiplier: reward when ≥2 coins collected in COMBO_WINDOW steps
+    COMBO_WINDOW      = 8        # steps within which coins count as a combo
+    COMBO_BONUS       = 0.5      # flat bonus per combo trigger
+    COMBO_MAX         = 3.0      # cap on total combo bonus per episode
+
+    # ── Feature 3: Exploration / backtracking signals ─────────────────────────
+    EXPLORATION_BONUS = 0.06     # reward for first visit to a new tile
+    BACKTRACK_BONUS   = 0.25     # reward for revisiting a tile that had a coin
+    REVISIT_PENALTY   = -0.004   # per-step penalty when visit_count ≥ STALE_THRESH
+    STALE_THRESH      = 6        # visit_count above which tile is "stale"
+
+    # ── Terminal signals ─────────────────────────────────────────────────────
+    WIN_BASE          = 3.0
+    WIN_COIN_SCALE    = 0.20     # extra reward per coin at win
+    WIN_COIN_CAP      = 30       # cap on coins counted for win bonus
+    DEATH_PENALTY     = -3.0
+    LIFE_LOST_PENALTY = -0.3
+
+
+W = _CoinCollectorWeights   # short alias for use inside shape_reward
+
+
+def shape_reward(info: Info, state: dict) -> Dict[str, float]:
+    """
+    Modular reward shaping function for the coin_collector persona.
+
+    Parameters
+    ----------
+    info  : the full info dict from platformer_core._info()
+    state : mutable per-env state dict managed by the factory closure below.
+            Keys: 'combo_steps', 'combo_count', 'combo_total',
+                  'prev_visit_counts' (set of tiles seen this ep)
+
+    Returns
+    -------
+    Dict mapping component name → float reward.
+    Sum of values = total shaped reward.
+
+    How to tune
+    -----------
+    Edit _CoinCollectorWeights above and re-run training. Each component is
+    logged separately via info["reward_components"] so you can see which signal
+    dominates in TensorBoard.
+    """
+    components: Dict[str, float] = {}
+
+    coins       = int(info.get("coins_delta", 0))
+    total_coins = int(info.get("coins_collected", 0))
+    won         = info.get("won", False)
+    terminated  = info.get("terminated", False)
+    life_lost   = info.get("life_lost", False)
+    near_dist   = float(info.get("nearest_coin_dist", math.inf))
+    visit_count = int(info.get("visit_count", 0))
+    had_coin    = bool(info.get("had_coin_here", False))
+
+    # ── Feature 2a: coin pickup reward ───────────────────────────────────────
+    components["coin_pickup"] = W.COIN_PICKUP * coins
+
+    # ── Feature 2b: proximity gradient ───────────────────────────────────────
+    # Gives a small dense signal that draws the agent toward coins.
+    # Capped at PROXIMITY_MIN_DIST to prevent explosion near coins.
+    if not math.isinf(near_dist) and near_dist > 0:
+        clamped = max(near_dist, W.PROXIMITY_MIN_DIST)
+        components["coin_proximity"] = W.COIN_PROXIMITY / clamped
+    else:
+        components["coin_proximity"] = 0.0
+
+    # ── Feature 2c: time penalty ──────────────────────────────────────────────
+    components["time_penalty"] = W.TIME_PENALTY
+
+    # ── Feature 2d: combo multiplier ─────────────────────────────────────────
+    # Count consecutive steps since last coin; reset on pickup.
+    # Trigger a flat bonus whenever agent collects coins close together in time.
+    r_combo = 0.0
+    if coins > 0:
+        steps_gap = state.get("combo_steps", W.COMBO_WINDOW + 1)
+        if steps_gap <= W.COMBO_WINDOW:
+            combo_so_far = state.get("combo_total", 0.0)
+            if combo_so_far < W.COMBO_MAX:
+                r_combo = min(W.COMBO_BONUS, W.COMBO_MAX - combo_so_far)
+                state["combo_total"] = combo_so_far + r_combo
+        state["combo_steps"] = 0
+    else:
+        state["combo_steps"] = state.get("combo_steps", 0) + 1
+    components["combo"] = r_combo
+
+    # ── Feature 3a: novelty / exploration bonus ───────────────────────────────
+    # Reward first visit to any tile (count-based exploration).
+    seen = state.setdefault("prev_visit_counts", set())
+    tile_key = (info.get("x_position", 0.0), info.get("y_position", 0.0))
+    r_explore = 0.0
+    if visit_count == 1 and tile_key not in seen:
+        r_explore = W.EXPLORATION_BONUS
+        seen.add(tile_key)
+    components["exploration"] = r_explore
+
+    # ── Feature 3b: backtracking bonus ────────────────────────────────────────
+    # Small positive when agent returns to a tile that originally had a coin
+    # (meaning it may have missed it and came back — smart map sweeping).
+    # Guard: visit_count > 1 so we only reward the RE-visit, not the first pass.
+    r_backtrack = 0.0
+    if had_coin and visit_count > 1 and visit_count <= 4:
+        r_backtrack = W.BACKTRACK_BONUS
+    components["backtrack"] = r_backtrack
+
+    # ── Feature 3c: stale-tile penalty ────────────────────────────────────────
+    # Discourages the agent from camping or pacing the same few tiles.
+    r_stale = 0.0
+    if visit_count >= W.STALE_THRESH:
+        r_stale = W.REVISIT_PENALTY
+    components["stale"] = r_stale
+
+    # ── Terminal signals ──────────────────────────────────────────────────────
+    r_win = r_death = 0.0
+    if won:
+        r_win = W.WIN_BASE + min(total_coins, W.WIN_COIN_CAP) * W.WIN_COIN_SCALE
+    elif terminated:
+        r_death = W.DEATH_PENALTY
+    elif life_lost:
+        r_death = W.LIFE_LOST_PENALTY
+    components["win"]   = r_win
+    components["death"] = r_death
+
+    return components
+
+
+def _make_coin_collector_fn():
+    """
+    Factory that builds a stateful coin_collector reward callable.
+    Called once per env instance so each parallel env has its own state dict
+    and _ScoreTracker — identical isolation guarantee as _wrap_with_tracker.
+    """
+    tracker = _ScoreTracker()
+    state   = {
+        "combo_steps":       0,
+        "combo_total":       0.0,
+        "prev_visit_counts": set(),
+    }
+
+    def _reset_state():
+        state["combo_steps"]       = 0
+        state["combo_total"]       = 0.0
+        state["prev_visit_counts"] = set()
+
+    def reward_fn(obs, base: float, terminated: bool, info: Info) -> float:
+        _score, _inc = tracker.step(info or {})
+        components   = shape_reward(info or {}, state)
+        info["reward_components"] = components
+        total = float(sum(components.values()))
+        if terminated or (info and info.get("terminated", False)):
+            tracker.reset()
+            _reset_state()
+        return total
+
+    reward_fn._core_fn    = None   # no @_wrap_with_tracker core, factory is self-contained
+    reward_fn._is_factory = False  # signal to GameEnv: already a callable, not a factory
+    return reward_fn
+
+
+def coin_collector():
+    """
+    COIN COLLECTOR persona factory.
+
+    Implements Features 2 & 3:
+      • Feature 2 — Aggressive coin incentives
+          - +COIN_PICKUP per coin collected
+          - +COIN_PROXIMITY / dist  proximity gradient to nearest coin
+          - TIME_PENALTY per step   discourages idling
+          - COMBO_BONUS             reward for collecting coins in rapid succession
+      • Feature 3 — Exploration / backtracking bonuses
+          - +EXPLORATION_BONUS on first visit to any tile (count-based novelty)
+          - +BACKTRACK_BONUS when revisiting a tile that originally held a coin
+          - REVISIT_PENALTY when visit_count ≥ STALE_THRESH (anti-camping)
+
+    All weights live in _CoinCollectorWeights — edit there to tune.
+    The shape_reward() function is importable and testable in isolation.
+
+    Returns a fresh stateful callable (not a factory) suitable for GameEnv.
+    """
+    return _make_coin_collector_fn()
+
+
+# Mark as a factory so GameEnv calls coin_collector() to get the actual fn.
+coin_collector._is_factory = True
 
 
 @_wrap_with_tracker
@@ -552,10 +738,11 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
 # =============================================================================
 # Aliases
 # =============================================================================
-platformer_simple       = simple
-platformer_dijkstra    = delta_dijkstra
-platformer_coin_hunter = coin_hunter
-platformer_enemy_hunter = enemy_hunter
-platformer_speedrunner = speedrunner
+platformer_simple        = simple
+platformer_dijkstra      = delta_dijkstra
+platformer_coin_hunter   = coin_hunter
+platformer_coin_collector= coin_collector   # Feature 2 & 3 persona
+platformer_enemy_hunter  = enemy_hunter
+platformer_speedrunner   = speedrunner
 platformer_completionist = completionist
-default                = simple
+default                  = simple

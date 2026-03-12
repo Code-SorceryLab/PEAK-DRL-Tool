@@ -23,11 +23,12 @@ class DebugManager:
         self.show_reward_log = True
         self.show_obs_values = True
 
-        # ── Toggleable (F1–F4) ─────────────────────────────
+        # ── Toggleable (F1–F4, F5) ─────────────────────────────
         self.show_sensors    = False   # F1 — sensor rays
         self.free_cam_active = False   # F2 — free camera
         self.slow_motion     = False   # F3 — slow motion
         self.show_hitboxes   = True    # F4 — hitboxes (default on)
+        # F5 max-view is owned by agent_view_overlay.max_view (toggled below)
 
         self.cam_move_speed   = 600.0
         self.current_cam_move = [0.0, 0.0]
@@ -68,6 +69,8 @@ class DebugManager:
         print("  F2  Free camera   (IJKL to move)")
         print("  F3  Slow motion   (0.5×)")
         print("  F4  Hitboxes      (toggle)")
+        print("  F5  Agent Vision  (Max View toggle)")
+        print("  Esc Max View off  (if open)")
         print("═"*40 + "\n")
 
     # ─────────────────────────────────────────────────────────
@@ -92,6 +95,13 @@ class DebugManager:
         if rising(pygame.K_F4):
             self.show_hitboxes = not self.show_hitboxes
             print(f"[Debug] Hitboxes:    {self.show_hitboxes}")
+        if rising(pygame.K_F5):
+            self.agent_view_overlay.max_view = not self.agent_view_overlay.max_view
+            print(f"[Debug] Max View:    {self.agent_view_overlay.max_view}")
+        # Esc closes max-view without affecting anything else
+        if rising(pygame.K_ESCAPE) and self.agent_view_overlay.max_view:
+            self.agent_view_overlay.max_view = False
+            print("[Debug] Max View:    closed")
 
         self.current_cam_move = [0.0, 0.0]
         if self.free_cam_active:
@@ -139,6 +149,7 @@ class DebugManager:
             ("F2", "cam",   self.free_cam_active),
             ("F3", "slow",  self.slow_motion),
             ("F4", "hbox",  self.show_hitboxes),
+            ("F5", "max",   self.agent_view_overlay.max_view),
         ]
         hx = debug_x + panel_w - 6
         sf = self.small_font
@@ -174,6 +185,11 @@ class DebugManager:
             by = self._badge(surface, core, "SLOW MOTION",       (185, 110, 0), y=by) + 4
         if self.show_sensors:
             self._badge(surface, core, "RAYS ON", (0, 145, 80), y=by)
+
+        # ── Max-view draws last so it covers everything ────────
+        # (AgentViewOverlay.render already dispatches; this badge confirms state)
+        if self.agent_view_overlay.max_view:
+            self._badge(surface, core, "AGENT MAX VIEW  (F5/Esc)", (30, 55, 150), y=6)
 
     # ─────────────────────────────────────────────────────────
     def _render_hud_strip(self, surface, core, debug_x, panel_w):

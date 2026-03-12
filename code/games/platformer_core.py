@@ -253,11 +253,9 @@ class PlatformerCore(gymnasium.Env):
         #
         # Knobs exposed as kwargs so they can be tuned from the config YAML
         # without touching this file.
-        # NOTE: these use DISTINCT key names from the batch-curriculum thresholds
-        # below so that a single kwargs.pop() cannot silently consume both.
         self._curriculum_window_size  =   int(kwargs.pop("curriculum_window" ,   5))
-        self._advance_threshold       = float(kwargs.pop("curriculum_advance_threshold" , 0.6))
-        self._fallback_threshold      = float(kwargs.pop("curriculum_fallback_threshold", 0.2))
+        self._advance_threshold       = float(kwargs.pop("advance_threshold" , 0.6))
+        self._fallback_threshold      = float(kwargs.pop("fallback_threshold", 0.2))
         self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
 
         # Per-level outcome windows — persist across episodes, never reset.
@@ -302,17 +300,11 @@ class PlatformerCore(gymnasium.Env):
         self.lives = self.max_lives
 
         # ── Batch Curriculum ───────────────────────────────────────────────
-        # FIX: advance_threshold / fallback_threshold are now safe to pop here
-        # because the sliding-window section above uses the distinct keys
-        # 'curriculum_advance_threshold' / 'curriculum_fallback_threshold'.
         self._batch_window            = int(kwargs.pop("batch_window", 10))
         self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
         self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
-        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))
+        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))  # reduced from 3
         self._review_prob             = float(kwargs.pop("review_prob", 0.25))
-        # +2/-2 dynamic curriculum: levels to skip on success / drop on failure.
-        self._curriculum_advance_step = int(kwargs.pop("curriculum_advance_step", 2))
-        self._curriculum_fallback_step= int(kwargs.pop("curriculum_fallback_step", 2))
         self._curriculum_position     = 0
         self._batch_results: list     = []
         self._episode_won_current     = False
@@ -321,8 +313,6 @@ class PlatformerCore(gymnasium.Env):
         self._consecutive_fallbacks   = {}
         self._level_visits     = {lvl: 0 for lvl in self.level_order}
         self._level_wins       = {lvl: 0 for lvl in self.level_order}
-        # Metrics: global frame of the very first WIN — never reset after init.
-        self._first_completion_step   = None
 
         # Camera
         self.camera_x = 0.0
@@ -416,6 +406,8 @@ class PlatformerCore(gymnasium.Env):
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
 
         self._dijkstra_window_cache = None
+        self._solid_window_cache    = None   # set by _grid_obs_window each step
+        self._hazard_window_cache   = None   # set by _grid_obs_window each step
 
         self.reset()
 
@@ -455,9 +447,7 @@ class PlatformerCore(gymnasium.Env):
     def step(self, action: int):
         if not self.alive:
             dead_obs = self._obs()
-            info = self._info()
-            info["episode_end"] = True
-            return dead_obs, 0.0, True, False, info
+            return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
         if self.render_mode != "human":
@@ -604,14 +594,10 @@ class PlatformerCore(gymnasium.Env):
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
 
-        # Record episode result into batch AND sliding window.
-        # Only for curriculum episodes (not review episodes).
+        # Record episode result into batch — only if it was a curriculum episode
+        # (NOT a review episode, which played a different level)
         if self.level_order and not self.locked_level and not self._is_review_episode:
             self._batch_results.append(self._episode_won_current)
-            # FIX: populate _level_window so _curriculum_win_rate() returns real data.
-            # complete_level() appends True on win; we append False here on loss/stall.
-            if not self._episode_won_current and self.world in self._level_window:
-                self._level_window[self.world].append(False)
 
         # Evaluate batch when window is full
         if len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
@@ -660,32 +646,26 @@ class PlatformerCore(gymnasium.Env):
         if consec_fb >= 2:
             effective_advance = max(0.10, effective_advance - 0.10)
 
-        adv  = self._curriculum_advance_step
-        fall = self._curriculum_fallback_step
-
         if win_rate >= effective_advance and pos < len(self.level_order) - 1:
-            new_pos = min(pos + adv, len(self.level_order) - 1)
-            self._curriculum_position = new_pos
+            self._curriculum_position += 1
             self._windows_on_level = 0
             self._consecutive_fallbacks[pos] = 0
-            print(f"  🎓 [Curriculum] ADVANCE +{adv} → Lvl {new_pos} "
-                  f"'{self.level_order[new_pos]}' "
+            print(f"  🎓 [Curriculum] ADVANCE → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
                   f"({wins}/{total} = {win_rate:.0%})")
         elif win_rate <= self._batch_fallback_threshold and pos > 0:
-            new_pos = max(pos - fall, 0)
-            self._curriculum_position = new_pos
+            self._curriculum_position -= 1
             self._windows_on_level = 0
             self._consecutive_fallbacks[pos] = consec_fb + 1
-            print(f"  ⬇️  [Curriculum] FALLBACK -{fall} → Lvl {new_pos} "
-                  f"'{self.level_order[new_pos]}' "
+            print(f"  ⬇️  [Curriculum] FALLBACK → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
                   f"({wins}/{total} = {win_rate:.0%}, fb={consec_fb + 1})")
         else:
             self._windows_on_level += 1
             if self._windows_on_level >= self._max_stay_windows and pos > 0:
-                new_pos = max(pos - fall, 0)
-                self._curriculum_position = new_pos
+                self._curriculum_position -= 1
                 self._windows_on_level = 0
-                print(f"  ⏳ [Curriculum] FORCE FALLBACK -{fall} → Lvl {new_pos} "
+                print(f"  ⏳ [Curriculum] FORCE FALLBACK → Lvl {self._curriculum_position} "
                       f"(stuck {self._max_stay_windows} windows)")
 
         self._batch_results.clear()
@@ -796,17 +776,7 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
 
-        # Metrics: record the frame of the very first WIN ever seen by this env.
-        if self._first_completion_step is None:
-            self._first_completion_step = self.frame
-
-        # Populate the per-level sliding window so _curriculum_win_rate() works.
-        # FIX: _level_window was initialised but never written — curriculum_win_rate
-        # always returned -1.0. Appending here activates the window properly.
-        if self.world in self._level_window:
-            self._level_window[self.world].append(True)
-
-        # Batch curriculum: mark win if this is the current curriculum level.
+        # Batch curriculum: mark win if this is the current curriculum level
         if self._curriculum_position < len(self.level_order):
             if self.world == self.level_order[self._curriculum_position]:
                 self._episode_won_current = True
@@ -814,9 +784,7 @@ class PlatformerCore(gymnasium.Env):
         # Store next level index but do NOT advance self.world yet.
         # self.world must stay as the completed level until _info() is called
         # so the WIN event is logged against the correct level.
-        # FIX: clamp instead of modulo — modulo wraps the last level back to
-        # index 0 mid-episode, causing a silent restart to Demo Lvl.
-        next_idx = min(self.current_index_world + 1, len(self.level_order) - 1)
+        next_idx = (self.current_index_world + 1) % len(self.level_order)
         self._pending_next_level_index = next_idx
         self._needs_level_transition = True
 
@@ -925,6 +893,9 @@ class PlatformerCore(gymnasium.Env):
             return self._handle_death("Timeout")
 
         if player.gObj.y > self.level_data.height:
+            # Fallback: PhysicsManager._check_oob() should have caught this
+            # first, but this guard ensures no frame is missed if the physics
+            # manager is bypassed (e.g. render-only mode, test harness).
             return self._handle_death("Pit")
 
         # 4. STALL DEATH
@@ -1003,10 +974,13 @@ class PlatformerCore(gymnasium.Env):
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
         # Stack order: Solids, Collectibles, Hazards, Dijkstra  (4 channels)
-        #   Ch 0 solid       : binary {0.0, 1.0}
+        #   Ch 0 solid       : {-0.5, 0.0, 1.0}  — pit / air / wall+platform
         #   Ch 1 collectible : {0.0, 0.35, 0.69, 1.0}  — coin / powerup / goal
-        #   Ch 2 hazard      : {-1.0, 0.0, +1.0}       — spike / empty / enemy
+        #   Ch 2 hazard      : {-1.0, -0.5, 0.0, +1.0} — spike / pit / empty / enemy
         #   Ch 3 dijkstra    : continuous [-1.0, 1.0]
+        #
+        # Pit encoding (-0.5) sits between safe air (0.0) and lethal spike (-1.0)
+        # on both solid and hazard channels so the CNN learns a clear danger gradient.
         stacked_grids = np.stack([
             solid_grid,
             collect_grid,
@@ -1139,6 +1113,82 @@ class PlatformerCore(gymnasium.Env):
                 ly = pr - map_row_start
                 if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height:
                     solid_grid[ly, lx] = 1.0
+
+        # ── Pit detection ─────────────────────────────────────────────────────
+        # A "pit" cell is an air tile that has no solid ground within
+        # PIT_SCAN_DEPTH tiles directly below it (i.e. the agent would fall
+        # to its death or off-screen if it stepped there).
+        #
+        # We write -0.5 into the hazard channel for these tiles so the agent
+        # can distinguish "safe air" (hazard=0) from "fatal gap" (hazard=-0.5),
+        # complementing the existing spike signal (-1.0).
+        #
+        # The value -0.5 sits between:
+        #   0.0  = empty air   (safe)
+        #  -0.5  = pit/gap     (lethal fall — this addition)
+        #  -1.0  = spike tile  (always lethal)
+        #
+        # Both the solid channel AND the hazard channel are updated so the
+        # agent gets the signal on two separate input planes.
+        #   solid[ly, lx]  = -0.5  (was 0.0 = air, visually identical to safe air)
+        #   hazard[ly, lx] = -0.5  (new — now agent can see the danger explicitly)
+        #
+        # PIT_SCAN_DEPTH: how many rows to scan downward per column.
+        # 6 tiles ≈ 192px ≈ 3 player heights — enough to detect any
+        # meaningful drop without scanning the entire level height.
+        PIT_SCAN_DEPTH = 6
+
+        grid     = self.level_data.grid
+        map_rows = self.level_data.rows
+        map_cols = self.level_data.cols
+
+        # Precompute: a tile is solid if it is NOT air (TILE_AIR = 0) AND not spike.
+        # We treat spikes as non-solid for the pit test because landing on a spike
+        # IS a hazard (it's already in hazard_grid) — we don't want to suppress
+        # the pit signal just because a spike sits at the bottom of a gap.
+        def _is_solid_floor(map_row, map_col):
+            if map_row < 0 or map_row >= map_rows:
+                return False
+            if map_col < 0 or map_col >= map_cols:
+                return False
+            t = grid[map_row][map_col]
+            return t not in (TILE_AIR, TILE_SPIKE)
+
+        for ly in range(self.obs_height):
+            for lx in range(self.obs_width):
+                # Only check cells that are currently air (solid=0) and
+                # not already flagged as a hazard (enemy/spike)
+                if solid_grid[ly, lx] != 0.0:
+                    continue
+                if hazard_grid[ly, lx] != 0.0:
+                    continue
+
+                map_row = map_row_start + ly
+                map_col = map_col_start + lx
+
+                # Skip tiles outside map bounds entirely (already OOB)
+                if map_col < 0 or map_col >= map_cols:
+                    continue
+
+                # Scan downward for solid ground
+                found_floor = False
+                for scan in range(1, PIT_SCAN_DEPTH + 1):
+                    scan_row = map_row + scan
+                    if _is_solid_floor(scan_row, map_col):
+                        found_floor = True
+                        break
+
+                if not found_floor:
+                    # No floor within PIT_SCAN_DEPTH — this is a pit.
+                    # Write pit marker into BOTH channels:
+                    #   solid:  -0.5  (distinguishes from safe air 0.0)
+                    #   hazard: -0.5  (distinguishes from spike -1.0 and enemy +1.0)
+                    solid_grid[ly,  lx] = -0.5
+                    hazard_grid[ly, lx] = -0.5
+
+        # Cache for debug overlay visualization (AgentViewOverlay reads these)
+        self._solid_window_cache  = solid_grid
+        self._hazard_window_cache = hazard_grid
 
         return solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start
 
@@ -1470,7 +1520,6 @@ class PlatformerCore(gymnasium.Env):
                 "curriculum_level_idx": self.current_index_world,
                 "curriculum_win_rate":  self._curriculum_win_rate(),
                 "curriculum_max_unlocked": self._max_unlocked_index,
-                "first_completion_step": self._first_completion_step if self._first_completion_step is not None else -1,
                 **self._obs_stats
             }
 
@@ -1481,9 +1530,7 @@ class PlatformerCore(gymnasium.Env):
             d = self.dijkstra.get_dist(px_tile, py_tile)
             self.dijkstra_current_tile = d
             if d >= 0:
-                # FIX: guard against cols=0 on malformed/empty levels.
-                denom = max(1, self.level_data.cols * 2)
-                dijkstra_dist = np.clip(d / denom, 0.0, 1.0)
+                dijkstra_dist = np.clip(d / (self.level_data.cols * 2), 0.0, 1.0)
             else:
                 dijkstra_dist = -1.0
 
@@ -1521,8 +1568,6 @@ class PlatformerCore(gymnasium.Env):
             "curriculum_level_idx": self.current_index_world,
             "curriculum_win_rate":  self._curriculum_win_rate(),
             "curriculum_max_unlocked": self._max_unlocked_index,
-            # Metrics: step of first ever WIN (-1 = not yet achieved)
-            "first_completion_step": self._first_completion_step if self._first_completion_step is not None else -1,
             **self._obs_stats
         }
 
