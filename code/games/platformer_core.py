@@ -163,19 +163,22 @@ class DijkstraSolver:
         return -1.0
 
 # =============================================================================
-# Jump Arc Precomputation (Physics-Aware Dijkstra Masking)
+# Jump Arc Precomputation (Physics-Aware Dijkstra Boost)
 # =============================================================================
 class JumpArcComputer:
     """
     Precomputes physically-accurate jump parabolas at multiple speed tiers
-    and directions, then at runtime overlays them onto the solid grid to
-    determine which air tiles are reachable via jump.
+    and directions, then at runtime applies an ADDITIVE boost to the
+    Dijkstra advantage channel on tiles the player can reach via jump.
 
-    Used to MASK the Dijkstra advantage channel: air tiles the player
-    can't physically reach get dampened so the gradient only flows through
-    tiles the player can actually traverse.
+    This nudges the gradient toward physically-traversable paths without
+    destroying the existing signal. Unlike multiplicative masking, additive
+    boosting works correctly on the signed [-1, 1] Dijkstra range:
+      - Negative tiles become slightly less negative (less repulsive)
+      - Positive tiles become slightly more positive (more attractive)
+      - Tiles not on any arc are completely untouched
 
-    Arc encoding (internal, not exposed as a channel):
+    Arc encoding (internal):
         0.0  — not reachable by any jump arc
         0.5  — in-flight tile (arc passes through, no landing here)
         1.0  — valid landing tile (arc descending + solid ground below)
@@ -188,15 +191,13 @@ class JumpArcComputer:
     def __init__(self, physics_context, tile_size: int, obs_half: int):
         self.tile_size = tile_size
         self.obs_half = obs_half
-        self.arcs: dict = {}   # (direction, speed_frac) → [(dx, dy, descending), ...]
+        self.arcs: dict = {}
         self._precompute(physics_context)
 
     def recompute(self, physics_context):
         """Re-precompute arcs after physics constants change (e.g. config reload)."""
         self.arcs.clear()
         self._precompute(physics_context)
-
-    # ── Precomputation ────────────────────────────────────────────────────
 
     def _precompute(self, ctx):
         for direction in (-1, 1):
@@ -215,9 +216,6 @@ class JumpArcComputer:
           2. gravity:     grav = FAST_FALL if vy>0 else GRAVITY
                           vy = min(vy + grav*dt, MAX_FALL_SPEED)
           3. position:    x += vx*dt,  y += vy*dt
-
-        Jump initiation:
-          vy = JUMP_VEL_MIN - min(2.2, |vx| * SPEED_JUMP_BONUS)
         """
         ts = self.tile_size
         half = self.obs_half
@@ -228,26 +226,21 @@ class JumpArcComputer:
 
         x, y = 0.0, 0.0
         offsets = []
-        visited = {(0, 0)}   # skip launch tile
+        visited = {(0, 0)}
 
         for frame in range(self.MAX_SIM_FRAMES):
-            # 1. Hold phase — reduces upward decel while player holds jump
             if frame < ctx.JUMP_HOLD_FRAMES:
                 vy -= ctx.GRAVITY * 0.12 * self.DT
 
-            # 2. Gravity (asymmetric: lighter while rising, heavier while falling)
             grav = ctx.FAST_FALL_GRAV if vy > 0 else ctx.GRAVITY
             vy = min(vy + grav * self.DT, ctx.MAX_FALL_SPEED)
 
-            # 3. Position update
             x += vx * self.DT
             y += vy * self.DT
 
-            # Floor division for correct negative tile coords
             tx = int(x // ts) if x >= 0 else -int((-x - 1) // ts) - 1
             ty = int(y // ts) if y >= 0 else -int((-y - 1) // ts) - 1
 
-            # Arc left the observation window — done
             if abs(tx) > half or abs(ty) > half:
                 break
 
@@ -258,21 +251,14 @@ class JumpArcComputer:
 
         return offsets
 
-    # ── Runtime: compute arc overlay ──────────────────────────────────────
-
     def compute_arc_grid(self, solid_grid, on_ground, obs_pad_x, obs_pad_y):
         """
-        Compute raw arc reachability grid (obs_height × obs_width).
-
-        Returns ndarray with values:
-            0.0 = unreachable by any jump arc
-            0.5 = in-flight (arc passes through)
-            1.0 = valid landing (descending + solid below)
+        Compute raw arc reachability grid (obs_height x obs_width).
+        Returns: 0.0 = unreachable, 0.5 = in-flight, 1.0 = valid landing.
         """
         h, w = solid_grid.shape
         arc_grid = np.zeros((h, w), dtype=np.float32)
 
-        # No jump possible while airborne
         if not on_ground:
             return arc_grid
 
@@ -286,18 +272,15 @@ class JumpArcComputer:
                 if not (0 <= lx < w and 0 <= ly < h):
                     continue
 
-                # Collision: arc hits a wall/ceiling → stop this arc
                 if solid_grid[ly, lx] > 0.5:
                     break
 
-                # Landing check: descending + solid ground below
                 below_ly = ly + 1
                 is_landing = False
                 if is_descending and below_ly < h:
                     if solid_grid[below_ly, lx] > 0.5:
                         is_landing = True
 
-                # Keep the max across overlapping arcs
                 if is_landing:
                     arc_grid[ly, lx] = max(arc_grid[ly, lx], 1.0)
                 else:
@@ -305,34 +288,29 @@ class JumpArcComputer:
 
         return arc_grid
 
-    # ── Runtime: composite arc mask into Dijkstra ─────────────────────────
-
-    def mask_dijkstra(self, dijkstra_grid, solid_grid, on_ground,
-                      obs_pad_x, obs_pad_y, dampen=0.15):
+    def boost_dijkstra(self, dijkstra_grid, solid_grid, on_ground,
+                       obs_pad_x, obs_pad_y,
+                       landing_boost=0.4, flight_boost=0.2):
         """
-        Modify the Dijkstra advantage grid in-place by dampening air tiles
-        that the player cannot physically reach via jump.
+        Apply an additive boost to Dijkstra tiles on the jump arc.
 
-        Compositing rules:
-          - Solid tiles (ground/platform):  untouched (always walkable)
-          - Air tiles on landing arc (1.0): untouched (player can land here)
-          - Air tiles on flight arc  (0.5): scaled by 0.6 (passing through)
-          - Air tiles NOT on any arc (0.0): scaled by `dampen` (unreachable)
-          - Player is airborne:             no masking (arc unknown mid-air)
+        Unlike multiplicative masking, this preserves the entire existing
+        gradient and only nudges arc-reachable tiles to be slightly more
+        attractive. Works correctly on signed [-1, 1] values:
+          - A tile at -0.3 with landing boost becomes -0.15 (less repulsive)
+          - A tile at +0.2 with landing boost becomes +0.35 (more attractive)
+          - Tiles not on any arc: completely untouched
 
         Args:
             dijkstra_grid: (H, W) advantage map, modified IN-PLACE
-            solid_grid:    (H, W) solid channel {-0.5, 0.0, 1.0}
+            solid_grid:    (H, W) solid channel
             on_ground:     player grounded flag
             obs_pad_x/y:   player's local position in the grid
-            dampen:        scale factor for unreachable air tiles (0.0 = full
-                           suppression, 1.0 = no effect). Default 0.15 keeps
-                           a faint gradient so the CNN doesn't see a hard wall
-                           of zeros which could confuse gradient flow.
+            landing_boost:  added to landing tiles (default 0.15)
+            flight_boost:   added to in-flight tiles (default 0.05)
 
         Returns:
-            (dijkstra_grid, arc_grid) — dijkstra modified in-place,
-            arc_grid is the raw reachability overlay {0.0, 0.5, 1.0}
+            (dijkstra_grid, arc_grid)
         """
         h, w = dijkstra_grid.shape
 
@@ -343,25 +321,17 @@ class JumpArcComputer:
             solid_grid, on_ground, obs_pad_x, obs_pad_y
         )
 
-        # Build per-tile scale factors:
-        #   solid tile (>0.5)  → 1.0  (keep full)
-        #   air + landing(1.0) → 1.0  (reachable)
-        #   air + flight (0.5) → 0.6  (partial)
-        #   air + no arc (0.0) → dampen (unreachable)
-        is_air = solid_grid <= 0.0   # air = 0.0, pit = -0.5
+        # Only boost air tiles — solid tiles already have correct gradient
+        is_air = solid_grid <= 0.0
 
-        scale = np.ones((h, w), dtype=np.float32)
-        # Only touch air tiles
-        air_flight  = is_air & (arc_grid >= 0.5) & (arc_grid < 1.0)
-        air_none    = is_air & (arc_grid < 0.5)
+        landing_mask = is_air & (arc_grid >= 1.0)
+        flight_mask  = is_air & (arc_grid >= 0.5) & (arc_grid < 1.0)
 
-        # Landing tiles: full signal (scale stays 1.0)
-        # Flight tiles: moderate dampening
-        scale[air_flight] = 0.6
-        # Unreachable air: heavy dampening
-        scale[air_none] = dampen
+        dijkstra_grid[landing_mask] += landing_boost
+        dijkstra_grid[flight_mask]  += flight_boost
 
-        dijkstra_grid *= scale
+        # np.clip(dijkstra_grid, -1.0, 1.0, out=dijkstra_grid)
+
         return dijkstra_grid, arc_grid
 
 # =============================================================================
@@ -566,12 +536,12 @@ class PlatformerCore(gymnasium.Env):
         self.dijkstra = None
         self.dijkstra_current_tile = 0.0
 
-        # Jump arc precomputation — masks Dijkstra channel with physics-aware
-        # reachability. Recomputed in load_level after config changes.
+        # Jump arc precomputation — boosts Dijkstra on reachable jump tiles.
+        # Recomputed in load_level after config changes.
         self.jump_arc_computer = JumpArcComputer(
             self.physics_manager.context,
             TILE_SIZE,
-            self.obs_pad_x  # obs_width // 2 = 10
+            self.obs_pad_x
         )
 
         self._obs_space = spaces.Dict({
@@ -595,10 +565,6 @@ class PlatformerCore(gymnasium.Env):
             #                      +1.0 = tile much closer to goal than player
             #                       0.0 = same distance / unreachable (neutral)
             #                      -1.0 = tile much further from goal than player
-            #                      NOTE: air tiles are masked by jump arc
-            #                      reachability — unreachable air is dampened
-            #                      so the gradient only flows through tiles
-            #                      the player can physically traverse.
             #
             # All channels span [-1, 1] so low=-1.0 covers spikes and Dijkstra.
             "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
@@ -622,7 +588,7 @@ class PlatformerCore(gymnasium.Env):
         self._dijkstra_window_cache = None
         self._solid_window_cache    = None   # set by _grid_obs_window each step
         self._hazard_window_cache   = None   # set by _grid_obs_window each step
-        self._jump_arc_cache        = None   # set by _obs each step (arc overlay)
+        self._jump_arc_cache        = None   # set by _obs each step
 
         self.reset()
 
@@ -1191,19 +1157,17 @@ class PlatformerCore(gymnasium.Env):
 
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # ── Physics-aware Dijkstra masking ────────────────────────────────
-        # Dampen Dijkstra values on air tiles the player can't physically
-        # reach via jump. This prevents the gradient from routing through
-        # impossible paths (e.g. straight up through open air shafts).
-        # Ground/platform tiles are untouched. When airborne, no masking
-        # is applied (the arc is only valid from a grounded launch).
+        # ── Physics-aware Dijkstra boost ──────────────────────────────────
+        # Add a small positive value to air tiles the player can physically
+        # reach via jump. Landing tiles get +0.15, in-flight tiles get +0.05.
+        # This nudges the gradient toward jumpable paths without destroying
+        # the existing signal. Solid tiles and unreachable air are untouched.
+        # When airborne, no boost is applied (arc only valid from ground).
         on_ground = self.player.on_ground if self.player else False
-        dijkstra_grid, arc_grid = self.jump_arc_computer.mask_dijkstra(
+        dijkstra_grid, arc_grid = self.jump_arc_computer.boost_dijkstra(
             dijkstra_grid, solid_grid, on_ground,
             self.obs_pad_x, self.obs_pad_y
         )
-
-        # Update caches AFTER masking so debug overlays show the arc effect
         self._dijkstra_window_cache = dijkstra_grid
         self._jump_arc_cache = arc_grid
 
