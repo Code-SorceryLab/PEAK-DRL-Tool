@@ -207,7 +207,8 @@ class DebugManager:
         self._render_hud_strip(surface, core, debug_x, panel_w)
 
         # ── Game-area overlays ────────────────────────────────
-        self.grid_overlay.render(surface, core)
+        if self.show_grid:
+            self.grid_overlay.render(surface, core)
         if self.show_hitboxes:
             self.hitbox_overlay.render(surface, core)
 

@@ -12,3 +12,4 @@ class EntityType(Enum):
     SPIKE = auto()
     PROJECTILE = auto()
     PIT = auto()
+    LADDER = auto()

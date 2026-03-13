@@ -1,1 +1,2 @@
-from importlib import import_module as _imp
+from .platformer_core import PlatformerCore
+from .megaman_core import MegaManCore

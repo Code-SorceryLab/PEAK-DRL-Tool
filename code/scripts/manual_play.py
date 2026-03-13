@@ -25,8 +25,8 @@ level_file = args.file  or os.environ.get('PEAK_PLAY_FILE',  None)
 if args.game == "mario":
     args.game = "platformer"
 
-# Enable manual play mode for mario/platformer
-if args.game == "platformer":
+# Enable manual play mode for platformer-like games
+if args.game in {"platformer", "megaman"}:
     os.environ["MARIO_MANUAL_PLAY"] = "1"
 
 # --- Load game core class dynamically
@@ -65,43 +65,15 @@ def _platformer_action(keys) -> list:
     return [move, int(bool(jump)), int(bool(fire))]
 
 
-def _sonic_action(keys) -> list:
-    """
-    Return a MultiDiscrete action [move, jump, down].
-      move : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
-      jump : 0=idle  1=jump
-      down : 0=idle  1=down   (crouch / roll / spin dash)
-    """
-    k = pygame.key.get_pressed()
-
-    left  = k[pygame.K_LEFT]  or k[pygame.K_a]
-    right = k[pygame.K_RIGHT] or k[pygame.K_d]
-    jump  = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
-    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
-    down  = k[pygame.K_DOWN]  or k[pygame.K_s]
-
-    # Move axis
-    if left and right:
-        move = 0
-    elif left:
-        move = 2 if run else 1
-    elif right:
-        move = 4 if run else 3
-    else:
-        move = 0
-
-    return [move, int(bool(jump)), int(bool(down))]
-
-
 ACTION_MAPPING = {
     "platformer": _platformer_action,
     "mario": _platformer_action,
-    "sonic": _sonic_action,
+    "megaman": _platformer_action,
 }
 
 CONTROL_DESCRIPTIONS = {
     "platformer": "\n[PLAYER] WASD to Move, SPACE to Jump, SHIFT to Run\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
-    "sonic": "\n[SONIC] Arrow Keys / WASD to Move, SPACE / UP to Jump, DOWN / S to Crouch/Roll/Spin Dash, SHIFT to Sprint\n[DEBUG] F5 = Free Cam, ESC = Quit",
+    "megaman": "\n[MEGA MAN] A / D to Move, W / S to Climb Ladders, SPACE to Jump, Z to Shoot\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
 }
 
 controls = CONTROL_DESCRIPTIONS.get(args.game, "Use game-specific keys. ESC = quit")

@@ -1,9 +1,50 @@
-game:
-  title: PEAK Platformer
-  screen_width: 800
+megaman:
+  env_cls: MegaManCore
+  module: code.games.megaman_core
+  screen_width: 960
   screen_height: 600
   fps: 60
-  render_mode: human
+  tile_size: 32
+  physics:
+    walk_speed: 1.5
+    max_fall_speed: 6.0
+    jump_velocity: -10.0
+    gravity: 0.5
+    bullet_speed: 8.0
+    i_frame_duration: 120
+    hp_max: 28
+  action_space:
+    type: Discrete
+    n: 7
+  observation_space:
+    type: Box
+    shape: [40]
+    low: -1.0
+    high: 1.0
+  reward:
+    shaping:
+      step: -0.01
+      goal: 10.0
+      fall: -5.0
+      enemy_kill: 0.5
+      damage_taken: -1.0
+  episode:
+    max_steps: 2000
+  render:
+    show_fps: true
+    debug_overlay: false
+    hud_color: [80, 208, 255]
+  defaults:
+    player:
+      lives: 3
+      dimensions:
+        width: 16
+        height: 24
+  levels:
+    MM-Stage1:
+      file: mm_stage1.txt
+      background_color: [120, 160, 255]
+
 env_cls: PlatformerCore
 module: code.games.platformer_core
 max_steps: 10000

@@ -1599,7 +1599,11 @@ def run_manual_play():
     _box_row()
     _box_kv("A / D",         "Move left / right")
     _box_kv("SPACE",         "Jump")
-    _box_kv("SHIFT",         "Run")
+    if selected_game.lower() == "megaman":
+        _box_kv("W / S",     "Climb ladder")
+        _box_kv("Z",         "Fire")
+    else:
+        _box_kv("SHIFT",     "Run")
     _box_kv("ESC",           "Quit session")
     _box_row()
     _box_mid()
