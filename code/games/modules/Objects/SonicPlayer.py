@@ -100,7 +100,6 @@ class SonicPlayer:
 
     # ── Jump ─────────────────────────────────────────────────────────────
     coyote: int = 0
-    jump_hold: int = 0
     jump_buffer: int = 0
     jump_pressed: bool = False
     last_jump_pressed: bool = False
@@ -137,10 +136,6 @@ class SonicPlayer:
     def handle_input(self, a=None):
         """
         Decode action [move, jump, down/spindash].
-
-        move: 0=idle, 1=left, 2=sprint_left, 3=right, 4=sprint_right
-        jump: 0=idle, 1=jump
-        down: 0=idle, 1=down (crouch/roll/spindash)
         """
         try:
             move_idx = int(a[0])
@@ -310,64 +305,73 @@ class SonicPlayer:
                 self.state = SonicState.WALKING
 
     def _apply_physics(self, dt, ctx):
-        """Sonic-specific physics."""
+        """Sonic-specific momentum physics."""
         if self.state == SonicState.HURT:
             # Knockback deceleration
             friction = GROUND_FRICTION * 0.5 * dt
             if self.vx > 0:
-                self.vx = max(0, self.vx - friction)
+                self.vx = max(0.0, self.vx - friction)
             elif self.vx < 0:
-                self.vx = min(0, self.vx + friction)
+                self.vx = min(0.0, self.vx + friction)
             return
 
         if self.state == SonicState.SPIN_DASH:
-            # No horizontal movement during spin dash charge
             self.vx *= 0.95  # Slow to a stop
             return
 
         # ── Rolling physics ──────────────────────────────────────────────
         if self.state == SonicState.ROLLING:
+            # High speed, low friction when rolling
             friction = ROLL_FRICTION * dt
             if self.vx > 0:
-                self.vx = max(0, self.vx - friction)
+                self.vx = max(0.0, self.vx - friction)
             elif self.vx < 0:
-                self.vx = min(0, self.vx + friction)
+                self.vx = min(0.0, self.vx + friction)
             self._handle_jump(dt, ctx)
             return
 
         # ── Normal movement ──────────────────────────────────────────────
-        if self.run_held:
-            target_max = ctx.MAX_RUN_SPEED if hasattr(ctx, 'MAX_RUN_SPEED') else MAX_RUN_SPEED
-            accel_rate = ctx.RUN_ACCEL if hasattr(ctx, 'RUN_ACCEL') else RUN_ACCEL
-        else:
-            target_max = ctx.MAX_WALK_SPEED if hasattr(ctx, 'MAX_WALK_SPEED') else MAX_WALK_SPEED
-            accel_rate = ctx.WALK_ACCEL if hasattr(ctx, 'WALK_ACCEL') else WALK_ACCEL
+        target_max = ctx.MAX_RUN_SPEED if hasattr(ctx, 'MAX_RUN_SPEED') and self.run_held else MAX_WALK_SPEED
+        accel_rate = ctx.RUN_ACCEL if hasattr(ctx, 'RUN_ACCEL') and self.run_held else WALK_ACCEL
 
+        # Air acceleration is doubled in classic Sonic
         if not self.on_ground:
-            accel_rate *= (ctx.AIR_CONTROL if hasattr(ctx, 'AIR_CONTROL') else AIR_CONTROL)
+            accel_rate *= 2.0
 
         if self.input_dir != 0:
             skidding = (self.vx > 0 and self.input_dir < 0) or \
                        (self.vx < 0 and self.input_dir > 0)
 
-            if self.on_ground and skidding:
-                self.vx += self.input_dir * SKID_DECEL * dt
+            if skidding:
+                # Decelerate when pushing opposite direction
+                decel = SKID_DECEL if self.on_ground else accel_rate
+                self.vx += self.input_dir * decel * dt
             else:
+                # Fix Discrepancy 1: Momentum Clamping
+                # Accelerate towards max, but DO NOT clamp if we are already exceeding it!
                 if self.input_dir > 0:
-                    self.vx = min(self.vx + accel_rate * dt, target_max)
+                    if self.vx < target_max:
+                        self.vx = min(self.vx + accel_rate * dt, target_max)
                 else:
-                    self.vx = max(self.vx - accel_rate * dt, -target_max)
+                    if self.vx > -target_max:
+                        self.vx = max(self.vx - accel_rate * dt, -target_max)
         else:
-            friction = (GROUND_FRICTION if self.on_ground else AIR_FRICTION) * dt
-            if self.vx > 0:
-                self.vx = max(0.0, self.vx - friction)
-            elif self.vx < 0:
-                self.vx = min(0.0, self.vx + friction)
+            # No directional input
+            if self.on_ground:
+                friction = GROUND_FRICTION * dt
+                if self.vx > 0:
+                    self.vx = max(0.0, self.vx - friction)
+                elif self.vx < 0:
+                    self.vx = min(0.0, self.vx + friction)
+            else:
+                # Fix Discrepancy 4: Zero Air Friction
+                # Sonic maintains his momentum perfectly if you let go of the D-Pad in mid-air
+                pass
 
         self._handle_jump(dt, ctx)
 
     def _handle_jump(self, dt, ctx):
-        """Jump logic with coyote time and variable height."""
+        """Fix Discrepancy 3: The Velocity Chop jump."""
         if self.jump_pressed and not self.last_jump_pressed:
             self.jump_buffer = JUMP_BUFFER_FRAMES
 
@@ -375,33 +379,31 @@ class SonicPlayer:
         if self.jump_buffer > 0:
             self.jump_buffer -= 1
 
-        if self.coyote > 0 and self.jump_hold == 0 and self.jump_buffer > 0:
-            base = JUMP_VEL_MIN
+        # Instant Takeoff
+        if self.coyote > 0 and self.jump_buffer > 0:
+            base_jump = ctx.JUMP_VEL_MAX if hasattr(ctx, 'JUMP_VEL_MAX') else JUMP_VEL_MAX
+            # Tiny bonus based on momentum
             bonus = min(80.0, abs(self.vx) * SPEED_JUMP_BONUS)
-            self.vy = base - bonus
+            self.vy = base_jump - bonus
+            
             self.on_ground = False
             self.coyote = 0
-            self.jump_hold = JUMP_HOLD_FRAMES
             self.jump_buffer = 0
             self.state = SonicState.JUMPING
 
-        if self.jump_hold > 0:
-            if self.jump_pressed:
-                grav = ctx.GRAVITY if hasattr(ctx, 'GRAVITY') else GRAVITY
-                self.vy -= grav * 0.10 * dt
-            self.jump_hold -= 1
+        # The "Velocity Chop" for variable jump height
+        # If Sonic is moving upwards, and the player RELEASES jump, aggressively cut speed
+        if not self.jump_pressed and not self.on_ground and self.vy < 0:
+            chop_vel = ctx.JUMP_VEL_MIN if hasattr(ctx, 'JUMP_VEL_MIN') else JUMP_VEL_MIN
+            if self.vy < chop_vel:
+                self.vy = chop_vel
 
     # =====================================================================
     # DAMAGE
     # =====================================================================
     def take_hit(self) -> bool:
-        """
-        Called when Sonic touches a hazard.
-        Returns True if Sonic should die (no rings, no shield).
-        Returns False if survived (had rings or shield).
-        """
         if self.invincible_timer > 0 or self.star_timer > 0:
-            return False  # Invincible, ignore hit
+            return False
 
         if self.shield:
             self.shield = False
@@ -409,53 +411,29 @@ class SonicPlayer:
             return False
 
         if self.rings > 0:
-            # Scatter rings! (core handles spawning lost rings)
-            scattered = self.rings
             self.rings = 0
             self.state = SonicState.HURT
             self.hurt_timer = 0.5
             self.invincible_timer = 2.0
-            # Knockback
             self.vy = -300.0
             self.vx = -120.0 if self.facing_right else 120.0
             return False
 
-        # No rings, no shield → die
         return True
 
     def bounce_off_enemy(self):
-        """Bounce after defeating a badnik from above."""
         self.vy = BOUNCE_VEL
         self.state = SonicState.JUMPING
 
     def spring_launch(self, velocity: float):
-        """Launched by a spring."""
         self.vy = velocity
         self.state = SonicState.SPRING
         self.on_ground = False
-        self.jump_hold = 0
 
     # =====================================================================
-    # OBSERVATION VECTOR (for RL compatibility)
+    # OBSERVATION VECTOR
     # =====================================================================
     def obs_vector(self, max_run_speed: float, max_fall_speed: float) -> np.ndarray:
-        """
-        13-element observation vector compatible with the platformer obs system.
-
-        [0]  x position (tiles)
-        [1]  y position (tiles)
-        [2]  velocity x normalised [-1, 1]
-        [3]  velocity y normalised [-1, 1]
-        [4]  on_ground
-        [5]  is_ball (rolling/jumping)
-        [6]  has_rings (> 0)
-        [7]  invincible
-        [8]  facing_right
-        [9]  spin_dash_charge normalised [0, 1]
-        [10] invincible_timer normalised [0, 1]
-        [11] coyote_active
-        [12] jump_extendable
-        """
         charge_frac = self.spin_dash_charge / max(SPIN_DASH_CHARGES_MAX, 1)
         inv_frac = np.clip(self.invincible_timer / 2.0, 0.0, 1.0)
 
@@ -472,7 +450,7 @@ class SonicPlayer:
             charge_frac,
             inv_frac,
             1.0 if self.coyote > 0 else 0.0,
-            1.0 if self.jump_hold > 0 else 0.0,
+            0.0, # Deprecated jump_extendable flag
         ], dtype=np.float32)
 
     # =====================================================================
@@ -482,9 +460,8 @@ class SonicPlayer:
         w = self.gObj.width
         h = self.gObj.height
 
-        # Invincibility flicker
         if self.invincible_timer > 0 and int(self.invincible_timer * 10) % 2 == 0:
-            if self.star_timer <= 0:  # Only flicker for post-hit, not star power
+            if self.star_timer <= 0:
                 return
 
         if self.is_ball:
@@ -496,15 +473,13 @@ class SonicPlayer:
         else:
             self._render_standing(surface, sx, sy, w, h)
 
-        # Star power sparkle effect
         if self.star_timer > 0 and self.anim_tick % 4 < 2:
             import random
             for _ in range(3):
-                spark_x = sx + random.randint(-4, w + 4)
-                spark_y = sy + random.randint(-4, h + 4)
+                spark_x = sx + random.randint(-4, int(w) + 4)
+                spark_y = sy + random.randint(-4, int(h) + 4)
                 pygame.draw.circle(surface, (255, 0, 0), (int(spark_x), int(spark_y)), 2)
 
-        # Speed streaks
         if abs(self.vx) > MAX_RUN_SPEED * 0.8:
             self._render_speed_lines(surface, sx, sy, w, h)
 
@@ -512,21 +487,14 @@ class SonicPlayer:
             self._render_debug(surface, sx, sy, w, h)
 
     def _render_ball(self, surface, sx, sy, w, h):
-        """Render Sonic as a spinning ball."""
         cx = int(sx + w // 2)
         cy = int(sy + h // 2)
-        radius = min(w, h) // 2
+        radius = int(min(w, h) // 2)
 
-        # Star power golden ball
-        if self.star_timer > 0:
-            ball_col = (255, 0, 0)
-        else:
-            ball_col = COLOR_SONIC_BALL
-
+        ball_col = (255, 0, 0) if self.star_timer > 0 else COLOR_SONIC_BALL
         pygame.draw.circle(surface, ball_col, (cx, cy), radius)
         pygame.draw.circle(surface, COLOR_BLACK, (cx, cy), radius, 1)
 
-        # Spin lines
         angle = self.ball_rotation
         for i in range(4):
             a = angle + i * (math.pi / 2)
@@ -535,17 +503,13 @@ class SonicPlayer:
             pygame.draw.circle(surface, (60, 80, 255), (lx, ly), 2)
 
     def _render_standing(self, surface, sx, sy, w, h):
-        """Render Sonic standing/walking/running."""
-        # Body (blue rectangle, slightly rounded feel)
-        body_rect = (int(sx + 2), int(sy + 2), w - 4, int(h * 0.6))
+        body_rect = (int(sx + 2), int(sy + 2), int(w - 4), int(h * 0.6))
         pygame.draw.rect(surface, COLOR_SONIC_BLUE, body_rect)
 
-        # Head area
         head_y = int(sy)
         head_x = int(sx + w // 2)
         pygame.draw.circle(surface, COLOR_SONIC_BLUE, (head_x, head_y + 8), 8)
 
-        # Spines (hair)
         if self.facing_right:
             for i in range(3):
                 spine_x = int(sx - 2 - i * 3)
@@ -559,53 +523,45 @@ class SonicPlayer:
                 pygame.draw.line(surface, (20, 40, 180),
                                (head_x, head_y + 5), (spine_x, spine_y), 2)
 
-        # Eye
         eye_x = int(sx + (w * 0.65 if self.facing_right else w * 0.35))
         eye_y = int(sy + 6)
         pygame.draw.circle(surface, COLOR_WHITE, (eye_x, eye_y), 4)
         pupil_off = 1 if self.facing_right else -1
         pygame.draw.circle(surface, COLOR_BLACK, (eye_x + pupil_off, eye_y), 2)
 
-        # Belly
         belly_rect = (int(sx + w * 0.25), int(sy + h * 0.35), int(w * 0.5), int(h * 0.25))
         pygame.draw.ellipse(surface, COLOR_SONIC_SKIN, belly_rect)
 
-        # Shoes
         shoe_y = int(sy + h - 8)
-        # Animate legs when moving
         if abs(self.vx) > 10:
             self.leg_anim = (self.anim_tick // max(1, int(8 - abs(self.vx) / 60))) % 4
             offsets = [(-2, 0, 4, 0), (0, -2, 0, 4), (2, 0, -4, 0), (0, 2, 0, -4)]
             lo = offsets[self.leg_anim % len(offsets)]
             pygame.draw.rect(surface, COLOR_SONIC_SHOE,
-                           (int(sx + 2 + lo[0]), shoe_y + lo[1], 8, 6))
+                           (int(sx + 2 + lo[0]), int(shoe_y + lo[1]), 8, 6))
             pygame.draw.rect(surface, COLOR_SONIC_SHOE,
-                           (int(sx + w - 10 + lo[2]), shoe_y + lo[3], 8, 6))
+                           (int(sx + w - 10 + lo[2]), int(shoe_y + lo[3]), 8, 6))
         else:
             pygame.draw.rect(surface, COLOR_SONIC_SHOE, (int(sx + 2), shoe_y, 8, 6))
             pygame.draw.rect(surface, COLOR_SONIC_SHOE, (int(sx + w - 10), shoe_y, 8, 6))
 
     def _render_crouch(self, surface, sx, sy, w, h):
-        """Render crouching Sonic (shorter)."""
         cx = int(sx + w // 2)
         cy = int(sy + h - 10)
-        pygame.draw.ellipse(surface, COLOR_SONIC_BLUE, (sx + 2, sy + h // 2, w - 4, h // 2))
-        pygame.draw.circle(surface, COLOR_WHITE, (cx + (3 if self.facing_right else -3), cy - 4), 3)
-        pygame.draw.circle(surface, COLOR_BLACK, (cx + (4 if self.facing_right else -4), cy - 4), 1)
+        pygame.draw.ellipse(surface, COLOR_SONIC_BLUE, (int(sx + 2), int(sy + h // 2), int(w - 4), int(h // 2)))
+        
+        pygame.draw.circle(surface, COLOR_WHITE, (int(cx + (3 if self.facing_right else -3)), int(cy - 4)), 3)
+        pygame.draw.circle(surface, COLOR_BLACK, (int(cx + (4 if self.facing_right else -4)), int(cy - 4)), 1)
 
     def _render_hurt(self, surface, sx, sy, w, h):
-        """Render hurt Sonic (flashing, knocked back)."""
         cx = int(sx + w // 2)
         cy = int(sy + h // 2)
-        # Tumbling body
-        pygame.draw.circle(surface, (200, 80, 80), (cx, cy), min(w, h) // 2)
+        pygame.draw.circle(surface, (200, 80, 80), (cx, cy), int(min(w, h) // 2))
         pygame.draw.circle(surface, COLOR_WHITE, (cx, cy - 3), 3)
-        # X eyes
         pygame.draw.line(surface, COLOR_BLACK, (cx - 3, cy - 5), (cx - 1, cy - 3), 1)
         pygame.draw.line(surface, COLOR_BLACK, (cx - 1, cy - 5), (cx - 3, cy - 3), 1)
 
     def _render_speed_lines(self, surface, sx, sy, w, h):
-        """Motion blur lines when at high speed."""
         n = 4
         spacing = 5
         length = int(abs(self.vx) / 30)
@@ -618,16 +574,13 @@ class SonicPlayer:
                 x1 = int(sx + w + offset)
                 x2 = int(x1 + length)
             y = int(sy + 6 + i * 6)
-            alpha = max(50, 200 - i * 40)
             pygame.draw.line(surface, COLOR_STREAK, (x1, y), (x2, y), 1)
 
     def _render_debug(self, surface, sx, sy, w, h):
-        """Debug velocity vector."""
         v_end = (
             int(sx + self.vx * 5 * self.dt),
             int(sy + self.vy * 5 * self.dt)
         )
         pygame.draw.line(surface, (100, 255, 255),
                         (int(sx + w / 2), int(sy + h / 2)), v_end, 2)
-        # Hitbox
-        pygame.draw.rect(surface, (255, 64, 64), (sx, sy, w, h), 1)
+        pygame.draw.rect(surface, (255, 64, 64), (int(sx), int(sy), int(w), int(h)), 1)

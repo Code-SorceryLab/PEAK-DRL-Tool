@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 import pygame
+from pygame import surface
 
 try:
     from .GameObject import GameObject
@@ -99,8 +100,8 @@ class Spring:
             # Base
             base_h = h // 2
             base_y = sy + h - base_h
-            pygame.draw.rect(surface, (180, 180, 180), (sx + 4, base_y, w - 8, base_h))
-
+            pygame.draw.rect(surface, (180, 180, 180), (int(sx + 4), int(base_y), int(w - 8), int(base_h)))
+        
             # Coil lines
             coil_y = base_y
             if self.compressed:
@@ -114,24 +115,24 @@ class Spring:
             # Top plate
             plate_h = 6
             plate_y = coil_y - 14 if not self.compressed else coil_y - 6
-            pygame.draw.rect(surface, top_color, (sx + 2, plate_y, w - 4, plate_h))
-            pygame.draw.rect(surface, COLOR_BLACK, (sx + 2, plate_y, w - 4, plate_h), 1)
+            pygame.draw.rect(surface, top_color, (int(sx + 2), int(plate_y), int(w - 4), int(plate_h)))
+            pygame.draw.rect(surface, COLOR_BLACK, (int(sx + 2), int(plate_y), int(w - 4), int(plate_h)), 1)
 
         elif self.direction == SpringDir.RIGHT:
             # Horizontal spring pointing right
             base_w = w // 2
-            pygame.draw.rect(surface, (180, 180, 180), (sx, sy + 4, base_w, h - 8))
-            plate_x = sx + w - 8 if not self.compressed else sx + w - 12
-            pygame.draw.rect(surface, top_color, (plate_x, sy + 2, 6, h - 4))
+            pygame.draw.rect(surface, (180, 180, 180), (int(sx), int(sy + 4), int(base_w), int(h - 8)))
+            plate_x = int(sx + w - 8) if not self.compressed else int(sx + w - 12)
+            pygame.draw.rect(surface, top_color, (plate_x, int(sy + 2), 6, int(h - 4)))
 
         elif self.direction == SpringDir.LEFT:
             base_w = w // 2
-            pygame.draw.rect(surface, (180, 180, 180), (sx + w - base_w, sy + 4, base_w, h - 8))
-            plate_x = sx + 2 if not self.compressed else sx + 6
-            pygame.draw.rect(surface, top_color, (plate_x, sy + 2, 6, h - 4))
+            pygame.draw.rect(surface, (180, 180, 180), (int(sx + w - base_w), int(sy + 4), int(base_w), int(h - 8)))
+            plate_x = int(sx + 2) if not self.compressed else int(sx + 6)
+            pygame.draw.rect(surface, top_color, (plate_x, int(sy + 2), 6, int(h - 4)))
 
         if debug:
-            pygame.draw.rect(surface, (255, 64, 64), (sx, sy, w, h), 1)
+            pygame.draw.rect(surface, (255, 64, 64), (int(sx), int(sy), int(w), int(h)), 1)
 
     def __repr__(self) -> str:
         return (f"<Spring type={self.spring_type.name} dir={self.direction.name} "
