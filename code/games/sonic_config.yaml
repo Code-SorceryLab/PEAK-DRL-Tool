@@ -1,0 +1,101 @@
+game:
+  title: Sonic NES Clone
+  screen_width: 800
+  screen_height: 600
+  fps: 60
+  render_mode: human
+
+env_cls: SonicCore
+module: code.games.sonic_core
+max_steps: 12000
+
+observation_space:
+  type: Box
+  shape:
+  - 36
+  low: -500.0
+  high: 500.0
+
+action_space:
+  type: Discrete
+  n: 10
+
+reward:
+  type: progress_flag
+  shaping:
+    step: 0.01
+    goal: 1.0
+    fall: -1.0
+
+episode:
+  max_steps: 2000
+
+init:
+  seed: 42
+  level: "Green Hill 1"
+
+persona: null
+
+metrics:
+- episode_reward
+- episode_length
+
+render:
+  window_size:
+  - 800
+  - 600
+  show_fps: false
+  debug_overlay: false
+
+logging:
+  tensorboard: true
+
+defaults:
+  player:
+    lives: 3
+    dimensions:
+      width: 24
+      height: 32
+  physics:
+    gravity: 1100.0
+    fast_fall_gravity: 2000.0
+    friction:
+      ground: 600.0
+      air: 100.0
+  player_movement:
+    max_run_speed: 380.0
+    run_accel: 600.0
+    max_walk_speed: 180.0
+    walk_accel: 480.0
+    air_control: 0.40
+  player_jump:
+    min_velocity: -520.0
+    max_velocity: -700.0
+    hold_frames: 20
+    coyote_frames: 6
+    buffer_frames: 8
+
+levels:
+  Green Hill 1:
+    file: green_hill_1.txt
+    time_limit: 300
+    background_color:
+    - 0
+    - 128
+    - 255
+
+  Green Hill 2:
+    file: green_hill_2.txt
+    time_limit: 300
+    background_color:
+    - 0
+    - 128
+    - 255
+
+  Green Hill 3:
+    file: green_hill_3.txt
+    time_limit: 300
+    background_color:
+    - 0
+    - 100
+    - 200

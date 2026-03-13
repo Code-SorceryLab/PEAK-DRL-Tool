@@ -180,22 +180,16 @@ class PhysicsManager:
             step_dt = dt / step_count
 
             for _ in range(step_count):
-                pre_y      = player.gObj.y       # save Y before update
-                pre_height = player.gObj.height  # save height before update
+                pre_y = player.gObj.y          # save Y before update
 
                 player.update(step_dt, ctx)    # moves both X and Y
 
-                post_y      = player.gObj.y       # save post-update Y (includes anchor correction)
-                post_height = player.gObj.height  # save post-update height
+                post_y = player.gObj.y         # save post-update Y
 
                 # ── Pass 1: X only ────────────────────────────────────────────
-                # Restore Y to pre-update value, BUT account for any height change
-                # that apply_to_player() made. Without this, the anchor correction
-                # is lost and the player sits at the wrong Y for the X pass,
-                # causing false wall overlaps that snap the X position.
-                height_delta = post_height - pre_height
-                player.gObj.y      = pre_y - height_delta  # keep feet at same spot
-                player.gObj.height = post_height
+                # Y is reset to pre-update so only X has changed.
+                # Every collision must be a wall — push out horizontally.
+                player.gObj.y = pre_y
                 self._resolve_player_world_x(core, level_data)
 
                 # ── Pass 2: Y only ────────────────────────────────────────────
@@ -545,8 +539,7 @@ class PhysicsManager:
 
             if tile_type == EntityType.SPIKE:
                 if not player.power_machine.is_invincible:
-                    if not player.power_machine.take_hit():
-                        core._handle_death("Spike")
+                    core._handle_death("Spike")
                     return
                 continue
 
