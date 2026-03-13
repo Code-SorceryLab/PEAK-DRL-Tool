@@ -558,6 +558,7 @@ def run_training():
 
     # ── Architectures ─────────────────────────────────────────────
     archs = get_available_architectures_from_grid()
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "spatialattention"), 0)
     arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
     arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
                              show_desc=arch_desc)
