@@ -249,9 +249,10 @@ def get_personas_for_game(game: str):
 
 # Architecture metadata used by the menu
 _ARCH_INFO = {
-    "light": ("LightCombinedExtractor", "~18K params  — no channel split, fast sweeps"),
-    "slim":  ("SlimPEAKExtractor",       "~77K params  — channel split, no SEBlock  [recommended]"),
-    "peak":  ("PEAKExtractor",           "~922K params — full SEBlock + deep semantic branch"),
+    "lightmobile":         ("LightMobileExtractor",          "~18K params  — no channel split, fast sweeps"),
+    "spatialattention":    ("SpatialAttentionExtractor",     "~77K params  — channel split, no SEBlock  [recommended]"),
+    "channelattention":    ("ChannelAttentionExtractor",     "~230K params — channel split + SEBlock"),
+    "deepchannelattention":("DeepChannelAttentionExtractor", "~922K params — full SEBlock + deep semantic branch"),
 }
 
 def get_available_architectures_from_grid():
@@ -259,7 +260,7 @@ def get_available_architectures_from_grid():
     cfg = load_grid_config()
     if cfg is not None and "architectures" in cfg and cfg.architectures:
         return list(cfg.architectures)
-    return ["light", "slim", "balanced", "peak"]
+    return ["lightmobile", "spatialattention", "channelattention", "deepchannelattention"]
 
 
 def get_trained_models_count():
@@ -557,7 +558,6 @@ def run_training():
 
     # ── Architectures ─────────────────────────────────────────────
     archs = get_available_architectures_from_grid()
-    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
     arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
     arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
                              show_desc=arch_desc)
@@ -676,7 +676,7 @@ def train_all_models_for_game():
 
     # ── Architecture ──────────────────────────────────────────────
     archs = get_available_architectures_from_grid()
-    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "spatialattention"), 0)
     arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
     arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
                              show_desc=arch_desc)
@@ -763,7 +763,7 @@ def train_complete_grid():
 
     # Architecture toggle
     archs = get_available_architectures_from_grid()
-    def_arch_idx = next((i for i, a in enumerate(archs) if a == "slim"), 0)
+    def_arch_idx = next((i for i, a in enumerate(archs) if a == "spatialattention"), 0)
     arch_desc = {a: f"{_ARCH_INFO[a][0]:<28}  {_ARCH_INFO[a][1]}" for a in archs if a in _ARCH_INFO}
     arch_sel = toggle_select("Architecture", archs, default_indices=[def_arch_idx], min_select=1,
                              show_desc=arch_desc)
@@ -870,7 +870,7 @@ def parse_model_metadata(model_path: Path):
     """
     folder = model_path.parent.name
     parts = folder.split("_")
-    _ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
+    _ARCH_TAGS = {"lightmobile", "spatialattention", "channelattention", "deepchannelattention", "mlp"}
     arch = None
     if len(parts) >= 2 and parts[-1].lower() in _ARCH_TAGS:
         arch = parts[-1].lower()
@@ -1127,7 +1127,7 @@ def watch_trained_agent():
 
     for folder in model_folders:
         parts = folder.name.split("_")
-        _ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
+        _ARCH_TAGS = {"lightmobile", "spatialattention", "channelattention", "deepchannelattention", "mlp"}
 
         if len(parts) >= 6 and parts[-1].lower() in _ARCH_TAGS:
             game, algo = parts[0], parts[1]
@@ -1744,7 +1744,7 @@ def watch_random_agent():
     if idx == len(available_games) + 1:
         return
     if not (1 <= idx <= len(available_games)):
-        print(_RED("  ✖  Invalid selection."))
+        print("Invalid selection.")
         return
 
     selected_game = available_games[idx - 1]

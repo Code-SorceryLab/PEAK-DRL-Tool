@@ -970,7 +970,14 @@ class PlatformerCore(gymnasium.Env):
         # Store next level index but do NOT advance self.world yet.
         # self.world must stay as the completed level until _info() is called
         # so the WIN event is logged against the correct level.
-        next_idx = (self.current_index_world + 1) % len(self.level_order)
+        #
+        # When locked_level is set (editor playtest), loop back to the same
+        # level instead of advancing — the player should restart the level
+        # they just completed, not be pushed into the next registered level.
+        if self.locked_level:
+            next_idx = self.current_index_world  # stay on the same level
+        else:
+            next_idx = (self.current_index_world + 1) % len(self.level_order)
         self._pending_next_level_index = next_idx
         self._needs_level_transition = True
 

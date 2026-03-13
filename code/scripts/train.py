@@ -113,7 +113,7 @@ class SEBlock(nn.Module):
     Learns a per-channel weight via global avg pool → FC → sigmoid.
     Adds only 2*(C^2 / reduction) parameters.
 
-    Used in PEAKExtractor's semantic branch to let the network suppress
+    Used in DeepChannelAttentionExtractor's semantic branch to let the network suppress
     the hazard channel when no enemies are on screen, amplify the
     collectible channel near coins, etc.
     """
@@ -133,9 +133,9 @@ class SEBlock(nn.Module):
 
 
 # =========================================================================
-# PEAKExtractor — primary multi-branch extractor (default)
+# DeepChannelAttentionExtractor — primary multi-branch extractor (default)
 # =========================================================================
-class PEAKExtractor(BaseFeaturesExtractor):
+class DeepChannelAttentionExtractor(BaseFeaturesExtractor):
     """
     Multi-branch feature extractor for the PEAK platformer environment.
 
@@ -335,11 +335,11 @@ class SpatialSelfAttention(nn.Module):
 
 
 # =========================================================================
-# SlimPEAKExtractor — middle ground (default for CPU+CUDA mixed setups)
+# SpatialAttentionExtractor — middle ground (default for CPU+CUDA mixed setups)
 # =========================================================================
-class SlimPEAKExtractor(BaseFeaturesExtractor):
+class SpatialAttentionExtractor(BaseFeaturesExtractor):
     """
-    Trimmed version of PEAKExtractor that keeps the architecturally
+    Trimmed version of DeepChannelAttentionExtractor that keeps the architecturally
     important channel split but eliminates the two biggest cost drivers:
 
       Removed:  SEBlock (global pool + 2× FC per forward pass)
@@ -527,11 +527,11 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
 
 
 # =========================================================================
-# BalancedPEAKExtractor — sweet spot (~230K params)
+# ChannelAttentionExtractor — sweet spot (~230K params)
 # =========================================================================
-class BalancedPEAKExtractor(BaseFeaturesExtractor):
+class ChannelAttentionExtractor(BaseFeaturesExtractor):
     """
-    Middle ground between SlimPEAK (77K) and full PEAK (922K).
+    Middle ground between SpatialAttention (77K) and full DeepChannelAttention (922K).
 
     Keeps what matters from PEAK:
       ✓ Channel split (semantic vs dijkstra)
@@ -650,9 +650,9 @@ class BalancedPEAKExtractor(BaseFeaturesExtractor):
 
 
 # =========================================================================
-# LightCombinedExtractor — fast sweep option (use_light_extractor: true)
+# LightMobileExtractor — fast sweep option (use_light_extractor: true)
 # =========================================================================
-class LightCombinedExtractor(BaseFeaturesExtractor):
+class LightMobileExtractor(BaseFeaturesExtractor):
     """
     Lightweight MobileNet-style extractor for fast hyperparameter sweeps.
     Enable with use_light_extractor: true in your algo yaml.
@@ -668,9 +668,9 @@ class LightCombinedExtractor(BaseFeaturesExtractor):
 
     NOTE: Does NOT split the Dijkstra channel — all 4 channels share the same
     conv stack (n_ch is read dynamically from the observation space).
-    Use SlimPEAKExtractor (default) or PEAKExtractor for full training runs
+    Use SpatialAttentionExtractor (default) or DeepChannelAttentionExtractor for full training runs
     where the Dijkstra channel split matters.
-    ~18K params in grids branch, 3-5× faster CPU inference than PEAKExtractor.
+    ~18K params in grids branch, 3-5× faster CPU inference than DeepChannelAttentionExtractor.
     """
 
     def __init__(self, observation_space: spaces.Dict):
@@ -826,12 +826,11 @@ def main(cfg: DictConfig):
     models_dir = repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    device = cfg.get("device", "cuda" if torch.cuda.is_available() else "cpu")
+    device = cfg.get("device", "cpu")
     if device == "cuda" and not torch.cuda.is_available():
-        print("[WARNING] CUDA requested but not available — falling back to CPU.")
+        print("[WARNING] CUDA not available, falling back to CPU.")
         device = "cpu"
-    print(f"[INFO] Training device: {device}"
-          + (f"  ({torch.cuda.get_device_name(0)})" if device == "cuda" else ""))
+    print(f"[INFO] Training device: {device}")
 
     tb_root   = str(cfg.get("tb_root", "runs"))
     eval_freq = int(cfg.get("eval_freq", 20_000))
@@ -918,25 +917,25 @@ def main(cfg: DictConfig):
             #   3. Default: slim
             #
             # Tags:
-            #   light    → LightCombinedExtractor   ~18K params   simple fast sweep
-            #   slim     → SlimPEAKExtractor         ~77K params   +Spatial Attention
-            #   balanced → BalancedPEAKExtractor     ~230K params  +SEBlock
-            #   peak     → PEAKExtractor             ~922K params  +SEBlock +deep CNN
+            #   lightmobile         → LightMobileExtractor   ~18K params   simple fast sweep
+            #   slim     → SpatialAttentionExtractor         ~77K params   +Spatial Attention
+            #   balanced → ChannelAttentionExtractor     ~230K params  +SEBlock
+            #   peak     → DeepChannelAttentionExtractor             ~922K params  +SEBlock +deep CNN
             arch_override = str(cfg.get("architecture", "") or "").strip().lower()
 
-            if arch_override == "light":
+            if arch_override == "lightmobile":
                 use_light = True
                 use_peak  = False
                 use_balanced = False
-            elif arch_override == "balanced":
+            elif arch_override == "channelattention":
                 use_light = False
                 use_peak  = False
                 use_balanced = True
-            elif arch_override == "peak":
+            elif arch_override == "deepchannelattention":
                 use_light = False
                 use_peak  = True
                 use_balanced = False
-            elif arch_override == "slim":
+            elif arch_override == "spatialattention":
                 use_light = False
                 use_peak  = False
                 use_balanced = False
@@ -947,24 +946,24 @@ def main(cfg: DictConfig):
                 use_balanced = False
 
             if use_light:
-                policy_kwargs["features_extractor_class"] = LightCombinedExtractor
-                extractor_tag = "light"
-                print("[INFO] Using LightCombinedExtractor (~18K params, fast sweep mode).")
+                policy_kwargs["features_extractor_class"] = LightMobileExtractor
+                extractor_tag = "lightmobile"
+                print("[INFO] Using LightMobileExtractor (~18K params, fast sweep mode).")
             elif use_balanced:
-                policy_kwargs["features_extractor_class"] = BalancedPEAKExtractor
+                policy_kwargs["features_extractor_class"] = ChannelAttentionExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 192})
-                extractor_tag = "balanced"
-                print("[INFO] Using BalancedPEAKExtractor (~230K params, SEBlock + jump CNN ch2-3).")
+                extractor_tag = "channelattention"
+                print("[INFO] Using ChannelAttentionExtractor (~230K params, SEBlock + jump CNN ch2-3).")
             elif use_peak:
-                policy_kwargs["features_extractor_class"] = PEAKExtractor
+                policy_kwargs["features_extractor_class"] = DeepChannelAttentionExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
-                extractor_tag = "peak"
-                print("[INFO] Using PEAKExtractor (~922K params, deep + jump CNN ch2-3).")
+                extractor_tag = "deepchannelattention"
+                print("[INFO] Using DeepChannelAttentionExtractor (~922K params, deep + jump CNN ch2-3).")
             else:
-                policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
+                policy_kwargs["features_extractor_class"] = SpatialAttentionExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
-                extractor_tag = "slim"
-                print("[INFO] Using SlimPEAKExtractor (~77K params, Spatial Attn + jump CNN ch2-3).")
+                extractor_tag = "spatialattention"
+                print("[INFO] Using SpatialAttentionExtractor (~77K params, Spatial Attn + jump CNN ch2-3).")
 
         if policy_kwargs and "activation_fn" in policy_kwargs:
             act_fn = policy_kwargs["activation_fn"]
