@@ -33,13 +33,6 @@ if args.game == "platformer":
 game_mod = importlib.import_module(f"code.games.{args.game}_core")
 GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
 
-# try:
-#     game_mod = importlib.import_module(f"code.games.{args.game}_core")
-#     GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
-# except ImportError:
-#     print(f"Error: Could not load game module 'code.games.{args.game}_core'.")
-#     exit(1)
-
 # --- Init pygame BEFORE key handling
 pygame.init()
 clock = pygame.time.Clock()
@@ -81,9 +74,7 @@ CONTROL_DESCRIPTIONS = {
 }
 
 controls = CONTROL_DESCRIPTIONS.get(args.game, "Use game-specific keys. ESC = quit")
-print(f"\n=== MANUAL PLAY: {args.game} ===")
-print(f"{controls}")
-print("=================================")
+
 
 # --- Validate level_file early
 TEMP_ID = '__editor_test__'
@@ -197,4 +188,3 @@ while running:
 
 env.close()
 pygame.quit()
-print("Game session ended.\n")

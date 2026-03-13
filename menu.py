@@ -1,5 +1,14 @@
-# menu.py — unified CLI for training, eval, TensorBoard, and manual play
+# menu.py — unified CLI for training, evaluation, TensorBoard, and manual play
 # Compatible with: Hydra overrides, TB logs under mylogs/, flat model files in models/
+#
+# Structure overview:
+#   1. Imports & constants          — packages, paths, required deps list
+#   2. Config helpers               — read grid.yaml, discover games/algos/personas
+#   3. UI helpers                   — ANSI palette, toggle_select, ask_index
+#   4. Training execution           — execute_training_run, print_training_summary
+#   5. Main actions                 — run_training, train_all, train_complete_grid,
+#                                     run_manual_play, watch_*, level editor, etc.
+#   6. Main menu loop               — DISPATCH table + main()
 
 # Imports
 import subprocess
@@ -124,8 +133,7 @@ HAS_MOVIEPY = MPY is not None
 
 def check_and_install_dependencies():
     """Check if required packages are installed and install missing ones"""
-    # check dependencies if missing install requirements
-    print("Checking dependencies...")
+    print(_DIM("  Checking dependencies..."))
 
     missing_packages = []
 
@@ -151,25 +159,25 @@ def check_and_install_dependencies():
                 missing_packages.append(package)
 
     if not missing_packages:
-        print("All dependencies are installed!")
+        print(_GRN("  ✓ All dependencies are installed!"))
         return True
 
-    print(f"Missing packages: {', '.join(missing_packages)}")
+    print(_YEL(f"  Missing packages: {', '.join(missing_packages)}"))
 
-    response = input("\nWould you like to install missing dependencies? [y/N]: ").strip().lower()
+    response = input(_BOLD("\n  ⟫ Install missing dependencies? [y/N]: ")).strip().lower()
     if response not in ('y', 'yes'):
-        print("Cannot proceed without required dependencies.")
+        print(_RED("  Cannot proceed without required dependencies."))
         return False
 
-    print("Installing missing packages...")
+    print(_DIM("  Installing missing packages..."))
     try:
         cmd = [sys.executable, '-m', 'pip', 'install'] + missing_packages
         subprocess.check_call(cmd)
-        print("Successfully installed all dependencies!")
+        print(_GRN("  ✓ Successfully installed all dependencies!"))
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Failed to install dependencies: {e}")
-        print("Please install manually using: pip install -r requirements.txt")
+        print(_RED(f"  ✖ Failed to install dependencies: {e}"))
+        print(_DIM("  Please install manually using: pip install -r requirements.txt"))
         return False
 
 def setup_project():
@@ -182,7 +190,8 @@ def setup_project():
         requirements_content = "\n".join(REQUIRED_PACKAGES) + "\n"
         requirements_path.write_text(requirements_content)
 
-# checking if grid yaml
+# Grid config is the single source of truth for which games, algos, and
+# personas are active. All get_available_* helpers call this first.
 def load_grid_config():
     """Load grid.yaml configuration"""
     if not GRID_CONFIG_PATH.exists():
@@ -194,12 +203,16 @@ def load_grid_config():
         return None
 
 def get_available_games():
-    """Get games from grid.yaml."""
+    """
+    Read the 'games' key from grid.yaml and return a sorted list of game names.
+    Falls back to an empty list with a warning if the key is absent or the
+    file cannot be parsed. Game names here must match code/games/*_core.py files.
+    """
     cfg = load_grid_config()
     if cfg is not None and 'games' in cfg and cfg.games:
         return sorted(list(cfg.games))
 
-    print("Warning: No 'games' section found or it is empty in grid.yaml.")
+    print(_YEL("  Warning: No 'games' section found or it is empty in grid.yaml."))
     return []
 
 def get_available_algos_from_grid():
@@ -225,7 +238,7 @@ def get_available_personas_from_grid():
     if cfg is not None and 'personas' in cfg and cfg.personas:
         return sorted(list(cfg.personas))
 
-    print("Warning: No 'personas' section found or it is empty in grid.yaml.")
+    print(_YEL("  Warning: No 'personas' section found or it is empty in grid.yaml."))
     return []
 
 def get_personas_for_game(game: str):
@@ -300,12 +313,17 @@ def open_browser(url):
                 os.system(f"open {url}")
         except Exception:
             pass
-    print(f"If your browser did not open automatically, go to: {url}")
+    print(_DIM(f"  If your browser did not open automatically, go to: {url}"))
 
 def ask_index(prompt, options, add_back=True, default=None):
-    """Print numbered options and return the selected item (or None if back)"""
+    """
+    Simple numbered-list prompt — used for linear (non-toggle) selections.
+    Prints the option list, reads an integer, and returns the chosen item.
+    Returns None if the user selects the auto-appended "Back" entry.
+    Supports an optional default value selected by pressing Enter.
+    """
     if not options:
-        print("No options available.")
+        print(_DIM("  No options available."))
         return None
 
     print(prompt)
@@ -336,7 +354,7 @@ def ask_index(prompt, options, add_back=True, default=None):
     except ValueError:
         pass
 
-    print("Invalid selection.")
+    print(_RED("  ✖  Invalid selection."))
     return None
 
 def ensure_current_algo():
@@ -350,7 +368,19 @@ def ensure_current_algo():
 
 def toggle_select(title, options, default_indices=None, min_select=1, show_desc=None):
     """
-    Interactive toggle-style multi-select.
+    Interactive toggle-style multi-select used throughout the training menus.
+
+    Renders a numbered checklist where each item can be toggled on/off.
+    Supports comma-separated input ("1,3") and ranges ("1-3") in one go.
+    Returns the confirmed list of selected items, or None if user typed "0" (back).
+
+    Parameters
+    ----------
+    title         : str         — section header shown above the list
+    options       : list[str]   — the items to display
+    default_indices: list[int]  — 0-based indices that start toggled ON
+    min_select    : int         — minimum items required before confirming
+    show_desc     : dict | None — {option: hint_string} for extra detail per row
     
     Type a number to flip that item on/off.  Press Enter to confirm.
     Returns a list of selected items, or None if the user backs out.
@@ -415,7 +445,14 @@ def toggle_select(title, options, default_indices=None, min_select=1, show_desc=
 # ============================================================================
 
 def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, architecture=None):
-    """Execute a single training run with error handling"""
+    """
+    Build and run a single Hydra training command via subprocess.
+
+    Constructs the `python -m code.scripts.train` invocation with the
+    appropriate +game, +model, +persona, +skill, tb_root, and optionally
+    +architecture overrides. Returns True on success, False on non-zero exit.
+    KeyboardInterrupt is re-raised so the caller's loop can catch and abort.
+    """
     cmd = [
         sys.executable, "-m", "code.scripts.train",
         f"+game={game}",
@@ -427,28 +464,29 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, ar
     if architecture:
         cmd.append(f"+architecture={architecture}")
 
-    print(">>> " + " ".join(cmd) + "\n")
+    print(_DIM("  >>> ") + _WHT(" ".join(cmd)) + "\n")
 
     # Runs the hydra CMD training script with specified parameters
     try:
         subprocess.run(cmd, check=True)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed: {game} | {algo} | {persona} | {skill} (exit code {e.returncode})")
+        print(_RED(f"  ✖ Failed: {game} | {algo} | {persona} | {skill} (exit {e.returncode})"))
         return False
     except KeyboardInterrupt:
         raise  # Re-raise to be caught by caller
 
 def print_training_summary(total, successful, failed):
     """Print final training summary with sound notification"""
-    print("\n" + "=" * 60)
-    print("TRAINING COMPLETE")
-    print("=" * 60)
-    print(f"✓ Successful: {successful}/{total}")
+    print()
+    print(_DIM("    ─" * 11))
+    print(f"    {_BOLD(_GRN('✓'))} {_BOLD('TRAINING COMPLETE')}")
+    print(_DIM("    ─" * 11))
+    print(f"    {_DIM('Successful:')}  {_GRN(f'{successful}/{total}')}")
     if failed > 0:
-        print(f"❌ Failed: {failed}/{total}")
-    print(f"Logs saved to: {DEFAULT_TB_ROOT}/")
-    print(f"Models saved to: {MODELS_DIR}/best/")
+        print(f"    {_DIM('Failed    :')}  {_RED(f'{failed}/{total}')}")
+    print(f"    {_DIM('Logs  →')}  {_WHT(DEFAULT_TB_ROOT + '/')}")
+    print(f"    {_DIM('Models→')}  {_WHT(str(MODELS_DIR) + '/best/')}")
 
     if HAS_WINSOUND and failed == 0:
         winsound.PlaySound("chime.wav", winsound.SND_FILENAME)
@@ -550,7 +588,7 @@ def run_training():
     print()
     confirm = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
-        print("  Aborted.")
+        print(_DIM("  Aborted."))
         return
 
     # ── Execute ───────────────────────────────────────────────────
@@ -660,7 +698,7 @@ def train_all_models_for_game():
     print(f"    {_DIM('─' * 50)}")
     confirm = input(_BOLD("\n    ⟫ Proceed? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
-        print("  Aborted.")
+        print(_DIM("  Aborted."))
         return
 
     # ── Execute ───────────────────────────────────────────────────
@@ -735,7 +773,7 @@ def train_complete_grid():
     total_runs *= len(arch_sel)
     confirm = input(_BOLD(f"\n    ⟫ Proceed with {total_runs} runs using [{', '.join(arch_sel)}]? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
-        print("  Aborted.")
+        print(_DIM("  Aborted."))
         return
 
     # Execute training grid
@@ -768,7 +806,7 @@ def train_complete_grid():
 # Currently NOT IN USE - needs adaptation
 def run_evaluation():
     """Evaluate all trained models for a selected game"""
-    print("\n===== Evaluation =====")
+    _section("EVALUATE  ›  Quick Eval")
 
     BEST_DIR = MODELS_DIR / "best"
     if not BEST_DIR.exists():
@@ -794,7 +832,8 @@ def run_evaluation():
         print(f"No best_model.zip folders found for game='{game}' in {BEST_DIR}")
         return
 
-    print(f"\nFound {len(model_dirs)} model(s) for '{game}'. Running quick eval (5 eps each)...\n")
+    _hint = _DIM("— 5 eps each")
+    print(f"    {_DIM(chr(8250))}  {_WHT(str(len(model_dirs)))} model(s) for {_GRN(game)}  {_hint}")
 
     for model_dir in model_dirs:
         model_zip = model_dir / "best_model.zip"
@@ -815,11 +854,20 @@ def run_evaluation():
         print(">>>", " ".join(cmd))
         subprocess.run(cmd)
 
-    print("\n✓ Evaluation completed for all best models.\n")
+    print(_GRN("    ✓ Evaluation complete."))
 
 
 def parse_model_metadata(model_path: Path):
-    """Parse game, algo, persona, skill, architecture from model folder name."""
+    """
+    Reverse-engineers metadata from a best_model folder name.
+
+    Folder names follow the convention:
+        {game}_{algo}_{persona}_{skill}_{arch}
+    e.g. "platformer_ppo_platformer_simple_novice_slim"
+
+    Returns a dict with keys: game, algo, persona, skill, arch.
+    Architecture tag is stripped from the end if it matches a known set.
+    """
     folder = model_path.parent.name
     parts = folder.split("_")
     _ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
@@ -960,7 +1008,7 @@ def record_agent_video(model_path: Path, episodes: int, fps: int = 30):
 
 def run_agent_analyzer():
     """Run the CSV log analyzer script"""
-    print("\n=== Agent Performance Analyzer ===")
+    _section("ANALYZE  ›  Agent Performance")
     script_path = Path("code/scripts/agent_analyzer.py")
 
     # Check if it exists in code/scripts or root
@@ -1066,7 +1114,7 @@ def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
 
 def watch_trained_agent():
     """Select a trained model, watch it play in a pygame window, optionally record that exact session."""
-    print("\n=== Watch Trained Agent Play ===")
+    _section("WATCH  ›  Trained Agent")
 
     model_folders = get_model_folders()
     if not model_folders:
@@ -1108,7 +1156,7 @@ def watch_trained_agent():
         model_idx = display_options.index(selected)
         model_path = paths[model_idx]
     except (ValueError, IndexError):
-        print("Invalid selection.")
+        print(_RED("  ✖  Invalid selection."))
         return
 
     # Infer metadata
@@ -1310,13 +1358,13 @@ def watch_trained_agent():
 
 def watch_all_models():
     """Launch the grid viewer to watch ALL trained models simultaneously."""
-    print("\n=== Watch All Models (Grid View) ===")
+    _section("WATCH  ›  All Models Grid")
 
     # Quick check for models
     from pathlib import Path as _P
     best_dir = _P("models/best")
     if not best_dir.exists():
-        print("No models/best/ directory found. Train some models first.")
+        print(_RED("  ✖  No models/best/ directory found.  Train some models first."))
         return
 
     folders = [f for f in best_dir.iterdir()
@@ -1356,7 +1404,7 @@ def watch_all_models():
 
 def run_tensorboard():
     """Launch TensorBoard with auto-open browser"""
-    print("\n=== TensorBoard (auto-open, blocking) ===")
+    _section("TENSORBOARD  ›  Launch")
     root = Path(DEFAULT_TB_ROOT)
     if not root.exists():
         print(f"No '{DEFAULT_TB_ROOT}/' folder found yet. Train first or change tb_root in train.")
@@ -1410,7 +1458,7 @@ def run_tensorboard():
 
 def delete_logs_and_models():
     """Permanently delete TensorBoard logs and all trained models"""
-    print("\n=== Delete TensorBoard Logs and Models ===")
+    _section("DANGER  ›  Delete Logs & Models")
     confirm = input(
         f"This will permanently delete '{DEFAULT_TB_ROOT}/' and '{MODELS_DIR}/'.\n"
         "Are you sure you want to continue? [y/N]: "
@@ -1447,49 +1495,145 @@ def delete_logs_and_models():
     print("\n🧹 All logs and models deleted successfully.\n")
 
 def run_manual_play():
-    """Manual gameplay interface"""
-    print("\n=== Manual Play Options ===")
+    """Manual gameplay interface — lets the user play any configured game with keyboard controls."""
+
+    # ── Panel width matches the main header (58 chars) ────────────────────────
+    W = 58
+
+    def _box_top():
+        print(_DIM("    ╔" + "═" * W + "╗"))
+
+    def _box_mid():
+        print(_DIM("    ╠" + "═" * W + "╣"))
+
+    def _box_bot():
+        print(_DIM("    ╚" + "═" * W + "╝"))
+
+    def _box_row(text="", color_fn=None):
+        """Print a single ║-bordered row, centered if no color_fn, left-padded otherwise."""
+        if color_fn:
+            # Left-aligned content with 2-space indent inside box
+            inner = f"  {text}"
+            pad   = W - len(inner)
+            print(_DIM("    ║") + color_fn(inner) + _DIM(" " * max(pad, 0) + "║"))
+        else:
+            # Centered plain-dim text
+            centered = text.center(W)
+            print(_DIM("    ║" + centered + "║"))
+
+    def _box_kv(key: str, val: str, key_w: int = 16):
+        """Print a key-value row inside the box."""
+        k_part  = _YEL(f"  {key:<{key_w}}")
+        v_part  = _WHT(val)
+        inner   = f"  {key:<{key_w}}{val}"   # plain for length calc
+        pad     = W - 2 - key_w - len(val)
+        print(_DIM("    ║") + k_part + v_part + _DIM(" " * max(pad, 0) + "║"))
+
+    def _box_key2(lbl1: str, key1: str, lbl2: str, key2: str):
+        """Print two F-key hints side-by-side on one box row."""
+        left  = f"  {_YEL(lbl1):<6}  {_DIM(key1)}"
+        right = f"  {_YEL(lbl2):<6}  {_DIM(key2)}"
+        # plain lengths for padding
+        left_len  = 2 + len(lbl1) + 2 + len(key1)
+        right_len = 2 + len(lbl2) + 2 + len(key2)
+        pad = W - left_len - right_len
+        print(_DIM("    ║") + left + " " * max(pad, 2) + right + _DIM("║"))
+
+    # ── Resolve available games ───────────────────────────────────────────────
+    clear_cli()
+    _print_header(
+        get_available_games(), get_available_algos_from_grid(),
+        get_trained_games_from_models_flat(), get_trained_models_count()
+    )
+    _section("MANUAL PLAY  ›  Select Game")
 
     available_games = get_available_games()
     if not available_games:
-        print("No game configurations found in grid.yaml or code/conf/game/")
+        print(_RED("  ✖  No game configurations found in grid.yaml"))
         return
 
-    print("Available games:")
+    # ── Themed game list ──────────────────────────────────────────────────────
+    print()
     for i, game in enumerate(available_games, 1):
-        print(f"  {i}. Play {game}")
-    print(f"  {len(available_games) + 1}. Back to main menu")
+        print(f"    {_YEL(f'[{i}]')}  {_WHT(game)}")
+    back_idx = len(available_games) + 1
+    print(f"    {_YEL(f'[{back_idx}]')}  {_DIM('Back')}")
+    print()
 
-    choice = input(f"Select game to play (1-{len(available_games) + 1}): ").strip()
+    raw = input(_BOLD("    ⟫ ")).strip()
     try:
-        idx = int(choice)
+        idx = int(raw)
     except ValueError:
-        print("Invalid selection.")
+        print(_RED("  ✖  Invalid selection."))
         return
 
-    if idx == len(available_games) + 1:
+    if idx == back_idx:
         return
     if not (1 <= idx <= len(available_games)):
-        print("Invalid selection.")
+        print(_RED("  ✖  Invalid selection."))
         return
 
     selected_game = available_games[idx - 1]
 
-    env = os.environ.copy()
+    # ── Strip dummy SDL driver so the real window opens ───────────────────────
+    proc_env = os.environ.copy()
+    proc_env.pop("SDL_VIDEODRIVER", None)
 
-    # Remove SDL_VIDEODRIVER to ensure proper window display
-    if "SDL_VIDEODRIVER" in env:
-        env.pop("SDL_VIDEODRIVER")
-
-    print(f"\n=== Playing {selected_game} manually ===")
-    print("Use game controls (e.g., spacebar for Flappy Bird). Press ESC to quit.")
-
+    # ── Verify the manual_play script exists before printing the banner ───────
     script_path = Path("code/scripts/manual_play.py")
     if not script_path.exists():
-        print("Manual play script not found at code/scripts/manual_play.py")
+        print(_RED("  ✖  Manual play script not found at code/scripts/manual_play.py"))
         return
 
-    subprocess.run([sys.executable, "-m", "code.scripts.manual_play", "--game", selected_game, "--fps", "30"], env=env)
+    # ── Pre-launch banner ─────────────────────────────────────────────────────
+    print()
+    _box_top()
+    _box_row()
+    _box_row("PEAK ENGINE  ·  MANUAL PLAY", color_fn=lambda t: _BOLD(_RED("    " + t.center(W - 4))))
+    _box_row(_WHT(f"  {selected_game.upper()}").center(W), color_fn=lambda t: _BOLD(_WHT("    " + selected_game.upper().center(W - 4))))
+    _box_row()
+    _box_mid()
+    # Controls section
+    _box_row("  CONTROLS", color_fn=_BOLD)
+    _box_row()
+    _box_kv("A / D",         "Move left / right")
+    _box_kv("SPACE",         "Jump")
+    _box_kv("SHIFT",         "Run")
+    _box_kv("ESC",           "Quit session")
+    _box_row()
+    _box_mid()
+    # Debug keys section
+    _box_row("  DEBUG OVERLAY  (F-keys)", color_fn=_BOLD)
+    _box_row()
+    _box_kv("F1",  "Sensor rays   (toggle)",    key_w=5)
+    _box_kv("F2",  "Free camera   (IJKL)",       key_w=5)
+    _box_kv("F3",  "Slow motion   (0.5×)",       key_w=5)
+    _box_kv("F4",  "Hitboxes      (toggle)",     key_w=5)
+    _box_kv("F5",  "Agent vision  (max view)",   key_w=5)
+    _box_row()
+    _box_bot()
+    print()
+
+    # ── Launch ────────────────────────────────────────────────────────────────
+    print(_DIM(f"    Launching {selected_game}..."))
+    print()
+
+    subprocess.run(
+        [sys.executable, "-m", "code.scripts.manual_play",
+         "--game", selected_game, "--fps", "30"],
+        env=proc_env
+    )
+
+    # ── Session-end banner ────────────────────────────────────────────────────
+    print()
+    _box_top()
+    _box_row()
+    _box_row("SESSION ENDED", color_fn=lambda t: _BOLD(_GRN("    " + t.center(W - 4))))
+    _box_row()
+    _box_row(_DIM("  Thanks for playing  ·  PEAK ENGINE"), color_fn=lambda t: _DIM("    " + "Thanks for playing  ·  PEAK ENGINE".center(W - 4)))
+    _box_row()
+    _box_bot()
+    print()
 
 
 def show_project_status():
@@ -1497,7 +1641,7 @@ def show_project_status():
     Display comprehensive project status
         - Shows how many models of each combination of games_algo_persona
     """
-    print("\n=== Project Status ===")
+    _section("STATUS  ›  Project Overview")
     games = get_available_games()
     algos = get_available_algos_from_grid()
     trained = get_trained_games_from_models_flat()
@@ -1572,13 +1716,13 @@ def show_project_status():
 #             CURRENT_ALGO = new_algo
 #             print(f"\n✓ Algorithm changed to: {CURRENT_ALGO}\n")
 #         else:
-#             print("Invalid selection.")
+#             print(_RED("  ✖  Invalid selection."))
 #     except ValueError:
-#         print("Invalid selection.")
+#         print(_RED("  ✖  Invalid selection."))
 
 def watch_random_agent():
     """Watch a random agent; optionally record the actual interactive session."""
-    print("\n=== Watch Random Agent Play ===")
+    _section("WATCH  ›  Random Agent")
 
     available_games = get_available_games()
     if not available_games:
@@ -1594,13 +1738,13 @@ def watch_random_agent():
     try:
         idx = int(choice)
     except ValueError:
-        print("Invalid selection.")
+        print(_RED("  ✖  Invalid selection."))
         return
 
     if idx == len(available_games) + 1:
         return
     if not (1 <= idx <= len(available_games)):
-        print("Invalid selection.")
+        print(_RED("  ✖  Invalid selection."))
         return
 
     selected_game = available_games[idx - 1]
@@ -1718,7 +1862,11 @@ def watch_random_agent():
         print(f"Saved GIF: {gif_path}\n")
 
 def clear_cli():
-    """Clear the terminal screen cross-platform."""
+    """
+    Clear the terminal screen using the platform-appropriate command.
+    'cls' on Windows, 'clear' on Unix/macOS. Called before every major
+    screen to keep the menu feeling like a full-screen TUI.
+    """
     os.system("cls" if sys.platform == "win32" else "clear")
 
 def _toggle_level_in_config(config_path, lid, enable):
@@ -1951,6 +2099,9 @@ def run_level_editor():
 # ============================================================================
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
+# All color/style output goes through these lambda wrappers.
+# When stdout is not a TTY (e.g., piped to a file), _SUPPORTS_COLOR is False
+# and all wrappers return plain text, keeping log files readable.
 _SUPPORTS_COLOR = (
     hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
     and os.environ.get("NO_COLOR") is None
@@ -1962,7 +2113,15 @@ def _c(code: str, text: str) -> str:
         return text
     return f"\033[{code}m{text}\033[0m"
 
-# Palette
+# Palette — each lambda wraps text in the matching ANSI escape sequence.
+# _DIM:  muted/secondary text (hints, dividers, labels)
+# _BOLD: emphasis (headers, prompts, important values)
+# _CYAN: accent color for section arrows and highlights
+# _MAG:  magenta — used for the sub-logo tagline
+# _YEL:  yellow  — menu key numbers and toggle brackets
+# _GRN:  green   — success states, trained counts, selected items
+# _RED:  red     — PEAK logo, errors, warnings, destructive actions
+# _WHT:  bright white — primary values and game names
 _DIM     = lambda t: _c("2",    t)
 _BOLD    = lambda t: _c("1",    t)
 _CYAN    = lambda t: _c("96",   t)
@@ -1986,7 +2145,13 @@ SUB_LOGO = "         E  N  G  I  N  E   By AL and Kevin"
 
 
 def _print_header(games, algos, trained_games, trained_models):
-    """Print the PEAK ENGINE banner + live stats bar."""
+    """
+    Render the top section of every PEAK ENGINE screen:
+      - ASCII art PEAK logo (red)
+      - Sub-logo tagline (magenta)
+      - Live stats bar: # games / algos available, # trained games / models
+    Called at the start of every action that clears the screen.
+    """
     W = 58
 
     print()
@@ -2010,13 +2175,17 @@ def _print_header(games, algos, trained_games, trained_models):
 
 
 def _menu_item(key: str, label: str, hint: str = "") -> str:
-    """Format a single menu row."""
+    """
+    Format a single menu row as:  [key]  Label  dim-hint
+    Key is right-aligned to 2 chars and yellow.  Hint is optional and dimmed.
+    """
     k = _YEL(f"  [{key:>2}]")
     h = _DIM(f"  {hint}") if hint else ""
     return f"{k}  {label}{h}"
 
 
 def _section(title: str):
+    """Print a cyan-accented section header — used to divide the menu into labelled groups."""
     print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}")
 
 
@@ -2029,6 +2198,9 @@ def main():
 
     global CURRENT_ALGO
 
+    # DISPATCH table maps menu key → (debug_label, callable).
+    # None as the callable means "handled inline" (currently only exit/0).
+    # Adding a new menu item: add the entry here AND a matching _menu_item() print below.
     DISPATCH = {
         "1":  ("show_project_status",  show_project_status),
         "2":  ("run_training",         run_training),

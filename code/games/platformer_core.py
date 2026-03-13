@@ -458,6 +458,8 @@ class PlatformerCore(gymnasium.Env):
         self.persona = str(kwargs.pop("persona", "simple")).lower()
         if self.persona == "default":
             self.persona = "simple"
+        # Architecture tag — passed from training config for debug overlay
+        self.arch_tag = str(kwargs.pop("arch_tag", "slim")).lower()
         # reward_fn is owned by generic_env (the wrapper), not the core game.
         # Kept as None here so the persona label is still accessible via self.persona.
         self.reward_fn = None

@@ -39,5 +39,8 @@ class Coin():
         self.animation = (self.animation + 1) % 60
 
     def render(self, surface:pygame.Surface, sx:float, sy:float, debug:bool = False):
-        pygame.draw.circle(surface, self.color, (int(sx), int(sy)), self.radius)
-        pygame.draw.circle(surface, MapP.COLOR_BLACK, (int(sx), int(sy)), self.radius, 2)
+        # Draw circle centred on the hitbox (gObj x/y is top-left of the 16×16 rect)
+        cx = int(sx) + self.radius
+        cy = int(sy) + self.radius
+        pygame.draw.circle(surface, self.color, (cx, cy), self.radius)
+        pygame.draw.circle(surface, MapP.COLOR_BLACK, (cx, cy), self.radius, 2)

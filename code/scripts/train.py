@@ -198,15 +198,18 @@ class PEAKExtractor(BaseFeaturesExtractor):
         grid_shape   = observation_space["grids"].shape    # (4, H, W)
         scalar_shape = observation_space["scalars"].shape  # (20,)
 
-        n_channels = grid_shape[0]    # 4
-        n_scalars  = scalar_shape[0]  # 20 — read dynamically, not hardcoded
-        H, W       = grid_shape[1], grid_shape[2]
+        n_scalars = scalar_shape[0]  # 20 — read dynamically, not hardcoded
+        H, W      = grid_shape[1], grid_shape[2]
 
-        n_semantic = n_channels - 1   # 3 (all except Dijkstra)
+        # Channel split:
+        #   ch 0-1 → Semantic (Solids + Collectibles)  — navigation
+        #   ch 2-3 → Jump     (Hazards + Dijkstra)     — timing + path
+        N_SEM = 2   # ch 0-1
+        N_JMP = 2   # ch 2-3
 
-        # ── Branch A: Semantic CNN (channels 0 to n_semantic-1) ─────────────
+        # ── Branch A: Semantic CNN (ch 0-1, navigation) ─────────────────────
         self.semantic_cnn = nn.Sequential(
-            nn.Conv2d(n_semantic, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(N_SEM, 32, kernel_size=3, stride=1, padding=1),
             nn.GroupNorm(8, 32),
             nn.ReLU(),
             SEBlock(32, reduction=4),
@@ -220,7 +223,7 @@ class PEAKExtractor(BaseFeaturesExtractor):
             nn.Flatten()                    # 64×4×4 = 1024
         )
         with torch.no_grad():
-            sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
+            sem_flat = self.semantic_cnn(torch.zeros(1, N_SEM, H, W)).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 256),
@@ -228,27 +231,26 @@ class PEAKExtractor(BaseFeaturesExtractor):
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (last channel only) ───────────────────────
-        # Staged reduction: 21×21 → 7×7 → 3×3
-        # AvgPool2d(3) at first reduction preserves the smooth gradient slope.
-        # MaxPool would select peak values per patch, dilating the path signal
-        # and destroying the directional continuity the second conv needs to read.
-        self.dijkstra_cnn = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 8),             # 8 ch / 4 groups = 2 ch per group
+        # ── Branch B: Jump CNN (ch 2-3, Hazards + Dijkstra) ─────────────────
+        # Asymmetric kernels encode jump-timing geometry:
+        #   5×1 vertical  — spans full jump height, fires on hazard columns
+        #   1×5 horizontal — sweeps timing window (safe landing strips)
+        # AvgPool(3) on Dijkstra preserves smooth gradient slope.
+        self.jump_cnn = nn.Sequential(
+            nn.Conv2d(N_JMP, 16, kernel_size=(5, 1), stride=1, padding=(2, 0)),  # vertical scan
+            nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.AvgPool2d(3),                # 21×21 → 7×7 (smooth, gradient-preserving)
-            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 16),            # 16 ch / 4 groups = 4 ch per group
+            nn.Conv2d(16, 16, kernel_size=(1, 5), stride=1, padding=(0, 2)),     # horizontal timing
+            nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),   # 7×7 → 3×3 (final compact summary)
-            nn.Flatten()                    # 16×3×3 = 144
+            nn.AdaptiveAvgPool2d((4, 4)),
+            nn.Flatten()
         )
         with torch.no_grad():
-            dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
+            jmp_flat = self.jump_cnn(torch.zeros(1, N_JMP, H, W)).shape[1]
 
-        self.dijkstra_fc = nn.Sequential(
-            nn.Linear(dij_flat, 64),
+        self.jump_fc = nn.Sequential(
+            nn.Linear(jmp_flat, 64),
             nn.LayerNorm(64),
             nn.ReLU()
         )
@@ -276,12 +278,13 @@ class PEAKExtractor(BaseFeaturesExtractor):
         grids   = observations["grids"]    # (B, 4, H, W)
         scalars = observations["scalars"]  # (B, 20)
 
-        # ch 0-2: semantic channels  |  ch 3: Dijkstra continuous
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))   # (B, 256)
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))   # (B,  64)
+        # ch 0-1: navigation (solids + collectibles)
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :2, :, :]))    # (B, 256)
+        # ch 2-3: jump timing (hazards + dijkstra) — asymmetric kernels
+        jmp  = self.jump_fc(self.jump_cnn(grids[:, 2:, :, :]))            # (B,  64)
         scal = self.scalar_mlp(scalars)                                    # (B,  64)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))             # (B, 256)
+        return self.fusion(torch.cat([sem, jmp, scal], dim=1))             # (B, 256)
 
 
 # =========================================================================
@@ -425,16 +428,18 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         grid_shape   = observation_space["grids"].shape    # (4, H, W)
         scalar_shape = observation_space["scalars"].shape  # (20,)
 
-        n_channels = grid_shape[0]    # 4
-        n_scalars  = scalar_shape[0]  # 20 — read dynamically, not hardcoded
-        H, W       = grid_shape[1], grid_shape[2]  # 21, 21
+        n_scalars = scalar_shape[0]  # 20 — read dynamically, not hardcoded
+        H, W      = grid_shape[1], grid_shape[2]  # 21, 21
 
-        # Number of semantic channels = all except the last (Dijkstra)
-        n_semantic = n_channels - 1   # 3
+        # Channel split:
+        #   ch 0-1 → Semantic (Solids + Collectibles) — navigation
+        #   ch 2-3 → Jump     (Hazards + Dijkstra)    — timing + path
+        N_SEM = 2
+        N_JMP = 2
 
-        # ── Branch A: Semantic CNN + Spatial Attention ───────────────────────
+        # ── Branch A: Semantic CNN + Spatial Attention (ch 0-1) ─────────────
         self.sem_conv1 = nn.Sequential(
-            nn.Conv2d(n_semantic, 16, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(N_SEM, 16, kernel_size=3, stride=1, padding=1),
             nn.GroupNorm(4, 16),
             nn.ReLU(),
             nn.MaxPool2d(2),          # 21×21 → 10×10
@@ -452,7 +457,7 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         )
 
         with torch.no_grad():
-            _x       = torch.zeros(1, n_semantic, H, W)
+            _x       = torch.zeros(1, N_SEM, H, W)
             _x       = self.sem_conv1(_x)
             _x       = self.sem_attn(_x)
             sem_flat = self.sem_conv2(_x).shape[1]
@@ -463,29 +468,27 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN (last channel only) ───────────────────────
-        # Staged reduction: 21×21 → 7×7 → 3×3
-        # First reduction uses AvgPool2d to preserve the smooth gradient slope.
-        # Two conv layers ensure the network can learn directional patterns
-        # ("gradient flows toward the goal") before the final spatial collapse.
-        self.dijkstra_cnn = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 8),             # 8 ch / 4 groups = 2 ch per group
+        # ── Branch B: Jump CNN (ch 2-3, Hazards + Dijkstra) ─────────────────
+        # Asymmetric kernels:
+        #   5×1 vertical  — spans full jump height, detects hazard columns
+        #   1×5 horizontal — sweeps timing window for safe landings
+        self.jump_cnn = nn.Sequential(
+            nn.Conv2d(N_JMP, 8, kernel_size=(5, 1), stride=1, padding=(2, 0)),
+            nn.GroupNorm(4, 8),
             nn.ReLU(),
-            nn.AvgPool2d(3),                # 21×21 → 7×7  (smooth, preserves gradient)
-            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
-            nn.GroupNorm(4, 16),            # 16 ch / 4 groups = 4 ch per group
+            nn.Conv2d(8, 16, kernel_size=(1, 5), stride=1, padding=(0, 2)),
+            nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((3, 3)),   # 7×7 → 3×3  (final compact summary)
-            nn.Flatten()                    # 16×3×3 = 144
+            nn.AdaptiveAvgPool2d((3, 3)),
+            nn.Flatten()
         )
 
         with torch.no_grad():
-            dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
+            jmp_flat = self.jump_cnn(torch.zeros(1, N_JMP, H, W)).shape[1]
 
-        self.dijkstra_fc = nn.Sequential(
-            nn.Linear(dij_flat, 32),
-            nn.LayerNorm(32),               # keeps Dijkstra features on same scale as Branch A+C
+        self.jump_fc = nn.Sequential(
+            nn.Linear(jmp_flat, 32),
+            nn.LayerNorm(32),
             nn.ReLU()
         )
 
@@ -509,18 +512,18 @@ class SlimPEAKExtractor(BaseFeaturesExtractor):
         grids   = observations["grids"]    # (B, 4, H, W)
         scalars = observations["scalars"]  # (B, 20)
 
-        # Branch A: conv1 → attention → conv2 → fc
-        x   = self.sem_conv1(grids[:, :-1, :, :])   # (B, 16, 10, 10)
+        # Branch A: ch 0-1 (navigation) — conv1 → attention → conv2 → fc
+        x   = self.sem_conv1(grids[:, :2, :, :])    # (B, 16, 10, 10)
         x   = self.sem_attn(x)                       # (B, 16, 10, 10)
         sem = self.semantic_fc(self.sem_conv2(x))    # (B, 128)
 
-        # Branch B: Dijkstra — staged AvgPool reduction
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))   # (B, 32)
+        # Branch B: ch 2-3 (jump timing) — asymmetric 5×1 → 1×5 kernels
+        jmp  = self.jump_fc(self.jump_cnn(grids[:, 2:, :, :]))    # (B, 32)
 
         # Branch C: scalars
-        scal = self.scalar_mlp(scalars)                                    # (B, 64)
+        scal = self.scalar_mlp(scalars)                            # (B, 64)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))             # (B, 128)
+        return self.fusion(torch.cat([sem, jmp, scal], dim=1))     # (B, 128)
 
 
 # =========================================================================
@@ -567,14 +570,16 @@ class BalancedPEAKExtractor(BaseFeaturesExtractor):
         grid_shape   = observation_space["grids"].shape
         scalar_shape = observation_space["scalars"].shape
 
-        n_channels = grid_shape[0]
-        n_scalars  = scalar_shape[0]
-        H, W       = grid_shape[1], grid_shape[2]
-        n_semantic = n_channels - 1
+        n_scalars = scalar_shape[0]
+        H, W      = grid_shape[1], grid_shape[2]
 
-        # ── Branch A: Semantic CNN ────────────────────────────────────────
+        # Channel split: ch 0-1 navigation | ch 2-3 jump timing
+        N_SEM = 2
+        N_JMP = 2
+
+        # ── Branch A: Semantic CNN (ch 0-1) + SEBlock ────────────────────
         self.semantic_cnn = nn.Sequential(
-            nn.Conv2d(n_semantic, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(N_SEM, 32, kernel_size=3, stride=1, padding=1),
             nn.GroupNorm(8, 32),
             nn.ReLU(),
             SEBlock(32, reduction=4),          # channel attention — cheap, impactful
@@ -585,7 +590,7 @@ class BalancedPEAKExtractor(BaseFeaturesExtractor):
             nn.Flatten()                       # 48×4×4 = 768
         )
         with torch.no_grad():
-            sem_flat = self.semantic_cnn(torch.zeros(1, n_semantic, H, W)).shape[1]
+            sem_flat = self.semantic_cnn(torch.zeros(1, N_SEM, H, W)).shape[1]
 
         self.semantic_fc = nn.Sequential(
             nn.Linear(sem_flat, 192),
@@ -593,22 +598,23 @@ class BalancedPEAKExtractor(BaseFeaturesExtractor):
             nn.ReLU()
         )
 
-        # ── Branch B: Dijkstra CNN ────────────────────────────────────────
-        self.dijkstra_cnn = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+        # ── Branch B: Jump CNN (ch 2-3, Hazards + Dijkstra) ──────────────
+        # Asymmetric kernels: 5×1 vertical hazard scan → 1×5 horizontal timing
+        self.jump_cnn = nn.Sequential(
+            nn.Conv2d(N_JMP, 16, kernel_size=(5, 1), stride=1, padding=(2, 0)),
             nn.GroupNorm(4, 16),
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(16, 32, kernel_size=(1, 5), stride=1, padding=(0, 2)),
             nn.GroupNorm(8, 32),
             nn.ReLU(),
             nn.AdaptiveAvgPool2d((3, 3)),
             nn.Flatten()
         )
         with torch.no_grad():
-            dij_flat = self.dijkstra_cnn(torch.zeros(1, 1, H, W)).shape[1]
+            jmp_flat = self.jump_cnn(torch.zeros(1, N_JMP, H, W)).shape[1]
 
-        self.dijkstra_fc = nn.Sequential(
-            nn.Linear(dij_flat, 48),
+        self.jump_fc = nn.Sequential(
+            nn.Linear(jmp_flat, 48),
             nn.LayerNorm(48),
             nn.ReLU()
         )
@@ -636,11 +642,11 @@ class BalancedPEAKExtractor(BaseFeaturesExtractor):
         grids   = observations["grids"]
         scalars = observations["scalars"]
 
-        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :-1, :, :]))
-        dij  = self.dijkstra_fc(self.dijkstra_cnn(grids[:, -1:, :, :]))
+        sem  = self.semantic_fc(self.semantic_cnn(grids[:, :2, :, :]))    # ch 0-1
+        jmp  = self.jump_fc(self.jump_cnn(grids[:, 2:, :, :]))            # ch 2-3
         scal = self.scalar_mlp(scalars)
 
-        return self.fusion(torch.cat([sem, dij, scal], dim=1))
+        return self.fusion(torch.cat([sem, jmp, scal], dim=1))
 
 
 # =========================================================================
@@ -820,11 +826,12 @@ def main(cfg: DictConfig):
     models_dir = repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    device = cfg.get("device", "cpu")
+    device = cfg.get("device", "cuda" if torch.cuda.is_available() else "cpu")
     if device == "cuda" and not torch.cuda.is_available():
-        print("[WARNING] CUDA not available, falling back to CPU.")
+        print("[WARNING] CUDA requested but not available — falling back to CPU.")
         device = "cpu"
-    print(f"[INFO] Training device: {device}")
+    print(f"[INFO] Training device: {device}"
+          + (f"  ({torch.cuda.get_device_name(0)})" if device == "cuda" else ""))
 
     tb_root   = str(cfg.get("tb_root", "runs"))
     eval_freq = int(cfg.get("eval_freq", 20_000))
@@ -902,16 +909,19 @@ def main(cfg: DictConfig):
                 policy_kwargs = {}
 
             # ── Architecture selection ────────────────────────────────────────
-            # Priority order:
+            # ALL architectures use asymmetric jump kernels (5×1 → 1×5) on
+            # ch 2-3 (Hazards + Dijkstra). The tag selects capacity level only.
+            #
+            # Priority:
             #   1. +architecture=<tag>  CLI/menu override
             #   2. use_light_extractor / use_full_peak flags in the algo YAML
-            #   3. Hardcoded default: slim
+            #   3. Default: slim
             #
-            # Architectures:
-            #   light    → LightCombinedExtractor   ~18K params   no channel split, fast
-            #   slim     → SlimPEAKExtractor         ~77K params   channel split, no SEBlock
-            #   balanced → BalancedPEAKExtractor     ~230K params  channel split + SEBlock
-            #   peak     → PEAKExtractor             ~922K params  full deep architecture
+            # Tags:
+            #   light    → LightCombinedExtractor   ~18K params   simple fast sweep
+            #   slim     → SlimPEAKExtractor         ~77K params   +Spatial Attention
+            #   balanced → BalancedPEAKExtractor     ~230K params  +SEBlock
+            #   peak     → PEAKExtractor             ~922K params  +SEBlock +deep CNN
             arch_override = str(cfg.get("architecture", "") or "").strip().lower()
 
             if arch_override == "light":
@@ -944,17 +954,17 @@ def main(cfg: DictConfig):
                 policy_kwargs["features_extractor_class"] = BalancedPEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 192})
                 extractor_tag = "balanced"
-                print("[INFO] Using BalancedPEAKExtractor (~230K params, SEBlock + channel split).")
+                print("[INFO] Using BalancedPEAKExtractor (~230K params, SEBlock + jump CNN ch2-3).")
             elif use_peak:
                 policy_kwargs["features_extractor_class"] = PEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 256})
                 extractor_tag = "peak"
-                print("[INFO] Using PEAKExtractor (~922K params, full architecture).")
+                print("[INFO] Using PEAKExtractor (~922K params, deep + jump CNN ch2-3).")
             else:
                 policy_kwargs["features_extractor_class"] = SlimPEAKExtractor
                 policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": 128})
                 extractor_tag = "slim"
-                print("[INFO] Using SlimPEAKExtractor (~77K params, channel split, no SEBlock).")
+                print("[INFO] Using SlimPEAKExtractor (~77K params, Spatial Attn + jump CNN ch2-3).")
 
         if policy_kwargs and "activation_fn" in policy_kwargs:
             act_fn = policy_kwargs["activation_fn"]
@@ -970,7 +980,8 @@ def main(cfg: DictConfig):
 
         for persona in selected_personas:
             env_kwargs = base_env_kwargs.copy()
-            env_kwargs['persona'] = persona
+            env_kwargs['persona']  = persona
+            env_kwargs['arch_tag'] = extractor_tag   # for debug overlay display
 
             active_reward_fn = None
             if hasattr(reward_module, persona):

@@ -36,17 +36,18 @@ def _av_card_h(core):
 _INFO_LINE_H  = 15
 _INFO_LINES   = 5
 _VEC_LINE_H   = 12
-_N_OBS        = 16     # 5 player + 11 tracking
+_N_OBS        = 20     # 13 player + 7 tracking (full scalar vector)
 
 def _lower_y(core):
     return _AV_Y + _av_card_h(core) + _GAP
 
 def _lower_h():
     info_h = _HDR_H + _INFO_LINES * _INFO_LINE_H + _PAD
+    # obs panel: enough rows for all 20 scalars split across two columns
     vec_h  = _HDR_H + ((_N_OBS + 1) // 2) * _VEC_LINE_H + _PAD
     return max(info_h, vec_h)
 
-# ── Reward strip ──────────────────────────────────────────────────────────────
+# ── Reward strip — sits directly below lower panels (no arch strip) ───────────
 def _reward_y(core):
     return _lower_y(core) + _lower_h() + _GAP
 
@@ -323,6 +324,7 @@ class AgentViewOverlay(DebugOverlay):
                 pygame.draw.rect(surface, col,  (dx, dy, cw - 1, ch - 1))
                 pygame.draw.rect(surface, bcol, (dx, dy, cw - 1, ch - 1), 1)
 
+                # Dijkstra tint only — no numbers in compact view (12px cells unreadable)
                 if (cost_cache is not None and
                         0 <= r < cost_cache.shape[0] and 0 <= c < cost_cache.shape[1]):
                     val = float(cost_cache[r, c]) * 10
@@ -331,8 +333,6 @@ class AgentViewOverlay(DebugOverlay):
                         tint = pygame.Surface((cw - 1, ch - 1), pygame.SRCALPHA)
                         tint.fill((0, 200, 80, intensity) if val > 0 else (255, 60, 30, intensity))
                         surface.blit(tint, (dx, dy))
-                        ns = tiny.render(str(int(val * 10)), True, (200, 200, 200))
-                        surface.blit(ns, (dx + (cw - 1 - ns.get_width()) // 2, dy + 1))
 
     # ── Max-View overlay ──────────────────────────────────────────────────────
     def _render_max(self, surface, core):
@@ -612,6 +612,33 @@ class InfoPanelOverlay(DebugOverlay):
 
 
 class ObsValuesOverlay(DebugOverlay):
+    # Scalar labels — must match the exact layout produced by _player_obs (13)
+    # followed by _tracking_obs (7) = 20 total scalars.
+    _P_LABELS = [
+        "Px",        # [0]  x pos (tiles)
+        "Py",        # [1]  y pos (tiles)
+        "Vx",        # [2]  vel x (norm)
+        "Vy",        # [3]  vel y (norm)
+        "Grnd",      # [4]  on_ground
+        "PwrUp",     # [5]  powered_up
+        "Fire",      # [6]  can_fire
+        "Invinc",    # [7]  invincible
+        "FaceR",     # [8]  facing_right
+        "FirCD",     # [9]  fire_cooldown
+        "InvTmr",    # [10] invincible_timer
+        "Coyote",    # [11] coyote_active
+        "JmpExt",    # [12] jump_extendable
+    ]
+    _T_LABELS = [
+        "EnmDst",    # [0]  enemy distance (norm)
+        "GoalDst",   # [1]  goal distance (norm)
+        "Timer",     # [2]  time remaining (norm)
+        "GoalΔY",    # [3]  goal delta-Y (norm)
+        "Dijkstra",  # [4]  dijkstra dist (norm)
+        "StepX",     # [5]  best step direction X
+        "StepY",     # [6]  best step direction Y
+    ]
+
     def render(self, surface, core):
         try:
             p_vals = core._player_obs()
@@ -619,13 +646,8 @@ class ObsValuesOverlay(DebugOverlay):
         except Exception:
             return
 
-        p_labels = ["Px", "Py", "Vx", "Vy", "Grnd"]
-        t_labels = ["EnmDst", "CoinDst", "GoalDst",
-                    "#Enm", "#Coin", "Score",
-                    "Time", "Lives", "DirX", "GoalY", "Dijkstra"]
-        if len(t_vals) > len(t_labels):
-            t_labels.extend([f"V{i}" for i in range(len(t_labels), len(t_vals))])
-        data = list(zip(p_labels, p_vals)) + list(zip(t_labels, t_vals))
+        data = (list(zip(self._P_LABELS, p_vals)) +
+                list(zip(self._T_LABELS, t_vals)))
 
         panel_w_total = core.TOTAL_WIDTH - core.DEBUG_PANEL_X - _PAD * 2
         half_w = panel_w_total // 2 - 2
@@ -643,10 +665,14 @@ class ObsValuesOverlay(DebugOverlay):
         for label, val in data:
             if cy + _VEC_LINE_H > py + ph - 2:
                 break
-            if "Dst" in label and 0 < val < 0.15:
-                vc = _C_NEG
-            elif "Grnd" in label and val > 0.5:
-                vc = _C_ACT
+
+            # Colour-code by semantic meaning
+            if label in ("GoalDst", "EnmDst") and 0 < val < 0.15:
+                vc = _C_NEG   # danger-close
+            elif label in ("Grnd", "Coyote", "JmpExt") and val > 0.5:
+                vc = _C_ACT   # active ground/jump state
+            elif label in ("PwrUp", "Fire", "Invinc") and val > 0.5:
+                vc = (255, 195, 60)  # power state — gold
             elif val > 0:
                 vc = _C_VAL
             else:
@@ -657,3 +683,177 @@ class ObsValuesOverlay(DebugOverlay):
             surface.blit(ls, (px + 5, cy))
             surface.blit(vs, (rx - vs.get_width(), cy))
             cy += _VEC_LINE_H
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ArchOverlay — compact pill strip showing the active feature extractor
+# Sits between Player Info / Obs Values and the Reward Trace card.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ARCH_PILLS = {
+    # tag  → list of (pill_color_rgb, short_label, detail_text)
+    "light":    [
+        ((55,  120, 190), "Grids CNN",    "Conv×2+DW"),
+        ((80,  160,  90), "Scalars",      "Lin(20→64)"),
+    ],
+    "slim":     [
+        ((55,  120, 190), "Semantic CNN", "Ch0-1 +Attn"),
+        ((160,  90, 200), "Jump CNN",     "Ch2-3 5×1→1×5"),
+        ((80,  160,  90), "Scalars",      "Lin(20→64)"),
+    ],
+    "balanced": [
+        ((55,  120, 190), "Semantic CNN", "Ch0-1 SE+Conv×2"),
+        ((160,  90, 200), "Jump CNN",     "Ch2-3 5×1→1×5"),
+        ((80,  160,  90), "Scalars",      "Lin(20→64)×2"),
+    ],
+    "peak":     [
+        ((55,  120, 190), "Semantic CNN", "Ch0-1 SE+Conv×3"),
+        ((160,  90, 200), "Jump CNN",     "Ch2-3 5×1→1×5"),
+        ((80,  160,  90), "Scalars",      "Lin(20→64)×2"),
+    ],
+}
+
+_ARCH_META = {
+    "light":    ("~18K",   192),
+    "slim":     ("~77K",   128),
+    "balanced": ("~230K",  192),
+    "peak":     ("~922K",  256),
+}
+
+
+class ArchOverlay(DebugOverlay):
+    """
+    Architecture overlay — disabled.  The ARCH strip has been removed from the
+    debug panel to give more vertical space to the Reward Trace sparkline.
+    The class is kept so existing import statements don't break.
+    """
+    def render(self, surface, core):
+        pass  # intentionally empty — arch info removed from debug panel
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JumpArcOverlay — draw a predicted jump trajectory on the GAME viewport
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class JumpArcOverlay(DebugOverlay):
+    """
+    Simulates the agent's jump arc from its current world position and draws
+    a dotted parabola on the game viewport.
+
+    Physics model (mirrors PhysicsManager):
+      - initial vy = -jump_force  (upward, so negative)
+      - each frame: vy += gravity * dt  then  y += vy * dt
+      - arc is clipped when y > player_y (landed) or off screen, max 120 frames
+
+    Coordinate conversion:
+      screen_x = world_x - cam_x
+      screen_y = world_y - cam_y
+    """
+
+    _COLOR_GROUND = ( 80, 220,  80)   # green — arc when on ground (preview)
+    _COLOR_AIR    = ( 80, 190, 255)   # blue  — arc when airborne (actual)
+    _DOT_GAP      = 5                 # pixels between dots
+
+    def render(self, surface, core):
+        if not core.player:
+            return
+
+        p = core.player
+
+        # ── Gather physics constants ──────────────────────────────────────────
+        # Try to read from the physics manager or fall back to common defaults
+        phys = getattr(core, 'physics_manager', None)
+        if phys is not None:
+            gravity    = float(getattr(phys, 'gravity',    1800.0))
+            jump_force = float(getattr(phys, 'jump_force',  620.0))
+        else:
+            gravity    = float(getattr(core, 'gravity',    1800.0))
+            jump_force = float(getattr(core, 'jump_force',  620.0))
+
+        # ── Player state ──────────────────────────────────────────────────────
+        wx  = float(p.gObj.x)
+        wy  = float(p.gObj.y)
+        vx  = float(getattr(p, 'vx', 0.0))
+        vy  = float(getattr(p, 'vy', 0.0))
+
+        grounded  = getattr(p, 'grounded', True)
+        can_jump  = getattr(p, 'can_jump', True)
+
+        # If on the ground, preview a jump with the current vx (or a default vx)
+        # If airborne, show the actual trajectory from current vy
+        if grounded and can_jump:
+            arc_vy = -jump_force
+            arc_vx = vx if abs(vx) > 10 else 200.0  # assume moving right if idle
+            col = self._COLOR_GROUND
+        elif not grounded:
+            arc_vy = vy
+            arc_vx = vx
+            col = self._COLOR_AIR
+        else:
+            return   # grounded but can't jump — nothing to show
+
+        # ── Camera offset ─────────────────────────────────────────────────────
+        cam_x = float(getattr(core, 'camera_x', 0.0))
+        cam_y = float(getattr(core, 'camera_y', 0.0))
+        sw    = core.WIDTH    # game viewport width (not total width)
+        sh    = core.HEIGHT
+
+        # ── Simulate arc ──────────────────────────────────────────────────────
+        dt         = 1.0 / 60.0
+        sim_x, sim_y = wx, wy
+        sim_vy     = arc_vy
+        sim_vx     = arc_vx
+        start_y    = wy
+
+        points = []
+        for _ in range(150):          # max ~2.5 s of flight
+            sim_x  += sim_vx * dt
+            sim_vy += gravity * dt
+            sim_y  += sim_vy * dt
+
+            sx = int(sim_x - cam_x)
+            sy = int(sim_y - cam_y)
+
+            # Stop if the arc lands back at or below the launch y (parabola peak done)
+            if sim_y > start_y + 4 and sim_vy > 0:
+                points.append((sx, sy))
+                break
+
+            # Stop if out of game viewport (x)
+            if sx < -20 or sx > sw + 20:
+                break
+
+            points.append((sx, sy))
+
+        # ── Draw dotted arc ───────────────────────────────────────────────────
+        if len(points) < 2:
+            return
+
+        # Accumulate distance to space dots evenly
+        accumulated = 0.0
+        dot_on = True
+        prev = points[0]
+
+        for pt in points[1:]:
+            dx = pt[0] - prev[0]
+            dy = pt[1] - prev[1]
+            seg_len = (dx * dx + dy * dy) ** 0.5
+            accumulated += seg_len
+
+            if accumulated >= self._DOT_GAP:
+                accumulated = 0.0
+                dot_on = not dot_on
+                if 0 <= pt[0] < sw and 0 <= pt[1] < sh:
+                    if dot_on:
+                        pygame.draw.circle(surface, col, pt, 2)
+                    else:
+                        # Dimmer gap dot
+                        gap_col = tuple(max(0, c - 80) for c in col)
+                        pygame.draw.circle(surface, gap_col, pt, 1)
+
+            prev = pt
+
+        # Landing dot (slightly larger)
+        lp = points[-1]
+        if 0 <= lp[0] < sw and 0 <= lp[1] < sh:
+            pygame.draw.circle(surface, col, lp, 4)
+            pygame.draw.circle(surface, (255, 255, 255), lp, 4, 1)
