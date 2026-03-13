@@ -70,7 +70,7 @@ class PowerState(Enum):
 # ── Constants ────────────────────────────────────────────────────────────────
 
 STAR_DURATION : float = 10.0   # seconds star power lasts
-HIT_IFRAMES   : float = 2.0    # seconds of i-frames after surviving a hit
+HIT_IFRAMES   : float = 5.0    # seconds of i-frames after surviving a hit
 SMALL_HEIGHT  : int   = 32     # px — player height in SMALL state
 BIG_HEIGHT    : int   = 42     # px — player height in BIG / FIRE state
 
@@ -195,6 +195,8 @@ class PlayerStateMachine:
         bool
             True if the player survived, False if they died.
         """
+        if self.is_invincible:
+            return True
         # 1. Star absorbs all damage
         if self._star_timer > 0.0:
             return True
@@ -257,18 +259,19 @@ class PlayerStateMachine:
         player.iframes_timer = self._iframes_timer
         player.invincible_timer = max(self._star_timer, self._iframes_timer)
 
-        # Height — determine new height first, then anchor feet in place
+        # Height — only shift y when GROWING (BIG/FIRE) so the feet stay
+        # anchored to the ground. When SHRINKING, leave gObj.y untouched —
+        # shifting it down embeds the player in the floor, which causes the
+        # wall resolver to push them out sideways, snapping the x position.
+        new_height = SMALL_HEIGHT if s == PowerState.SMALL else BIG_HEIGHT
         old_height = player.gObj.height
-        if s == PowerState.SMALL:
-            new_height = SMALL_HEIGHT
-        else:
-            new_height = BIG_HEIGHT
 
         if new_height != old_height:
-            # Shift gObj.y up by the difference so the bottom (feet) stays fixed.
-            # Growing: new_height > old_height → y moves up (negative direction).
-            # Shrinking: new_height < old_height → y moves down (feet stay grounded).
-            player.gObj.y     -= (new_height - old_height)
+            if new_height > old_height:
+                # Growing: shift y up so feet stay on the ground
+                player.gObj.y -= (new_height - old_height)
+            # Shrinking: leave y alone — top of hitbox just drops down,
+            # feet naturally stay at the same position without any y correction
             player.gObj.height = new_height
 
     # ── Reset ────────────────────────────────────────────────────────────────

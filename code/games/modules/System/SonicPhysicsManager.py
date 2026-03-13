@@ -539,9 +539,7 @@ class PhysicsManager:
 
             if tile_type == EntityType.SPIKE:
                 if not player.power_machine.is_invincible:
-                    survived = player.power_machine.take_hit()
-                    if not survived:
-                        core._handle_death("Spike")
+                    core._handle_death("Spike")
                     return
                 continue
 
@@ -738,6 +736,7 @@ class PhysicsManager:
                 core.kills_step += 1
             return
 
+        # 3. Take a hit through the state machine
         survived = player.power_machine.take_hit()
         if not survived:
             core._handle_death("Enemy")
