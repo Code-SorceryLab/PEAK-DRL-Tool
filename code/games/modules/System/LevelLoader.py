@@ -263,6 +263,7 @@ class LevelLoader:
                 elif ascii_char == 'E':
                     e = Enemy(GameObject(col * self.tile_size + 8, row * self.tile_size + 8, 25, 20, True), vx=-60.0)
                     e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "enemy"
                     data.enemies.append(e)
 
                 elif ascii_char == 'k':
@@ -279,6 +280,7 @@ class LevelLoader:
                     data.player_start = (float(col * self.tile_size), float(row * self.tile_size))
 
                 elif ascii_char == 'G' or ascii_char == 'D':
+                    data.grid[row][col] = TILE_GOAL
                     g = Goal(gObj=GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True))
                     data.goals.append(g)
 
@@ -286,12 +288,22 @@ class LevelLoader:
                     # Met spawn (generic Enemy for now, MegaManCore will convert)
                     e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
                     e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "met"
                     data.enemies.append(e)
 
                 elif ascii_char == 'B':
                     # Bat spawn (generic Enemy for now, MegaManCore will convert)
                     e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
                     e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "bat"
+                    data.enemies.append(e)
+
+                elif ascii_char == 'X':
+                    # Boss spawn placeholder. MegaManCore upgrades this into the
+                    # real boss object during level load.
+                    e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
+                    e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "boss"
                     data.enemies.append(e)
 
                 elif ascii_char == 'O':

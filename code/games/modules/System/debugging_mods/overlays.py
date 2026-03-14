@@ -646,8 +646,23 @@ class ObsValuesOverlay(DebugOverlay):
         except Exception:
             return
 
-        data = (list(zip(self._P_LABELS, p_vals)) +
-                list(zip(self._T_LABELS, t_vals)))
+        p_labels = self._P_LABELS
+        t_labels = self._T_LABELS
+        label_fn = getattr(core, "get_obs_value_labels", None)
+        if callable(label_fn):
+            try:
+                custom = label_fn()
+                if custom and len(custom) == 2:
+                    p_custom, t_custom = custom
+                    if len(p_custom) == len(p_vals):
+                        p_labels = list(p_custom)
+                    if len(t_custom) == len(t_vals):
+                        t_labels = list(t_custom)
+            except Exception:
+                pass
+
+        data = (list(zip(p_labels, p_vals)) +
+                list(zip(t_labels, t_vals)))
 
         panel_w_total = core.TOTAL_WIDTH - core.DEBUG_PANEL_X - _PAD * 2
         half_w = panel_w_total // 2 - 2
@@ -669,8 +684,10 @@ class ObsValuesOverlay(DebugOverlay):
             # Colour-code by semantic meaning
             if label in ("GoalDst", "EnmDst") and 0 < val < 0.15:
                 vc = _C_NEG   # danger-close
-            elif label in ("Grnd", "Coyote", "JmpExt") and val > 0.5:
+            elif label in ("Grnd", "Coyote", "JmpExt", "Laddr") and val > 0.5:
                 vc = _C_ACT   # active ground/jump state
+            elif label == "Climb" and abs(val) > 0.01:
+                vc = _C_ACT
             elif label in ("PwrUp", "Fire", "Invinc") and val > 0.5:
                 vc = (255, 195, 60)  # power state — gold
             elif val > 0:
@@ -770,26 +787,43 @@ class JumpArcOverlay(DebugOverlay):
             jump_force = float(getattr(core, 'jump_force',  620.0))
 
         # ── Player state ──────────────────────────────────────────────────────
-        wx  = float(p.gObj.x)
-        wy  = float(p.gObj.y)
-        vx  = float(getattr(p, 'vx', 0.0))
-        vy  = float(getattr(p, 'vy', 0.0))
-
-        grounded  = getattr(p, 'grounded', True)
-        can_jump  = getattr(p, 'can_jump', True)
-
-        # If on the ground, preview a jump with the current vx (or a default vx)
-        # If airborne, show the actual trajectory from current vy
-        if grounded and can_jump:
-            arc_vy = -jump_force
-            arc_vx = vx if abs(vx) > 10 else 200.0  # assume moving right if idle
-            col = self._COLOR_GROUND
-        elif not grounded:
-            arc_vy = vy
-            arc_vx = vx
-            col = self._COLOR_AIR
+        state_fn = getattr(core, "get_jump_arc_debug_state", None)
+        if callable(state_fn):
+            state = state_fn() or {}
         else:
-            return   # grounded but can't jump — nothing to show
+            state = {}
+
+        if state:
+            wx = float(state.get("x", p.gObj.x))
+            wy = float(state.get("y", p.gObj.y))
+            grounded = bool(state.get("grounded", getattr(p, 'grounded', True)))
+            can_jump = bool(state.get("can_jump", getattr(p, 'can_jump', True)))
+            arc_vx = float(state.get("vx", getattr(p, 'vx', 0.0)))
+            arc_vy = float(state.get("vy", -jump_force if grounded and can_jump else getattr(p, 'vy', 0.0)))
+            col = state.get("color", self._COLOR_GROUND if grounded and can_jump else self._COLOR_AIR)
+            if grounded and not can_jump:
+                return
+        else:
+            wx  = float(p.gObj.x)
+            wy  = float(p.gObj.y)
+            vx  = float(getattr(p, 'vx', 0.0))
+            vy  = float(getattr(p, 'vy', 0.0))
+
+            grounded  = getattr(p, 'grounded', True)
+            can_jump  = getattr(p, 'can_jump', True)
+
+            # If on the ground, preview a jump with the current vx (or a default vx)
+            # If airborne, show the actual trajectory from current vy
+            if grounded and can_jump:
+                arc_vy = -jump_force
+                arc_vx = vx if abs(vx) > 10 else 200.0
+                col = self._COLOR_GROUND
+            elif not grounded:
+                arc_vy = vy
+                arc_vx = vx
+                col = self._COLOR_AIR
+            else:
+                return
 
         # ── Camera offset ─────────────────────────────────────────────────────
         cam_x = float(getattr(core, 'camera_x', 0.0))

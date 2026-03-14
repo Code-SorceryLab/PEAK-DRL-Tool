@@ -578,11 +578,11 @@ class PlatformerCore(gymnasium.Env):
             # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
         })
 
-        # Action Space: 10 actions (0-9) — basic movement set, no fire variants.
-        # ACTION_NAMES has 20 entries (0-19, including fire offset +10), but the
-        # RL agent only uses the base 10. Fire actions are available in human mode
-        # via the Z key, not exposed to the agent during training.
-        self._act_space = spaces.Discrete(10)
+        # Action Space: MultiDiscrete [move, jump, fire]
+        #   move : 0=idle 1=left 2=run_left 3=right 4=run_right
+        #   jump : 0=idle 1=jump
+        #   fire : 0=idle 1=fire
+        self._act_space = spaces.MultiDiscrete([5, 2, 2])
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)

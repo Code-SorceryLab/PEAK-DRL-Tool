@@ -61,6 +61,14 @@ BORDER_DONE    = (132, 64, 90)
 SCORE_COLOR    = (255, 220, 120)
 PAUSED_COLOR   = (255, 110, 110)
 
+_ARCH_TAGS = {
+    "lightmobile",
+    "spatialattention",
+    "channelattention",
+    "deepchannelattention",
+    "mlp",
+}
+
 
 # ---------------------------------------------------------------------------
 # Model metadata parsing (mirrors watch_agent.py)
@@ -72,6 +80,9 @@ def parse_model_info(model_path: str):
         parts = folder.split("_")
     else:
         parts = path.stem.replace("_model", "").replace("best", "").split("_")
+
+    if len(parts) >= 5 and parts[-1].lower() in _ARCH_TAGS:
+        parts = parts[:-1]
 
     if len(parts) >= 4:
         game  = parts[0]
@@ -908,7 +919,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5, game_filter: str | None = Non
             ("ESC", "quit",     None),
             ("SPACE", "pause",  None),
             ("R", "reset",      None),
-            ("F1", "rays+arc",  getattr(first_dm, "show_sensors", False) if first_dm else False),
+            ("F1", "shot+arc",  getattr(first_dm, "show_sensors", False) if first_dm else False),
             ("F2", "cam",       getattr(first_dm, "free_cam_active", False) if first_dm else False),
             ("F3", "slow",      getattr(first_dm, "slow_motion", False) if first_dm else False),
             ("F4", "hitboxes",  getattr(first_dm, "show_hitboxes", False) if first_dm else False),

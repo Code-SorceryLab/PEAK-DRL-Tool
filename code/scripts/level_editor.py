@@ -79,13 +79,14 @@ TILE_LIBRARY = [
     ('B', 'Bat Enemy',      (190, 120, 255), (255, 220, 255)),
     ('G', 'Goal',           (60, 200, 100),  (0, 60, 20)),
     ('D', 'Boss Door',      (255, 90, 140),  (60, 10, 30)),
+    ('X', 'Boss Spawn',     (255, 120, 80),  (70, 18, 18)),
     ('P', 'Player Start',   (60, 160, 255),  (0, 30, 120)),
 ]
 TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
 TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
 GAME_TILE_ORDER = {
     "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
-    "megaman": [' ', '#', '=', '^', 'H', 'M', 'B', 'G', 'D', 'P'],
+    "megaman": [' ', '#', '=', '^', 'O', 'H', 'M', 'B', 'G', 'D', 'X', 'P'],
 }
 SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
 
@@ -725,6 +726,12 @@ def render_tile_object(surf, char, sx, sy, ts):
         pygame.draw.rect(surf,(40,16,24),(sx,sy,ti,ti))
         pygame.draw.rect(surf,(255,90,140),(sx+4,sy+2,ti-8,ti-4),border_radius=max(2,ti//12))
         pygame.draw.rect(surf,(60,10,30),(sx+8,sy+6,ti-16,ti-12),border_radius=max(2,ti//14))
+    elif char=='X':
+        pygame.draw.rect(surf,(24,10,18),(sx,sy,ti,ti))
+        pygame.draw.rect(surf,(220,90,70),(sx+ti*0.14,sy+ti*0.18,ti*0.72,ti*0.64),border_radius=max(2,ti//10))
+        pygame.draw.rect(surf,(255,184,92),(sx+ti*0.24,sy+ti*0.1,ti*0.52,ti*0.2),border_radius=max(2,ti//12))
+        pygame.draw.rect(surf,(255,255,255),(sx+ti*0.26,sy+ti*0.42,ti*0.14,ti*0.1),border_radius=2)
+        pygame.draw.rect(surf,(255,255,255),(sx+ti*0.6,sy+ti*0.42,ti*0.14,ti*0.1),border_radius=2)
     elif char=='P':
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2,cy2=sx+ti//2,sy+ti//2; hr=max(2,ti//6)
         pygame.draw.circle(surf,(255,204,170),(cx2,cy2-hr),hr)
@@ -943,15 +950,38 @@ class Editor:
         self._assign_r=pygame.Rect(0,0,0,0)
         self._drag_lid=None; self._drag_y=0; self._drag_si=-1; self._drag_di=-1
         self._lv_list_top=0; self._lv_row_h=36
-        ph=gc.physics or {}; fric=ph.get('friction',{}) or {}
+        ph = copy.deepcopy(gc.physics or {})
+        if getattr(level, "physics_overrides", None):
+            if isinstance(level.physics_overrides, dict):
+                if isinstance(ph.get("friction"), dict) and isinstance(level.physics_overrides.get("friction"), dict):
+                    ph["friction"] = {**ph.get("friction", {}), **level.physics_overrides.get("friction", {})}
+                    for k, v in level.physics_overrides.items():
+                        if k != "friction":
+                            ph[k] = v
+                else:
+                    ph.update(level.physics_overrides)
+        fric_raw = ph.get('friction', {}) or {}
+        if isinstance(fric_raw, dict):
+            fric = fric_raw
+        else:
+            base_fric = float(fric_raw) if isinstance(fric_raw, (int, float)) else 1300.0
+            fric = {
+                'ground': base_fric,
+                'air': max(50.0, min(1000.0, base_fric * 0.2)),
+            }
+        gravity_val = float(ph.get('gravity', 1300))
+        fast_fall_val = float(ph.get('fast_fall_gravity', max(gravity_val * 1.8, ph.get('max_fall_speed', 550))))
+        max_run_val = float(ph.get('max_run_speed', ph.get('run_speed', ph.get('walk_speed', 150))))
+        jump_val = abs(float(ph.get('jump_velocity', ph.get('jump_force', 800))))
+        max_fall_val = float(ph.get('max_fall_speed', 550))
         self.phys_sliders=[
-            PhysicsSlider("Gravity","gravity",ph.get('gravity',1300),200,3000,50),
-            PhysicsSlider("Fast Fall","fast_fall",ph.get('fast_fall_gravity',2500),500,5000,50),
+            PhysicsSlider("Gravity","gravity",gravity_val,200,3000,50),
+            PhysicsSlider("Fast Fall","fast_fall",fast_fall_val,500,5000,50),
             PhysicsSlider("Gnd Frict","ground_fric",fric.get('ground',1300),200,3000,50),
             PhysicsSlider("Air Frict","air_fric",fric.get('air',250),50,1000,25),
-            PhysicsSlider("Max Run","max_run",150,50,500,10),
-            PhysicsSlider("Jump Vel","jump_vel",800,200,1500,25),
-            PhysicsSlider("Max Fall","max_fall",550,200,1200,25),
+            PhysicsSlider("Max Run","max_run",max_run_val,50,500,10),
+            PhysicsSlider("Jump Vel","jump_vel",jump_val,200,1500,25),
+            PhysicsSlider("Max Fall","max_fall",max_fall_val,200,1200,25),
         ]
         ep=(ph.get('enemies',{}) or {}) if ph else {}
         self.enemy_sliders=[
@@ -1035,6 +1065,23 @@ class Editor:
                 else: return False
             return True
         return r=="no"
+
+
+def bake_level_physics(ed):
+    max_run = ed.phys_sliders[4].value
+    ed.level.physics_overrides = {
+        'gravity': ed.phys_sliders[0].value,
+        'fast_fall_gravity': ed.phys_sliders[1].value,
+        'friction': {
+            'ground': ed.phys_sliders[2].value,
+            'air': ed.phys_sliders[3].value,
+        },
+        'max_run_speed': max_run,
+        'run_speed': max_run,
+        'walk_speed': round(max_run * 0.75, 1),
+        'jump_velocity': -abs(ed.phys_sliders[5].value),
+        'max_fall_speed': ed.phys_sliders[6].value,
+    }
 
 # ═══════════════════════════════════════════════════════════════════
 # DRAW FUNCTIONS (viewport, panels, toolbar, status)
@@ -1432,6 +1479,7 @@ def draw_status(surf,ed,sfont):
 def launch_play(ed,scr,sf):
     lv=ed.level
     # Bake current slider values into the level before saving (same as SAVE action)
+    bake_level_physics(ed)
     lv.enemy_physics={
         'walk_speed':   ed.enemy_sliders[0].value,
         'gravity_mult': round(ed.enemy_sliders[1].value/100.0, 3),
@@ -1482,6 +1530,7 @@ def do_action(result,ed,scr,sf):
         p=ed.level.filename or dlg_save(scr,sf)
         if p:
             # Bake slider values back into the level before writing
+            bake_level_physics(ed)
             ed.level.enemy_physics={
                 'walk_speed':   ed.enemy_sliders[0].value,
                 'gravity_mult': round(ed.enemy_sliders[1].value/100.0, 3),

@@ -32,10 +32,12 @@ Use these characters in `.txt` level files and in the level editor.
 
 | Char | Meaning |
 | --- | --- |
+| `O` | Pit / kill zone |
 | `H` | Ladder |
 | `M` | Met enemy |
 | `B` | Bat enemy |
 | `D` | Boss door / exit door |
+| `X` | Boss spawn |
 
 Notes:
 - `.` is the recommended empty tile for hand-editing levels.

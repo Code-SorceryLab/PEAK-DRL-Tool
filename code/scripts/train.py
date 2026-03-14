@@ -28,7 +28,6 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from sb3_contrib import RecurrentPPO
 
-import code.rewards.train_platformer as reward_module
 from code.wrappers.generic_env import GameEnv
 from code.algos import get_algo
 
@@ -79,6 +78,19 @@ def _pretty_steps(n: int) -> str:
     if n >= 1_000_000:
         return f"{n // 1_000_000}M"
     return f"{n // 1_000}k"
+
+
+ARCH_ALIASES = {
+    "lightmobile": "lightmobile",
+    "spatialattention": "spatialattention",
+    "channelattention": "channelattention",
+    "deepchannelattention": "deepchannelattention",
+    "mlp": "mlp",
+}
+
+
+def _canonical_arch_tag(raw: str) -> str:
+    return ARCH_ALIASES.get(str(raw or "").strip().lower(), "")
 
 
 def _load_yaml(conf_root: Path, group: str, name: str) -> Dict:
@@ -737,6 +749,26 @@ class LightMobileExtractor(BaseFeaturesExtractor):
 # ─────────────────────────────────────────────────────────────────────────────
 # EvalPreviewCallback
 # ─────────────────────────────────────────────────────────────────────────────
+class FlatVectorExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Box, features_dim: int = 128):
+        super().__init__(observation_space, features_dim=features_dim)
+        in_dim = int(np.prod(observation_space.shape))
+        hidden = max(features_dim, 96)
+        self.net = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_dim, hidden),
+            nn.LayerNorm(hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, features_dim),
+            nn.LayerNorm(features_dim),
+            nn.ReLU(),
+        )
+        self._features_dim = features_dim
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        return self.net(observations)
+
+
 class EvalPreviewCallback(BaseCallback):
     def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
                  make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
@@ -855,6 +887,13 @@ def main(cfg: DictConfig):
         print(f"ERROR: Could not load game class for '{game_name}'.")
         sys.exit(1)
 
+    try:
+        reward_module = importlib.import_module(f"code.rewards.train_{game_name}")
+        print(f"[INFO] Loaded reward module: code.rewards.train_{game_name}")
+    except Exception as e:
+        print(f"[WARNING] Could not load code.rewards.train_{game_name} ({e}). Falling back to train_platformer.")
+        reward_module = importlib.import_module("code.rewards.train_platformer")
+
     base_env_kwargs = dict(
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
@@ -892,6 +931,18 @@ def main(cfg: DictConfig):
             raise ValueError(f"skill='{key}' not in cfg.skills {list(selected_skills.keys())}")
         selected_skills = {key: selected_skills[key]}
 
+    probe_persona = selected_personas[0] if selected_personas else "simple"
+    probe_env = GameEnv(game_cls, reward_fn=None, persona=probe_persona, arch_tag="mlp", **base_env_kwargs)
+    obs_space = probe_env.observation_space
+    probe_env.close()
+    uses_dict_obs = isinstance(obs_space, spaces.Dict)
+
+    vecnorm_kwargs = dict(norm_obs=True, norm_reward=False, clip_obs=10.0)
+    if uses_dict_obs:
+        norm_keys = [k for k, v in obs_space.spaces.items() if isinstance(v, spaces.Box)]
+        if norm_keys:
+            vecnorm_kwargs["norm_obs_keys"] = norm_keys
+
     run_count = 0
     for model_name in selected_models:
         algo_conf = _load_yaml(conf_root, "algo", model_name)
@@ -903,7 +954,24 @@ def main(cfg: DictConfig):
                          if k not in {"_target_", "name", "policy", "policy_kwargs"}}
 
         extractor_tag = "mlp"  # default for non-MultiInputPolicy
-        if policy == "MultiInputPolicy":
+        arch_override = _canonical_arch_tag(cfg.get("architecture", ""))
+        if policy == "MultiInputPolicy" and not uses_dict_obs:
+            policy = "MlpPolicy"
+            if policy_kwargs is None:
+                policy_kwargs = {}
+
+            flat_dim = 128
+            if arch_override == "lightmobile":
+                flat_dim = 64
+            elif arch_override == "channelattention":
+                flat_dim = 192
+            elif arch_override == "deepchannelattention":
+                flat_dim = 256
+
+            policy_kwargs["features_extractor_class"] = FlatVectorExtractor
+            policy_kwargs.setdefault("features_extractor_kwargs", {"features_dim": flat_dim})
+            print(f"[INFO] {game_name} uses flat observations â€” switching {model_name.upper()} to MlpPolicy.")
+        elif policy == "MultiInputPolicy":
             if policy_kwargs is None:
                 policy_kwargs = {}
 
@@ -914,15 +982,13 @@ def main(cfg: DictConfig):
             # Priority:
             #   1. +architecture=<tag>  CLI/menu override
             #   2. use_light_extractor / use_full_peak flags in the algo YAML
-            #   3. Default: slim
+            #   3. Default: spatialattention
             #
             # Tags:
-            #   lightmobile         → LightMobileExtractor   ~18K params   simple fast sweep
-            #   slim     → SpatialAttentionExtractor         ~77K params   +Spatial Attention
-            #   balanced → ChannelAttentionExtractor     ~230K params  +SEBlock
-            #   peak     → DeepChannelAttentionExtractor             ~922K params  +SEBlock +deep CNN
-            arch_override = str(cfg.get("architecture", "") or "").strip().lower()
-
+            #   lightmobile         → LightMobileExtractor         ~18K params
+            #   spatialattention    → SpatialAttentionExtractor    ~77K params
+            #   channelattention    → ChannelAttentionExtractor   ~230K params
+            #   deepchannelattention→ DeepChannelAttentionExtractor ~922K params
             if arch_override == "lightmobile":
                 use_light = True
                 use_peak  = False
@@ -940,7 +1006,7 @@ def main(cfg: DictConfig):
                 use_peak  = False
                 use_balanced = False
             else:
-                # Fall back to YAML flags; default to slim if neither flag is set
+                # Fall back to YAML flags; default to SpatialAttention if neither flag is set
                 use_light = bool(algo_conf.get("use_light_extractor", False))
                 use_peak  = bool(algo_conf.get("use_full_peak",       False))
                 use_balanced = False
@@ -1012,8 +1078,7 @@ def main(cfg: DictConfig):
             else:
                 raw_env = DummyVecEnv([make_env()])
 
-            env = VecNormalize(raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0,
-                               norm_obs_keys=["scalars"])
+            env = VecNormalize(raw_env, **vecnorm_kwargs)
 
             def make_monitored_env(render_mode=None):
                 """Factory that wraps the env with Monitor for proper eval logging."""
@@ -1025,8 +1090,7 @@ def main(cfg: DictConfig):
                 return _init
 
             eval_raw_env = DummyVecEnv([make_monitored_env()])
-            eval_env = VecNormalize(eval_raw_env, norm_obs=True, norm_reward=False, clip_obs=10.0,
-                                    norm_obs_keys=["scalars"])
+            eval_env = VecNormalize(eval_raw_env, **vecnorm_kwargs)
             # FIX: sync running obs statistics from the training wrapper so the
             # eval agent sees identical normalised observations. Without this,
             # eval_env accumulates its own obs_rms from scratch and best_model

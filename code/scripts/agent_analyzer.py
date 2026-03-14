@@ -22,7 +22,13 @@ OBS_SANITY_COLS = {
     'grid_dijkstra_mean','grid_dijkstra_std','grid_dijkstra_min','grid_dijkstra_max',
     'scalar_mean','scalar_std','scalar_min','scalar_max','dijkstra_val','obs_warnings',
 }
-_ARCH_TAGS = {"light", "slim", "balanced", "peak", "mlp"}
+_ARCH_TAGS = {
+    "lightmobile": "lightmobile",
+    "spatialattention": "spatialattention",
+    "channelattention": "channelattention",
+    "deepchannelattention": "deepchannelattention",
+    "mlp": "mlp",
+}
 _SKILL_TAGS = {"novice", "expert", "custom"}
 W = 72
 
@@ -59,7 +65,7 @@ def _load_csv(fp, max_rows=800_000):
 def _parse_run_id(fp):
     name = os.path.basename(fp).replace("training_log_", "").replace(".csv", "")
     parts = name.split("_")
-    arch = parts.pop() if parts and parts[-1].lower() in _ARCH_TAGS else None
+    arch = _ARCH_TAGS[parts.pop().lower()] if parts and parts[-1].lower() in _ARCH_TAGS else None
     skill = parts.pop() if parts and parts[-1].lower() in _SKILL_TAGS else None
     game = parts[0] if len(parts) >= 1 else "?"
     persona = "_".join(parts[2:]) if len(parts) >= 3 else (parts[1] if len(parts) >= 2 else name)

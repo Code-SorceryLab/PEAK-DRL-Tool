@@ -40,7 +40,13 @@ os.environ.pop("SDL_VIDEODRIVER", None)
 # Parse (game, algo, persona, skill) from the model folder/filename
 # ---------------------------------------------------------------------------
 # Known extractor tags (the last segment added to run_id by train.py)
-_EXTRACTOR_TAGS = {"light", "slim", "peak", "mlp"}
+_EXTRACTOR_TAGS = {
+    "lightmobile",
+    "spatialattention",
+    "channelattention",
+    "deepchannelattention",
+    "mlp",
+}
 # Known skill levels (the second-to-last segment)
 _SKILL_LEVELS   = {"novice", "expert", "custom"}
 
@@ -132,10 +138,28 @@ def load_model(model_path: str, algo: str = "ppo"):
         classes["recurrent_ppo"] = RecurrentPPO
     cls = classes.get(algo.lower(), PPO)
     try:
-        return cls.load(model_path)
+        return cls.load(model_path, device="cpu")
     except Exception as e:
         print(f"[WARN] Failed to load as {algo.upper()}: {e} — trying PPO")
-        return PPO.load(model_path)
+        return PPO.load(model_path, device="cpu")
+
+
+# ---------------------------------------------------------------------------
+# Action logging helpers
+# ---------------------------------------------------------------------------
+def _action_for_log(action):
+    arr = np.asarray(action)
+    if arr.ndim == 0:
+        value = int(arr)
+        return value, str(value)
+
+    flat = arr.reshape(-1)
+    if flat.size == 1:
+        value = int(flat[0])
+        return value, str(value)
+
+    values = [int(v) for v in flat.tolist()]
+    return values, ",".join(str(v) for v in values)
 
 
 # ---------------------------------------------------------------------------
@@ -190,12 +214,19 @@ def build_env(game: str, persona: str, fps: int, vecnorm_path: Optional[Path], r
     except Exception as e:
         print(f"[WARN] Could not load reward module: {e}")
 
+    env_kwargs = {
+        "persona": persona,
+        "random_start_world": random_start_world,
+    }
+    if game == "megaman":
+        # Watching should mirror normal play progression, not the training curriculum.
+        env_kwargs["curriculum_enabled"] = False
+
     raw_env = GameEnv(
         GameCoreClass,
         render_mode="human",
         fps=fps,
-        persona=persona,
-        random_start_world=random_start_world,
+        **env_kwargs,
         **({"reward_fn": reward_fn} if reward_fn else {}),
     )
 
@@ -235,7 +266,6 @@ def watch_agent_play(
     except Exception as e:
         print(f"[WARN] Could not parse model info: {e}")
         p_game, p_algo, p_persona, skill = "unknown", "ppo", "default", "unknown"
-
     if game    is None: game    = p_game
     if algo    is None: algo    = p_algo
     if persona is None: persona = p_persona
@@ -312,16 +342,21 @@ def watch_agent_play(
                 steps += 1
 
                 # ── Record this frame ─────────────────────────────────────
-                act_val = int(action[0]) if hasattr(action, '__len__') else int(action)
-                act_name = info_dict.get("action_name", str(act_val))
+                act_val, act_id = _action_for_log(action)
+                act_name = info_dict.get("action_name", act_id)
                 # Get action name from core if available
-                if core and hasattr(core, 'ACTION_NAMES'):
+                if core and hasattr(core, 'ACTION_NAMES') and isinstance(act_val, int):
                     act_name = core.ACTION_NAMES.get(act_val, str(act_val))
+                elif core and hasattr(core, 'action_to_str') and not info_dict.get("action_name"):
+                    try:
+                        act_name = core.action_to_str(act_val)
+                    except Exception:
+                        act_name = act_id
 
                 session_log.append({
                     "episode":  ep + 1,
                     "step":     steps,
-                    "action_id": act_val,
+                    "action_id": act_id,
                     "action":   act_name,
                     "level":    info_dict.get("level", ""),
                     "x":        round(info_dict.get("x_position", 0.0), 2),

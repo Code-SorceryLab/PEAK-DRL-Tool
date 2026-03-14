@@ -24,7 +24,7 @@ class GameEnv(gym.Env):
         **game_kwargs,
     ):
         assert render_mode in self.metadata["render_modes"]
-        self.game = game_cls(render_mode = render_mode, **game_kwargs)
+        self.game = game_cls(render_mode = render_mode, max_steps=max_steps, **game_kwargs)
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps

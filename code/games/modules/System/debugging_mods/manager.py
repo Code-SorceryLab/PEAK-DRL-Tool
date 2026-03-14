@@ -95,7 +95,7 @@ class DebugManager:
             pad = " " * max(0, W - len(visible))
             print(dim("    ║") + inner + pad + dim("║"))
 
-        row("F1", "Rays + Jump Arc   (toggle)")
+        row("F1", "Shot Line + Arc   (toggle)")
         row("F2", "Free camera       (IJKL to move)")
         row("F3", "Slow motion       (0.5×)")
         row("F4", "Hitboxes          (toggle)")
@@ -122,7 +122,7 @@ class DebugManager:
         if rising(pygame.K_F1):
             self.show_sensors = not self.show_sensors
             state = grn("ON") if self.show_sensors else dim("off")
-            print(f"  {dim('F1')}  Rays + Jump Arc  →  {state}")
+            print(f"  {dim('F1')}  Shot Line + Arc  →  {state}")
         if rising(pygame.K_F2):
             self.free_cam_active = not self.free_cam_active
             state = grn("ON") if self.free_cam_active else dim("off")
@@ -185,7 +185,7 @@ class DebugManager:
 
         # F-key hint chips (right-aligned in banner)
         toggles = [
-            ("F1", "rays+arc", self.show_sensors),
+            ("F1", "shot+arc", self.show_sensors),
             ("F2", "cam",      self.free_cam_active),
             ("F3", "slow",     self.slow_motion),
             ("F4", "hbox",     self.show_hitboxes),
@@ -212,7 +212,7 @@ class DebugManager:
         if self.show_hitboxes:
             self.hitbox_overlay.render(surface, core)
 
-        # ── Jump arc — toggled with F1 (rays+arc) ──────────────
+        # ── Jump arc — toggled with F1 (shot+arc) ──────────────
         if self.show_sensors:
             self.jump_arc_overlay.render(surface, core)
 
@@ -230,7 +230,7 @@ class DebugManager:
         if self.slow_motion:
             by = self._badge(surface, core, "SLOW MOTION",       (185, 110, 0), y=by) + 4
         if self.show_sensors:
-            self._badge(surface, core, "RAYS + JUMP ARC  (F1)", (0, 145, 80), y=by)
+            self._badge(surface, core, "SHOT LINE + JUMP ARC  (F1)", (0, 145, 80), y=by)
 
         # ── Max-view draws last so it covers everything ────────
         # (AgentViewOverlay.render already dispatches; this badge confirms state)

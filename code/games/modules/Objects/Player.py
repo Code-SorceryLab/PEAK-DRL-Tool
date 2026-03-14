@@ -72,6 +72,14 @@ class Player():
     # in step() to actually spawn the projectile. platformer_core is the only
     # place that should reset this flag to False after reading it.
     fire_requested: bool = False
+    hp: int = 1
+    hp_max: int = 1
+    shot_cooldown: float = 0.0
+    jump_cut: bool = False
+    on_ladder: bool = False
+    ladder_x: float = 0.0
+    can_jump: bool = False
+    grounded: bool = False
 
     def __post_init__(self):
         # 1. Initialise power state machine (no on_death yet — wired later if needed)
@@ -145,6 +153,7 @@ class Player():
         # 6. Tick fire cooldown — keeps it draining even when fire key is not held
         if self._fire_cooldown > 0.0:
             self._fire_cooldown = max(0.0, self._fire_cooldown - dt)
+        self.shot_cooldown = self._fire_cooldown
 
     def _update_animation_logic(self, dt: float):
         """Decides which animation state to use based on physics."""

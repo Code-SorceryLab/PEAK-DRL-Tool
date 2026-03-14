@@ -249,14 +249,15 @@ def get_personas_for_game(game: str):
 
 # Architecture metadata used by the menu
 _ARCH_INFO = {
-    "lightmobile":         ("LightMobileExtractor",          "~18K params  — no channel split, fast sweeps"),
-    "spatialattention":    ("SpatialAttentionExtractor",     "~77K params  — channel split, no SEBlock  [recommended]"),
-    "channelattention":    ("ChannelAttentionExtractor",     "~230K params — channel split + SEBlock"),
-    "deepchannelattention":("DeepChannelAttentionExtractor", "~922K params — full SEBlock + deep semantic branch"),
+    "lightmobile":         ("LightMobile / Depthwise",       "LightMobileExtractor  - lightweight depthwise stack"),
+    "spatialattention":    ("SpatialAttention",              "SpatialAttentionExtractor"),
+    "channelattention":    ("ChannelAttention",              "ChannelAttentionExtractor"),
+    "deepchannelattention":("DeepChannelAttention",          "DeepChannelAttentionExtractor"),
+    "mlp":                 ("MlpPolicy",                     "default flat observation policy"),
 }
 
 def get_available_architectures_from_grid():
-    """Return architectures list from grid.yaml, falling back to all three if absent."""
+    """Return architectures list from grid.yaml, falling back to the extractor tag set if absent."""
     cfg = load_grid_config()
     if cfg is not None and "architectures" in cfg and cfg.architectures:
         return list(cfg.architectures)
@@ -367,6 +368,64 @@ def ensure_current_algo():
         if algos:
             CURRENT_ALGO = "ppo" if "ppo" in algos else algos[0]
 
+
+def get_training_runtime_defaults():
+    """Read default device / env-count from grid.yaml."""
+    cfg = load_grid_config()
+    default_n_envs = 1
+    default_device = "cpu"
+
+    if cfg is not None:
+        try:
+            default_n_envs = int(cfg.get("n_envs", default_n_envs))
+        except (TypeError, ValueError):
+            default_n_envs = 1
+        default_device = str(cfg.get("device", default_device) or default_device).strip().lower()
+
+    if default_n_envs < 1:
+        default_n_envs = 1
+    if default_device not in ("cpu", "cuda"):
+        default_device = "cpu"
+
+    return default_n_envs, default_device
+
+
+def prompt_training_runtime_overrides():
+    """
+    Ask for optional launch-only runtime overrides.
+
+    Enter keeps the grid.yaml value; typed input overrides it for this menu run.
+    """
+    default_n_envs, default_device = get_training_runtime_defaults()
+
+    envs_raw = input(_DIM(f"\n    Env count [{default_n_envs}] (Enter to keep grid default): ")).strip()
+    n_envs_override = None
+    if envs_raw:
+        try:
+            n_envs_override = int(envs_raw)
+            if n_envs_override < 1:
+                raise ValueError
+        except ValueError:
+            print(_RED("  Invalid env count. Use a positive integer."))
+            return None
+
+    device_raw = input(_DIM(f"    Device [{default_device}] (cpu/cuda, Enter to keep grid default): ")).strip().lower()
+    device_override = None
+    if device_raw:
+        if device_raw == "gpu":
+            device_raw = "cuda"
+        if device_raw not in ("cpu", "cuda"):
+            print(_RED("  Invalid device. Use 'cpu' or 'cuda'."))
+            return None
+        device_override = device_raw
+
+    return {
+        "default_n_envs": default_n_envs,
+        "default_device": default_device,
+        "n_envs_override": n_envs_override,
+        "device_override": device_override,
+    }
+
 def toggle_select(title, options, default_indices=None, min_select=1, show_desc=None):
     """
     Interactive toggle-style multi-select used throughout the training menus.
@@ -445,7 +504,16 @@ def toggle_select(title, options, default_indices=None, min_select=1, show_desc=
 # TRAINING EXECUTION - Core Logic (DRY refactor)
 # ============================================================================
 
-def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, architecture=None):
+def execute_training_run(
+    game,
+    algo,
+    persona,
+    skill,
+    tb_root=DEFAULT_TB_ROOT,
+    architecture=None,
+    n_envs_override=None,
+    device_override=None,
+):
     """
     Build and run a single Hydra training command via subprocess.
 
@@ -464,6 +532,10 @@ def execute_training_run(game, algo, persona, skill, tb_root=DEFAULT_TB_ROOT, ar
     ]
     if architecture:
         cmd.append(f"+architecture={architecture}")
+    if n_envs_override is not None:
+        cmd.append(f"n_envs={int(n_envs_override)}")
+    if device_override:
+        cmd.append(f"device={device_override}")
 
     print(_DIM("  >>> ") + _WHT(" ".join(cmd)) + "\n")
 
@@ -565,8 +637,23 @@ def run_training():
     if arch_sel is None:
         return
 
+    runtime = prompt_training_runtime_overrides()
+    if runtime is None:
+        return
+    n_envs_override = runtime["n_envs_override"]
+    device_override = runtime["device_override"]
+    envs_display = str(n_envs_override) if n_envs_override is not None else f"{runtime['default_n_envs']} (grid)"
+    device_display = device_override if device_override is not None else f"{runtime['default_device']} (grid)"
+
     # ── TensorBoard root ──────────────────────────────────────────
     tb_root = input(_DIM(f"\n    TensorBoard root [{DEFAULT_TB_ROOT}] (Enter to keep): ")).strip() or DEFAULT_TB_ROOT
+    runtime = prompt_training_runtime_overrides()
+    if runtime is None:
+        return
+    n_envs_override = runtime["n_envs_override"]
+    device_override = runtime["device_override"]
+    envs_display = str(n_envs_override) if n_envs_override is not None else f"{runtime['default_n_envs']} (grid)"
+    device_display = device_override if device_override is not None else f"{runtime['default_device']} (grid)"
 
     # ── Summary ───────────────────────────────────────────────────
     run_skills = list(skill_sel)
@@ -584,6 +671,8 @@ def run_training():
     print(f"    {_DIM('Personas  :')}  {_GRN(personas_short)}  {_DIM(f'({len(persona_sel)})')}")
     print(f"    {_DIM('Skills    :')}  {_GRN(', '.join(run_skills))}")
     print(f"    {_DIM('Archs     :')}  {_GRN(', '.join(arch_sel))}")
+    print(f"    {_DIM('Env count :')}  {_GRN(envs_display)}")
+    print(f"    {_DIM('Device    :')}  {_GRN(device_display)}")
     print(f"    {_DIM('Total runs:')}  {_WHT(str(total))}")
     print(f"    {_DIM('─' * 50)}")
     print()
@@ -607,6 +696,10 @@ def run_training():
                             "skill=Custom", f"+skills.Custom={custom_steps}",
                             f"tb_root={tb_root}", f"+architecture={arch}",
                         ]
+                        if n_envs_override is not None:
+                            cmd.append(f"n_envs={int(n_envs_override)}")
+                        if device_override:
+                            cmd.append(f"device={device_override}")
                         print(">>> " + " ".join(cmd))
                         try:
                             subprocess.run(cmd, check=True)
@@ -615,7 +708,11 @@ def run_training():
                     for skill in skill_sel:
                         completed += 1
                         print(_DIM(f"\n  [{completed}/{total}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
-                        ok = execute_training_run(game, algo, persona, skill, tb_root, arch)
+                        ok = execute_training_run(
+                            game, algo, persona, skill, tb_root, arch,
+                            n_envs_override=n_envs_override,
+                            device_override=device_override,
+                        )
                         if not ok:
                             failed += 1
     except KeyboardInterrupt:
@@ -695,6 +792,8 @@ def train_all_models_for_game():
     print(f"    {_DIM('Personas  :')}  {_GRN(personas_short)}  {_DIM(f'({len(persona_sel)})')}")
     print(f"    {_DIM('Skills    :')}  {_GRN(', '.join(skill_sel))}")
     print(f"    {_DIM('Archs     :')}  {_GRN(', '.join(arch_sel))}")
+    print(f"    {_DIM('Env count :')}  {_GRN(envs_display)}")
+    print(f"    {_DIM('Device    :')}  {_GRN(device_display)}")
     print(f"    {_DIM('Total runs:')}  {_WHT(str(total_runs))}")
     print(f"    {_DIM('─' * 50)}")
     confirm = input(_BOLD("\n    ⟫ Proceed? [Y/n]: ")).strip().lower()
@@ -711,7 +810,11 @@ def train_all_models_for_game():
                     for skill in skill_sel:
                         completed += 1
                         print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
-                        ok = execute_training_run(game, algo, persona, skill, architecture=arch)
+                        ok = execute_training_run(
+                            game, algo, persona, skill, architecture=arch,
+                            n_envs_override=n_envs_override,
+                            device_override=device_override,
+                        )
                         if not ok:
                             failed += 1
     except KeyboardInterrupt:
@@ -771,7 +874,16 @@ def train_complete_grid():
     if arch_sel is None:
         return
 
+    runtime = prompt_training_runtime_overrides()
+    if runtime is None:
+        return
+    n_envs_override = runtime["n_envs_override"]
+    device_override = runtime["device_override"]
+    envs_display = str(n_envs_override) if n_envs_override is not None else f"{runtime['default_n_envs']} (grid)"
+    device_display = device_override if device_override is not None else f"{runtime['default_device']} (grid)"
+
     total_runs *= len(arch_sel)
+    print(f"\n    Runtime: {_GRN(envs_display)} env(s)  |  {_GRN(device_display)}")
     confirm = input(_BOLD(f"\n    ⟫ Proceed with {total_runs} runs using [{', '.join(arch_sel)}]? [Y/n]: ")).strip().lower()
     if confirm in ("n", "no"):
         print(_DIM("  Aborted."))
@@ -794,7 +906,11 @@ def train_complete_grid():
                         for skill in skills:
                             completed += 1
                             print(_DIM(f"\n  [{completed}/{total_runs}]") + f"  {game} | {algo} | {persona} | {skill} | {arch}")
-                            success = execute_training_run(game, algo, persona, skill, architecture=arch)
+                            success = execute_training_run(
+                                game, algo, persona, skill, architecture=arch,
+                                n_envs_override=n_envs_override,
+                                device_override=device_override,
+                            )
                             if not success:
                                 failed += 1
     except KeyboardInterrupt:
@@ -871,10 +987,16 @@ def parse_model_metadata(model_path: Path):
     """
     folder = model_path.parent.name
     parts = folder.split("_")
-    _ARCH_TAGS = {"lightmobile", "spatialattention", "channelattention", "deepchannelattention", "mlp"}
+    _ARCH_TAGS = {
+        "lightmobile": "lightmobile",
+        "spatialattention": "spatialattention",
+        "channelattention": "channelattention",
+        "deepchannelattention": "deepchannelattention",
+        "mlp": "mlp",
+    }
     arch = None
     if len(parts) >= 2 and parts[-1].lower() in _ARCH_TAGS:
-        arch = parts[-1].lower()
+        arch = _ARCH_TAGS[parts[-1].lower()]
         parts = parts[:-1]
     meta = {
         "game":    parts[0] if len(parts) >= 1 else None,
@@ -1128,11 +1250,17 @@ def watch_trained_agent():
 
     for folder in model_folders:
         parts = folder.name.split("_")
-        _ARCH_TAGS = {"lightmobile", "spatialattention", "channelattention", "deepchannelattention", "mlp"}
+        _ARCH_TAGS = {
+            "lightmobile": "lightmobile",
+            "spatialattention": "spatialattention",
+            "channelattention": "channelattention",
+            "deepchannelattention": "deepchannelattention",
+            "mlp": "mlp",
+        }
 
         if len(parts) >= 6 and parts[-1].lower() in _ARCH_TAGS:
             game, algo = parts[0], parts[1]
-            arch = parts[-1]
+            arch = _ARCH_TAGS[parts[-1].lower()]
             skill = parts[-2]
             persona = "_".join(parts[2:-2])
             if persona.startswith(f"{game}_"):

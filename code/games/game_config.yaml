@@ -1,16 +1,29 @@
-
 env_cls: PlatformerCore
 module: code.games.platformer_core
 max_steps: 10000
 observation_space:
-  type: Box
-  shape:
-  - 36
-  low: -500.0
-  high: 500.0
+  type: Dict
+  spaces:
+    grids:
+      type: Box
+      shape:
+      - 4
+      - 21
+      - 21
+      low: -1.0
+      high: 1.0
+    scalars:
+      type: Box
+      shape:
+      - 20
+      low: -.inf
+      high: .inf
 action_space:
-  type: Discrete
-  n: 8
+  type: MultiDiscrete
+  nvec:
+  - 5
+  - 2
+  - 2
 reward:
   type: progress_flag
   shaping:
@@ -18,7 +31,7 @@ reward:
     goal: 1.0
     fall: -1.0
 episode:
-  max_steps: 1000
+  max_steps: 10000
 init:
   seed: 42
   level: easy
@@ -55,7 +68,6 @@ levels:
     - 0
     - 0
     - 0
-
 megaman:
   env_cls: MegaManCore
   module: code.games.megaman_core
@@ -64,21 +76,47 @@ megaman:
   fps: 60
   tile_size: 32
   physics:
-    walk_speed: 1.5
-    max_fall_speed: 6.0
-    jump_velocity: -10.0
-    gravity: 0.5
-    bullet_speed: 8.0
-    i_frame_duration: 120
+    walk_speed: 240.0
+    run_speed: 320.0
+    accel: 2800.0
+    friction: 2600.0
+    jump_velocity: -560.0
+    gravity: 1500.0
+    max_fall_speed: 900.0
+    climb_speed: 190.0
+    bullet_speed: 760.0
+    shot_cooldown: 0.16
+    max_player_shots: 3
+    i_frame_duration: 0.75
     hp_max: 28
+    enemies:
+      gravity_mult: 1.0
+      max_fall_speed: 760.0
+      bullet_speed: 420.0
   action_space:
-    type: Discrete
-    n: 7
+    type: MultiDiscrete
+    nvec:
+    - 5
+    - 3
+    - 2
+    - 2
   observation_space:
-    type: Box
-    shape: [40]
-    low: -1.0
-    high: 1.0
+    type: Dict
+    spaces:
+      grids:
+        type: Box
+        shape:
+        - 4
+        - 21
+        - 21
+        low: 0.0
+        high: 1.0
+      scalars:
+        type: Box
+        shape:
+        - 24
+        low: -1.0
+        high: 1.0
   reward:
     shaping:
       step: -0.01
@@ -87,18 +125,49 @@ megaman:
       enemy_kill: 0.5
       damage_taken: -1.0
   episode:
-    max_steps: 2000
+    max_steps: 10000
   render:
     show_fps: true
     debug_overlay: false
-    hud_color: [80, 208, 255]
+    hud_color:
+    - 80
+    - 208
+    - 255
   defaults:
     player:
       lives: 3
       dimensions:
-        width: 16
-        height: 24
+        width: 20
+        height: 28
   levels:
     MM-Stage1:
       file: mm_stage1.txt
-      background_color: [120, 160, 255]
+      background_color:
+      - 120
+      - 160
+      - 255
+    MM-Train4:
+      file: mm_train4.txt
+      background_color:
+      - 120
+      - 160
+      - 255
+  disabled_levels:
+    MM-Train3:
+      file: mm_train3.txt
+      background_color:
+      - 120
+      - 160
+      - 255
+    MM-Train1:
+      file: mm_train1.txt
+      background_color:
+      - 120
+      - 160
+      - 255
+    MM-Train2:
+      file: mm_train2.txt
+      background_color:
+      - 120
+      - 160
+      - 255

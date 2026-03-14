@@ -65,10 +65,47 @@ def _platformer_action(keys) -> list:
     return [move, int(bool(jump)), int(bool(fire))]
 
 
+def _megaman_action(keys) -> list:
+    """
+    Return a MultiDiscrete action [move, climb, jump, fire].
+      move  : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      climb : 0=idle  1=up    2=down
+      jump  : 0=idle  1=jump
+      fire  : 0=idle  1=fire
+    """
+    k = pygame.key.get_pressed()
+
+    left  = k[pygame.K_a]
+    right = k[pygame.K_d]
+    up    = k[pygame.K_w] or k[pygame.K_UP]
+    down  = k[pygame.K_s] or k[pygame.K_DOWN]
+    jump  = k[pygame.K_SPACE]
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    fire  = k[pygame.K_z]
+
+    if left and right:
+        move = 0
+    elif left:
+        move = 2 if run else 1
+    elif right:
+        move = 4 if run else 3
+    else:
+        move = 0
+
+    if up and not down:
+        climb = 1
+    elif down and not up:
+        climb = 2
+    else:
+        climb = 0
+
+    return [move, climb, int(bool(jump)), int(bool(fire))]
+
+
 ACTION_MAPPING = {
     "platformer": _platformer_action,
     "mario": _platformer_action,
-    "megaman": _platformer_action,
+    "megaman": _megaman_action,
 }
 
 CONTROL_DESCRIPTIONS = {
@@ -95,6 +132,8 @@ if level_id:
     env_kwargs['world'] = level_id
     env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
+elif args.game == "megaman":
+    env_kwargs['curriculum_enabled'] = False
 # NOTE: do NOT pass world='__editor_test__' here — it doesn't exist in config
 # yet so platformer_core.__init__ -> reset() would load an empty level.
 env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps, **env_kwargs)
@@ -165,7 +204,7 @@ while running:
     if core_game and hasattr(core_game, 'debug_manager'):
         # If the user has enabled Free Cam (F5), force the player action to IDLE (0).
         if core_game.debug_manager.free_cam_active:
-            action = [0, 0, 0]
+            action = [0, 0, 0, 0] if args.game == "megaman" else [0, 0, 0]
 
     # Step the environment
     step_result = env.step(action)
