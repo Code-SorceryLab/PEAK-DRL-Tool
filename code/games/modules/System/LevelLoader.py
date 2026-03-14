@@ -205,6 +205,10 @@ class LevelLoader:
             curr_row = lines[row]
             for col in range(len(curr_row)):
                 ascii_char = curr_row[col]
+
+                if ascii_char in ('.', ' '):
+                    data.grid[row][col] = TILE_AIR
+                    continue
                 
                 # 1. Handle Spikes with dedicated Spike class
                 if ascii_char == '^':

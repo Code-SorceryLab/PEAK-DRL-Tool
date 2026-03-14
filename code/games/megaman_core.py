@@ -241,7 +241,11 @@ class MegamanCore(gymnasium.Env):
         self.source_lines: List[str] = []
         self.physics_manager = _DebugPhysics(self)
 
-        self.world = kwargs.get("world", "MM-Stage1")
+        config_levels = self.raw_config.get("levels", {}) or {}
+        self.level_order = list(config_levels.keys())
+        default_world = self.level_order[0] if self.level_order else "MM-Stage1"
+        self.world = str(kwargs.get("world", default_world))
+        self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
         self.camera_x = 0.0
         self.camera_y = 0.0
         self.steps = 0
@@ -270,8 +274,36 @@ class MegamanCore(gymnasium.Env):
         self._step_dx = 0.0
         self._step_dy = 0.0
 
+    def _levels_config(self) -> dict:
+        levels = {}
+        for level_id, cfg in (self.raw_config.get("levels", {}) or {}).items():
+            if isinstance(cfg, dict):
+                levels[str(level_id)] = cfg
+
+        injected_levels = self.config_manager.yaml_data.get("levels", {}) or {}
+        for level_id, cfg in injected_levels.items():
+            if not isinstance(cfg, dict):
+                continue
+            level_file = str(cfg.get("file", ""))
+            if os.path.isabs(level_file) or str(level_id).startswith("__editor_"):
+                levels[str(level_id)] = cfg
+        return levels
+
+    def _resolve_level_key(self, level_id: str) -> str:
+        levels = self._levels_config()
+        if level_id in levels:
+            return level_id
+        level_id_lower = str(level_id).lower()
+        for key in levels:
+            if str(key).lower() == level_id_lower:
+                return str(key)
+        return str(level_id)
+
     def _level_config(self) -> dict:
-        levels = self.raw_config.get("levels", {})
+        resolved = self._resolve_level_key(self.world)
+        levels = self._levels_config()
+        if resolved in levels:
+            self.world = resolved
         return levels.get(self.world, {"file": "mm_stage1.txt"})
 
     def _level_file_path(self) -> str:
@@ -296,6 +328,45 @@ class MegamanCore(gymnasium.Env):
                 elif ch == "B":
                     self.enemies.append(BatEnemy(x, y))
 
+    def load_level(self):
+        self.source_lines = self._load_source_lines()
+        self.level_data = self.loader.load_level(self._level_config().get("file", "mm_stage1.txt"))
+
+        px, py = self.level_data.player_start
+        if self.player is None:
+            self.player = MegaManPlayer(GameObject(px, py, 20, 28, True))
+        else:
+            self.player.gObj.x = px
+            self.player.gObj.y = py
+            self.player.gObj.active = True
+            self.player.gObj.width = 20
+            self.player.gObj.height = 28
+            self.player.vx = 0.0
+            self.player.vy = 0.0
+            self.player.on_ground = False
+            self.player.facing_right = True
+            self.player.hp = self.player.hp_max
+            self.player.i_frames = 0.0
+            self.player.invincible_timer = 0.0
+            self.player.star_timer = 0.0
+            self.player.shot_cooldown = 0.0
+            self.player.jump_cut = False
+            self.player.powered_up = False
+            self.player.fire_requested = False
+            self.player.on_ladder = False
+            self.player.ladder_x = 0.0
+
+        self.projectiles = []
+        self._spawn_enemies()
+        self.level_data.enemies = self.enemies
+        self._visit_map = np.zeros((self.level_data.rows, self.level_data.cols), dtype=np.int32)
+        self.camera_x = 0.0
+        self.camera_y = 0.0
+        self.timer = self.time_limit
+        self.alive = True
+        self.reached_goal = False
+        self._update_debug_caches()
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.steps = 0
@@ -312,15 +383,7 @@ class MegamanCore(gymnasium.Env):
         self.stall_timer = 0.0
         self.stall_windows_count = 0
 
-        self.source_lines = self._load_source_lines()
-        self.level_data = self.loader.load_level(self._level_config().get("file", "mm_stage1.txt"))
-        px, py = self.level_data.player_start
-        self.player = MegaManPlayer(GameObject(px, py, 20, 28, True))
-        self.projectiles = []
-        self._spawn_enemies()
-        self.level_data.enemies = self.enemies
-        self._visit_map = np.zeros((self.level_data.rows, self.level_data.cols), dtype=np.int32)
-        self._update_debug_caches()
+        self.load_level()
 
         return self._obs(), self._info()
 

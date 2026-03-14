@@ -1376,6 +1376,17 @@ def watch_all_models():
 
     print(f"Found {len(folders)} trained model(s).")
 
+    available_games = sorted({f.name.split("_")[0] for f in folders if "_" in f.name})
+    game_choice = ask_index(
+        "Choose game filter:",
+        available_games + ["all games"],
+        add_back=True,
+        default=available_games[0] if available_games else "all games",
+    )
+    if game_choice is None:
+        return
+    selected_game = None if game_choice == "all games" else game_choice
+
     fps_input = input("Rendering FPS? [20]: ").strip()
     fps = int(fps_input) if fps_input.isdigit() and int(fps_input) > 0 else 20
 
@@ -1390,8 +1401,11 @@ def watch_all_models():
         "--fps", str(fps),
         "--episodes", str(episodes),
     ]
+    if selected_game:
+        cmd += ["--game", selected_game]
 
-    print(f"\nLaunching grid viewer ({len(folders)} models, {fps} FPS)...")
+    scope = selected_game or "all games"
+    print(f"\nLaunching grid viewer for {scope} ({fps} FPS)...")
     print(">>>", " ".join(cmd), "\n")
 
     try:
@@ -2035,6 +2049,219 @@ def run_toggle_levels():
             print(_RED("  Invalid input."))
 
 
+def get_level_editor_entries(game):
+    config_path = Path("code/games/game_config.yaml")
+    if not config_path.exists():
+        return []
+    try:
+        cfg = OmegaConf.load(config_path)
+    except Exception:
+        return []
+
+    root = (cfg.get("megaman") or {}) if game == "megaman" else cfg
+    raw_levels = root.get("levels") or {}
+    entries = []
+    for level_id, level_cfg in raw_levels.items():
+        if not level_cfg:
+            continue
+        filename = level_cfg.get("file", "")
+        if not filename:
+            continue
+        file_path = Path(filename)
+        if not file_path.is_absolute():
+            file_path = config_path.parent / "levels" / filename
+        entries.append((str(level_id), file_path))
+    return entries
+
+
+DISABLED_LEVELS_KEY = "disabled_levels"
+
+
+def _load_game_config_yaml():
+    try:
+        import yaml
+    except ImportError:
+        return None, None, None
+
+    candidates = [Path("game_config.yaml"), Path("code/games/game_config.yaml")]
+    config_path = next((p for p in candidates if p.exists()), None)
+    if config_path is None:
+        return None, None, yaml
+
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        data = {}
+    return config_path, data, yaml
+
+
+def _game_config_root(data, game, create=False):
+    if game == "megaman":
+        root = data.get("megaman")
+        if isinstance(root, dict):
+            return root
+        if create:
+            data["megaman"] = {}
+            return data["megaman"]
+        return {}
+    return data
+
+
+def _game_level_maps(data, game, create=False):
+    root = _game_config_root(data, game, create=create)
+    levels = root.get("levels")
+    if not isinstance(levels, dict):
+        if create:
+            root["levels"] = {}
+            levels = root["levels"]
+        else:
+            levels = {}
+
+    disabled = root.get(DISABLED_LEVELS_KEY)
+    if not isinstance(disabled, dict):
+        if create:
+            root[DISABLED_LEVELS_KEY] = {}
+            disabled = root[DISABLED_LEVELS_KEY]
+        else:
+            disabled = {}
+    return levels, disabled
+
+
+def _toggle_game_level_in_config(game, lid, enable):
+    config_path, data, yaml = _load_game_config_yaml()
+    if not config_path or yaml is None:
+        return False
+
+    levels, disabled = _game_level_maps(data, game, create=True)
+    if enable:
+        if lid in disabled:
+            levels[lid] = disabled.pop(lid)
+    else:
+        if lid in levels:
+            disabled[lid] = levels.pop(lid)
+
+    root = _game_config_root(data, game, create=True)
+    if not disabled:
+        root.pop(DISABLED_LEVELS_KEY, None)
+
+    try:
+        config_path.write_text(
+            yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return True
+    except Exception:
+        return False
+
+
+def run_toggle_levels():
+    """Enable or disable levels in game_config.yaml from the CLI."""
+    config_path, _, yaml = _load_game_config_yaml()
+    if not config_path or yaml is None:
+        print("\n  Could not find a readable game_config.yaml")
+        return
+
+    game = ask_index(
+        "\n  Choose which game's levels to manage:",
+        ["platformer", "megaman"],
+        add_back=True,
+        default="platformer",
+    )
+    if not game:
+        return
+
+    while True:
+        try:
+            data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        except Exception as e:
+            print(f"\n  Error reading config: {e}")
+            return
+
+        active, disabled = _game_level_maps(data, game, create=False)
+        active_ids = list(active.keys())
+        disabled_ids = list(disabled.keys())
+
+        print(_BOLD(f"\n  Level Toggle [{game}]"))
+        print(f"  Config: {_DIM(str(config_path))}\n")
+
+        if active_ids:
+            print(f"  {_GRN('ENABLED')}  ({len(active_ids)})")
+            for i, lid in enumerate(active_ids, 1):
+                fn = active[lid].get("file", "???") if isinstance(active[lid], dict) else "???"
+                print(f"    {_YEL(f'{i:>3}.')}  {_GRN('[ON ]')}  {_WHT(lid):<20}  {_DIM(fn)}")
+        else:
+            print(f"  {_DIM('(no active levels)')}")
+
+        start = len(active_ids)
+        if disabled_ids:
+            print(f"\n  {_RED('DISABLED')}  ({len(disabled_ids)})")
+            for j, lid in enumerate(disabled_ids, start + 1):
+                fn = disabled[lid].get("file", "???") if isinstance(disabled[lid], dict) else "???"
+                print(f"    {_YEL(f'{j:>3}.')}  {_RED('[OFF]')}  {_WHT(lid):<20}  {_DIM(fn)}")
+
+        all_ids = active_ids + disabled_ids
+        back_n = len(all_ids) + 1
+        print(f"\n    {_YEL(f'{back_n:>3}.')}  {_RED('Back')}")
+        print()
+
+        pick = input(_BOLD("    Toggle # ")).strip()
+        try:
+            n = int(pick)
+            if n == back_n:
+                return
+            if 1 <= n <= len(all_ids):
+                lid = all_ids[n - 1]
+                is_active = n <= len(active_ids)
+                ok = _toggle_game_level_in_config(game, lid, enable=not is_active)
+                if ok:
+                    state = _GRN("enabled") if not is_active else _RED("disabled")
+                    print(f"\n  '{lid}' {state}\n")
+                else:
+                    print(_RED(f"\n  Failed to toggle '{lid}'\n"))
+            else:
+                print(_RED("  Invalid selection."))
+        except ValueError:
+            print(_RED("  Invalid input."))
+
+
+def run_level_editor():
+    """Launch the PEAK level editor (pygame-based tile painter)."""
+    print("\n  Launching PEAK Level Editor...")
+
+    candidates = [
+        Path("code/scripts/level_editor.py"),
+        Path("code/games/platformer/level_editor.py"),
+        Path("level_editor.py"),
+    ]
+
+    editor_path = next((p for p in candidates if p.exists()), None)
+    if editor_path is None:
+        print("  Could not find level_editor.py.")
+        print("  Checked: " + ", ".join(str(c) for c in candidates))
+        return
+
+    game = ask_index(
+        "\n  Choose which game to edit:",
+        ["platformer", "megaman"],
+        add_back=True,
+        default="platformer",
+    )
+    if not game:
+        return
+
+    env_vars = os.environ.copy()
+    env_vars.pop("SDL_VIDEODRIVER", None)
+    cmd = [sys.executable, str(editor_path), "--game", game]
+
+    print("  >>>", " ".join(cmd), "\n")
+    try:
+        subprocess.run(cmd, check=True, env=env_vars)
+    except subprocess.CalledProcessError as e:
+        print(f"\n  Editor exited with error code {e.returncode}")
+    except KeyboardInterrupt:
+        print("\n  Editor closed.")
+
+
 def run_level_editor():
     """Launch the PEAK level editor (pygame-based tile painter)."""
     print("\n  Launching PEAK Level Editor...")
@@ -2046,49 +2273,24 @@ def run_level_editor():
         Path("level_editor.py"),
     ]
 
-    editor_path = None
-    for p in candidates:
-        if p.exists():
-            editor_path = p
-            break
-
+    editor_path = next((p for p in candidates if p.exists()), None)
     if editor_path is None:
         print("  Could not find level_editor.py.")
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
-    # Optionally open an existing level file
-    levels_dir = Path("code/games/platformer/levels")
-    level_files = sorted(levels_dir.glob("*.txt")) if levels_dir.exists() else []
-
-    if level_files:
-        print("\n  Existing levels:")
-        print("    0. New blank level")
-        for i, lf in enumerate(level_files, 1):
-            print(f"    {i}. {lf.name}")
-        print(f"    {len(level_files) + 1}. Back")
-
-        pick = input(f"\n  Open level (0-{len(level_files) + 1}): ").strip()
-        try:
-            n = int(pick)
-            if n == len(level_files) + 1:
-                return
-            if n == 0:
-                # new blank
-                cmd = [sys.executable, str(editor_path)]
-            elif 1 <= n <= len(level_files):
-                cmd = [sys.executable, str(editor_path), str(level_files[n - 1])]
-            else:
-                print("  Invalid selection.")
-                return
-        except ValueError:
-            print("  Invalid selection.")
-            return
-    else:
-        cmd = [sys.executable, str(editor_path)]
+    game = ask_index(
+        "\n  Choose which game to edit:",
+        ["platformer", "megaman"],
+        add_back=True,
+        default="platformer",
+    )
+    if not game:
+        return
 
     env_vars = os.environ.copy()
     env_vars.pop("SDL_VIDEODRIVER", None)
+    cmd = [sys.executable, str(editor_path), "--game", game]
 
     print("  >>>", " ".join(cmd), "\n")
     try:

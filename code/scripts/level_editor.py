@@ -11,6 +11,8 @@ Fixes from v3.0:
   • Improved fallback tile rendering when game objects unavailable
 """
 
+import argparse
+import fnmatch
 import os, sys, math, copy, re, subprocess, string
 import pygame, pygame.freetype
 from pathlib import Path
@@ -27,6 +29,10 @@ UNDO_LIMIT  = 200
 LEFT_PANEL_W  = 230; RIGHT_PANEL_W = 300
 TOOLBAR_H = 52; STATUS_H = 28; HSB_H = 12; SB_W = 10
 DEFAULT_ROWS = 34; DEFAULT_COLS = 75
+DEFAULT_GAME = "platformer"
+MOVING_PLATFORM_BRUSH = "__moving_platform__"
+DISABLED_LEVELS_KEY = "disabled_levels"
+LEGACY_DISABLED_LEVELS_KEY = "editor_disabled_levels"
 
 # ─── Game object imports (optional) ──────────────────────────────
 try:
@@ -34,6 +40,7 @@ try:
     from code.games.modules.Objects.Coin import Coin
     from code.games.modules.Objects.Enemy import Enemy
     from code.games.modules.Objects.Goal import Goal
+    from code.games.modules.Objects.Ladder import Ladder
     from code.games.modules.Objects.QuestionBlock import QuestionBlock
     from code.games.modules.Objects.GameObject import GameObject
     from code.games.modules.Parameters.Map_parameters import (
@@ -44,7 +51,17 @@ except ImportError:
     USE_REAL_OBJECTS = False
 
 # ─── Tile definitions ─────────────────────────────────────────────
-TILES = [
+GAME_LABELS = {
+    "platformer": "Mario / Platformer",
+    "megaman": "Mega Man",
+}
+
+GAME_FILE_GLOBS = {
+    "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
+    "megaman": ["mm_*.txt", "mega*.txt"],
+}
+
+TILE_LIBRARY = [
     (' ', 'Air',            (30, 35, 50),    (80, 90, 120)),
     ('#', 'Ground',         (80, 60, 40),    (220, 200, 160)),
     ('=', 'Platform',       (60, 90, 60),    (180, 230, 140)),
@@ -54,13 +71,26 @@ TILES = [
     ('>', 'QBlock (star)',  (255, 220, 80),  (80, 60, 0)),
     ('<', 'QBlock (mush)',  (200, 80, 80),   (255, 240, 240)),
     ('F', 'QBlock (fire)',  (255, 120, 30),  (80, 30, 0)),
+    ('L', 'QBlock (life)',  (90, 220, 120),  (0, 60, 20)),
     ('C', 'Coin',           (255, 215, 0),   (80, 60, 0)),
     ('E', 'Enemy',          (180, 60, 180),  (255, 220, 255)),
+    ('H', 'Ladder',         (120, 215, 255), (10, 60, 90)),
+    ('M', 'Met Enemy',      (80, 140, 255),  (235, 230, 120)),
+    ('B', 'Bat Enemy',      (190, 120, 255), (255, 220, 255)),
     ('G', 'Goal',           (60, 200, 100),  (0, 60, 20)),
+    ('D', 'Boss Door',      (255, 90, 140),  (60, 10, 30)),
     ('P', 'Player Start',   (60, 160, 255),  (0, 30, 120)),
 ]
-TILE_BY_CHAR = {t[0]: t for t in TILES}
-SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F'}
+TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
+TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
+GAME_TILE_ORDER = {
+    "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
+    "megaman": [' ', '#', '=', '^', 'H', 'M', 'B', 'G', 'D', 'P'],
+}
+SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
+
+def tile_entries_for(game):
+    return [TILE_BY_CHAR[ch] for ch in GAME_TILE_ORDER.get(game, GAME_TILE_ORDER[DEFAULT_GAME])]
 
 # ─── Moving Platform ─────────────────────────────────────────────
 PLAT_DEFAULT_W = TILE_SIZE * 3; PLAT_DEFAULT_H = TILE_SIZE // 2; PLAT_DEFAULT_SPD = 80.0
@@ -345,45 +375,152 @@ def dlg_unsaved(scr,sf):
 # GAME CONFIG (reads/writes game_config.yaml)
 # ═══════════════════════════════════════════════════════════════════
 class GameConfig:
-    def __init__(self):
-        self.yaml_data={}; self.levels={}; self.level_ids=[]
-        self.physics={}; self.levels_dir=None; self.config_path=None; self._load()
-    def _load(self):
-        if yaml is None: return
-        cwd=Path.cwd(); sd=Path(__file__).resolve().parent
-        for p in [cwd/"game_config.yaml",cwd/"code"/"games"/"platformer"/"game_config.yaml",
-                   cwd/"code"/"games"/"game_config.yaml",sd/"game_config.yaml",
-                   sd.parent/"game_config.yaml",sd.parent.parent/"game_config.yaml"]:
-            if p.exists(): self.config_path=p; break
-        if not self.config_path: return
+    def __init__(self, game=DEFAULT_GAME):
+        self.game = game if game in GAME_LABELS else DEFAULT_GAME
+        self.game_label = GAME_LABELS.get(self.game, GAME_LABELS[DEFAULT_GAME])
+        self.yaml_data = {}
+        self.levels = {}
+        self.level_ids = []
+        self.disabled_levels = {}
+        self.physics = {}
+        self.levels_dir = None
+        self.config_path = None
+        self._load()
+
+    def _root_cfg(self, data, create=False):
+        if self.game == "platformer":
+            return data
+        if create and self.game not in data:
+            data[self.game] = {}
+        return data.get(self.game, {})
+
+    def _default_level_entry(self, filename):
+        if self.game == "megaman":
+            return {
+                "file": filename,
+                "background_color": [120, 160, 255],
+            }
+        return {
+            "file": filename,
+            "time_limit": 300,
+            "background_color": [0, 0, 0],
+        }
+
+    def _write_yaml(self, data):
+        if not self.config_path or yaml is None:
+            return False
         try:
-            with open(self.config_path,'r') as f: self.yaml_data=yaml.safe_load(f) or {}
-        except Exception as e: print(f"[GameConfig] {e}"); return
-        cd=self.config_path.parent
-        for d in [cd/"levels",cd,cwd/"levels",cwd]:
-            if d.exists() and list(d.glob("*.txt")): self.levels_dir=d; break
-        raw=self.yaml_data.get('levels',{}) or {}
-        for lid,lcfg in raw.items():
-            if isinstance(lcfg,dict): self.levels[str(lid)]=lcfg; self.level_ids.append(str(lid))
-        defs=self.yaml_data.get('defaults',{}) or {}
-        self.physics=copy.deepcopy(defs.get('physics',{}) or {})
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            return True
+        except Exception:
+            return False
+
+    def _load(self):
+        if yaml is None:
+            return
+        cwd = Path.cwd()
+        sd = Path(__file__).resolve().parent
+        for p in [
+            cwd / "game_config.yaml",
+            cwd / "code" / "games" / "platformer" / "game_config.yaml",
+            cwd / "code" / "games" / "game_config.yaml",
+            sd / "game_config.yaml",
+            sd.parent / "game_config.yaml",
+            sd.parent.parent / "game_config.yaml",
+        ]:
+            if p.exists():
+                self.config_path = p
+                break
+        if not self.config_path:
+            return
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                self.yaml_data = yaml.safe_load(f) or {}
+        except Exception as e:
+            print(f"[GameConfig] {e}")
+            return
+
+        cd = self.config_path.parent
+        for d in [cd / "levels", cd, cwd / "levels", cwd]:
+            if d.exists() and list(d.glob("*.txt")):
+                self.levels_dir = d
+                break
+
+        root_cfg = self._root_cfg(self.yaml_data)
+        raw = root_cfg.get('levels', {}) or {}
+        for lid, lcfg in raw.items():
+            if isinstance(lcfg, dict):
+                self.levels[str(lid)] = lcfg
+                self.level_ids.append(str(lid))
+
+        disabled = root_cfg.get(DISABLED_LEVELS_KEY)
+        if not isinstance(disabled, dict):
+            disabled = root_cfg.get(LEGACY_DISABLED_LEVELS_KEY, {}) or {}
+        if isinstance(disabled, dict):
+            self.disabled_levels = {str(lid): cfg for lid, cfg in disabled.items() if isinstance(cfg, dict)}
+
+        self.physics = copy.deepcopy(root_cfg.get('physics', {}) or {})
+
+    def _levels_dict(self, data, create=False):
+        root_cfg = self._root_cfg(data, create=create)
+        levels = root_cfg.get('levels')
+        if not isinstance(levels, dict):
+            if create:
+                root_cfg['levels'] = {}
+                return root_cfg['levels']
+            return {}
+        return levels
+
+    def _disabled_levels_dict(self, data, create=False):
+        root_cfg = self._root_cfg(data, create=create)
+        levels = root_cfg.get(DISABLED_LEVELS_KEY)
+        if not isinstance(levels, dict):
+            if create:
+                root_cfg[DISABLED_LEVELS_KEY] = {}
+                return root_cfg[DISABLED_LEVELS_KEY]
+            legacy = root_cfg.get(LEGACY_DISABLED_LEVELS_KEY, {})
+            return legacy if isinstance(legacy, dict) else {}
+        return levels
+
+    def is_file_for_game(self, path):
+        name = Path(path).name.lower()
+        known = {Path(cfg.get('file', '')).name.lower() for cfg in list(self.levels.values()) + list(self.disabled_levels.values())}
+        if name in known:
+            return True
+        for pattern in GAME_FILE_GLOBS.get(self.game, []):
+            if fnmatch.fnmatch(name, pattern.lower()):
+                return True
+        return False
+
     def get_level_file_path(self, lid):
-        lc=self.levels.get(lid); fn=lc.get('file','') if lc else ''
-        if not fn: return None
-        for b in ([self.levels_dir] if self.levels_dir else [])+([self.config_path.parent] if self.config_path else []):
-            p=Path(b)/fn
-            if p.exists(): return str(p)
+        lc = self.levels.get(lid) or self.disabled_levels.get(lid)
+        fn = lc.get('file', '') if lc else ''
+        if not fn:
+            return None
+        for b in ([self.levels_dir] if self.levels_dir else []) + ([self.config_path.parent] if self.config_path else []):
+            p = Path(b) / fn
+            if p.exists():
+                return str(p)
         return str(Path(fn).resolve()) if Path(fn).exists() else None
+
     def get_all_level_files(self, extra_path=None):
         fs=set(); seen=set()
         def _a(p):
             try: rp=Path(p).resolve()
             except: rp=Path(p)
             if rp not in seen and rp.exists() and rp.is_dir():
-                seen.add(rp); [fs.add(f) for f in rp.glob("*.txt")]
+                seen.add(rp)
+                for f in rp.glob("*.txt"):
+                    if self.is_file_for_game(f):
+                        fs.add(f)
         if self.levels_dir: _a(self.levels_dir)
         if self.config_path: _a(self.config_path.parent)
-        if extra_path: _a(Path(extra_path).parent)
+        if extra_path:
+            extra = Path(extra_path)
+            _a(extra.parent)
+            if extra.exists():
+                fs.add(extra.resolve())
         return sorted(fs,key=lambda p:p.name)
     # ── Key-matching helpers ─────────────────────────────────────
     # YAML keys can appear unquoted, single-quoted, or double-quoted:
@@ -416,25 +553,7 @@ class GameConfig:
     }
 
     def get_commented_levels(self):
-        """Find all commented-out level keys in game_config.yaml."""
-        if not self.config_path: return {}
-        try: text = self.config_path.read_text()
-        except: return {}
-        d = {}
-        # Match:  #  "key":  OR  # 'key':  OR  # key:
-        # Capture the key name from any quote style
-        for m in re.finditer(
-            r'^\s*#\s*(?:"([^"]+)"|\'([^\']+)\'|([^\s:][^:]*?)):\s*$',
-            text, re.MULTILINE
-        ):
-            lid = m.group(1) or m.group(2) or m.group(3)
-            if not lid: continue
-            lid = lid.strip()
-            # Skip known level sub-property keys (e.g. background_color, time_limit)
-            if lid in self._LEVEL_SUBKEYS: continue
-            if lid not in self.levels:
-                d[lid] = True
-        return d
+        return dict(self.disabled_levels)
 
     def _get_commented_file(self, lid):
         if not self.config_path: return None
@@ -449,103 +568,79 @@ class GameConfig:
         return fm.group(1) if fm else None
 
     def toggle_level_in_config(self, lid, enable):
-        if not self.config_path or yaml is None: return False
-        try: text = self.config_path.read_text()
-        except: return False
-        lines = text.split('\n'); nl = []; ib = False; bi = 0
-        if enable:
-            # Uncomment a previously commented-out level block
-            for line in lines:
-                s = line.lstrip()
-                if not ib and self._is_commented_key(s, lid):
-                    ib = True
-                    nl.append(line.replace('# ', '', 1) if '# ' in line else line.replace('#', '', 1))
-                    continue
-                if ib:
-                    if s.startswith('#') and (s[1:].startswith('  ') or s[1:].startswith(' ')):
-                        nl.append(line.replace('# ', '', 1) if '# ' in line else line.replace('#', '', 1))
-                    else:
-                        ib = False; nl.append(line)
-                else:
-                    nl.append(line)
-        else:
-            # Comment out an active level block
-            for line in lines:
-                s = line.lstrip(); ind = len(line) - len(s)
-                if not ib and self._is_key(s, lid):
-                    ib = True; bi = ind
-                    nl.append(' ' * ind + '# ' + s); continue
-                if ib:
-                    # Keep commenting lines that are deeper-indented (children)
-                    if s and ind > bi:
-                        nl.append(' ' * ind + '# ' + s)
-                    else:
-                        ib = False; nl.append(line)
-                else:
-                    nl.append(line)
+        if not self.config_path or yaml is None:
+            return False
         try:
-            self.config_path.write_text('\n'.join(nl))
-            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self._load(); return True
-        except: return False
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+        except Exception:
+            return False
+        levels = self._levels_dict(data, create=True)
+        disabled = self._disabled_levels_dict(data, create=True)
+        if enable:
+            if lid in disabled:
+                levels[lid] = disabled.pop(lid)
+        else:
+            if lid in levels:
+                disabled[lid] = levels.pop(lid)
+        if not disabled:
+            self._root_cfg(data, create=True).pop(DISABLED_LEVELS_KEY, None)
+        if self._write_yaml(data):
+            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self.disabled_levels = {}; self._load(); return True
+        return False
 
     def reorder_levels(self, new_order):
         if not self.config_path or yaml is None: return False
         try:
-            with open(self.config_path, 'r') as f: data = yaml.safe_load(f) or {}
+            with open(self.config_path, 'r', encoding='utf-8') as f: data = yaml.safe_load(f) or {}
         except: return False
-        ol = data.get('levels', {}) or {}; nv = {}
+        ol = self._levels_dict(data, create=True); nv = {}
         for lid in new_order:
             if lid in ol: nv[lid] = ol[lid]
         for lid, v in ol.items():
             if lid not in nv: nv[lid] = v
-        data['levels'] = nv
-        try:
-            with open(self.config_path, 'w') as f:
-                yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self._load(); return True
-        except: return False
+        self._root_cfg(data, create=True)['levels'] = nv
+        if self._write_yaml(data):
+            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self.disabled_levels = {}; self._load(); return True
+        return False
 
     def assign_stage_to_level(self, filename, lid):
-        if not self.config_path: return False
-        try: text = self.config_path.read_text(encoding='utf-8')
-        except: return False
-        # Match existing entry with any key quoting
-        kp = self._key_re(lid)
-        ep = re.compile(r'([ \t]*' + kp + r':\s*\n[ \t]+file:\s*)["\']?[^"\'\n]+["\']?', re.MULTILINE)
-        if ep.search(text):
-            text = ep.sub(lambda m: m.group(1) + f'"{filename}"', text)
-        else:
-            lh = re.search(r'^levels:\s*$', text, re.MULTILINE)
-            if not lh: return False
-            ne = f'  "{lid}":\n    file: "{filename}"\n    time_limit: 300\n    background_color: [0, 0, 0]\n'
-            text = text[:lh.end()] + '\n' + ne + text[lh.end():]
+        if not self.config_path or yaml is None:
+            return False
         try:
-            self.config_path.write_text(text, encoding='utf-8')
-            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self._load(); return True
-        except: return False
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+        except Exception:
+            return False
+        levels = self._levels_dict(data, create=True)
+        entry = dict(levels.get(lid, self._default_level_entry(filename)))
+        entry['file'] = filename
+        levels[lid] = entry
+        disabled = self._disabled_levels_dict(data, create=True)
+        disabled.pop(lid, None)
+        if not disabled:
+            self._root_cfg(data, create=True).pop(DISABLED_LEVELS_KEY, None)
+        if self._write_yaml(data):
+            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self.disabled_levels = {}; self._load(); return True
+        return False
 
     def delete_level_from_config(self, lid):
-        if not self.config_path: return False
+        if not self.config_path or yaml is None:
+            return False
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f: lines = f.read().split('\n')
-        except: return False
-        nl = []; i = 0; skip = False; bi = -1
-        while i < len(lines):
-            line = lines[i]; s = line.lstrip(); ind = len(line) - len(s)
-            if not skip and self._is_key(s, lid) and ind <= 4:
-                skip = True; bi = ind; i += 1; continue
-            if skip:
-                if not s:
-                    nl.append(line); i += 1; continue
-                if ind > bi:
-                    i += 1; continue
-                else:
-                    skip = False
-            nl.append(line); i += 1
-        try:
-            self.config_path.write_text('\n'.join(nl), encoding='utf-8')
-            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self._load(); return True
-        except: return False
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+        except Exception:
+            return False
+        levels = self._levels_dict(data, create=True)
+        disabled = self._disabled_levels_dict(data, create=True)
+        levels.pop(lid, None)
+        disabled.pop(lid, None)
+        if not disabled:
+            self._root_cfg(data, create=True).pop(DISABLED_LEVELS_KEY, None)
+        if self._write_yaml(data):
+            self.yaml_data = {}; self.levels = {}; self.level_ids = []; self.disabled_levels = {}; self._load(); return True
+        return False
 
 # ═══════════════════════════════════════════════════════════════════
 # RENDERERS
@@ -559,17 +654,19 @@ def render_tile_object(surf, char, sx, sy, ts):
             t=create_tile(TILE_PLATFORM,0,0,True,COLOR_PLATFORM); t.gObj.width=t.gObj.height=ti; t.gObj.x=sx; t.gObj.y=sy; t.render(surf,0,0); return
         elif char=='^':
             t=create_tile(TILE_SPIKE,0,0,False,COLOR_SPIKE); t.gObj.width=t.gObj.height=ti; t.gObj.x=sx; t.gObj.y=sy; t.render(surf,0,0); return
+        elif char=='H':
+            Ladder.from_tile(sx, sy, ti).render(surf, sx, sy); return
         elif char=='G':
             Goal(gObj=GameObject(float(sx),float(sy),ti,ti)).render(surf,sx,sy); return
         elif char=='C':
             h2=ti//2; c=Coin(gObj=GameObject(float(sx+h2),float(sy+h2),ti,ti)); c.radius=max(4,h2-2); c.render(surf,sx+h2,sy+h2); return
         elif char=='E':
             Enemy(gObj=GameObject(float(sx),float(sy),ti,ti)).render(surf,sx,sy); return
-        elif char in ('?','>','<','F'):
-            cn={'?':'coin','>':'star','<':'mushroom','F':'flower'}[char]
+        elif char in ('?','>','<','F','L'):
+            cn={'?':'coin','>':'star','<':'mushroom','F':'flower','L':'life'}[char]
             QuestionBlock(gObj=GameObject(float(sx),float(sy),ti,ti),contains=cn).render(surf,sx,sy); return
     # Fallback rendering
-    if char==' ': pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); return
+    if char in (' ', '.'): pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); return
     if char in ('#','='):
         col=(139,69,19) if char=='#' else (205,133,63)
         pygame.draw.rect(surf,col,(sx,sy,ti,ti))
@@ -588,12 +685,13 @@ def render_tile_object(surf, char, sx, sy, ts):
                     s=pygame.Surface((min(cell,ti-ix),min(cell,ti-iy)),pygame.SRCALPHA); s.fill((180,30,50,120)); surf.blit(s,(sx+ix,sy+iy))
         pygame.draw.line(surf,(*UI_PIT_DIAG,200),(sx+2,sy+2),(sx+ti-2,sy+ti-2),2)
         pygame.draw.line(surf,(*UI_PIT_DIAG,200),(sx+ti-2,sy+2),(sx+2,sy+ti-2),2)
-    elif char in ('?','>','<','F'):
-        cols={'?':(255,165,0),'>':(255,215,0),'<':(255,68,68),'F':(255,102,0)}; col=cols.get(char,(255,165,0))
+    elif char in ('?','>','<','F','L'):
+        cols={'?':(255,165,0),'>':(255,215,0),'<':(255,68,68),'F':(255,102,0),'L':(90,220,120)}; col=cols.get(char,(255,165,0))
         pygame.draw.rect(surf,col,(sx,sy,ti,ti)); pygame.draw.rect(surf,tuple(max(0,c-40) for c in col),(sx,sy,ti,ti),max(1,ti//16))
         fsz=max(10,int(ti*0.55)); fnt=pygame.font.SysFont("Consolas",fsz,bold=True)
-        tcol=(80,60,0) if char in ('?','>') else (255,240,240) if char=='<' else (80,30,0)
-        t=fnt.render(char,True,tcol); surf.blit(t,t.get_rect(center=(sx+ti//2,sy+ti//2)))
+        tcol=(80,60,0) if char in ('?','>') else (255,240,240) if char=='<' else (0,60,20) if char=='L' else (80,30,0)
+        marker='1' if char=='L' else char
+        t=fnt.render(marker,True,tcol); surf.blit(t,t.get_rect(center=(sx+ti//2,sy+ti//2)))
     elif char=='C':
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2,cy2=sx+ti//2,sy+ti//2; r=max(3,ti//4)
         pygame.draw.circle(surf,(255,215,0),(cx2,cy2),r); pygame.draw.circle(surf,(184,134,11),(cx2,cy2),r,max(1,ti//16))
@@ -601,10 +699,32 @@ def render_tile_object(surf, char, sx, sy, ts):
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2,cy2=sx+ti//2,sy+ti//2; br=max(3,ti//4)
         pygame.draw.ellipse(surf,(139,69,19),(cx2-br,cy2-br//2,br*2,br)); er=max(1,ti//12)
         pygame.draw.circle(surf,(255,255,255),(cx2-er*2,cy2-er),er); pygame.draw.circle(surf,(255,255,255),(cx2+er*2,cy2-er),er)
+    elif char=='H':
+        rail=(120,215,255); rung=(240,240,200)
+        pygame.draw.line(surf,rail,(sx+ti*0.32,sy+2),(sx+ti*0.32,sy+ti-2),3)
+        pygame.draw.line(surf,rail,(sx+ti*0.68,sy+2),(sx+ti*0.68,sy+ti-2),3)
+        for off in (0.22, 0.44, 0.66, 0.84):
+            y2=int(sy+ti*off)
+            pygame.draw.line(surf,rung,(sx+ti*0.32,y2),(sx+ti*0.68,y2),2)
+    elif char=='M':
+        pygame.draw.rect(surf,(38,48,80),(sx,sy,ti,ti))
+        pygame.draw.rect(surf,(70,120,255),(sx+ti*0.12,sy+ti*0.45,ti*0.76,ti*0.38),border_radius=max(2,ti//10))
+        pygame.draw.rect(surf,(235,230,120),(sx+ti*0.2,sy+ti*0.18,ti*0.6,ti*0.32),border_radius=max(2,ti//10))
+        pygame.draw.circle(surf,(25,25,30),(int(sx+ti*0.35),int(sy+ti*0.58)),max(1,ti//14))
+        pygame.draw.circle(surf,(25,25,30),(int(sx+ti*0.65),int(sy+ti*0.58)),max(1,ti//14))
+    elif char=='B':
+        pygame.draw.rect(surf,(18,12,34),(sx,sy,ti,ti))
+        pygame.draw.polygon(surf,(190,120,255),[(sx+ti*0.18,sy+ti*0.48),(sx+ti*0.5,sy+ti*0.18),(sx+ti*0.42,sy+ti*0.56)])
+        pygame.draw.polygon(surf,(190,120,255),[(sx+ti*0.82,sy+ti*0.48),(sx+ti*0.5,sy+ti*0.18),(sx+ti*0.58,sy+ti*0.56)])
+        pygame.draw.ellipse(surf,(255,120,180),(sx+ti*0.34,sy+ti*0.42,ti*0.32,ti*0.28))
     elif char=='G':
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2=sx+ti//2; px=cx2-ti//8
         pygame.draw.line(surf,(136,136,136),(px,sy+ti*2//3),(px,sy+ti//6),2)
         pygame.draw.polygon(surf,(255,34,34),[(px+2,sy+ti//6),(px+ti//3,sy+ti//4),(px+2,sy+ti//3)])
+    elif char=='D':
+        pygame.draw.rect(surf,(40,16,24),(sx,sy,ti,ti))
+        pygame.draw.rect(surf,(255,90,140),(sx+4,sy+2,ti-8,ti-4),border_radius=max(2,ti//12))
+        pygame.draw.rect(surf,(60,10,30),(sx+8,sy+6,ti-16,ti-12),border_radius=max(2,ti//14))
     elif char=='P':
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2,cy2=sx+ti//2,sy+ti//2; hr=max(2,ti//6)
         pygame.draw.circle(surf,(255,204,170),(cx2,cy2-hr),hr)
@@ -633,7 +753,7 @@ def draw_palette_icon(surf, char, rect):
     x,y,w,h=rect.x,rect.y,rect.width,rect.height; cx,cy=x+w//2,y+h//2
     col=TILE_BY_CHAR.get(char,TILE_BY_CHAR[' '])[2]
     hi=tuple(min(255,c+70) for c in col); dk=tuple(max(0,c-40) for c in col)
-    if char==' ':
+    if char in (' ', '.'):
         for a in range(0,360,45):
             pygame.draw.circle(surf,(55,30,40),(cx+int(4*math.cos(math.radians(a))),cy+int(4*math.sin(math.radians(a)))),1)
     elif char=='O':
@@ -651,13 +771,16 @@ def draw_palette_icon(surf, char, rect):
         pygame.draw.rect(surf,col,(x+1,by2,w-2,bh2),border_radius=3); pygame.draw.rect(surf,hi,(x+1,by2,w-2,bh2),1,border_radius=3)
     elif char=='^':
         pts=[(cx,y+2),(x+2,y+h-2),(x+w-2,y+h-2)]; pygame.draw.polygon(surf,col,pts); pygame.draw.polygon(surf,(255,100,100),pts,1)
-    elif char in ('?','>','<','F'):
-        qc={'?':(210,170,30),'>':(240,200,50),'<':(195,80,70),'F':(240,110,20)}[char]
+    elif char in ('?','>','<','F','L'):
+        qc={'?':(210,170,30),'>':(240,200,50),'<':(195,80,70),'F':(240,110,20),'L':(90,220,120)}[char]
         pygame.draw.rect(surf,qc,(x+2,y+2,w-4,h-4),border_radius=3)
         pygame.draw.rect(surf,tuple(min(255,c+60) for c in qc),(x+2,y+2,w-4,h-4),1,border_radius=3)
         if char=='?': pygame.draw.circle(surf,(40,30,0),(cx,cy-1),max(2,w//6))
         elif char=='>': pygame.draw.polygon(surf,(40,30,0),[(cx,y+4),(x+w-3,cy),(cx,y+h-4)])
         elif char=='<': pygame.draw.rect(surf,(40,30,0),(cx-2,cy-2,4,4),border_radius=1)
+        elif char=='L':
+            pygame.draw.line(surf,(0,60,20),(cx,y+5),(cx,y+h-5),2)
+            pygame.draw.line(surf,(0,60,20),(cx,y+h-5),(x+w-4,y+h-5),2)
         elif char=='F':
             for a in range(0,360,72):
                 pygame.draw.circle(surf,(255,80,20),(cx+int((w//4)*math.cos(math.radians(a))),cy+int((h//4)*math.sin(math.radians(a)))),max(2,w//7))
@@ -668,9 +791,24 @@ def draw_palette_icon(surf, char, rect):
         r2=min(w,h)//2-2; pygame.draw.circle(surf,col,(cx,cy),r2)
         ey=cy-r2//4
         for ox in (-r2//3,r2//3): pygame.draw.circle(surf,(255,255,255),(cx+ox,ey),max(1,r2//3)); pygame.draw.circle(surf,(20,0,20),(cx+ox,ey),max(1,r2//5))
+    elif char=='H':
+        pygame.draw.line(surf,col,(x+w//3,y+3),(x+w//3,y+h-3),2)
+        pygame.draw.line(surf,col,(x+w*2//3,y+3),(x+w*2//3,y+h-3),2)
+        for yy in range(y+6, y+h-3, max(5, h//4)):
+            pygame.draw.line(surf,hi,(x+w//3,yy),(x+w*2//3,yy),2)
+    elif char=='M':
+        pygame.draw.rect(surf,(70,120,255),(x+3,y+h//2,w-6,h//3),border_radius=3)
+        pygame.draw.rect(surf,(235,230,120),(x+6,y+4,w-12,h//3),border_radius=3)
+    elif char=='B':
+        pygame.draw.polygon(surf,col,[(x+3,cy),(cx,y+3),(cx-2,cy+2)])
+        pygame.draw.polygon(surf,col,[(x+w-3,cy),(cx,y+3),(cx+2,cy+2)])
+        pygame.draw.circle(surf,(255,120,180),(cx,cy+2),max(2,w//7))
     elif char=='G':
         px2=cx-1; pygame.draw.line(surf,(200,200,200),(px2,y+2),(px2,y+h-2),2)
         pygame.draw.polygon(surf,col,[(px2+1,y+3),(x+w-2,y+3+h//4),(px2+1,y+3+h//2)])
+    elif char=='D':
+        pygame.draw.rect(surf,col,(x+3,y+2,w-6,h-4),border_radius=3)
+        pygame.draw.rect(surf,(60,10,30),(x+7,y+6,w-14,h-12),border_radius=3)
     elif char=='P':
         hr=max(3,h//5); pygame.draw.circle(surf,(80,180,255),(cx,y+h//3),hr)
         pygame.draw.rect(surf,(50,140,220),(cx-w//5,y+h//3+hr-1,w*2//5,h//3),border_radius=2)
@@ -784,7 +922,8 @@ class TBBtn:
 # ═══════════════════════════════════════════════════════════════════
 class Editor:
     def __init__(self, level, gc):
-        self.level=level; self.gc=gc
+        self.level=level; self.gc=gc; self.game=gc.game; self.game_label=gc.game_label
+        self.tile_entries=tile_entries_for(self.game)
         self.undo_stack=[]; self.redo_stack=[]
         self.selected_tile='#'; self.show_grid=True; self.fill_mode=False; self.eraser_mode=False
         self.cam_x=0.0; self.cam_y=0.0; self.zoom=1.0
@@ -876,7 +1015,7 @@ class Editor:
             self.undo_stack.clear(); self.redo_stack.clear()
             self.dirty=False; self._center(); self.browser_level_id=lid; return True
         except: return False
-    def brush(self): return ' ' if self.eraser_mode else self.selected_tile
+    def brush(self): return ' ' if self.eraser_mode or self.selected_tile==MOVING_PLATFORM_BRUSH else self.selected_tile
     def start_lv_drag(self,lid,si,my): self._drag_lid=lid;self._drag_si=si;self._drag_y=my;self._drag_di=si
     def finish_lv_drag(self):
         if not self._drag_lid: return
@@ -922,7 +1061,7 @@ def draw_platforms(surf,ed,vp):
         dash(surf,PLAT_PATH_COL,(bx+bw//2,by+bh//2),(ex+ew//2,ey+eh//2))
         for cx2,cy2,cl in [(bx+bw//2,by+bh//2,HANDLE_START),(ex+ew//2,ey+eh//2,HANDLE_END)]:
             pygame.draw.circle(surf,cl,(cx2,cy2),HANDLE_R); pygame.draw.circle(surf,(255,255,255),(cx2,cy2),HANDLE_R,2)
-    if ed.selected_tile=='M' and ed.plat_placing and ed.plat_ghost_end:
+    if ed.selected_tile==MOVING_PLATFORM_BRUSH and ed.plat_placing and ed.plat_ghost_end:
         sx0,sy0=ed.wp2s(*ed.plat_start_world); sw=int(PLAT_DEFAULT_W*ed.zoom);sh=int(PLAT_DEFAULT_H*ed.zoom)
         ex0,ey0=ed.wp2s(*ed.plat_ghost_end)
         g1=pygame.Surface((max(1,sw),max(1,sh)),pygame.SRCALPHA);g1.fill((*PLAT_BODY_COL,160));surf.blit(g1,(sx0,sy0))
@@ -982,10 +1121,10 @@ def draw_left_panel(surf,ed,font,sfont):
     pygame.draw.rect(surf,UI_PANEL,(0,TOOLBAR_H,px,WINDOW_H-TOOLBAR_H-STATUS_H))
     pygame.draw.line(surf,UI_BORDER,(px-1,TOOLBAR_H),(px-1,WINDOW_H-STATUS_H),1)
     y=TOOLBAR_H+10
-    try:sfont.render_to(surf,(pad+2,y),"TILES",fgcolor=UI_SUBTEXT,size=11)
+    try:sfont.render_to(surf,(pad+2,y),f"TILES  {ed.game.upper()}",fgcolor=UI_SUBTEXT,size=11)
     except:pass
     y+=16;cw=(px-pad*2-4)//2;th=34;ics=24;gap=3;ed._tile_rects.clear()
-    for idx,tile in enumerate(TILES):
+    for idx,tile in enumerate(ed.tile_entries):
         char,label,color,tcol=tile;ci=idx%2;ri=idx//2
         tx=pad+ci*(cw+gap);ty=y+ri*(th+gap);rect=pygame.Rect(tx,ty,cw,th);ed._tile_rects[char]=rect
         sel=char==ed.selected_tile and not ed.eraser_mode
@@ -994,7 +1133,7 @@ def draw_left_panel(surf,ed,font,sfont):
         try:sfont.render_to(surf,(tx+ics+6,ty+th//2-5),label,fgcolor=UI_TEXT if sel else UI_SUBTEXT,size=10)
         except:pass
         if sel:pygame.draw.rect(surf,UI_ACCENT,rect,2,border_radius=4)
-    rn=math.ceil(len(TILES)/2);y+=rn*(th+gap)+8
+    rn=math.ceil(len(ed.tile_entries)/2);y+=rn*(th+gap)+8
     pygame.draw.line(surf,UI_BORDER,(pad,y),(px-pad,y),1);y+=8
     try:sfont.render_to(surf,(pad+2,y),"TOOLS",fgcolor=UI_SUBTEXT,size=11)
     except:pass
@@ -1012,11 +1151,11 @@ def draw_left_panel(surf,ed,font,sfont):
     y+=32;pygame.draw.line(surf,UI_BORDER,(pad,y),(px-pad,y),1);y+=8
     try:sfont.render_to(surf,(pad+2,y),"PLATFORM",fgcolor=UI_SUBTEXT,size=11)
     except:pass
-    y+=14;pa=ed.selected_tile=='M';pr=pygame.Rect(pad,y,px-pad*2,26);ed._tool_rects['platform']=pr
+    y+=14;pa=ed.selected_tile==MOVING_PLATFORM_BRUSH;pr=pygame.Rect(pad,y,px-pad*2,26);ed._tool_rects['platform']=pr
     pygame.draw.rect(surf,UI_BTN_ACT if pa else UI_BTN,pr,border_radius=4)
     ico=pygame.Rect(pad+6,y+10,18,5);pygame.draw.rect(surf,PLAT_BODY_COL,ico,border_radius=1)
     pygame.draw.circle(surf,HANDLE_START,(ico.x+3,ico.centery),3);pygame.draw.circle(surf,HANDLE_END,(ico.x+ico.w-3,ico.centery),3)
-    try:sfont.render_to(surf,(pad+28,y+7),"M  Platform",fgcolor=UI_TEXT if pa else UI_SUBTEXT,size=11)
+    try:sfont.render_to(surf,(pad+28,y+7),"V  Platform",fgcolor=UI_TEXT if pa else UI_SUBTEXT,size=11)
     except:pass
     if pa:pygame.draw.rect(surf,UI_ACCENT,pr,1,border_radius=4)
     y+=30;sr=pygame.Rect(pad,y,px-pad*2,24)
@@ -1042,7 +1181,7 @@ def draw_left_panel(surf,ed,font,sfont):
     for kt,dt in [("LClick","Paint"),("RClick","Erase"),("MDrag","Pan"),("Scroll","Zoom"),
                    ("Ctrl+S","Save"),("Ctrl+O","Open"),("Ctrl+N","New"),("Ctrl+R","Resize"),
                    ("Ctrl+P","Play"),("Ctrl+Z","Undo"),("Ctrl+Y","Redo"),("Ctrl+X","Clear"),
-                   ("G","Grid"),("F","Fill"),("X","Eraser"),("M","Platform"),("Del","Del plat"),
+                   ("G","Grid"),("F","Fill"),("X","Eraser"),("V","Platform"),("Del","Del plat"),
                    ("Home","Reset"),("1-0","Tiles"),("Esc","Cancel")]:
         if y+12>WINDOW_H-STATUS_H-4:break
         try:
@@ -1132,7 +1271,7 @@ def draw_right_panel(surf,ed,sfont,mpos):
             y+=32
     # Unlisted files
     af=gc.get_all_level_files(extra_path=ed.level.filename)
-    lf={gc.levels.get(l,{}).get('file','') for l in gc.level_ids}
+    lf={cfg.get('file','') for cfg in list(gc.levels.values()) + list(gc.disabled_levels.values())}
     ul=[f for f in af if f.name not in lf]
     if ul:
         y+=6;pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
@@ -1237,7 +1376,7 @@ def draw_toolbar(surf,ed,sfont,btns,mpos):
     pygame.draw.line(surf,UI_BORDER,(0,TOOLBAR_H-1),(WINDOW_W,TOOLBAR_H-1),1)
     try:
         sfont.render_to(surf,(10,8),"PEAK",fgcolor=UI_ACCENT,size=18)
-        sfont.render_to(surf,(10,30),"Level Editor",fgcolor=UI_SUBTEXT,size=11)
+        sfont.render_to(surf,(10,30),f"Level Editor  {ed.game_label}",fgcolor=UI_SUBTEXT,size=11)
     except:pass
     title=""
     if ed.level.filename:title=Path(ed.level.filename).name
@@ -1279,11 +1418,11 @@ def draw_status(surf,ed,sfont):
     y=WINDOW_H-STATUS_H;pygame.draw.rect(surf,UI_STATUS,(0,y,WINDOW_W,STATUS_H))
     pygame.draw.line(surf,UI_BORDER,(0,y),(WINDOW_W,y),1)
     lv=ed.level
-    tl="Eraser" if ed.eraser_mode else ("Platform" if ed.selected_tile=='M' else TILE_BY_CHAR.get(ed.selected_tile,TILES[0])[1])
-    info=f"  {lv.rows}r x {lv.cols}c  |  Zoom {ed.zoom:.2f}x  |  Brush: {tl}  |  Plats: {len(lv.platforms)}"
-    if ed.hover_cell and ed.selected_tile!='M':
+    tl="Eraser" if ed.eraser_mode else ("Platform" if ed.selected_tile==MOVING_PLATFORM_BRUSH else TILE_BY_CHAR.get(ed.selected_tile,TILE_BY_CHAR[' '])[1])
+    info=f"  {ed.game_label}  |  {lv.rows}r x {lv.cols}c  |  Zoom {ed.zoom:.2f}x  |  Brush: {tl}  |  Plats: {len(lv.platforms)}"
+    if ed.hover_cell and ed.selected_tile!=MOVING_PLATFORM_BRUSH:
         hr,hc=ed.hover_cell;ch=lv.get(hr,hc)
-        info+=f"  |  [{hr},{hc}]: {TILE_BY_CHAR.get(ch,TILES[0])[1] if ch else 'Air'}"
+        info+=f"  |  [{hr},{hc}]: {TILE_BY_CHAR.get(ch,TILE_BY_CHAR[' '])[1] if ch else 'Air'}"
     bb=lv.bounding_box()
     if bb:info+=f"  |  Export: {bb[2]-bb[0]+3}r x {bb[3]-bb[1]+3}c"
     try:sfont.render_to(surf,(LEFT_PANEL_W,y+7),info,fgcolor=UI_SUBTEXT,size=11)
@@ -1319,7 +1458,7 @@ def launch_play(ed,scr,sf):
     env=os.environ.copy();env['PYTHONPATH']=(str(pr)+os.pathsep+env.get('PYTHONPATH','')).rstrip(os.pathsep)
     # Always pass --file so manual_play loads exactly the file being edited,
     # regardless of whether it's registered in game_config.yaml.
-    cmd=[sys.executable,ps,'--game','platformer','--file',str(Path(lv.filename).resolve())]
+    cmd=[sys.executable,ps,'--game',ed.gc.game,'--file',str(Path(lv.filename).resolve())]
     subprocess.Popen(cmd,env=env,cwd=str(pr))
 
 # ─── Toolbar action dispatcher ───────────────────────────────────
@@ -1359,17 +1498,28 @@ def do_action(result,ed,scr,sf):
 # ═══════════════════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════════════════
-def main():
+def parse_args(argv=None):
+    ap = argparse.ArgumentParser(description="PEAK level editor")
+    ap.add_argument("level", nargs="?", help="Optional level file to open")
+    ap.add_argument("--game", choices=sorted(GAME_LABELS.keys()), default=DEFAULT_GAME, help="Game ruleset/palette to edit")
+    return ap.parse_args(argv)
+
+def main(argv=None):
     global WINDOW_W,WINDOW_H
+    args=parse_args(argv)
     pygame.init();pygame.freetype.init()
     screen=pygame.display.set_mode((WINDOW_W,WINDOW_H),pygame.RESIZABLE)
-    pygame.display.set_caption("PEAK Level Editor v3.1")
+    pygame.display.set_caption(f"PEAK Level Editor v3.1 - {GAME_LABELS.get(args.game, args.game)}")
     font=pygame.freetype.SysFont("monospace",14);sfont=pygame.freetype.SysFont("monospace",14)
     clock=pygame.time.Clock()
-    gc=GameConfig();lv=Level(DEFAULT_ROWS,DEFAULT_COLS)
-    for r in range(DEFAULT_ROWS):lv.set(r,0,'#');lv.set(r,DEFAULT_COLS-1,'#')
-    for c in range(DEFAULT_COLS):lv.set(0,c,'#');lv.set(DEFAULT_ROWS-1,c,'#')
-    lv.set(DEFAULT_ROWS-2,2,'P')
+    gc=GameConfig(args.game)
+    if args.level:
+        lv=Level.load(args.level); lv.level_id=next((lid for lid,cfg in gc.levels.items() if Path(cfg.get('file','')).name==Path(args.level).name), None)
+    else:
+        lv=Level(DEFAULT_ROWS,DEFAULT_COLS)
+        for r in range(DEFAULT_ROWS):lv.set(r,0,'#');lv.set(r,DEFAULT_COLS-1,'#')
+        for c in range(DEFAULT_COLS):lv.set(0,c,'#');lv.set(DEFAULT_ROWS-1,c,'#')
+        lv.set(DEFAULT_ROWS-2,2,'P')
     ed=Editor(lv,gc);btns=build_tb()
     pstarted=False;running=True
     while running:
@@ -1470,12 +1620,12 @@ def main():
                                 if key=="eraser":ed.eraser_mode=not ed.eraser_mode
                                 elif key=="fill":ed.fill_mode=not ed.fill_mode
                                 elif key=="grid":ed.show_grid=not ed.show_grid
-                                elif key=="platform":ed.selected_tile='M';ed.plat_placing=False;ed.eraser_mode=False
+                                elif key=="platform":ed.selected_tile=MOVING_PLATFORM_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
                                 break
                         for ch,rect in ed._tile_rects.items():
                             if rect.collidepoint(ex,ey):ed.selected_tile=ch;ed.plat_placing=False;ed.eraser_mode=False;break
                     elif in_vp:
-                        if ed.selected_tile=='M' and not ed.eraser_mode:
+                        if ed.selected_tile==MOVING_PLATFORM_BRUSH and not ed.eraser_mode:
                             hi,hh=ed.ht_plat(ex,ey)
                             if hi is not None:
                                 ed.sel_plat_idx=hi;ed.drag_handle=hh;p=ed.level.platforms[hi]
@@ -1495,7 +1645,7 @@ def main():
                                 if not pstarted:ed.push_undo();pstarted=True
                                 ed.paint_char=brush;ed.painting=True;ed.last_cell=None;ed.paint_cell(r,c,ed.paint_char)
                 elif ev.button==3 and in_vp:
-                    if ed.selected_tile=='M':ed.plat_placing=False;ed.sel_plat_idx=None
+                    if ed.selected_tile==MOVING_PLATFORM_BRUSH:ed.plat_placing=False;ed.sel_plat_idx=None
                     elif ed.hover_cell:
                         if not pstarted:ed.push_undo();pstarted=True
                         ed.paint_char=' ';ed.painting=True;ed.last_cell=None;ed.paint_cell(ed.hover_cell[0],ed.hover_cell[1],' ')
@@ -1526,7 +1676,7 @@ def main():
                     tw=ed._hs_thumb.width if ed._hs_thumb.width>0 else 40
                     mc=max(0,ed.level.cols*TILE_SIZE*ed.zoom-vw2)
                     sh2=mc/max(1,vw2-tw);ed.cam_x=max(0.0,min(float(mc),ed._hs_dc+dx*sh2))
-                if ed.selected_tile=='M':
+                if ed.selected_tile==MOVING_PLATFORM_BRUSH:
                     if ed.drag_handle is not None and ed.sel_plat_idx is not None:
                         wx,wy=ed.s2wp(mpos[0]+ed.drag_offset[0],mpos[1]+ed.drag_offset[1],snap=True)
                         p=ed.level.platforms[ed.sel_plat_idx];wp=[wx-p.width/2,wy-p.height/2]
@@ -1553,18 +1703,18 @@ def main():
                 elif ev.key==pygame.K_g:ed.show_grid=not ed.show_grid
                 elif ev.key==pygame.K_f:ed.fill_mode=not ed.fill_mode
                 elif ev.key==pygame.K_x and not ctrl:ed.eraser_mode=not ed.eraser_mode
-                elif ev.key==pygame.K_m:ed.selected_tile='M';ed.plat_placing=False;ed.eraser_mode=False
+                elif ev.key==pygame.K_v:ed.selected_tile=MOVING_PLATFORM_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
                 elif ev.key==pygame.K_ESCAPE:
                     if ed._drag_lid:ed.cancel_lv_drag()
                     elif ed.plat_placing:ed.plat_placing=False
                     elif ed.eraser_mode:ed.eraser_mode=False
                 elif ev.key==pygame.K_DELETE:
-                    if ed.selected_tile=='M' and ed.sel_plat_idx is not None and 0<=ed.sel_plat_idx<len(ed.level.platforms):
+                    if ed.selected_tile==MOVING_PLATFORM_BRUSH and ed.sel_plat_idx is not None and 0<=ed.sel_plat_idx<len(ed.level.platforms):
                         ed.push_undo();ed.level.platforms.pop(ed.sel_plat_idx);ed.sel_plat_idx=None;ed.dirty=True
                 else:
                     for i,k in enumerate([pygame.K_1,pygame.K_2,pygame.K_3,pygame.K_4,pygame.K_5,
                                           pygame.K_6,pygame.K_7,pygame.K_8,pygame.K_9,pygame.K_0]):
-                        if ev.key==k and i<len(TILES):ed.selected_tile=TILES[i][0];ed.eraser_mode=False
+                        if ev.key==k and i<len(ed.tile_entries):ed.selected_tile=ed.tile_entries[i][0];ed.eraser_mode=False
         screen.fill(UI_BG)
         draw_viewport(screen,ed,font,sfont);draw_toolbar(screen,ed,sfont,btns,mpos)
         draw_left_panel(screen,ed,font,sfont);draw_right_panel(screen,ed,sfont,mpos)
