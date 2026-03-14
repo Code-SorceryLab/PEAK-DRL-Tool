@@ -25,6 +25,7 @@ class PhysicsContext:
     """
     Carries all physics constants for a frame.
     """
+    # Movement
     RUN_ACCEL: float = RUN_ACCEL
     WALK_ACCEL: float = WALK_ACCEL
     MAX_WALK_SPEED: float = MAX_WALK_SPEED
@@ -37,6 +38,7 @@ class PhysicsContext:
     FAST_FALL_GRAV: float = FAST_FALL_GRAV
     MAX_FALL_SPEED: float = MAX_FALL_SPEED
 
+    # Jump
     JUMP_VEL_MIN: float = JUMP_VEL_MIN
     JUMP_VEL_MAX: float = JUMP_VEL_MAX
     JUMP_HOLD_FRAMES: int = JUMP_HOLD_FRAMES
@@ -107,7 +109,7 @@ class SonicPhysicsManager:
             for spike in cached_spikes:
                 self.hazard_hash.insert(spike)
         for coin in level_data.coins:
-            if coin.gObj.active and not coin.collected: self.collectible_hash.insert(coin)
+            if coin.gObj.active and not getattr(coin, 'collected', False): self.collectible_hash.insert(coin)
         for pup in level_data.powerups:
             if pup.gObj.active: self.collectible_hash.insert(pup)
         for goal in level_data.goals:
@@ -122,7 +124,7 @@ class SonicPhysicsManager:
         level_data = core.level_data
 
         if player:
-            # FIX: Prevent Spin Dash from launching the player upwards
+            # Prevent Spin Dash from launching the player upwards
             if hasattr(player, 'state') and getattr(player.state, 'name', '') == "SPIN_DASH":
                 if hasattr(player, 'jump_buffer'):
                     player.jump_buffer = 0
@@ -202,7 +204,7 @@ class SonicPhysicsManager:
 
         self._resolve_dynamic_interactions(core, player_was_falling)
 
-        # ── 4. RESOLVE SLOPES FOR PLAYER & ENEMIES ──
+        # ── RESOLVE SLOPES FOR PLAYER & ENEMIES ──
         if player and core.alive:
             resolve_slopes(player, level_data.slope_tiles, level_data)
             apply_slope_speed(player, level_data.slope_tiles, core.dt)
@@ -364,10 +366,18 @@ class SonicPhysicsManager:
                 continue
 
             if tile_type == EntityType.SPIKE:
-                if not hasattr(player, 'power_machine') or not player.power_machine.is_invincible:
+                # SPIKE COLLISION
+                if getattr(player, 'invincible_timer', 0) > 0 or getattr(player, 'star_timer', 0) > 0:
+                    continue # Immune
+                    
+                rings_before = getattr(player, 'rings', 0)
+                dies = player.take_hit() if hasattr(player, 'take_hit') else True
+                
+                if dies:
                     core._handle_death("Spike")
-                    return
-                continue
+                elif rings_before > 0 and hasattr(core, '_scatter_rings'):
+                    core._scatter_rings(player, rings_before)
+                return
 
             if player.vy >= 0:
                 player.gObj.y    = trect.top - player.gObj.height
@@ -450,9 +460,6 @@ class SonicPhysicsManager:
                         core.score += int(core.timer)
                         core.reached_goal = True
                         core.complete_level()
-                elif t_type == EntityType.SPIKE:
-                    if not hasattr(source, 'power_machine') or not source.power_machine.is_invincible:
-                        core._handle_death("Spike")
 
             case EntityType.ENEMY:
                 if t_type == EntityType.ENEMY:
@@ -470,43 +477,56 @@ class SonicPhysicsManager:
     def _handle_player_enemy(self, core, player, enemy, player_was_falling):
         if not enemy.gObj.active: return
 
-        if hasattr(enemy, 'on_stomp'):
-            player_bottom = player.gObj.y + player.gObj.height
-            enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
-            enemy_rising  = hasattr(enemy, 'vy') and enemy.vy < 0
-            if (player_was_falling or enemy_rising) and player_bottom < enemy_center + 10:
-                enemy.on_stomp(player, core)
-            else:
-                enemy.on_touch(player, core)
-            return
-
-        player_bottom = player.gObj.y + player.gObj.height
-        enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
-
-        if player_was_falling and player_bottom < enemy_center + 10:
-            enemy.gObj.active = False
-            player.vy = JUMP_VEL_MIN * 0.6   
+        # 1. Star Power Invincibility
+        if getattr(player, 'star_timer', 0.0) > 0:
+            if hasattr(enemy, 'destroy'): enemy.destroy()
+            else: enemy.gObj.active = False
             core.score += 100
             if hasattr(core, 'kills_step'): core.kills_step += 1
+            if hasattr(core, 'badniks_destroyed'): core.badniks_destroyed += 1
             return
 
-        if hasattr(player, 'power_machine') and player.power_machine.is_star_active:
-            enemy.gObj.active = False
+        # 2. Sonic Ball Attack (Jumping, Rolling, Spindash)
+        if getattr(player, 'is_ball', False):
+            if hasattr(enemy, 'destroy'): enemy.destroy()
+            else: enemy.gObj.active = False
+            
+            if hasattr(player, 'bounce_off_enemy'):
+                player.bounce_off_enemy()
+                
             core.score += 100
             if hasattr(core, 'kills_step'): core.kills_step += 1
+            if hasattr(core, 'badniks_destroyed'): core.badniks_destroyed += 1
             return
 
-        survived = player.take_hit() if hasattr(player, 'take_hit') else False
-        if not survived:
+        # 3. Take Damage
+        if getattr(player, 'invincible_timer', 0.0) > 0:
+            return # Already invincible
+
+        rings_before = getattr(player, 'rings', 0)
+        dies = player.take_hit() if hasattr(player, 'take_hit') else True
+
+        if dies:
             core._handle_death("Enemy")
+        elif rings_before > 0 and hasattr(core, '_scatter_rings'):
+            core._scatter_rings(player, rings_before)
 
     def _handle_player_coin(self, core, player, coin):
-        if not coin.collected:
+        # Ignore lost rings that are still in grace period
+        if hasattr(coin, 'can_collect') and not coin.can_collect:
+            return
+
+        if not getattr(coin, 'collected', False):
             coin.gObj.active = False
-            coin.collected = True
+            if hasattr(coin, 'collected'):
+                coin.collected = True
             core.score += 10
             core.coins_step += 1
             core.coins_total += 1
+            if hasattr(player, 'rings'):
+                player.rings += 1
+            if hasattr(core, 'ring_total'):
+                core.ring_total += 1
 
     def _handle_projectile_enemy(self, core, proj, enemy):
         enemy.gObj.active = False
@@ -518,20 +538,18 @@ class SonicPhysicsManager:
         powerup.gObj.active = False
         core.powerups_step += 1
 
-        if not hasattr(player, 'power_machine'):
-            return
-
-        if powerup.kind == "mushroom":
-            player.power_machine.collect_mushroom()
+        kind = getattr(powerup, 'kind', 'star')
+        
+        if kind == "mushroom" or kind == "flower":
+            if hasattr(player, 'shield'):
+                player.shield = True
             core.score += 50
-        elif powerup.kind == "flower":
-            player.power_machine.collect_flower()
-            core.score += 50
-        elif powerup.kind == "life":
+        elif kind == "life":
             core.lives += 1
             core.score += 200
-        else:
-            player.power_machine.collect_star()
+        else: # Star
+            if hasattr(player, 'star_timer'):
+                player.star_timer = 10.0
             core.score += 100
 
     def _handle_enemy_enemy(self, core, e1, e2):
@@ -605,6 +623,7 @@ class SonicPhysicsManager:
             is_solid  = getattr(item, 'solid', False)
             gobj_tid  = item.gObj.type_id if hasattr(item.gObj, 'type_id') else EntityType.TILE
 
+            # Filter: pass solids, spikes, and qblocks through
             if not is_solid and gobj_tid not in (EntityType.SPIKE, EntityType.QBLOCK):
                 continue
 

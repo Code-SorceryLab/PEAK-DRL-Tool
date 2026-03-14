@@ -45,9 +45,9 @@ class Ring:
     is_lost: bool = False       # True = scattered ring after being hit
     vx: float = 0.0
     vy: float = 0.0
-    life: float = 0.0           # Seconds remaining before despawn
-    bounce_count: int = 0
-    can_collect: bool = True    # Brief grace period after scatter
+    lifetime: float = 0.0       # Seconds remaining before despawn
+    collect_delay: float = 0.0  # Seconds before it can be picked up again
+    can_collect: bool = True    # True if ready to be collected
 
     # Convenience properties matching other entity interfaces
     @property
@@ -71,8 +71,9 @@ class Ring:
             is_lost=True,
             vx=vx,
             vy=vy,
-            life=4.0,           # 4 seconds to re-collect
-            can_collect=False,   # Brief grace before collectible
+            lifetime=4.0,       # 4 seconds to re-collect
+            collect_delay=0.5,  # 0.5s grace period before it can be grabbed
+            can_collect=False,  
         )
         return ring
 
@@ -81,36 +82,23 @@ class Ring:
         self.animation_tick = (self.animation_tick + 1) % 120
 
         if self.is_lost:
-            # Physics for scattered ring
+            # Apply base physics (gravity and velocity)
             grav = context.GRAVITY if context else GRAVITY
             self.vy += grav * dt
             self.gObj.x += self.vx * dt
             self.gObj.y += self.vy * dt
 
-            # Bounce off floor (simple: if y > spawn level)
-            # In practice, PhysicsManager handles this
-            self.life -= dt
-            if self.life <= 0:
-                self.gObj.active = False
-
-            # Become collectible after 0.5s grace period
-            if self.life < 3.5:
-                self.can_collect = True
-
-            # Flicker near end of life
-            if self.life < 1.0 and int(self.life * 10) % 2 == 0:
-                pass  # Render handles flicker
+            # NOTE: Bouncing off walls/floors, horizontal friction, and 
+            # lifetime/delay countdowns are now explicitly handled by 
+            # sonic_core.py in the step() loop so they interact perfectly 
+            # with the level environment.
 
     # ── Render ───────────────────────────────────────────────────────────
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = False):
         if not self.gObj.active or self.collected:
             return
 
-        # Flicker effect for dying lost rings
-        if self.is_lost and self.life < 1.5 and int(self.life * 8) % 2 == 0:
-            return
-
-        # Bobbing animation for static rings
+        # Bobbing animation for static rings (lost rings don't bob, they bounce)
         bob = 0
         if not self.is_lost:
             bob = int(2 * math.sin(self.animation_tick * 0.1))
@@ -123,7 +111,8 @@ class Ring:
         pygame.draw.circle(surface, COLOR_RING, (cx, cy), radius)
         pygame.draw.circle(surface, COLOR_RING_INNER, (cx, cy), radius - 2)
         pygame.draw.circle(surface, COLOR_BLACK, (cx, cy), radius, 1)
-        # Inner hole (sky-colored or dark)
+        
+        # Inner hole
         pygame.draw.circle(surface, (0, 100, 200), (cx, cy), 3)
 
         # Shine highlight

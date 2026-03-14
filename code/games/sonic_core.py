@@ -591,9 +591,8 @@ class SonicCore(gymnasium.Env):
             if ring.gObj.active and not ring.collected:
                 self.physics_manager.collectible_hash.insert(ring)
         for ring in self.lost_rings:
-            if ring.gObj.active and ring.can_collect:
+            if ring.gObj.active and getattr(ring, 'can_collect', True):
                 self.physics_manager.collectible_hash.insert(ring)
-        # Ensure Springs populate in the collectible grid channel
         for spring in self.springs:
             if spring.gObj.active:
                 self.physics_manager.collectible_hash.insert(spring)
@@ -614,8 +613,37 @@ class SonicCore(gymnasium.Env):
         # ── Update entities ──────────────────────────────────────────────
         for ring in self.rings:
             ring.update(self.dt, self.physics_manager.context)
+            
         for ring in self.lost_rings:
+            if not ring.gObj.active: continue
+            
+            # Store previous Y velocity to calculate bounce
+            prev_vy = getattr(ring, 'vy', 0.0)
             ring.update(self.dt, self.physics_manager.context)
+            
+            # Decrease Lifetime
+            if hasattr(ring, 'lifetime'):
+                ring.lifetime -= self.dt
+                if ring.lifetime <= 0:
+                    ring.gObj.active = False
+                    continue
+            
+            # Allow recollection after delay
+            if hasattr(ring, 'collect_delay') and not getattr(ring, 'can_collect', True):
+                ring.collect_delay -= self.dt
+                if ring.collect_delay <= 0:
+                    ring.can_collect = True
+
+            # Bounce off static environment via AABB collision
+            nearby = self.physics_manager._get_tile_rects_near(self.level_data, ring.gObj)
+            self.physics_manager._solve_aabb_collision(ring, nearby, bounce_x=True)
+            
+            # Perform Y-Axis Bounce & Friction
+            if getattr(ring, 'vy', 0.0) == 0 and abs(prev_vy) > 20:
+                ring.vy = -abs(prev_vy) * 0.75
+                if hasattr(ring, 'vx'):
+                    ring.vx *= 0.9
+            
         for spring in self.springs:
             spring.update(self.dt)
 
@@ -692,7 +720,7 @@ class SonicCore(gymnasium.Env):
                 self.score += 10
 
         for ring in self.lost_rings:
-            if ring.gObj.active and ring.can_collect and p_rect.colliderect(ring.gObj.get_rect()):
+            if ring.gObj.active and getattr(ring, 'can_collect', True) and p_rect.colliderect(ring.gObj.get_rect()):
                 ring.gObj.active = False
                 p.rings += 1
                 self.ring_total += 1
@@ -708,10 +736,11 @@ class SonicCore(gymnasium.Env):
                     self.badniks_destroyed += 1
                     self.score += 100
                 else:
+                    rings_before = p.rings
                     if p.take_hit():
                         self._handle_death("Badnik")
-                    else:
-                        self._scatter_rings(p)
+                    elif rings_before > 0:
+                        self._scatter_rings(p, rings_before)
 
         for enemy in self.level_data.enemies:
             if enemy.gObj.active and p_rect.colliderect(enemy.gObj.get_rect()):
@@ -721,10 +750,11 @@ class SonicCore(gymnasium.Env):
                     self.kills_step += 1
                     self.score += 100
                 else:
+                    rings_before = p.rings
                     if p.take_hit():
                         self._handle_death("Enemy")
-                    else:
-                        self._scatter_rings(p)
+                    elif rings_before > 0:
+                        self._scatter_rings(p, rings_before)
 
         for spring in self.springs:
             if spring.gObj.active and p_rect.colliderect(spring.gObj.get_rect()):
@@ -738,20 +768,38 @@ class SonicCore(gymnasium.Env):
                 self.score += p.rings * 100
                 self.complete_level()
 
-    def _scatter_rings(self, player: SonicPlayer):
-        scatter_count = min(player.rings, 32)
+    def _scatter_rings(self, player: SonicPlayer, rings_lost: int):
+        scatter_count = min(rings_lost, 32)
         if scatter_count == 0: return
 
-        cx = player.gObj.x + player.gObj.width / 2
-        cy = player.gObj.y + player.gObj.height / 2
-        angle_step = (2 * math.pi) / max(scatter_count, 1)
+        cx = player.gObj.x + player.gObj.width / 2 - 8
+        cy = player.gObj.y + player.gObj.height / 2 - 8
+        
+        # Sonic ring scatter logic (Two concentric circles)
+        angle_step = (2 * math.pi) / 16
         
         for i in range(scatter_count):
-            angle = i * angle_step + random.uniform(-0.2, 0.2)
-            speed = random.uniform(150, 350)
+            angle = i * angle_step
+            # Inner circle is slower, offset angle slightly
+            if i >= 16:
+                angle += angle_step / 2.0
+                speed = 200.0
+            else:
+                speed = 400.0
+                
             vx = math.cos(angle) * speed
-            vy = math.sin(angle) * speed - 200
+            vy = math.sin(angle) * speed
+            
             lost = Ring.create_lost_ring(cx, cy, vx, vy)
+            
+            # Ensure properties exist for our bouncing/vanishing logic
+            if not hasattr(lost, 'lifetime'):
+                lost.lifetime = 4.0
+            if not hasattr(lost, 'can_collect'):
+                lost.can_collect = False
+            if not hasattr(lost, 'collect_delay'):
+                lost.collect_delay = 0.5
+                
             self.lost_rings.append(lost)
 
     # =========================================================================
@@ -885,6 +933,19 @@ class SonicCore(gymnasium.Env):
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
+        # Prevent instant death from Environmental Hazards (Spikes) if Sonic has rings or shield
+        if cause in ("Spike", "Enemy", "Badnik") and self.player:
+            # First check if Sonic is already invincible
+            if self.player.invincible_timer > 0 or self.player.star_timer > 0:
+                return False
+                
+            rings_before = self.player.rings
+            if not self.player.take_hit():
+                # Survived because he had rings or a shield
+                if rings_before > 0:
+                    self._scatter_rings(self.player, rings_before)
+                return False
+                
         self.death_cause = cause
         self.lives = max(0, self.lives - 1)
         if self.lives > 0:
@@ -1176,6 +1237,12 @@ class SonicCore(gymnasium.Env):
         for lst in [self.rings, self.lost_rings, self.badniks, self.level_data.enemies, self.springs]:
             for obj in lst:
                 if getattr(obj, 'collected', False) or not obj.gObj.active: continue
+                
+                # Blink logic for vanishing lost rings
+                if getattr(obj, 'is_lost', False) and getattr(obj, 'lifetime', 99) < 1.5:
+                    if self.frame % 10 < 5:
+                        continue
+                        
                 ox, oy = obj.gObj.x - cx, obj.gObj.y - cy
                 if -32 < ox < cw + 32 and -32 < oy < ch + 32: obj.render(surface, ox, oy)
         for goal in self.level_data.goals:
