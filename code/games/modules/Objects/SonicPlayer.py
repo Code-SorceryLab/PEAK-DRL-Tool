@@ -189,7 +189,6 @@ class SonicPlayer:
         self.dt = dt
         self.anim_tick += 1
 
-        # Tick timers
         if self.invincible_timer > 0:
             self.invincible_timer = max(0, self.invincible_timer - dt)
         if self.star_timer > 0:
@@ -199,46 +198,34 @@ class SonicPlayer:
             if self.hurt_timer <= 0:
                 self.state = SonicState.IDLE
 
-        # State machine
         self._update_state(dt, context)
-
-        # Physics
         self._apply_physics(dt, context)
 
-        # Gravity
         grav = context.FAST_FALL_GRAV if self.vy > 0 else context.GRAVITY
         self.vy = min(self.vy + grav * dt, context.MAX_FALL_SPEED)
 
-        # Integration
         self.gObj.x += self.vx * dt
         self.gObj.y += self.vy * dt
         self.on_ground = False
 
-        # Facing direction (not while hurt)
         if self.state != SonicState.HURT:
             if self.vx > 1.0:
                 self.facing_right = True
             elif self.vx < -1.0:
                 self.facing_right = False
 
-        # Ball state
         self.is_ball = self.state in (
             SonicState.JUMPING, SonicState.ROLLING, SonicState.SPIN_DASH
         )
 
-        # Ball rotation
         if self.is_ball and abs(self.vx) > 10:
             self.ball_rotation += self.vx * dt * 0.05
 
     def _update_state(self, dt, context):
-        """State machine transitions."""
-        if self.state == SonicState.HURT:
-            return  # Can't act while hurt
+        if self.state == SonicState.HURT: return
 
-        # ── Spin Dash ────────────────────────────────────────────────────
         if self.state == SonicState.SPIN_DASH:
             if not self.down_held:
-                # Release spin dash!
                 speed = SPIN_DASH_MIN + self.spin_dash_rev
                 speed = min(speed, SPIN_DASH_MAX)
                 self.vx = speed if self.facing_right else -speed
@@ -246,42 +233,31 @@ class SonicPlayer:
                 self.spin_dash_charge = 0
                 self.spin_dash_rev = 0.0
                 return
-
-            # Charge with jump taps
             if self.jump_pressed and not self.last_jump_pressed:
                 self.spin_dash_charge = min(self.spin_dash_charge + 1, SPIN_DASH_CHARGES_MAX)
                 self.spin_dash_rev = self.spin_dash_charge * SPIN_DASH_CHARGE_RATE
             return
 
-        # ── Crouching / Roll initiation ──────────────────────────────────
         if self.on_ground and self.down_held:
             if abs(self.vx) > ROLL_SPEED_THRESHOLD:
                 self.state = SonicState.ROLLING
             elif self.state not in (SonicState.ROLLING, SonicState.SPIN_DASH):
                 self.state = SonicState.CROUCHING
-                # Start spin dash on jump while crouching
                 if self.jump_pressed and not self.last_jump_pressed:
                     self.state = SonicState.SPIN_DASH
                     self.spin_dash_charge = 0
                     self.spin_dash_rev = 0.0
                 return
 
-        # ── Jumping ──────────────────────────────────────────────────────
         if not self.on_ground:
-            if self.vy < 0:
-                self.state = SonicState.JUMPING
-            else:
-                self.state = SonicState.FALLING
+            self.state = SonicState.JUMPING if self.vy < 0 else SonicState.FALLING
             return
 
-        # ── Rolling on ground ────────────────────────────────────────────
         if self.state == SonicState.ROLLING:
             if abs(self.vx) < 30.0:
-                # Too slow, uncurl
                 self.state = SonicState.IDLE
             return
 
-        # ── Ground states ────────────────────────────────────────────────
         if self.up_held and abs(self.vx) < 10:
             self.state = SonicState.LOOKING_UP
             return
@@ -305,50 +281,36 @@ class SonicPlayer:
                 self.state = SonicState.WALKING
 
     def _apply_physics(self, dt, ctx):
-        """Sonic-specific momentum physics."""
         if self.state == SonicState.HURT:
-            # Knockback deceleration
             friction = GROUND_FRICTION * 0.5 * dt
-            if self.vx > 0:
-                self.vx = max(0.0, self.vx - friction)
-            elif self.vx < 0:
-                self.vx = min(0.0, self.vx + friction)
+            if self.vx > 0: self.vx = max(0.0, self.vx - friction)
+            elif self.vx < 0: self.vx = min(0.0, self.vx + friction)
             return
 
         if self.state == SonicState.SPIN_DASH:
-            self.vx *= 0.95  # Slow to a stop
+            self.vx *= 0.95
             return
 
-        # ── Rolling physics ──────────────────────────────────────────────
         if self.state == SonicState.ROLLING:
-            # High speed, low friction when rolling
             friction = ROLL_FRICTION * dt
-            if self.vx > 0:
-                self.vx = max(0.0, self.vx - friction)
-            elif self.vx < 0:
-                self.vx = min(0.0, self.vx + friction)
+            if self.vx > 0: self.vx = max(0.0, self.vx - friction)
+            elif self.vx < 0: self.vx = min(0.0, self.vx + friction)
             self._handle_jump(dt, ctx)
             return
 
-        # ── Normal movement ──────────────────────────────────────────────
         target_max = ctx.MAX_RUN_SPEED if hasattr(ctx, 'MAX_RUN_SPEED') and self.run_held else MAX_WALK_SPEED
         accel_rate = ctx.RUN_ACCEL if hasattr(ctx, 'RUN_ACCEL') and self.run_held else WALK_ACCEL
 
-        # Air acceleration is doubled in classic Sonic
         if not self.on_ground:
             accel_rate *= 2.0
 
         if self.input_dir != 0:
-            skidding = (self.vx > 0 and self.input_dir < 0) or \
-                       (self.vx < 0 and self.input_dir > 0)
+            skidding = (self.vx > 0 and self.input_dir < 0) or (self.vx < 0 and self.input_dir > 0)
 
             if skidding:
-                # Decelerate when pushing opposite direction
                 decel = SKID_DECEL if self.on_ground else accel_rate
                 self.vx += self.input_dir * decel * dt
             else:
-                # Fix Discrepancy 1: Momentum Clamping
-                # Accelerate towards max, but DO NOT clamp if we are already exceeding it!
                 if self.input_dir > 0:
                     if self.vx < target_max:
                         self.vx = min(self.vx + accel_rate * dt, target_max)
@@ -356,22 +318,14 @@ class SonicPlayer:
                     if self.vx > -target_max:
                         self.vx = max(self.vx - accel_rate * dt, -target_max)
         else:
-            # No directional input
             if self.on_ground:
                 friction = GROUND_FRICTION * dt
-                if self.vx > 0:
-                    self.vx = max(0.0, self.vx - friction)
-                elif self.vx < 0:
-                    self.vx = min(0.0, self.vx + friction)
-            else:
-                # Fix Discrepancy 4: Zero Air Friction
-                # Sonic maintains his momentum perfectly if you let go of the D-Pad in mid-air
-                pass
+                if self.vx > 0: self.vx = max(0.0, self.vx - friction)
+                elif self.vx < 0: self.vx = min(0.0, self.vx + friction)
 
         self._handle_jump(dt, ctx)
 
     def _handle_jump(self, dt, ctx):
-        """Fix Discrepancy 3: The Velocity Chop jump."""
         if self.jump_pressed and not self.last_jump_pressed:
             self.jump_buffer = JUMP_BUFFER_FRAMES
 
@@ -379,10 +333,8 @@ class SonicPlayer:
         if self.jump_buffer > 0:
             self.jump_buffer -= 1
 
-        # Instant Takeoff
         if self.coyote > 0 and self.jump_buffer > 0:
             base_jump = ctx.JUMP_VEL_MAX if hasattr(ctx, 'JUMP_VEL_MAX') else JUMP_VEL_MAX
-            # Tiny bonus based on momentum
             bonus = min(80.0, abs(self.vx) * SPEED_JUMP_BONUS)
             self.vy = base_jump - bonus
             
@@ -391,25 +343,18 @@ class SonicPlayer:
             self.jump_buffer = 0
             self.state = SonicState.JUMPING
 
-        # The "Velocity Chop" for variable jump height
-        # If Sonic is moving upwards, and the player RELEASES jump, aggressively cut speed
         if not self.jump_pressed and not self.on_ground and self.vy < 0:
             chop_vel = ctx.JUMP_VEL_MIN if hasattr(ctx, 'JUMP_VEL_MIN') else JUMP_VEL_MIN
             if self.vy < chop_vel:
                 self.vy = chop_vel
 
-    # =====================================================================
-    # DAMAGE
-    # =====================================================================
     def take_hit(self) -> bool:
         if self.invincible_timer > 0 or self.star_timer > 0:
             return False
-
         if self.shield:
             self.shield = False
             self.invincible_timer = 1.0
             return False
-
         if self.rings > 0:
             self.rings = 0
             self.state = SonicState.HURT
@@ -418,7 +363,6 @@ class SonicPlayer:
             self.vy = -300.0
             self.vx = -120.0 if self.facing_right else 120.0
             return False
-
         return True
 
     def bounce_off_enemy(self):
@@ -431,9 +375,28 @@ class SonicPlayer:
         self.on_ground = False
 
     # =====================================================================
-    # OBSERVATION VECTOR
+    # OBSERVATION VECTOR (FOR DRL AGENT)
     # =====================================================================
     def obs_vector(self, max_run_speed: float, max_fall_speed: float) -> np.ndarray:
+        """
+        Returns a flat float32 array of 13 state values relevant to the AI agent.
+        Matches the footprint of platformer_core to easily hot-swap environments.
+
+        Layout (13 values):
+        [0]  x position          (in tiles, unbounded)
+        [1]  y position          (in tiles, unbounded)
+        [2]  velocity x          (normalized [-1, 1])
+        [3]  velocity y          (normalized [-1, 1])
+        [4]  on_ground           (binary {0, 1})
+        [5]  is_ball             (binary {0, 1} - safe to attack enemies!)
+        [6]  has_rings           (binary {0, 1} - indicates 1 hit point)
+        [7]  invincible          (binary {0, 1} - post-hit invulnerability)
+        [8]  facing_right        (binary {0, 1})
+        [9]  spin_dash_charge    (normalized [0, 1] - how much burst speed is queued)
+        [10] invincible_timer    (normalized [0, 1] - fraction of invincibility left)
+        [11] coyote_active       (binary {0, 1} - grace period for jumping off ledges)
+        [12] padding             (0.0 - reserved slot)
+        """
         charge_frac = self.spin_dash_charge / max(SPIN_DASH_CHARGES_MAX, 1)
         inv_frac = np.clip(self.invincible_timer / 2.0, 0.0, 1.0)
 
@@ -450,7 +413,7 @@ class SonicPlayer:
             charge_frac,
             inv_frac,
             1.0 if self.coyote > 0 else 0.0,
-            0.0, # Deprecated jump_extendable flag
+            0.0, 
         ], dtype=np.float32)
 
     # =====================================================================
@@ -549,7 +512,6 @@ class SonicPlayer:
         cx = int(sx + w // 2)
         cy = int(sy + h - 10)
         pygame.draw.ellipse(surface, COLOR_SONIC_BLUE, (int(sx + 2), int(sy + h // 2), int(w - 4), int(h // 2)))
-        
         pygame.draw.circle(surface, COLOR_WHITE, (int(cx + (3 if self.facing_right else -3)), int(cy - 4)), 3)
         pygame.draw.circle(surface, COLOR_BLACK, (int(cx + (4 if self.facing_right else -4)), int(cy - 4)), 1)
 
@@ -574,6 +536,7 @@ class SonicPlayer:
                 x1 = int(sx + w + offset)
                 x2 = int(x1 + length)
             y = int(sy + 6 + i * 6)
+            alpha = max(50, 200 - i * 40)
             pygame.draw.line(surface, COLOR_STREAK, (x1, y), (x2, y), 1)
 
     def _render_debug(self, surface, sx, sy, w, h):

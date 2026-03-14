@@ -31,7 +31,6 @@ import gymnasium
 from gymnasium import spaces
 import random
 
-# ── Imports: shared infrastructure from the existing package ─────────────────
 try:
     from .modules.System.EntityType import EntityType
     from .modules.Objects.GameObject import GameObject
@@ -43,7 +42,6 @@ try:
     from .modules.Objects.MovingPlatform import MovingPlatform
     from .modules.System.LevelLoader import LevelLoader, LevelData
     
-    # Import Base Context and our NEW Sonic Physics Manager
     from .modules.System.PhysicsManager import PhysicsContext
     from .modules.System.SonicPhysicsManager import SonicPhysicsManager
     
@@ -68,7 +66,6 @@ try:
         COLOR_POWERUP_STAR, COLOR_COIN, TILE_SIZE
     )
 except ImportError:
-    # ── Fallback: standalone / flat-directory mode ────────────────────────────
     from .modules.System.EntityType import EntityType
     from .modules.Objects.GameObject import GameObject
     from .modules.Objects.Tile import Tile, create_tile
@@ -93,8 +90,8 @@ except ImportError:
 
     class DebugManager:
         def __init__(self, **kw):
-            self.show_sensors = False
-            self.show_obs_panel = False
+            self.show_sensors = True
+            self.show_obs_panel = True
             self.free_cam_active = False
             self.slow_motion = False
             self.current_cam_move = (0, 0)
@@ -104,20 +101,26 @@ except ImportError:
 
 
 # =============================================================================
-# Dijkstra Pathfinding (reused from platformer_core)
+# Dijkstra Pathfinding Helper (Global Distance Map)
 # =============================================================================
 class DijkstraSolver:
-    """Flood-fill distance map from goals for RL observation."""
-    def __init__(self, grid, rows, cols):
+    """
+    Computes a 'heatmap' of distances from the Goal to every reachable tile.
+    Adapted for Sonic to heavily penalize vertical air jumps without platforms.
+    """
+    def __init__(self, grid: List[List[int]], rows: int, cols: int):
         self.grid = grid
         self.rows = rows
         self.cols = cols
         self.dist_map = np.full((rows, cols), float('inf'), dtype=np.float32)
 
-    def compute_map(self, goals, coins=None):
-        if coins is None:
-            coins = set()
+    def compute_map(self, goals: List[Tuple[int, int]], rings: Set[Tuple[int, int]] = None):
+        if rings is None:
+            rings = set()
+
+        MAX_JUMP_TILES = 6 
         SOLID = {TILE_GROUND, TILE_PLATFORM}
+
         pq = []
         for gx, gy in goals:
             if 0 <= gx < self.cols and 0 <= gy < self.rows:
@@ -125,44 +128,180 @@ class DijkstraSolver:
                 heapq.heappush(pq, (0.0, gx, gy))
 
         directions = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)]
+
         while pq:
-            dist, cx, cy = heapq.heappop(pq)
-            if dist > self.dist_map[cy][cx]:
+            current_dist, cx, cy = heapq.heappop(pq)
+            if current_dist > self.dist_map[cy][cx]:
                 continue
+
             for dx, dy in directions:
                 nx, ny = cx + dx, cy + dy
                 if not (0 <= nx < self.cols and 0 <= ny < self.rows):
                     continue
+
                 tile = self.grid[ny][nx]
                 if tile not in (TILE_AIR, TILE_GOAL, TILE_SPIKE):
-                    continue
-                if dy < 0:
-                    step = 3.5
-                elif dy > 0:
-                    step = 1.2
-                else:
-                    step = 2.0
+                    continue 
+
+                # Sonic is fast, horizontal is cheap
+                if dy < 0:          
+                    step_cost = 3.5
+                elif dy > 0:        
+                    step_cost = 1.2
+                else:               
+                    step_cost = 2.0
+
                 if dx != 0 and dy != 0:
-                    step *= 1.1
+                    step_cost *= 1.1   
+
                 if tile == TILE_SPIKE:
-                    step += 18.0
-                if (nx, ny) in coins:
-                    step -= 0.8
+                    step_cost += 18.0
+
+                if (nx, ny) in rings:
+                    step_cost -= 0.8
+
                 if ny + 1 < self.rows and self.grid[ny + 1][nx] in SOLID:
-                    step -= 1.0
+                    step_cost -= 1.0
                 if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
-                    step -= 0.5
-                step = max(1.0, step)
-                new_dist = dist + step
+                    step_cost -= 0.5
+                if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
+                    step_cost -= 0.2
+
+                # Floating-tile penalty for upward steps
+                if dy < 0:
+                    has_ground_nearby = any(
+                        ny + k < self.rows and self.grid[ny + k][nx] in SOLID
+                        for k in range(1, MAX_JUMP_TILES + 1)
+                    )
+                    if not has_ground_nearby:
+                        step_cost += 3.0
+
+                step_cost = max(1.0, step_cost)
+                new_dist  = current_dist + step_cost
                 if new_dist < self.dist_map[ny][nx]:
                     self.dist_map[ny][nx] = new_dist
                     heapq.heappush(pq, (new_dist, nx, ny))
 
-    def get_dist(self, x, y):
+    def get_dist(self, x: int, y: int) -> float:
         if 0 <= x < self.cols and 0 <= y < self.rows:
             d = self.dist_map[y][x]
             return d if d != float('inf') else -1.0
         return -1.0
+
+
+# =============================================================================
+# Jump Arc Precomputation (Physics-Aware Dijkstra Boost)
+# =============================================================================
+class JumpArcComputer:
+    """
+    Precomputes physically-accurate jump parabolas for Sonic to boost 
+    Dijkstra gradients towards jumpable platforms.
+    """
+    SPEED_FRACTIONS = [0.0, 0.5, 1.0]   
+    MAX_SIM_FRAMES  = 200                
+    DT              = 1.0 / 60.0
+
+    def __init__(self, physics_context, tile_size: int, obs_half: int):
+        self.tile_size = tile_size
+        self.obs_half = obs_half
+        self.arcs: dict = {}
+        self._precompute(physics_context)
+
+    def recompute(self, physics_context):
+        self.arcs.clear()
+        self._precompute(physics_context)
+
+    def _precompute(self, ctx):
+        for direction in (-1, 1):
+            for frac in self.SPEED_FRACTIONS:
+                speed = getattr(ctx, 'MAX_RUN_SPEED', 380.0) * frac
+                arc = self._simulate_arc(direction, speed, ctx)
+                self.arcs[(direction, frac)] = arc
+
+    def _simulate_arc(self, direction, speed, ctx):
+        """Simulates Sonic's explosive velocity jump."""
+        ts = self.tile_size
+        half = self.obs_half
+
+        vx = speed * direction
+        
+        # Sonic's explosive jump launch
+        base_jump = getattr(ctx, 'JUMP_VEL_MAX', -700.0)
+        bonus = min(80.0, abs(speed) * getattr(ctx, 'SPEED_JUMP_BONUS', 0.12))
+        vy = base_jump - bonus
+
+        x, y = 0.0, 0.0
+        offsets = []
+        visited = {(0, 0)}
+
+        for frame in range(self.MAX_SIM_FRAMES):
+            grav = getattr(ctx, 'FAST_FALL_GRAV', 2000.0) if vy > 0 else getattr(ctx, 'GRAVITY', 1100.0)
+            vy = min(vy + grav * self.DT, getattr(ctx, 'MAX_FALL_SPEED', 600.0))
+
+            x += vx * self.DT
+            y += vy * self.DT
+
+            tx = int(x // ts) if x >= 0 else -int((-x - 1) // ts) - 1
+            ty = int(y // ts) if y >= 0 else -int((-y - 1) // ts) - 1
+
+            if abs(tx) > half or abs(ty) > half:
+                break
+
+            tile = (tx, ty)
+            if tile not in visited:
+                visited.add(tile)
+                offsets.append((tx, ty, vy > 0))
+
+        return offsets
+
+    def compute_arc_grid(self, solid_grid, on_ground, obs_pad_x, obs_pad_y):
+        h, w = solid_grid.shape
+        arc_grid = np.zeros((h, w), dtype=np.float32)
+
+        if not on_ground:
+            return arc_grid
+
+        cx, cy = obs_pad_x, obs_pad_y
+
+        for arc_offsets in self.arcs.values():
+            for dx, dy, is_descending in arc_offsets:
+                lx = cx + dx
+                ly = cy + dy
+
+                if not (0 <= lx < w and 0 <= ly < h):
+                    continue
+
+                if solid_grid[ly, lx] > 0.5:
+                    break
+
+                below_ly = ly + 1
+                is_landing = False
+                if is_descending and below_ly < h:
+                    if solid_grid[below_ly, lx] > 0.5:
+                        is_landing = True
+
+                if is_landing:
+                    arc_grid[ly, lx] = max(arc_grid[ly, lx], 1.0)
+                else:
+                    arc_grid[ly, lx] = max(arc_grid[ly, lx], 0.5)
+
+        return arc_grid
+
+    def boost_dijkstra(self, dijkstra_grid, solid_grid, on_ground, obs_pad_x, obs_pad_y, landing_boost=0.4, flight_boost=0.2):
+        h, w = dijkstra_grid.shape
+        if not on_ground:
+            return dijkstra_grid, np.zeros((h, w), dtype=np.float32)
+
+        arc_grid = self.compute_arc_grid(solid_grid, on_ground, obs_pad_x, obs_pad_y)
+        is_air = solid_grid <= 0.0
+
+        landing_mask = is_air & (arc_grid >= 1.0)
+        flight_mask  = is_air & (arc_grid >= 0.5) & (arc_grid < 1.0)
+
+        dijkstra_grid[landing_mask] += landing_boost
+        dijkstra_grid[flight_mask]  += flight_boost
+
+        return dijkstra_grid, arc_grid
 
 
 # =============================================================================
@@ -221,8 +360,6 @@ class SonicCore(gymnasium.Env):
         # Managers
         self.config_manager = ConfigManager("sonic_config.yaml")
         self.loader = LevelLoader()
-        
-        # 🚀 Now using the dedicated Sonic Physics Manager!
         self.physics_manager = SonicPhysicsManager()
 
         try:
@@ -232,6 +369,10 @@ class SonicCore(gymnasium.Env):
             )
         except TypeError:
             self.debug_manager = DebugManager()
+
+        # Turn on overlays by default
+        self.debug_manager.show_obs_panel = True
+        self.debug_manager.show_sensors = True
 
         # State
         self.level_data = LevelData()
@@ -325,6 +466,12 @@ class SonicCore(gymnasium.Env):
 
         self.dijkstra = None
         self.dijkstra_current_tile = 0.0
+        
+        self.jump_arc_computer = JumpArcComputer(
+            self.physics_manager.context,
+            TILE_SIZE,
+            self.obs_pad_x
+        )
 
         self._obs_space = spaces.Dict({
             "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
@@ -338,6 +485,7 @@ class SonicCore(gymnasium.Env):
         self._dijkstra_window_cache = None
         self._solid_window_cache = None
         self._hazard_window_cache = None
+        self._jump_arc_cache = None
         self._cached_spikes = []
 
         self.ring_total = 0
@@ -425,7 +573,7 @@ class SonicCore(gymnasium.Env):
         if self.player:
             self.player._on_moving_platform = False
 
-        # ── Rebuild spatial hashes ───────────────────────────────────────
+        # ── Rebuild spatial hashes for Observations ───────────────────────
         self.physics_manager.hazard_hash.clear()
         for enemy in self.level_data.enemies:
             if enemy.gObj.active and not (hasattr(enemy, 'alive') and not enemy.alive):
@@ -445,9 +593,10 @@ class SonicCore(gymnasium.Env):
         for ring in self.lost_rings:
             if ring.gObj.active and ring.can_collect:
                 self.physics_manager.collectible_hash.insert(ring)
-        for coin in self.level_data.coins:
-            if coin.gObj.active and not coin.collected:
-                self.physics_manager.collectible_hash.insert(coin)
+        # Ensure Springs populate in the collectible grid channel
+        for spring in self.springs:
+            if spring.gObj.active:
+                self.physics_manager.collectible_hash.insert(spring)
         for pup in self.level_data.powerups:
             if pup.gObj.active:
                 self.physics_manager.collectible_hash.insert(pup)
@@ -472,8 +621,6 @@ class SonicCore(gymnasium.Env):
 
         # ── Physics system ───────────────────────────────────────────────
         self.physics_manager.update_system(self.dt, self)
-        
-        # This now automatically handles regular tiles, lip snagging, AND slope physics!
         self.physics_manager.resolve_collisions(self)
 
         # ── Sonic-specific logical collisions (combat/items) ─────────────
@@ -668,7 +815,7 @@ class SonicCore(gymnasium.Env):
         self.level_data = self.loader.load_level(config)
         self.level_data.projectiles = []
         self.badniks = []
-        self.springs = self.level_data.springs # ← Pull the loaded springs!
+        self.springs = self.level_data.springs
         self.lost_rings = []
 
         self.rings = []
@@ -704,13 +851,14 @@ class SonicCore(gymnasium.Env):
             self.player.state = SonicState.IDLE
             self.player.spin_dash_charge = 0; self.player.spin_dash_rev = 0.0
             self.player.is_ball = False; self.player.hurt_timer = 0
-            self.player.coyote = 0; self.player.jump_hold = 0; self.player.jump_buffer = 0
+            self.player.coyote = 0; self.player.jump_buffer = 0
             if not preserve_rings:
                 self.player.rings = 0; self.player.invincible_timer = 0; self.player.shield = False
 
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
         self.physics_manager.rebuild_dynamic_hashes(self.level_data, self._cached_spikes)
+        self.jump_arc_computer.recompute(self.physics_manager.context)
 
         self.progress_x_best = self.player.gObj.x
         self.progress_y_best = self.level_data.height - self.player.gObj.y
@@ -793,15 +941,28 @@ class SonicCore(gymnasium.Env):
         return False
 
     # =========================================================================
-    # OBSERVATION & INFO (Truncated repetitive RL grids for brevity, identical logic)
+    # OBSERVATION & INFO
     # =========================================================================
     def _obs(self) -> Dict[str, np.ndarray]:
         if not self.player:
-            return {"grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32), "scalars": np.zeros(20, dtype=np.float32)}
+            return {
+                "grids": np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32), 
+                "scalars": np.zeros(20, dtype=np.float32)
+            }
+            
         p_obs = self._player_obs()
         track_obs = self._tracking_obs()
+        
         solid, collect, hazard, row_start, col_start = self._grid_obs_window()
         dijkstra_grid = self._dijkstra_obs_window(row_start, col_start)
+
+        # Add physics-aware Dijkstra boost on valid jump arcs
+        on_ground = self.player.on_ground if self.player else False
+        dijkstra_grid, arc_grid = self.jump_arc_computer.boost_dijkstra(
+            dijkstra_grid, solid, on_ground, self.obs_pad_x, self.obs_pad_y
+        )
+        self._jump_arc_cache = arc_grid
+
         stacked = np.stack([solid, collect, hazard, dijkstra_grid], axis=0).astype(np.float32)
         scalars = np.concatenate([p_obs, track_obs]).astype(np.float32)
         return {"grids": stacked, "scalars": scalars}
@@ -817,6 +978,7 @@ class SonicCore(gymnasium.Env):
         if not p:
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
             return z, z, z, 0, 0
+            
         px, py = int(p.gObj.x // TILE_SIZE), int(p.gObj.y // TILE_SIZE)
         map_row_start, map_col_start = py - self.obs_pad_y, px - self.obs_pad_x
         solid_grid, collect_grid, hazard_grid = [np.zeros((self.obs_height, self.obs_width), dtype=np.float32) for _ in range(3)]
@@ -828,19 +990,36 @@ class SonicCore(gymnasium.Env):
             if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height and abs(value) > abs(grid[ly, lx]):
                 grid[ly, lx] = value
 
+        # Hazard Layer (Spikes = -1.0, Badniks = +1.0)
         for h in self.physics_manager.hazard_hash.query_rect(wx, wy, ww, wh):
-            if h.gObj.active: _place(hazard_grid, h.gObj.x, h.gObj.y, -1.0 if isinstance(h, Spike) else +1.0)
+            if h.gObj.active: 
+                _place(hazard_grid, h.gObj.x, h.gObj.y, -1.0 if isinstance(h, Spike) else +1.0)
+                
+        # Collectible Layer (Goal = 1.0, Springs = 0.8, Rings = 0.35)
         for c in self.physics_manager.collectible_hash.query_rect(wx, wy, ww, wh):
             if c.gObj.active and not getattr(c, 'collected', False):
-                _place(collect_grid, c.gObj.x, c.gObj.y, 1.0 if isinstance(c, Goal) else (0.35 if isinstance(c, (Ring, Coin)) else 0.69))
+                if isinstance(c, Goal):
+                    _place(collect_grid, c.gObj.x, c.gObj.y, 1.0)
+                elif isinstance(c, Spring):
+                    _place(collect_grid, c.gObj.x, c.gObj.y, 0.8)
+                elif isinstance(c, Ring):
+                    _place(collect_grid, c.gObj.x, c.gObj.y, 0.35)
+                else:
+                    _place(collect_grid, c.gObj.x, c.gObj.y, 0.69)
+                    
+        # Solid Layer (Ground, Platforms, SlopeTiles)
         for obj in self.level_data.static_hash.query_rect(wx, wy, ww, wh):
-            if not isinstance(obj, Spike): _place(solid_grid, obj.gObj.x, obj.gObj.y, 1.0)
+            if not isinstance(obj, Spike): 
+                _place(solid_grid, obj.gObj.x, obj.gObj.y, 1.0)
+                
+        # Platforms
         for plat in self.physics_manager.platform_hash.query_rect(wx, wy, ww, wh):
             if plat.gObj.active:
                 for pc in range(int(plat.gObj.x // TILE_SIZE), int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1):
                     lx, ly = pc - map_col_start, int(plat.gObj.y // TILE_SIZE) - map_row_start
                     if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height: solid_grid[ly, lx] = 1.0
 
+        # Pit Detection (Encodes fatal falls as -0.5)
         for ly in range(self.obs_height):
             for lx in range(self.obs_width):
                 if solid_grid[ly, lx] != 0.0 or hazard_grid[ly, lx] != 0.0: continue
@@ -954,6 +1133,14 @@ class SonicCore(gymnasium.Env):
         game_surf.fill(COLOR_SKY)
         self._draw_background(game_surf); self._draw_world(game_surf)
         self._draw_entities(game_surf); self._draw_player(game_surf); self._draw_hud(game_surf)
+
+        # ── Toggle Debug Overlays via DebugManager ──
+        if self.render_mode == "human" and hasattr(self, 'debug_manager'):
+            try:
+                if hasattr(self.debug_manager, 'render_overlays'):
+                    self.debug_manager.render_overlays(surface, self)
+            except Exception:
+                pass # Fail gracefully if debug module is mismatched
 
     def _draw_background(self, surface: pygame.Surface):
         h = surface.get_height()
