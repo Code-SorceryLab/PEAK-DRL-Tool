@@ -171,11 +171,16 @@ class ModelSlot:
 
         try:
             from code.wrappers.generic_env import GameEnv
+            env_kwargs = {
+                "persona": self.persona,
+            }
+            if self.game in {"megaman", "sonic"}:
+                env_kwargs["curriculum_enabled"] = False
             self.raw_env = GameEnv(
                 GameCls,
                 render_mode="none",
                 fps=None,
-                persona=self.persona,
+                **env_kwargs,
                 **({"reward_fn": reward_fn} if reward_fn else {}),
             )
         except Exception as e:
@@ -965,7 +970,7 @@ def main():
     ap = argparse.ArgumentParser(description="PEAK Grid Viewer — watch all trained models.")
     ap.add_argument("--fps",      type=int, default=20,  help="Render FPS (default 20)")
     ap.add_argument("--episodes", type=int, default=5,   help="Episodes per agent (default 5, 0=infinite)")
-    ap.add_argument("--game",     type=str, default=None, help="Optional game filter (platformer or megaman)")
+    ap.add_argument("--game",     type=str, default=None, help="Optional game filter (platformer, megaman, or sonic)")
     args = ap.parse_args()
 
     run_grid(fps=args.fps, max_episodes=args.episodes, game_filter=args.game)

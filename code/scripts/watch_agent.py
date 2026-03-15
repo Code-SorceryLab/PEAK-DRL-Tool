@@ -218,7 +218,7 @@ def build_env(game: str, persona: str, fps: int, vecnorm_path: Optional[Path], r
         "persona": persona,
         "random_start_world": random_start_world,
     }
-    if game == "megaman":
+    if game in {"megaman", "sonic"}:
         # Watching should mirror normal play progression, not the training curriculum.
         env_kwargs["curriculum_enabled"] = False
 

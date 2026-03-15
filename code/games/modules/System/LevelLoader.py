@@ -25,6 +25,8 @@ from ..Objects.StarPowerUp import StarPowerUp
 from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
 from ..Objects.Ladder import Ladder
+from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
+from ..Objects.Spring import Spring
 from .SpatialHash import SpatialHash
 
 @dataclass
@@ -47,6 +49,8 @@ class LevelData:
     powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
     ladders:          List[Ladder]             = field(default_factory=list)
+    slope_tiles:      List[SlopeTile]          = field(default_factory=list)
+    springs:          List[Spring]             = field(default_factory=list)
     pits:             List[Any]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
@@ -91,6 +95,40 @@ class LevelLoader:
             'L': 'life',
         }
 
+    def resolve_level_path(self, raw_file: str) -> str:
+        """Resolve absolute, nested, and legacy flat level paths."""
+        if not raw_file:
+            return ""
+
+        normalized = os.path.normpath(raw_file)
+        basename = os.path.basename(normalized)
+        candidates = []
+
+        if os.path.isabs(normalized):
+            candidates.append(normalized)
+        else:
+            candidates.extend([
+                normalized,
+                os.path.join(self.base_dir, normalized),
+                os.path.join(self.level_path, normalized),
+                os.path.join(self.level_path, basename),
+            ])
+
+        seen = set()
+        for candidate in candidates:
+            probe = os.path.normpath(candidate)
+            if probe in seen:
+                continue
+            seen.add(probe)
+            if os.path.exists(probe):
+                return probe
+
+        if os.path.isabs(normalized):
+            return normalized
+        if normalized.startswith("levels" + os.sep) or normalized.startswith("levels/"):
+            return os.path.join(self.base_dir, normalized)
+        return os.path.join(self.level_path, normalized)
+
     def load_level(self, source: Union[Dict[str, Any], str]) -> LevelData:
         """
         Orchestrates loading using either a YAML config dictionary OR a direct filename string.
@@ -115,15 +153,12 @@ class LevelLoader:
         if isinstance(source, dict):
             config   = source
             raw_file = config.get('file', '')
-            filename = os.path.basename(raw_file)
+            filename = raw_file
         elif isinstance(source, str):
             config = {}
             # Absolute or existing path → use directly; otherwise join with level_path
-            if os.path.isabs(source) or os.path.exists(source):
-                txt_path = source
-            else:
-                filename = os.path.basename(source)
-                txt_path = os.path.join(self.level_path, filename)
+            filename = source
+            txt_path = self.resolve_level_path(source)
 
         # 2. Build full path (dict source only — str source sets txt_path above)
         if isinstance(source, dict):
@@ -132,10 +167,7 @@ class LevelLoader:
                 return data
             # If raw_file is an absolute path that exists, use it directly.
             # This allows editor play-test injection without copying files.
-            if os.path.isabs(raw_file) and os.path.exists(raw_file):
-                txt_path = raw_file
-            else:
-                txt_path = os.path.join(self.level_path, filename)
+            txt_path = self.resolve_level_path(raw_file)
 
         # Guard: never try to open a directory as a file
         if os.path.isfile(txt_path):
@@ -221,12 +253,34 @@ class LevelLoader:
                     data.static_hash.insert(spike)
 
                 # 2. Handle other Static Tiles via Dictionary
+                elif ascii_char in SLOPE_CHAR_MAP:
+                    slope_type = SLOPE_CHAR_MAP[ascii_char]
+                    slope_tile = SlopeTile.create(col, row, slope_type, self.tile_size)
+                    slope_tile.gObj.type_id = EntityType.TILE
+                    data.grid[row][col] = slope_tile.type_id
+                    data.tiles[row][col] = slope_tile
+                    data.slope_tiles.append(slope_tile)
+                    data.static_hash.insert(slope_tile)
+
+                elif ascii_char == 'S':
+                    spring = Spring(
+                        gObj=GameObject(
+                            col * self.tile_size,
+                            row * self.tile_size + (self.tile_size // 2),
+                            self.tile_size,
+                            self.tile_size // 2,
+                            True,
+                        )
+                    )
+                    data.springs.append(spring)
+
+                # 3. Handle other Static Tiles via Dictionary
                 elif ascii_char == 'H':
                     ladder = Ladder.from_tile(col * self.tile_size, row * self.tile_size, self.tile_size)
                     data.grid[row][col] = TILE_AIR
                     data.ladders.append(ladder)
 
-                # 3. Handle other Static Tiles via Dictionary
+                # 4. Handle other Static Tiles via Dictionary
                 elif ascii_char in self.TILE_MAP:
                     t_type, color, solid, e_type = self.TILE_MAP[ascii_char]
                     
@@ -246,7 +300,7 @@ class LevelLoader:
                     if solid:
                         data.static_hash.insert(new_tile)
 
-                # 4. Handle Complex Entities (QBlocks, Enemies, Start Pos)
+                # 5. Handle Complex Entities (QBlocks, Enemies, Start Pos)
                 elif ascii_char in self.QBLOCK_CONTAINS:
                     contains = self.QBLOCK_CONTAINS[ascii_char]
                     data.grid[row][col] = TILE_QBLOCK

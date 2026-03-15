@@ -1,4 +1,5 @@
 import pygame
+import math
 from ...Parameters.Map_parameters import (TILE_SIZE, TILE_AIR, TILE_SPIKE, TILE_GOAL)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -118,6 +119,8 @@ class HitboxOverlay(DebugOverlay):
         gs = _game_surf(surface, core)
         player = core.player
         if player:
+            if not all(math.isfinite(v) for v in (player.gObj.x, player.gObj.y, player.gObj.width, player.gObj.height)):
+                return
             px, py, _ = core._world_to_screen(player.gObj)
             r = pygame.Rect(px, py, player.gObj.width, player.gObj.height).inflate(6, 6)
             # Dashed-style: draw 4 corner brackets
@@ -133,6 +136,8 @@ class HitboxOverlay(DebugOverlay):
         for entity in (pm.hazard_hash.query_rect(cx, cy, cw, ch) +
                        pm.collectible_hash.query_rect(cx, cy, cw, ch)):
             gObj = entity.gObj if hasattr(entity, 'gObj') else entity
+            if not all(math.isfinite(v) for v in (gObj.x, gObj.y, gObj.width, gObj.height)):
+                continue
             sx, sy, _ = core._world_to_screen(gObj)
             # Coins = cyan outline, hazards = red
             color = ( 50, 235, 200) if hasattr(entity, 'kind') else (255, 55, 55)
@@ -216,15 +221,32 @@ class AgentViewOverlay(DebugOverlay):
 
     # ── Shared data extraction ────────────────────────────────────────────────
     def _extract_locs(self, core):
+        if not core.player:
+            return None
+        if not all(math.isfinite(v) for v in (core.player.gObj.x, core.player.gObj.y)):
+            return None
         p_cx = int(core.player.gObj.x // TILE_SIZE)
         p_cy = int(core.player.gObj.y // TILE_SIZE)
         ox   = p_cx - core.obs_pad_x
         oy   = p_cy - core.obs_pad_y
-        enemy_locs = {(int(e.gObj.x//TILE_SIZE), int(e.gObj.y//TILE_SIZE))
-                      for e in core.level_data.enemies if e.gObj.active}
-        coin_locs  = {(int(c.gObj.x//TILE_SIZE), int(c.gObj.y//TILE_SIZE))
-                      for c in core.level_data.coins
-                      if c.gObj.active and not getattr(c, 'collected', False)}
+        enemy_src = getattr(core, "enemies", None)
+        if not enemy_src:
+            enemy_src = getattr(core.level_data, "enemies", [])
+        enemy_locs = {
+            (int(e.gObj.x // TILE_SIZE), int(e.gObj.y // TILE_SIZE))
+            for e in enemy_src
+            if getattr(e, "gObj", None) is not None and e.gObj.active
+        }
+
+        coin_src = list(getattr(core.level_data, "coins", []))
+        coin_src.extend(getattr(core, "rings", []) or [])
+        coin_locs  = {
+            (int(c.gObj.x // TILE_SIZE), int(c.gObj.y // TILE_SIZE))
+            for c in coin_src
+            if getattr(c, "gObj", None) is not None
+            and c.gObj.active
+            and not getattr(c, "collected", False)
+        }
         goal_locs  = {(int(g.gObj.x//TILE_SIZE), int(g.gObj.y//TILE_SIZE))
                       for g in core.level_data.goals if g.gObj.active}
         return p_cx, p_cy, ox, oy, enemy_locs, coin_locs, goal_locs
@@ -287,7 +309,10 @@ class AgentViewOverlay(DebugOverlay):
         if not core.player:
             return
 
-        p_cx, p_cy, ox, oy, enemy_locs, coin_locs, goal_locs = self._extract_locs(core)
+        extracted = self._extract_locs(core)
+        if extracted is None:
+            return
+        p_cx, p_cy, ox, oy, enemy_locs, coin_locs, goal_locs = extracted
 
         # ── Legend strip (left) ───────────────────────────────────────────────
         legend_x = px + _PAD
@@ -458,7 +483,10 @@ class AgentViewOverlay(DebugOverlay):
         if not core.player:
             return
 
-        p_cx, p_cy, ox, oy, enemy_locs, coin_locs, goal_locs = self._extract_locs(core)
+        extracted = self._extract_locs(core)
+        if extracted is None:
+            return
+        p_cx, p_cy, ox, oy, enemy_locs, coin_locs, goal_locs = extracted
         cost_cache = getattr(core, '_dijkstra_window_cache', None)
         visit_map  = getattr(core, '_visit_map', None)
         med_font   = self._get_medium_font()
@@ -595,8 +623,10 @@ class InfoPanelOverlay(DebugOverlay):
                           "Player Info", px, py, half_w, accent=(80, 180, 80))
 
         sf = core.debug_manager.small_font
+        px_val = int(p.gObj.x) if math.isfinite(p.gObj.x) else 0
+        py_val = int(p.gObj.y) if math.isfinite(p.gObj.y) else 0
         rows = [
-            ("Pos",    f"{int(p.gObj.x)}, {int(p.gObj.y)}"),
+            ("Pos",    f"{px_val}, {py_val}"),
             ("Vel",    f"{p.vx:.1f}, {p.vy:.1f}"),
             ("Stall",  f"{core.stall_timer:.2f}s ×{core.stall_windows_count}"),
             ("Best X", f"{int(core.progress_x_best)}"),
@@ -684,7 +714,7 @@ class ObsValuesOverlay(DebugOverlay):
             # Colour-code by semantic meaning
             if label in ("GoalDst", "EnmDst") and 0 < val < 0.15:
                 vc = _C_NEG   # danger-close
-            elif label in ("Grnd", "Coyote", "JmpExt", "Laddr") and val > 0.5:
+            elif label in ("Grnd", "Coyote", "JmpExt", "Laddr", "Ball", "Rings") and val > 0.5:
                 vc = _C_ACT   # active ground/jump state
             elif label == "Climb" and abs(val) > 0.01:
                 vc = _C_ACT

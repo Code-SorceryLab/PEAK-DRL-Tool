@@ -806,6 +806,7 @@ class MegamanCore(gymnasium.Env):
         self.progress_x_best = 0.0
         self.stall_timer = 0.0
         self.stall_windows_count = 0
+        self.stalled_this_frame = False
         self.obs_width = 21
         self.obs_height = 21
         self.obs_pad_x = self.obs_width // 2
@@ -999,11 +1000,11 @@ class MegamanCore(gymnasium.Env):
         levels = self._levels_config()
         if resolved in levels:
             self.world = resolved
-        return levels.get(self.world, {"file": "mm_stage1.txt"})
+        return levels.get(self.world, {"file": "megaman/mm_stage1.txt"})
 
     def _level_file_path(self) -> str:
-        level_file = self._level_config().get("file", "mm_stage1.txt")
-        return level_file if os.path.isabs(level_file) else os.path.join(self.loader.level_path, level_file)
+        level_file = self._level_config().get("file", "megaman/mm_stage1.txt")
+        return self.loader.resolve_level_path(level_file)
 
     def _load_source_lines(self) -> List[str]:
         path = self._level_file_path()
@@ -1214,7 +1215,7 @@ class MegamanCore(gymnasium.Env):
 
     def load_level(self):
         self.source_lines = self._load_source_lines()
-        self.level_data = self.loader.load_level(self._level_config().get("file", "mm_stage1.txt"))
+        self.level_data = self.loader.load_level(self._level_config().get("file", "megaman/mm_stage1.txt"))
         level_yaml = os.path.splitext(self._level_file_path())[0] + ".yaml"
         self.level_meta = {}
         self.is_boss_level = False
@@ -1308,6 +1309,7 @@ class MegamanCore(gymnasium.Env):
         self.progress_x_best = 0.0
         self.stall_timer = 0.0
         self.stall_windows_count = 0
+        self.stalled_this_frame = False
         self.last_event = ""
         self.last_cause = ""
         self.enemies_killed_step = 0
@@ -1803,10 +1805,17 @@ class MegamanCore(gymnasium.Env):
 
         if self.player:
             self.max_x_seen = max(self.max_x_seen, self.player.gObj.x)
+            self.stalled_this_frame = False
             if abs(self.player.vx) < 8.0 and not self.player.on_ladder:
+                prev_stall = self.stall_timer
                 self.stall_timer += self.dt
+                if prev_stall < 1.5 <= self.stall_timer:
+                    self.stall_windows_count += 1
+                    self.stalled_this_frame = True
             else:
                 self.stall_timer = 0.0
+        else:
+            self.stalled_this_frame = False
 
         truncated = (self.max_steps is not None and self.steps >= self.max_steps) or self.time_limit <= 0.0
         terminated = self.reached_goal or not self.alive
@@ -1921,6 +1930,7 @@ class MegamanCore(gymnasium.Env):
             "boss_damage_step": self.boss_damage_step,
             "damage_taken_step": self.damage_taken_step,
             "stalled": self.stall_timer >= 1.5,
+            "stalled_this_frame": self.stalled_this_frame,
             "on_ladder": bool(self.player and self.player.on_ladder),
             "on_ground": bool(self.player and self.player.on_ground),
             "boss_level": self.is_boss_level,

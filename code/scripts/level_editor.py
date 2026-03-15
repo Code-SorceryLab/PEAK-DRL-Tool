@@ -54,11 +54,13 @@ except ImportError:
 GAME_LABELS = {
     "platformer": "Mario / Platformer",
     "megaman": "Mega Man",
+    "sonic": "Sonic",
 }
 
 GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
     "megaman": ["mm_*.txt", "mega*.txt"],
+    "sonic": ["green_hill*.txt", "sonic*.txt", "gh*.txt"],
 }
 
 TILE_LIBRARY = [
@@ -75,6 +77,15 @@ TILE_LIBRARY = [
     ('C', 'Coin',           (255, 215, 0),   (80, 60, 0)),
     ('E', 'Enemy',          (180, 60, 180),  (255, 220, 255)),
     ('H', 'Ladder',         (120, 215, 255), (10, 60, 90)),
+    ('S', 'Spring',         (255, 90, 90),   (255, 230, 120)),
+    ('/', 'Slope Up',       (120, 190, 90),  (30, 70, 20)),
+    ('\\', 'Slope Down',    (120, 190, 90),  (30, 70, 20)),
+    ('(', 'Gentle Up',      (120, 190, 90),  (30, 70, 20)),
+    (')', 'Gentle Down',    (120, 190, 90),  (30, 70, 20)),
+    ('[', 'Top Up',         (120, 190, 90),  (30, 70, 20)),
+    (']', 'Top Down',       (120, 190, 90),  (30, 70, 20)),
+    ('U', 'Concave',        (120, 190, 90),  (30, 70, 20)),
+    ('n', 'Convex',         (120, 190, 90),  (30, 70, 20)),
     ('M', 'Met Enemy',      (80, 140, 255),  (235, 230, 120)),
     ('B', 'Bat Enemy',      (190, 120, 255), (255, 220, 255)),
     ('G', 'Goal',           (60, 200, 100),  (0, 60, 20)),
@@ -87,6 +98,7 @@ TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
 GAME_TILE_ORDER = {
     "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
     "megaman": [' ', '#', '=', '^', 'O', 'H', 'M', 'B', 'G', 'D', 'X', 'P'],
+    "sonic": [' ', '#', '=', '^', 'O', 'S', '/', '\\', '(', ')', '[', ']', 'U', 'n', 'C', 'E', 'G', 'P'],
 }
 SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
 
@@ -385,6 +397,8 @@ class GameConfig:
         self.disabled_levels = {}
         self.physics = {}
         self.levels_dir = None
+        self.levels_root = None
+        self.game_levels_dir = None
         self.config_path = None
         self._load()
 
@@ -396,10 +410,17 @@ class GameConfig:
         return data.get(self.game, {})
 
     def _default_level_entry(self, filename):
+        filename = self.normalize_level_file(filename)
         if self.game == "megaman":
             return {
                 "file": filename,
                 "background_color": [120, 160, 255],
+            }
+        if self.game == "sonic":
+            return {
+                "file": filename,
+                "time_limit": 300,
+                "background_color": [0, 128, 255],
             }
         return {
             "file": filename,
@@ -416,6 +437,97 @@ class GameConfig:
             return True
         except Exception:
             return False
+
+    def _candidate_level_roots(self, cwd, script_dir):
+        config_parent = self.config_path.parent if self.config_path else None
+        return [
+            config_parent / "levels" if config_parent else None,
+            cwd / "code" / "games" / "levels",
+            script_dir.parent / "levels",
+            script_dir.parent.parent / "levels",
+            cwd / "levels",
+        ]
+
+    def _refresh_level_dirs(self, cwd, script_dir):
+        self.levels_root = None
+        self.game_levels_dir = None
+        self.levels_dir = None
+
+        for candidate in self._candidate_level_roots(cwd, script_dir):
+            if candidate and candidate.exists() and candidate.is_dir():
+                self.levels_root = candidate.resolve()
+                break
+
+        if self.levels_root:
+            game_dir = self.levels_root / self.game
+            if game_dir.exists() and game_dir.is_dir():
+                self.game_levels_dir = game_dir.resolve()
+                self.levels_dir = self.game_levels_dir
+            else:
+                self.levels_dir = self.levels_root
+        elif self.config_path:
+            self.levels_dir = self.config_path.parent
+
+    def get_default_level_dir(self):
+        for candidate in [self.game_levels_dir, self.levels_root, self.config_path.parent if self.config_path else None]:
+            if candidate and Path(candidate).exists():
+                return str(candidate)
+        return str(Path.cwd())
+
+    def _resolve_level_path(self, level_file):
+        if not level_file:
+            return None
+
+        raw = Path(level_file)
+        candidates = []
+
+        if raw.is_absolute():
+            candidates.append(raw)
+        else:
+            if self.levels_root:
+                candidates.append(self.levels_root / raw)
+                candidates.append(self.levels_root / raw.name)
+            if self.game_levels_dir:
+                candidates.append(self.game_levels_dir / raw.name)
+            if self.config_path:
+                candidates.append(self.config_path.parent / raw)
+            candidates.append(raw)
+
+        seen = set()
+        for candidate in candidates:
+            try:
+                probe = candidate.resolve()
+            except Exception:
+                probe = candidate
+            probe_key = str(probe).lower()
+            if probe_key in seen:
+                continue
+            seen.add(probe_key)
+            if candidate.exists():
+                return str(probe)
+        return None
+
+    def normalize_level_file(self, level_file):
+        if not level_file:
+            return ""
+
+        resolved = self._resolve_level_path(level_file)
+        if resolved and self.levels_root:
+            try:
+                return Path(resolved).resolve().relative_to(self.levels_root.resolve()).as_posix()
+            except Exception:
+                pass
+
+        raw = Path(level_file)
+        return raw.as_posix() if not raw.is_absolute() else raw.name
+
+    def _file_identity(self, level_file):
+        if not level_file:
+            return ""
+        resolved = self._resolve_level_path(level_file)
+        if resolved:
+            return str(Path(resolved).resolve()).lower()
+        return self.normalize_level_file(level_file).lower()
 
     def _load(self):
         if yaml is None:
@@ -442,11 +554,7 @@ class GameConfig:
             print(f"[GameConfig] {e}")
             return
 
-        cd = self.config_path.parent
-        for d in [cd / "levels", cd, cwd / "levels", cwd]:
-            if d.exists() and list(d.glob("*.txt")):
-                self.levels_dir = d
-                break
+        self._refresh_level_dirs(cwd, sd)
 
         root_cfg = self._root_cfg(self.yaml_data)
         raw = root_cfg.get('levels', {}) or {}
@@ -461,7 +569,19 @@ class GameConfig:
         if isinstance(disabled, dict):
             self.disabled_levels = {str(lid): cfg for lid, cfg in disabled.items() if isinstance(cfg, dict)}
 
-        self.physics = copy.deepcopy(root_cfg.get('physics', {}) or {})
+        physics_cfg = copy.deepcopy(root_cfg.get('physics', {}) or {})
+        if not physics_cfg:
+            defaults = copy.deepcopy(root_cfg.get('defaults', {}) or {})
+            player_defaults = defaults.get('player', {}) if isinstance(defaults, dict) else {}
+            movement_defaults = player_defaults.get('movement', {}) if isinstance(player_defaults, dict) else {}
+            jump_defaults = player_defaults.get('jump', {}) if isinstance(player_defaults, dict) else {}
+            physics_defaults = defaults.get('physics', {}) if isinstance(defaults, dict) else {}
+            physics_cfg = {
+                **physics_defaults,
+                "max_run_speed": movement_defaults.get("max_run_speed", movement_defaults.get("run_speed", 150)),
+                "jump_velocity": jump_defaults.get("max_velocity", -800),
+            }
+        self.physics = physics_cfg
 
     def _levels_dict(self, data, create=False):
         root_cfg = self._root_cfg(data, create=create)
@@ -499,30 +619,29 @@ class GameConfig:
         fn = lc.get('file', '') if lc else ''
         if not fn:
             return None
-        for b in ([self.levels_dir] if self.levels_dir else []) + ([self.config_path.parent] if self.config_path else []):
-            p = Path(b) / fn
-            if p.exists():
-                return str(p)
-        return str(Path(fn).resolve()) if Path(fn).exists() else None
+        return self._resolve_level_path(fn)
 
     def get_all_level_files(self, extra_path=None):
         fs=set(); seen=set()
-        def _a(p):
+        def _a(p, recursive=False):
             try: rp=Path(p).resolve()
             except: rp=Path(p)
             if rp not in seen and rp.exists() and rp.is_dir():
                 seen.add(rp)
-                for f in rp.glob("*.txt"):
+                iterator = rp.rglob("*.txt") if recursive else rp.glob("*.txt")
+                for f in iterator:
                     if self.is_file_for_game(f):
-                        fs.add(f)
-        if self.levels_dir: _a(self.levels_dir)
-        if self.config_path: _a(self.config_path.parent)
+                        fs.add(f.resolve())
+        if self.game_levels_dir:
+            _a(self.game_levels_dir, recursive=True)
+        elif self.levels_dir:
+            _a(self.levels_dir, recursive=True)
         if extra_path:
             extra = Path(extra_path)
             _a(extra.parent)
             if extra.exists():
                 fs.add(extra.resolve())
-        return sorted(fs,key=lambda p:p.name)
+        return sorted(fs,key=lambda p:(p.parent.name.lower(), p.name.lower()))
     # ── Key-matching helpers ─────────────────────────────────────
     # YAML keys can appear unquoted, single-quoted, or double-quoted:
     #   Long Level:    "1-2":    'Mario1-2':
@@ -615,7 +734,7 @@ class GameConfig:
             return False
         levels = self._levels_dict(data, create=True)
         entry = dict(levels.get(lid, self._default_level_entry(filename)))
-        entry['file'] = filename
+        entry['file'] = self.normalize_level_file(filename)
         levels[lid] = entry
         disabled = self._disabled_levels_dict(data, create=True)
         disabled.pop(lid, None)
@@ -666,6 +785,9 @@ def render_tile_object(surf, char, sx, sy, ts):
         elif char in ('?','>','<','F','L'):
             cn={'?':'coin','>':'star','<':'mushroom','F':'flower','L':'life'}[char]
             QuestionBlock(gObj=GameObject(float(sx),float(sy),ti,ti),contains=cn).render(surf,sx,sy); return
+    if char == 'S' or char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
+        draw_tile_rect(surf, char, sx, sy, ti, ti)
+        return
     # Fallback rendering
     if char in (' ', '.'): pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); return
     if char in ('#','='):
@@ -749,6 +871,30 @@ def draw_tile_rect(surf, char, x, y, w, h, alpha=255):
                 if (ix//cell+iy//cell)%2==0:
                     s2=pygame.Surface((min(cell,w-ix),min(cell,h-iy)),pygame.SRCALPHA); s2.fill((180,30,50,120)); s.blit(s2,(ix,iy))
         surf.blit(s,(x,y)); return
+    if char == 'S':
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        base_h = max(4, h // 3)
+        pygame.draw.rect(s, (170, 170, 178, alpha), (w * 0.18, h * 0.52, w * 0.64, base_h), border_radius=2)
+        for i in range(3):
+            yy = int(h * 0.48 - i * max(2, h // 8))
+            pygame.draw.line(s, (130, 130, 138, alpha), (int(w * 0.22), yy), (int(w * 0.78), yy), 2)
+        pygame.draw.rect(s, (255, 90, 90, alpha), (w * 0.12, h * 0.2, w * 0.76, max(4, h // 5)), border_radius=2)
+        surf.blit(s, (x, y)); return
+    if char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        pts = {
+            '/':  [(0, h), (w, h * 0.55), (w, h), (0, h)],
+            '\\': [(0, h * 0.55), (w, h), (w, h), (0, h)],
+            '(':  [(0, h), (w, 0), (w, h), (0, h)],
+            ')':  [(0, 0), (w, h), (w, h), (0, h)],
+            '[':  [(w * 0.15, h), (w, h * 0.45), (w, h), (0, h)],
+            ']':  [(0, h * 0.45), (w * 0.85, h), (w, h), (0, h)],
+            'U':  [(0, h * 0.45), (w * 0.2, h * 0.75), (w * 0.5, h * 0.9), (w * 0.8, h * 0.75), (w, h * 0.45), (w, h), (0, h)],
+            'n':  [(0, h * 0.8), (w * 0.25, h * 0.35), (w * 0.5, h * 0.15), (w * 0.75, h * 0.35), (w, h * 0.8), (w, h), (0, h)],
+        }[char]
+        pygame.draw.polygon(s, (*color, alpha), pts)
+        pygame.draw.lines(s, (120, 230, 120, alpha), False, pts[:-2] if char in ('U', 'n') else pts[:2], 2)
+        surf.blit(s, (x, y)); return
     s=pygame.Surface((w,h),pygame.SRCALPHA); s.fill((*color,alpha))
     if char in SOLID_CHARS and w>4:
         hi=tuple(min(255,c+40) for c in color)
@@ -776,8 +922,36 @@ def draw_palette_icon(surf, char, rect):
     elif char=='=':
         bh2=max(5,h//3); by2=cy-bh2//2
         pygame.draw.rect(surf,col,(x+1,by2,w-2,bh2),border_radius=3); pygame.draw.rect(surf,hi,(x+1,by2,w-2,bh2),1,border_radius=3)
+    elif char=='S':
+        base_h=max(4,h//3); base_y=y+h-base_h-1
+        pygame.draw.rect(surf,(180,180,186),(x+3,base_y,w-6,base_h),border_radius=2)
+        for i in range(3):
+            yy=base_y-2-i*max(2,h//8)
+            pygame.draw.line(surf,(140,140,146),(x+4,yy),(x+w-4,yy),2)
+        pygame.draw.rect(surf,(255,90,90),(x+2,y+3,w-4,max(4,h//5)),border_radius=2)
     elif char=='^':
         pts=[(cx,y+2),(x+2,y+h-2),(x+w-2,y+h-2)]; pygame.draw.polygon(surf,col,pts); pygame.draw.polygon(surf,(255,100,100),pts,1)
+    elif char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
+        if char == '/':
+            pts=[(x+2,y+h-2),(x+w-2,y+h//2),(x+w-2,y+h-2)]
+        elif char == '\\':
+            pts=[(x+2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
+        elif char == '(':
+            pts=[(x+2,y+h-2),(x+w-2,y+2),(x+w-2,y+h-2)]
+        elif char == ')':
+            pts=[(x+2,y+2),(x+w-2,y+h-2),(x+2,y+h-2)]
+        elif char == '[':
+            pts=[(x+w//6,y+h-2),(x+w-2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
+        elif char == ']':
+            pts=[(x+2,y+h//2),(x+w*5//6,y+h-2),(x+w-2,y+h-2),(x+2,y+h-2)]
+        elif char == 'U':
+            pts=[(x+2,y+h//2),(x+w//4,y+h*3//4),(cx,y+h-3),(x+w*3//4,y+h*3//4),(x+w-2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
+        else:
+            pts=[(x+2,y+h*4//5),(x+w//4,y+h//3),(cx,y+3),(x+w*3//4,y+h//3),(x+w-2,y+h*4//5),(x+w-2,y+h-2),(x+2,y+h-2)]
+        pygame.draw.polygon(surf,col,pts)
+        top_line = pts[:-2] if char in ('U', 'n') else pts[:2]
+        if len(top_line) >= 2:
+            pygame.draw.lines(surf,(140,255,160),False,top_line,2)
     elif char in ('?','>','<','F','L'):
         qc={'?':(210,170,30),'>':(240,200,50),'<':(195,80,70),'F':(240,110,20),'L':(90,220,120)}[char]
         pygame.draw.rect(surf,qc,(x+2,y+2,w-4,h-4),border_radius=3)
@@ -1060,7 +1234,7 @@ class Editor:
         if r=="yes":
             if self.level.filename: self.level.save(self.level.filename); self.dirty=False
             else:
-                p=dlg_save(scr,sf)
+                p=dlg_save(scr,sf,sd=self.gc.get_default_level_dir())
                 if p: self.level.save(p); self.dirty=False
                 else: return False
             return True
@@ -1318,8 +1492,8 @@ def draw_right_panel(surf,ed,sfont,mpos):
             y+=32
     # Unlisted files
     af=gc.get_all_level_files(extra_path=ed.level.filename)
-    lf={cfg.get('file','') for cfg in list(gc.levels.values()) + list(gc.disabled_levels.values())}
-    ul=[f for f in af if f.name not in lf]
+    lf={gc._file_identity(cfg.get('file','')) for cfg in list(gc.levels.values()) + list(gc.disabled_levels.values())}
+    ul=[f for f in af if gc._file_identity(f) not in lf]
     if ul:
         y+=6;pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
         try:sfont.render_to(surf,(rx+pad,y),"UNLISTED FILES",fgcolor=UI_SUBTEXT,size=11)
@@ -1488,7 +1662,7 @@ def launch_play(ed,scr,sf):
     }
     if lv.filename:lv.save(lv.filename);ed.dirty=False
     else:
-        p=dlg_save(scr,sf)
+        p=dlg_save(scr,sf,sd=ed.gc.get_default_level_dir())
         if not p:return
         lv.save(p);ed.dirty=False
     if not lv.filename:return
@@ -1522,12 +1696,12 @@ def do_action(result,ed,scr,sf):
             ed.undo_stack.clear();ed.redo_stack.clear();ed.dirty=False;ed._center()
     elif result=="OPEN":
         if not ed.check_unsaved(scr,sf):return
-        p=dlg_open(scr,sf)
+        p=dlg_open(scr,sf,ed.gc.get_default_level_dir())
         if p:
             try:ed.level=Level.load(p);ed.undo_stack.clear();ed.redo_stack.clear();ed.dirty=False;ed._center()
             except Exception as e:print(f"[Editor] {e}")
     elif result=="SAVE":
-        p=ed.level.filename or dlg_save(scr,sf)
+        p=ed.level.filename or dlg_save(scr,sf,sd=ed.gc.get_default_level_dir())
         if p:
             # Bake slider values back into the level before writing
             bake_level_physics(ed)
@@ -1591,13 +1765,20 @@ def main(argv=None):
                 elif in_rp:ed.right_scroll=max(0,min(ed.right_max_scroll,ed.right_scroll-ev.y*20))
             elif ev.type==pygame.MOUSEBUTTONDOWN:
                 ex,ey=ev.pos
-                if in_rp and ed._sb_thumb.collidepoint(ex,ey):
+                ev_in_vp=LEFT_PANEL_W<ex<WINDOW_W-RIGHT_PANEL_W and TOOLBAR_H<ey<WINDOW_H-STATUS_H-HSB_H
+                ev_in_rp=ex>WINDOW_W-RIGHT_PANEL_W;ev_in_lp=ex<LEFT_PANEL_W;ev_in_tb=ey<TOOLBAR_H
+                target_cell=None
+                if ev_in_vp:
+                    rr,cc=ed.s2c(ex,ey)
+                    if 0<=rr<ed.level.rows and 0<=cc<ed.level.cols:
+                        target_cell=(rr,cc)
+                if ev_in_rp and ed._sb_thumb.collidepoint(ex,ey):
                     ed._sb_drag=True;ed._sb_dy=ey;ed._sb_ds=ed.right_scroll;continue
-                if not in_rp and not in_lp and ed._hs_thumb.collidepoint(ex,ey):
+                if not ev_in_rp and not ev_in_lp and ed._hs_thumb.collidepoint(ex,ey):
                     ed._hs_drag=True;ed._hs_dx=ex;ed._hs_dc=ed.cam_x;continue
                 if ev.button==1:
                     # TOOLBAR CLICKS (FIX from v3.0)
-                    if in_tb:
+                    if ev_in_tb:
                         for btn in btns:
                             if btn.label=="|":continue
                             if btn.rect.collidepoint(ex,ey):
@@ -1610,7 +1791,7 @@ def main(argv=None):
                                     if isinstance(r2,str):do_action(r2,ed,screen,sfont)
                                 break
                         continue
-                    if in_rp:
+                    if ev_in_rp:
                         h=False
                         if not h:
                             for lid,rect in ed._dh_rects.items():
@@ -1652,7 +1833,7 @@ def main(argv=None):
                                     h=True;break
                         if not h and ed._assign_r.collidepoint(ex,ey) and ed.level.filename:
                             lid=dlg_assign(screen,sfont,ed.level.filename)
-                            if lid:gc.assign_stage_to_level(Path(ed.level.filename).name,lid);ed.level.level_id=lid;ed.browser_level_id=lid
+                            if lid:gc.assign_stage_to_level(ed.level.filename,lid);ed.level.level_id=lid;ed.browser_level_id=lid
                             h=True
                         if not h:
                             for sl in ed.phys_sliders:
@@ -1663,7 +1844,7 @@ def main(argv=None):
                         if not h:
                             if ed._spd_m.collidepoint(ex,ey):ed.plat_default_spd=max(10,ed.plat_default_spd-10)
                             elif ed._spd_p.collidepoint(ex,ey):ed.plat_default_spd=min(500,ed.plat_default_spd+10)
-                    elif in_lp:
+                    elif ev_in_lp:
                         for key,rect in ed._tool_rects.items():
                             if rect.collidepoint(ex,ey):
                                 if key=="eraser":ed.eraser_mode=not ed.eraser_mode
@@ -1673,7 +1854,7 @@ def main(argv=None):
                                 break
                         for ch,rect in ed._tile_rects.items():
                             if rect.collidepoint(ex,ey):ed.selected_tile=ch;ed.plat_placing=False;ed.eraser_mode=False;break
-                    elif in_vp:
+                    elif ev_in_vp:
                         if ed.selected_tile==MOVING_PLATFORM_BRUSH and not ed.eraser_mode:
                             hi,hh=ed.ht_plat(ex,ey)
                             if hi is not None:
@@ -1687,17 +1868,17 @@ def main(argv=None):
                                 wx,wy=ed.s2wp(ex,ey,snap=True);ed.push_undo()
                                 ed.level.platforms.append(PlatformDef(list(ed.plat_start_world),[wx,wy],speed=ed.plat_default_spd))
                                 ed.sel_plat_idx=len(ed.level.platforms)-1;ed.plat_placing=False;ed.dirty=True
-                        elif ed.hover_cell:
-                            r,c=ed.hover_cell;brush=ed.brush()
+                        elif target_cell:
+                            r,c=target_cell;brush=ed.brush()
                             if ed.fill_mode:ed.flood_fill(r,c,brush)
                             else:
                                 if not pstarted:ed.push_undo();pstarted=True
                                 ed.paint_char=brush;ed.painting=True;ed.last_cell=None;ed.paint_cell(r,c,ed.paint_char)
-                elif ev.button==3 and in_vp:
+                elif ev.button==3 and ev_in_vp:
                     if ed.selected_tile==MOVING_PLATFORM_BRUSH:ed.plat_placing=False;ed.sel_plat_idx=None
-                    elif ed.hover_cell:
+                    elif target_cell:
                         if not pstarted:ed.push_undo();pstarted=True
-                        ed.paint_char=' ';ed.painting=True;ed.last_cell=None;ed.paint_cell(ed.hover_cell[0],ed.hover_cell[1],' ')
+                        ed.paint_char=' ';ed.painting=True;ed.last_cell=None;ed.paint_cell(target_cell[0],target_cell[1],' ')
                 elif ev.button==2:ed.panning=True;ed.pan_start=ev.pos;ed.pan_cam=(ed.cam_x,ed.cam_y)
             elif ev.type==pygame.MOUSEBUTTONUP:
                 if ev.button==1:
@@ -1708,6 +1889,13 @@ def main(argv=None):
                     for sl in ed.enemy_sliders:sl.dragging=False
                 elif ev.button==2:ed.panning=False
             elif ev.type==pygame.MOUSEMOTION:
+                mx2,my2=ev.pos
+                motion_in_vp=LEFT_PANEL_W<mx2<WINDOW_W-RIGHT_PANEL_W and TOOLBAR_H<my2<WINDOW_H-STATUS_H-HSB_H
+                if motion_in_vp:
+                    rr,cc=ed.s2c(mx2,my2)
+                    ed.hover_cell=(rr,cc) if 0<=rr<ed.level.rows and 0<=cc<ed.level.cols else None
+                elif not ed.panning:
+                    ed.hover_cell=None
                 if ed._drag_lid:
                     sy2=my+ed.right_scroll-ed._lv_list_top
                     ed._drag_di=max(0,min(len(ed.gc.level_ids)-1,sy2//ed._lv_row_h));ed._drag_y=my
@@ -1732,8 +1920,8 @@ def main(argv=None):
                         if ed.drag_handle=='start':p.start=wp
                         else:p.end=wp
                         ed.dirty=True
-                    elif ed.plat_placing and in_vp:ed.plat_ghost_end=ed.s2wp(mpos[0],mpos[1],snap=True)
-                if ed.painting and in_vp and ed.hover_cell:ed.paint_cell(ed.hover_cell[0],ed.hover_cell[1],ed.paint_char)
+                    elif ed.plat_placing and motion_in_vp:ed.plat_ghost_end=ed.s2wp(ev.pos[0],ev.pos[1],snap=True)
+                if ed.painting and motion_in_vp and ed.hover_cell:ed.paint_cell(ed.hover_cell[0],ed.hover_cell[1],ed.paint_char)
                 if ed.panning:ed.cam_x=ed.pan_cam[0]-(ev.pos[0]-ed.pan_start[0]);ed.cam_y=ed.pan_cam[1]-(ev.pos[1]-ed.pan_start[1])
             elif ev.type==pygame.KEYDOWN:
                 mods=pygame.key.get_mods();ctrl=mods&pygame.KMOD_CTRL

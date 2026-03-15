@@ -55,14 +55,14 @@ defaults:
       height: 32
 levels:
   Mario1-1:
-    file: world1_1.txt
+    file: platformer/world1_1.txt
     time_limit: 300
     background_color:
     - 0
     - 0
     - 0
   Mario1-2:
-    file: world1_2.txt
+    file: platformer/world1_2.txt
     time_limit: 300
     background_color:
     - 0
@@ -141,33 +141,102 @@ megaman:
         height: 28
   levels:
     MM-Train4:
-      file: mm_train4.txt
+      file: megaman/mm_train4.txt
       background_color:
       - 120
       - 160
       - 255
     MM-Stage1:
-      file: mm_stage1.txt
+      file: megaman/mm_stage1.txt
       background_color:
       - 120
       - 160
       - 255
   disabled_levels:
     MM-Train2:
-      file: mm_train2.txt
+      file: megaman/mm_train2.txt
       background_color:
       - 120
       - 160
       - 255
     MM-Train1:
-      file: mm_train1.txt
+      file: megaman/mm_train1.txt
       background_color:
       - 120
       - 160
       - 255
     MM-Train3:
-      file: mm_train3.txt
+      file: megaman/mm_train3.txt
       background_color:
       - 120
       - 160
+      - 255
+sonic:
+  env_cls: SonicCore
+  module: code.games.sonic_core
+  screen_width: 800
+  screen_height: 600
+  fps: 60
+  tile_size: 32
+  max_steps: 10000
+  observation_space:
+    type: Dict
+    spaces:
+      grids:
+        type: Box
+        shape:
+        - 4
+        - 21
+        - 21
+        low: -1.0
+        high: 1.0
+      scalars:
+        type: Box
+        shape:
+        - 20
+        low: -.inf
+        high: .inf
+  action_space:
+    type: Discrete
+    n: 10
+  episode:
+    max_steps: 10000
+  defaults:
+    player:
+      lives: 3
+      dimensions:
+        width: 24
+        height: 32
+      movement:
+        max_run_speed: 380.0
+        run_accel: 600.0
+        max_walk_speed: 180.0
+        walk_accel: 480.0
+        air_control: 0.40
+      jump:
+        min_velocity: -520.0
+        max_velocity: -700.0
+        hold_frames: 20
+        coyote_frames: 6
+        buffer_frames: 8
+    physics:
+      gravity: 1100.0
+      fast_fall_gravity: 2000.0
+      friction:
+        ground: 600.0
+        air: 100.0
+  levels:
+    Green Hill 1:
+      file: sonic/green_hill_1.txt
+      time_limit: 300
+      background_color:
+      - 0
+      - 128
+      - 255
+    Green Hill 2:
+      file: sonic/green_hill_2.txt
+      time_limit: 300
+      background_color:
+      - 0
+      - 128
       - 255

@@ -1,4 +1,5 @@
 import pygame
+import math
 from .....wrappers.RewardHub import RewardHub
 from .overlays import (
     HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay,
@@ -60,6 +61,7 @@ class DebugManager:
         self.obs_values_overlay = ObsValuesOverlay()
         self.arch_overlay       = ArchOverlay()
         self.jump_arc_overlay   = JumpArcOverlay()
+        self._overlay_errors_seen = set()
 
         if print_help:
             self._print_help_to_terminal()
@@ -221,20 +223,20 @@ class DebugManager:
 
         # ── Game-area overlays ────────────────────────────────
         if self.show_grid:
-            self.grid_overlay.render(surface, core)
+            self._safe_overlay("grid", self.grid_overlay.render, surface, core)
         if self.show_hitboxes:
-            self.hitbox_overlay.render(surface, core)
+            self._safe_overlay("hitboxes", self.hitbox_overlay.render, surface, core)
 
         # ── Jump arc — toggled with F1 (shot+arc) ──────────────
         if self.show_sensors:
-            self.jump_arc_overlay.render(surface, core)
+            self._safe_overlay("jump_arc", self.jump_arc_overlay.render, surface, core)
 
         # ── Panel overlays ────────────────────────────────────
-        self.agent_view_overlay.render(surface, core)
-        self.info_overlay.render(surface, core)
-        self.obs_values_overlay.render(surface, core)
+        self._safe_overlay("agent_view", self.agent_view_overlay.render, surface, core)
+        self._safe_overlay("info_panel", self.info_overlay.render, surface, core)
+        self._safe_overlay("obs_values", self.obs_values_overlay.render, surface, core)
         # NOTE: arch_overlay not rendered — ARCH strip removed for more reward trace space
-        self._render_reward_strip(surface, core, debug_x, panel_w)
+        self._safe_overlay("reward_strip", self._render_reward_strip, surface, core, debug_x, panel_w)
 
         # ── Status badges (game area, top-centre) ─────────────
         by = 6
@@ -249,6 +251,14 @@ class DebugManager:
         # (AgentViewOverlay.render already dispatches; this badge confirms state)
         if self.agent_view_overlay.max_view:
             self._badge(surface, core, "AGENT MAX VIEW  (F5/Esc)", (30, 55, 150), y=6)
+
+    def _safe_overlay(self, name, fn, *args):
+        try:
+            fn(*args)
+        except Exception as exc:
+            if name not in self._overlay_errors_seen:
+                print(f"[Debug Overlay:{name}] {exc}")
+                self._overlay_errors_seen.add(name)
 
     # ─────────────────────────────────────────────────────────
     def _render_hud_strip(self, surface, core, debug_x, panel_w):
@@ -271,29 +281,40 @@ class DebugManager:
 
         sf = self.small_font
 
-        # Pull values from core
-        lives  = max(0, getattr(core, 'lives', 0))
-        score  = getattr(core, 'score', 0)
-        coins  = getattr(core, 'coins_total', 0)
-        timer  = int(getattr(core, 'timer', 0))
-        player = getattr(core, 'player', None)
-        if player:
-            status = "STAR" if player.invincible_timer > 0 else ("SUPER" if player.powered_up else "SMALL")
-        else:
-            status = "—"
+        items = None
+        item_fn = getattr(core, "get_debug_hud_strip_items", None)
+        if callable(item_fn):
+            try:
+                custom_items = item_fn()
+                if custom_items:
+                    items = list(custom_items)
+            except Exception:
+                items = None
 
-        # Warn colours
-        lives_col = _C_NEG if lives <= 1 else _C_VAL
-        time_col  = _C_NEG if timer < 60  else _C_VAL
+        if not items:
+            # Pull values from core
+            lives  = max(0, getattr(core, 'lives', 0))
+            score  = getattr(core, 'score', 0)
+            coins  = getattr(core, 'coins_total', 0)
+            timer  = int(getattr(core, 'timer', 0))
+            player = getattr(core, 'player', None)
+            if player:
+                status = "STAR" if player.invincible_timer > 0 else ("SUPER" if player.powered_up else "SMALL")
+            else:
+                status = "—"
 
-        # Build label/value pairs and space them evenly
-        items = [
-            ("LIVES",  str(lives),  lives_col),
-            ("SCORE",  str(score),  _C_VAL),
-            ("COINS",  str(coins),  (220, 190, 60)),
-            ("STATUS", status,      _C_ACT),
-            ("TIME",   str(timer),  time_col),
-        ]
+            # Warn colours
+            lives_col = _C_NEG if lives <= 1 else _C_VAL
+            time_col  = _C_NEG if timer < 60  else _C_VAL
+
+            # Build label/value pairs and space them evenly
+            items = [
+                ("LIVES",  str(lives),  lives_col),
+                ("SCORE",  str(score),  _C_VAL),
+                ("COINS",  str(coins),  (220, 190, 60)),
+                ("STATUS", status,      _C_ACT),
+                ("TIME",   str(timer),  time_col),
+            ]
 
         slot_w = pw // len(items)
 

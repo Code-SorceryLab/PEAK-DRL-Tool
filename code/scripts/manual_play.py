@@ -102,15 +102,44 @@ def _megaman_action(keys) -> list:
     return [move, climb, int(bool(jump)), int(bool(fire))]
 
 
+def _sonic_action(keys) -> list:
+    """
+    Return a Sonic action [move, jump, down].
+      move : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      jump : 0=idle  1=jump
+      down : 0=idle  1=down / spin dash
+    """
+    k = pygame.key.get_pressed()
+
+    left = k[pygame.K_a]
+    right = k[pygame.K_d]
+    jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
+    run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    down = k[pygame.K_s] or k[pygame.K_DOWN]
+
+    if left and right:
+        move = 0
+    elif left:
+        move = 2 if run else 1
+    elif right:
+        move = 4 if run else 3
+    else:
+        move = 0
+
+    return [move, int(bool(jump)), int(bool(down))]
+
+
 ACTION_MAPPING = {
     "platformer": _platformer_action,
     "mario": _platformer_action,
     "megaman": _megaman_action,
+    "sonic": _sonic_action,
 }
 
 CONTROL_DESCRIPTIONS = {
     "platformer": "\n[PLAYER] WASD to Move, SPACE to Jump, SHIFT to Run\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
     "megaman": "\n[MEGA MAN] A / D to Move, W / S to Climb Ladders, SPACE to Jump, Z to Shoot\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
+    "sonic": "\n[SONIC] A / D to Move, SHIFT to Run, S / DOWN to Crouch or Spin Dash, SPACE to Jump\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
 }
 
 controls = CONTROL_DESCRIPTIONS.get(args.game, "Use game-specific keys. ESC = quit")
@@ -133,6 +162,8 @@ if level_id:
     env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
 elif args.game == "megaman":
+    env_kwargs['curriculum_enabled'] = False
+elif args.game == "sonic":
     env_kwargs['curriculum_enabled'] = False
 # NOTE: do NOT pass world='__editor_test__' here — it doesn't exist in config
 # yet so platformer_core.__init__ -> reset() would load an empty level.

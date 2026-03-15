@@ -1744,6 +1744,9 @@ def run_manual_play():
     if selected_game.lower() == "megaman":
         _box_kv("W / S",     "Climb ladder")
         _box_kv("Z",         "Fire")
+    elif selected_game.lower() == "sonic":
+        _box_kv("SHIFT",     "Run")
+        _box_kv("S / DOWN",  "Crouch / spin dash")
     else:
         _box_kv("SHIFT",     "Run")
     _box_kv("ESC",           "Quit session")
@@ -1941,7 +1944,10 @@ def watch_random_agent():
     pygame.init()
 
     # IMPORTANT: human mode so you see it
-    env = GameEnv(GameCls, render_mode="human", fps=fps)
+    env_kwargs = {}
+    if selected_game in {"megaman", "sonic"}:
+        env_kwargs["curriculum_enabled"] = False
+    env = GameEnv(GameCls, render_mode="human", fps=fps, **env_kwargs)
     reset_out = env.reset()
     obs = reset_out[0] if isinstance(reset_out, tuple) else reset_out
 
@@ -2186,7 +2192,7 @@ def get_level_editor_entries(game):
     except Exception:
         return []
 
-    root = (cfg.get("megaman") or {}) if game == "megaman" else cfg
+    root = cfg if game == "platformer" else (cfg.get(game) or {})
     raw_levels = root.get("levels") or {}
     entries = []
     for level_id, level_cfg in raw_levels.items():
@@ -2224,15 +2230,15 @@ def _load_game_config_yaml():
 
 
 def _game_config_root(data, game, create=False):
-    if game == "megaman":
-        root = data.get("megaman")
-        if isinstance(root, dict):
-            return root
-        if create:
-            data["megaman"] = {}
-            return data["megaman"]
-        return {}
-    return data
+    if game == "platformer":
+        return data
+    root = data.get(game)
+    if isinstance(root, dict):
+        return root
+    if create:
+        data[game] = {}
+        return data[game]
+    return {}
 
 
 def _game_level_maps(data, game, create=False):
@@ -2289,11 +2295,12 @@ def run_toggle_levels():
         print("\n  Could not find a readable game_config.yaml")
         return
 
+    game_choices = get_available_games() or ["platformer", "megaman", "sonic"]
     game = ask_index(
         "\n  Choose which game's levels to manage:",
-        ["platformer", "megaman"],
+        game_choices,
         add_back=True,
-        default="platformer",
+        default=game_choices[0],
     )
     if not game:
         return
@@ -2368,11 +2375,12 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
+    game_choices = get_available_games() or ["platformer", "megaman", "sonic"]
     game = ask_index(
         "\n  Choose which game to edit:",
-        ["platformer", "megaman"],
+        game_choices,
         add_back=True,
-        default="platformer",
+        default=game_choices[0],
     )
     if not game:
         return
@@ -2407,11 +2415,12 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
+    game_choices = get_available_games() or ["platformer", "megaman", "sonic"]
     game = ask_index(
         "\n  Choose which game to edit:",
-        ["platformer", "megaman"],
+        game_choices,
         add_back=True,
-        default="platformer",
+        default=game_choices[0],
     )
     if not game:
         return

@@ -39,6 +39,24 @@ Use these characters in `.txt` level files and in the level editor.
 | `D` | Boss door / exit door |
 | `X` | Boss spawn |
 
+## Sonic
+
+| Char | Meaning |
+| --- | --- |
+| `C` | Ring |
+| `E` | Badnik spawn |
+| `S` | Spring |
+| `/` | Steep slope up |
+| `\` | Steep slope down |
+| `(` | Gentle slope up |
+| `)` | Gentle slope down |
+| `[` | Gentle slope up top |
+| `]` | Gentle slope down top |
+| `U` | Concave slope |
+| `n` | Convex slope |
+| `G` | Goal / act clear |
+| `P` | Player start |
+
 Notes:
 - `.` is the recommended empty tile for hand-editing levels.
-- The editor now filters files by game, so `platformer` shows Mario levels and `megaman` shows Mega Man levels.
+- The editor now filters files by game, so each game only shows its own levels.
