@@ -393,7 +393,11 @@ class PlatformerCore(gymnasium.Env):
         self.config_manager = ConfigManager("game_config.yaml")
         self.loader = LevelLoader()
         self.physics_manager = PhysicsManager()
-        self.debug_manager = DebugManager(default_active=(render_mode=="human"), print_help=(render_mode=="human"))
+        self.debug_manager = DebugManager(
+            default_active=(render_mode=="human"),
+            print_help=(render_mode=="human"),
+            sensor_mode="rays",
+        )
 
         # 2. Config & State Containers
         self.level_data = LevelData() # Empty initial state
@@ -1776,6 +1780,37 @@ class PlatformerCore(gymnasium.Env):
             "curriculum_win_rate":  self._curriculum_win_rate(),
             "curriculum_max_unlocked": self._max_unlocked_index,
             **self._obs_stats
+        }
+
+    def get_jump_arc_debug_state(self) -> dict:
+        if not self.player:
+            return {}
+
+        p = self.player
+        ctx = self.physics_manager.context
+        origin_x = p.gObj.x + p.gObj.width * 0.5
+        origin_y = p.gObj.y + p.gObj.height
+        grounded = bool(p.on_ground)
+        can_jump = bool(p.on_ground or p.coyote > 0)
+        preview_jump = grounded and can_jump
+
+        if preview_jump:
+            preview_speed = max(180.0, float(getattr(ctx, "MAX_RUN_SPEED", 240.0)) * 0.6)
+            preview_vx = p.vx if abs(p.vx) > 10.0 else (preview_speed if p.facing_right else -preview_speed)
+            preview_vy = float(getattr(ctx, "JUMP_VEL_MIN", -620.0))
+        else:
+            preview_vx = p.vx
+            preview_vy = p.vy
+
+        return {
+            "x": float(origin_x),
+            "y": float(origin_y),
+            "vx": float(preview_vx),
+            "vy": float(preview_vy),
+            "grounded": grounded,
+            "can_jump": can_jump,
+            "preview_jump": preview_jump,
+            "color": (80, 220, 80) if preview_jump else (80, 190, 255),
         }
 
     def render(self, surface: pygame.Surface, blit_only: bool = True):

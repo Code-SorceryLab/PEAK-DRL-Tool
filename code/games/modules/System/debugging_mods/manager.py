@@ -13,9 +13,10 @@ from .overlays import (
 
 
 class DebugManager:
-    def __init__(self, default_active=True, print_help=True):
+    def __init__(self, default_active=True, print_help=True, sensor_mode="rays"):
         self.active = True
         self.hub    = None  # injected by GameEnv wrapper
+        self.sensor_mode = "shot" if str(sensor_mode).lower() == "shot" else "rays"
 
         # ── Always-on ──────────────────────────────────────
         self.show_agent_view = True
@@ -63,6 +64,18 @@ class DebugManager:
         if print_help:
             self._print_help_to_terminal()
 
+    def _sensor_short_label(self):
+        return "shot+arc" if self.sensor_mode == "shot" else "rays+arc"
+
+    def _sensor_row_label(self):
+        return "Shot Line + Arc   (toggle)" if self.sensor_mode == "shot" else "Rays + Jump Arc   (toggle)"
+
+    def _sensor_status_label(self):
+        return "Shot Line + Arc" if self.sensor_mode == "shot" else "Rays + Jump Arc"
+
+    def _sensor_badge_label(self):
+        return "SHOT LINE + JUMP ARC  (F1)" if self.sensor_mode == "shot" else "RAYS + JUMP ARC  (F1)"
+
     # ─────────────────────────────────────────────────────────
     def _print_help_to_terminal(self):
         # Lazy import — colour helpers live in menu.py which imports manager.py,
@@ -95,7 +108,7 @@ class DebugManager:
             pad = " " * max(0, W - len(visible))
             print(dim("    ║") + inner + pad + dim("║"))
 
-        row("F1", "Shot Line + Arc   (toggle)")
+        row("F1", self._sensor_row_label())
         row("F2", "Free camera       (IJKL to move)")
         row("F3", "Slow motion       (0.5×)")
         row("F4", "Hitboxes          (toggle)")
@@ -122,7 +135,7 @@ class DebugManager:
         if rising(pygame.K_F1):
             self.show_sensors = not self.show_sensors
             state = grn("ON") if self.show_sensors else dim("off")
-            print(f"  {dim('F1')}  Shot Line + Arc  →  {state}")
+            print(f"  {dim('F1')}  {self._sensor_status_label()}  →  {state}")
         if rising(pygame.K_F2):
             self.free_cam_active = not self.free_cam_active
             state = grn("ON") if self.free_cam_active else dim("off")
@@ -185,7 +198,7 @@ class DebugManager:
 
         # F-key hint chips (right-aligned in banner)
         toggles = [
-            ("F1", "shot+arc", self.show_sensors),
+            ("F1", self._sensor_short_label(), self.show_sensors),
             ("F2", "cam",      self.free_cam_active),
             ("F3", "slow",     self.slow_motion),
             ("F4", "hbox",     self.show_hitboxes),
@@ -230,7 +243,7 @@ class DebugManager:
         if self.slow_motion:
             by = self._badge(surface, core, "SLOW MOTION",       (185, 110, 0), y=by) + 4
         if self.show_sensors:
-            self._badge(surface, core, "SHOT LINE + JUMP ARC  (F1)", (0, 145, 80), y=by)
+            self._badge(surface, core, self._sensor_badge_label(), (0, 145, 80), y=by)
 
         # ── Max-view draws last so it covers everything ────────
         # (AgentViewOverlay.render already dispatches; this badge confirms state)

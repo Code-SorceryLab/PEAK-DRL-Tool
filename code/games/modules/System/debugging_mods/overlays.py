@@ -779,7 +779,11 @@ class JumpArcOverlay(DebugOverlay):
         # ── Gather physics constants ──────────────────────────────────────────
         # Try to read from the physics manager or fall back to common defaults
         phys = getattr(core, 'physics_manager', None)
-        if phys is not None:
+        if phys is not None and hasattr(phys, 'context'):
+            ctx = phys.context
+            gravity = float(getattr(ctx, 'GRAVITY', 1800.0))
+            jump_force = abs(float(getattr(ctx, 'JUMP_VEL_MIN', -620.0)))
+        elif phys is not None:
             gravity    = float(getattr(phys, 'gravity',    1800.0))
             jump_force = float(getattr(phys, 'jump_force',  620.0))
         else:

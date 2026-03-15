@@ -637,14 +637,6 @@ def run_training():
     if arch_sel is None:
         return
 
-    runtime = prompt_training_runtime_overrides()
-    if runtime is None:
-        return
-    n_envs_override = runtime["n_envs_override"]
-    device_override = runtime["device_override"]
-    envs_display = str(n_envs_override) if n_envs_override is not None else f"{runtime['default_n_envs']} (grid)"
-    device_display = device_override if device_override is not None else f"{runtime['default_device']} (grid)"
-
     # ── TensorBoard root ──────────────────────────────────────────
     tb_root = input(_DIM(f"\n    TensorBoard root [{DEFAULT_TB_ROOT}] (Enter to keep): ")).strip() or DEFAULT_TB_ROOT
     runtime = prompt_training_runtime_overrides()
@@ -780,6 +772,14 @@ def train_all_models_for_game():
                              show_desc=arch_desc)
     if arch_sel is None:
         return
+
+    runtime = prompt_training_runtime_overrides()
+    if runtime is None:
+        return
+    n_envs_override = runtime["n_envs_override"]
+    device_override = runtime["device_override"]
+    envs_display = str(n_envs_override) if n_envs_override is not None else f"{runtime['default_n_envs']} (grid)"
+    device_display = device_override if device_override is not None else f"{runtime['default_device']} (grid)"
 
     # ── Summary + confirm ─────────────────────────────────────────
     total_runs = len(arch_sel) * len(algo_sel) * len(persona_sel) * len(skill_sel)

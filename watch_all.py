@@ -915,11 +915,12 @@ def run_grid(fps: int = 20, max_episodes: int = 5, game_filter: str | None = Non
                 if first_dm:
                     break
 
+        sensor_label = getattr(first_dm, "_sensor_short_label", lambda: "rays+arc")() if first_dm else "rays+arc"
         hud_items = [
             ("ESC", "quit",     None),
             ("SPACE", "pause",  None),
             ("R", "reset",      None),
-            ("F1", "shot+arc",  getattr(first_dm, "show_sensors", False) if first_dm else False),
+            ("F1", sensor_label, getattr(first_dm, "show_sensors", False) if first_dm else False),
             ("F2", "cam",       getattr(first_dm, "free_cam_active", False) if first_dm else False),
             ("F3", "slow",      getattr(first_dm, "slow_motion", False) if first_dm else False),
             ("F4", "hitboxes",  getattr(first_dm, "show_hitboxes", False) if first_dm else False),

@@ -725,7 +725,11 @@ class MegamanCore(gymnasium.Env):
 
         self.loader = LevelLoader(tile_size=self.TILE_SIZE)
         pygame.init()
-        self.debug_manager = DebugManager(default_active=(render_mode == "human"), print_help=(render_mode == "human"))
+        self.debug_manager = DebugManager(
+            default_active=(render_mode == "human"),
+            print_help=(render_mode == "human"),
+            sensor_mode="shot",
+        )
         self.debug_manager.show_grid = False
 
         if self.render_mode == "human":
