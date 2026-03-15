@@ -484,6 +484,8 @@ class SonicPhysicsManager:
                 elif t_type == EntityType.GOAL:
                     goal_is_real = target.gObj.x > TILE_SIZE
                     if not core.reached_goal and goal_is_real:
+                        if hasattr(source, "rings"):
+                            core.score += int(source.rings) * 100
                         core.score += int(core.timer)
                         core.reached_goal = True
                         core.complete_level()
@@ -544,15 +546,17 @@ class SonicPhysicsManager:
             return
 
         if not getattr(coin, 'collected', False):
+            is_lost_ring = bool(getattr(coin, "is_lost", False))
             coin.gObj.active = False
             if hasattr(coin, 'collected'):
                 coin.collected = True
             core.score += 10
-            core.coins_step += 1
-            core.coins_total += 1
             if hasattr(player, 'rings'):
                 player.rings += 1
-            if hasattr(core, 'ring_total'):
+            if not is_lost_ring:
+                core.coins_step += 1
+                core.coins_total += 1
+            if hasattr(core, 'ring_total') and not is_lost_ring:
                 core.ring_total += 1
 
     def _handle_projectile_enemy(self, core, proj, enemy):

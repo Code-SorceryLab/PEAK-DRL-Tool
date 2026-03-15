@@ -706,68 +706,24 @@ class SonicCore(gymnasium.Env):
         if not p: return
         p_rect = p.gObj.get_rect()
 
-        for ring in self.rings:
-            if not ring.collected and ring.gObj.active and p_rect.colliderect(ring.gObj.get_rect()):
-                ring.collected = True
-                ring.gObj.active = False
-                p.rings += 1
-                self.ring_total += 1
-                self.coins_total += 1
-                self.coins_step += 1
-                self.score += 10
-
-        for ring in self.lost_rings:
-            if ring.gObj.active and getattr(ring, 'can_collect', True) and p_rect.colliderect(ring.gObj.get_rect()):
-                ring.gObj.active = False
-                p.rings += 1
-                self.ring_total += 1
-                self.coins_total += 1
-                self.score += 10
-
-        for badnik in self.badniks:
-            if badnik.gObj.active and badnik.alive and p_rect.colliderect(badnik.gObj.get_rect()):
-                if p.is_ball:
-                    badnik.destroy()
-                    p.bounce_off_enemy()
-                    self.kills_step += 1
-                    self.badniks_destroyed += 1
-                    self.score += 100
-                else:
-                    rings_before = p.rings
-                    if p.take_hit():
-                        self._handle_death("Badnik")
-                    elif rings_before > 0:
-                        self._scatter_rings(p, rings_before)
-
-        for enemy in self.level_data.enemies:
-            if enemy.gObj.active and p_rect.colliderect(enemy.gObj.get_rect()):
-                if p.is_ball:
-                    enemy.gObj.active = False
-                    p.bounce_off_enemy()
-                    self.kills_step += 1
-                    self.score += 100
-                else:
-                    rings_before = p.rings
-                    if p.take_hit():
-                        self._handle_death("Enemy")
-                    elif rings_before > 0:
-                        self._scatter_rings(p, rings_before)
-
         for spring in self.springs:
             if spring.gObj.active and p_rect.colliderect(spring.gObj.get_rect()):
                 spring.trigger()
                 p.spring_launch(spring.bounce_velocity)
                 self.score += 10
 
-        for goal in self.level_data.goals:
-            if p_rect.colliderect(goal.gObj.get_rect()):
-                self.reached_goal = True
-                self.score += p.rings * 100
-                self.complete_level()
+    def _clear_lost_rings(self):
+        for ring in self.lost_rings:
+            ring.gObj.active = False
+        self.lost_rings.clear()
 
     def _scatter_rings(self, player: SonicPlayer, rings_lost: int):
         scatter_count = min(rings_lost, 32)
         if scatter_count == 0: return
+
+        # Only one scattered-ring cloud should exist at a time. Otherwise
+        # repeated hits can stack old loose rings on top of the newly lost set.
+        self._clear_lost_rings()
 
         cx = player.gObj.x + player.gObj.width / 2 - 8
         cy = player.gObj.y + player.gObj.height / 2 - 8
