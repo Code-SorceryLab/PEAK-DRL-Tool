@@ -14,6 +14,16 @@
   
   <!-- EXTERNAL CSS & JS -->
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .audience-grid-2x2 {
+      grid-template-columns: repeat(2, 1fr) !important;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    @media (max-width: 600px) {
+      .audience-grid-2x2 { grid-template-columns: 1fr !important; }
+    }
+  </style>
   <script src="script.js" defer></script>
 </head>
 <body>
@@ -30,8 +40,6 @@
       <li><a href="#policy">PPO & Architectures</a></li>
       <li><a href="#personas">Personas</a></li>
       <li><a href="#architecture">Engine</a></li>
-      <li><a href="#team">Team</a></li>
-      <li><a href="https://github.com/Code-SorceryLab/drl-PEAK-agents-balance" target="_blank">GitHub ↗</a></li>
     </ul>
     <button class="hamburger" id="burger" onclick="toggleMenu()">
       <span></span><span></span><span></span>
@@ -46,8 +54,6 @@
     <a href="#policy" onclick="toggleMenu()">PPO & Architectures</a>
     <a href="#personas" onclick="toggleMenu()">Personas</a>
     <a href="#architecture" onclick="toggleMenu()">Engine</a>
-    <a href="#team" onclick="toggleMenu()">Team</a>
-    <a href="https://github.com/Code-SorceryLab/drl-PEAK-agents-balance" target="_blank" onclick="toggleMenu()">GitHub ↗</a>
   </div>
 
   <!-- HERO SECTION -->
@@ -55,14 +61,8 @@
     <div class="container" style="position:relative">
       <div class="particle-field" id="heroParticles"></div>
       <img src="static/PEAK_LOGO.png" alt="PEAK Logo" class="hero-logo-img">
-      <p class="hero-tagline">A <strong>deterministic, high-performance</strong> reinforcement learning benchmarking engine for evaluating deep RL agent adaptability in <strong>2D platformer environments</strong>.</p>
-      <p class="hero-authors">
-        <a href="https://www.linkedin.com/in/al-mohamed-shifan-5266b924b/" target="_blank">Al Muqshith Shifan</a><sup>1</sup>, 
-        <a href="https://www.linkedin.com/in/kevincchua/" target="_blank">Kevin Christopher Chua</a><sup>1</sup><br>
-        <span><sup>1</sup>Ontario Tech University · Supervised by <a href="https://cpoli.live/" target="_blank">Dr. Cristiano Politowski</a></span>
-      </p>
+      <p class="hero-tagline">A <strong>lightweight 2D platformer engine</strong> for designing, training, and playtesting games with <strong>deep reinforcement learning agents</strong>.</p>
       <div class="hero-links">
-        <a href="https://github.com/Code-SorceryLab/drl-PEAK-agents-balance" target="_blank" class="btn btn-fill">⬇ GitHub</a>
         <a href="#demos" class="btn btn-outline">▶ Demos</a>
         <a href="#workflow" class="btn btn-outline">🔧 Workflow</a>
       </div>
@@ -75,7 +75,7 @@
   <section class="container reveal">
     <h2 class="section-heading">Abstract</h2>
     <p style="text-align:center;max-width:720px;margin:0 auto;color:var(--text-secondary)">
-      <strong style="color:var(--text-primary)">PEAK</strong> (Platformer Engine by Al &amp; Kevin) is a research-grade RL benchmark engine built for Ontario Tech University's Master's Program under the supervision of <strong style="color:var(--text-primary)">Dr. Cristiano Politowski</strong>. It provides a complete toolkit — from <strong style="color:var(--text-primary)">visual level editor</strong> to <strong style="color:var(--text-primary)">live training dashboard</strong> to <strong style="color:var(--text-primary)">real-time debug overlays</strong> — for studying how deep RL agents learn, adapt, and generalize in physics-based platformer games. The engine ships with 6 reward personas, 4 neural network architectures, a batch-based curriculum system, 10+ progressive stages, and a multi-channel observation pipeline designed for Stable-Baselines3 PPO integration.
+      <strong style="color:var(--text-primary)">PEAK</strong> is a lightweight 2D platformer engine and DRL experimentation environment that integrates authoring, training, debugging, and playtesting in one integrated workflow. It provides a complete toolkit — from <strong style="color:var(--text-primary)">visual level editor</strong> to <strong style="color:var(--text-primary)">live training dashboard</strong> to <strong style="color:var(--text-primary)">real-time debug overlays</strong> — for studying how deep RL agents learn, adapt, and generalize in physics-based platformer games. The engine ships with three built-in reward personas (Pathfinder, Simple, Completionist), four neural network architectures, a multi-channel observation pipeline, and Stable-Baselines3 PPO integration — all within a deterministic, reproducible workflow.
     </p>
   </section>
 
@@ -84,13 +84,11 @@
   <!-- WHO IS THIS FOR -->
   <section class="wide-container" id="audience">
     <h2 class="section-heading reveal">Who Is This Tool For?</h2>
-    <div class="audience-grid stagger-kids">
-      <div class="audience-card"><div class="a-icon">🎓</div><h4>RL Researchers</h4><p>Study reward shaping, curriculum learning, and observation design with 6 personas that produce measurably different behaviors. Deterministic physics enable rigorous A/B experiments.</p></div>
-      <div class="audience-card"><div class="a-icon">🧑‍🎓</div><h4>Graduate Students</h4><p>A thesis-ready platform: train agents, visualize decisions with debug overlays, compare algorithms, and export publication-quality data from the analytics dashboard.</p></div>
-      <div class="audience-card"><div class="a-icon">🎮</div><h4>Game AI Developers</h4><p>Design levels in the visual editor, train agents to play them, and watch the results. The modular persona system makes behavior experimentation fast.</p></div>
-      <div class="audience-card"><div class="a-icon">🏫</div><h4>Course Instructors</h4><p>Use PEAK as a teaching tool for RL courses. Students can see agents learn in real-time with debug overlays, making abstract concepts like reward shaping tangible.</p></div>
-      <div class="audience-card"><div class="a-icon">🔬</div><h4>Reward Designers</h4><p>Test reward hypotheses rapidly. Six built-in personas demonstrate how different reward signals produce different emergent behaviors — then build your own.</p></div>
-      <div class="audience-card"><div class="a-icon">🛠️</div><h4>Benchmark Engineers</h4><p>Need a controlled, deterministic environment for comparing RL algorithms? PEAK's reproducible physics and standardized stages make it ideal for fair comparisons.</p></div>
+    <div class="audience-grid audience-grid-2x2 stagger-kids">
+      <div class="audience-card"><div class="a-icon">🏗️</div><h4>Game Studios &amp; Designers</h4><p>Prototype levels in the visual editor, train agents with different personas, and inspect failure hotspots and difficulty spikes — all before committing to expensive art or external QA.</p></div>
+      <div class="audience-card"><div class="a-icon">🏫</div><h4>Course Instructors &amp; Students</h4><p>A self-contained environment for RL education. Author a level, train a PPO agent, monitor learning curves in TensorBoard, and explain agent behavior — all in a single homework assignment.</p></div>
+      <div class="audience-card"><div class="a-icon">🔬</div><h4>Quality Assurance Teams</h4><p>Stress-test levels against qualitatively different play styles simultaneously. Persona-based testing converts design intuitions into measurable completion rates and failure-position heatmaps.</p></div>
+      <div class="audience-card"><div class="a-icon">⚖️</div><h4>Difficulty &amp; Accessibility Tuning</h4><p>Train novice-budget and expert-budget agents on the same level to identify difficulty spikes and structural dead ends — making level balance a measurable, iterable property.</p></div>
     </div>
   </section>
 
@@ -168,20 +166,10 @@
       </div>
     </div>
 
+
     <div class="showcase slide-left">
       <div class="showcase-visual">
-        <div class="placeholder"><div class="icon">🖥️</div><span>PyQt5 GUI Screenshot</span></div>
-      </div>
-      <div class="showcase-text">
-        <h3>GUI Control Center</h3>
-        <p>PyQt5 desktop app with tabbed navigation for training, evaluation, manual play, and TensorBoard. Dropdown selection for algorithms, personas, levels — no command-line required.</p>
-        <span class="pill">PyQt5</span><span class="pill">tabbed UI</span><span class="pill">model mgmt</span><span class="pill">TensorBoard</span>
-      </div>
-    </div>
-
-    <div class="showcase reverse slide-right">
-      <div class="showcase-visual">
-        <div class="placeholder"><div class="icon">👁️</div><span>Watch Agent / Watch All Screenshot</span></div>
+        <img src="static/Watch_All.png" alt="Watch All Agents Viewer">
       </div>
       <div class="showcase-text">
         <h3>Agent Viewer &amp; Multi-Model Grid</h3>
@@ -200,7 +188,7 @@
     
     <div class="policy-section reveal">
       <h3>PPO</h3><div class="algo-type">Proximal Policy Optimization · Stable-Baselines3</div>
-      <p>PPO clips the policy ratio to prevent destructive updates, making training stable across diverse reward landscapes. PEAK uses <code>MultiInputPolicy</code> to handle the Dict observation space (grids + scalars) — the CNN branch processes the 5-channel spatial grid while the MLP branch processes the 12 scalar features. Outputs are concatenated before the shared policy/value heads.</p>
+      <p>PPO clips the policy ratio to prevent destructive updates, making training stable across diverse reward landscapes. PEAK uses <code>MultiInputPolicy</code> to handle the Dict observation space (grids + scalars) — the CNN branch processes the spatial grid while the MLP branch processes the scalar features. Outputs are concatenated before the shared policy/value heads. The action space uses a factored <code>MultiDiscrete([5, 2, 2])</code> design: movement (5 options), jump (2 options), and shoot toggle (2 options), keeping control semantics consistent across ground, air, and platform states.</p>
       <p>All architectures use <strong>GroupNorm</strong> (not BatchNorm — BatchNorm assumes i.i.d. mini-batches, which RL rollouts violate). The VecNormalize wrapper is configured with <code>norm_obs_keys=["scalars"]</code> so that binary grid observations are never corrupted by running statistics.</p>
       <div class="hp-grid">
         <div class="hp-item"><strong>n_steps:</strong> 2048</div>
@@ -216,10 +204,10 @@
     </div>
     
     <div class="arch-cards stagger-kids">
-      <div class="arch-mini"><h4>Light</h4><div class="params">~18K params</div><p>No channel split, single conv path. Fastest for hyperparameter sweeps and quick experiments.</p></div>
-      <div class="arch-mini"><h4>Slim</h4><div class="params">~77K params</div><p>Channel-split CNN — separate conv paths for terrain vs hazard channels. Recommended starting point.</p></div>
-      <div class="arch-mini"><h4>Balanced</h4><div class="params">~230K params</div><p>SEBlock channel attention, 2-conv branches, 2-layer scalar MLP. Best accuracy-to-cost ratio.</p></div>
-      <div class="arch-mini"><h4>Peak</h4><div class="params">~922K params</div><p>Full deep semantic branch with SEBlock attention. Maximum capacity for complex levels.</p></div>
+      <div class="arch-mini"><h4>LightMobile</h4><div class="params">~18K params</div><p>MobileNet-style depthwise-separable convolution with a single scalar MLP. Fastest for hyperparameter sweeps. All grid channels share one CNN stack — recommended only for fast iteration, not serious training runs.</p></div>
+      <div class="arch-mini"><h4>SpatialAttention</h4><div class="params">~77K params</div><p>Branched design separating the Dijkstra channel from semantic channels, with a spatial self-attention block after the first pooling layer. Recommended starting point for level training.</p></div>
+      <div class="arch-mini"><h4>ChannelAttention</h4><div class="params">~230K params</div><p>SEBlock channel attention with two branched conv paths and a two-layer scalar MLP. Best accuracy-to-cost ratio for complex levels.</p></div>
+      <div class="arch-mini"><h4>DeepChannelAttention</h4><div class="params">~922K params</div><p>Full deep semantic branch with SEBlock attention. Maximum capacity for structurally complex levels requiring rich spatial reasoning.</p></div>
     </div>
   </section>
 
@@ -235,12 +223,9 @@
           <tr><th>Persona</th><th>Primary Signal</th><th>Win</th><th>Death</th><th>Components</th><th>Emergent Behavior</th></tr>
         </thead>
         <tbody>
-          <tr><td class="name-cell"><span class="dot" style="background:#E7575A"></span>Dijkstra</td><td>Potential-based pathfinding</td><td>+5.0</td><td>−3.0</td><td><span class="tag">potential</span><span class="tag">frontier</span><span class="tag">patience</span></td><td>Follows optimal path, patient on platforms</td></tr>
-          <tr><td class="name-cell"><span class="dot" style="background:#ff9f43"></span>Simple</td><td>Forward progress</td><td>+3.0</td><td>−3.0</td><td><span class="tag">progress</span><span class="tag">coins</span><span class="tag">alive</span></td><td>Steady rightward movement, baseline</td></tr>
-          <tr><td class="name-cell"><span class="dot" style="background:#ffd24d"></span>Coin Hunter</td><td>Coin collection only</td><td>+3.0+c×0.15</td><td>−3.0</td><td><span class="tag">coins</span><span class="tag">alive</span><span class="tag">kills</span></td><td>Thorough exploration, chases every coin</td></tr>
-          <tr><td class="name-cell"><span class="dot" style="background:#ff4d6a"></span>Enemy Hunter</td><td>Stomps (no goal gradient)</td><td>+3.0</td><td>−2.0</td><td><span class="tag">kills</span><span class="tag">powerup</span><span class="tag">alive</span></td><td>Aggressive, seeks enemies to stomp</td></tr>
-          <tr><td class="name-cell"><span class="dot" style="background:#6ec6e6"></span>Speedrunner</td><td>Velocity + time penalty</td><td>+8.0</td><td>−3.0</td><td><span class="tag">velocity</span><span class="tag">potential</span><span class="tag">time</span></td><td>Maximum speed, ignores collectibles</td></tr>
-          <tr><td class="name-cell"><span class="dot" style="background:#50c878"></span>Completionist</td><td>All objectives at parity</td><td>+5.0+c×0.1</td><td>−3.0</td><td><span class="tag">potential</span><span class="tag">coins</span><span class="tag">kills</span><span class="tag">patience</span></td><td>Versatile — grabs, stomps, progresses</td></tr>
+          <tr><td class="name-cell"><span class="dot" style="background:#E7575A"></span>Pathfinder</td><td>Potential-based pathfinding (Dijkstra)</td><td>+5.0</td><td>−3.0</td><td><span class="tag">potential</span><span class="tag">velocity-align</span><span class="tag">patience</span></td><td>Follows optimal path, patient on platforms</td></tr>
+          <tr><td class="name-cell"><span class="dot" style="background:#ff9f43"></span>Simple</td><td>Forward progress (Euclidean)</td><td>+5.0</td><td>−3.0</td><td><span class="tag">progress</span><span class="tag">coins</span><span class="tag">alive</span></td><td>Steady rightward movement, baseline</td></tr>
+          <tr><td class="name-cell"><span class="dot" style="background:#50c878"></span>Completionist</td><td>Balanced sub-goals</td><td>+5.0</td><td>−3.0</td><td><span class="tag">potential</span><span class="tag">coins</span><span class="tag">kills</span><span class="tag">patience</span></td><td>Versatile — grabs, stomps, progresses</td></tr>
         </tbody>
       </table>
     </div>
@@ -253,11 +238,9 @@
     <div class="radar-wrap reveal">
       <div class="radar-center"><canvas id="radarChart" width="420" height="420"></canvas></div>
       <div class="legend-list">
-        <div class="legend-row"><div class="legend-swatch" style="background:#E7575A"></div><div><h4>Dijkstra</h4><p>Best goal adherence. Moderate speed, low coins.</p></div></div>
-        <div class="legend-row"><div class="legend-swatch" style="background:#6ec6e6"></div><div><h4>Speedrunner</h4><p>Fastest times. Minimal exploration. High death rate.</p></div></div>
-        <div class="legend-row"><div class="legend-swatch" style="background:#ffd24d"></div><div><h4>Coin Hunter</h4><p>Highest coin rates. Slowest completions.</p></div></div>
-        <div class="legend-row"><div class="legend-swatch" style="background:#ff4d6a"></div><div><h4>Enemy Hunter</h4><p>Most kills. Risky — often forgets the goal.</p></div></div>
-        <div class="legend-row"><div class="legend-swatch" style="background:#50c878"></div><div><h4>Completionist</h4><p>Most balanced. Jack of all trades.</p></div></div>
+        <div class="legend-row"><div class="legend-swatch" style="background:#E7575A"></div><div><h4>Pathfinder</h4><p>Best goal adherence. Follows Dijkstra-optimal path, patient on platforms.</p></div></div>
+        <div class="legend-row"><div class="legend-swatch" style="background:#ff9f43"></div><div><h4>Simple</h4><p>Steady rightward movement. Baseline forward-progress signal.</p></div></div>
+        <div class="legend-row"><div class="legend-swatch" style="background:#50c878"></div><div><h4>Completionist</h4><p>Most balanced. Grabs coins, stomps enemies, reaches the goal.</p></div></div>
       </div>
     </div>
   </section>
@@ -269,20 +252,19 @@
     <p class="section-intro reveal">A dual-stream perception system — spatial awareness plus global context — designed so no critical information is lost to either stream.</p>
     <div class="obs-cols scale-in">
       <div class="obs-box">
-        <h3>Grid Observation</h3><span class="dim">5 × 21 × 21 binary channels</span>
-        <p>A 21×21 tile window centered on the player, encoded as 5 spatial channels. <strong>Never normalized</strong> by VecNormalize — fixing this was the single biggest performance unlock.</p>
+        <h3>Grid Observation</h3><span class="dim">4-channel spatial grid</span>
+        <p>A multi-channel spatial grid centered on the player, encoding the local environment as four binary/continuous channels. <strong>Never normalized</strong> by VecNormalize — preserving crisp spatial structure is critical for stable training.</p>
         <div style="margin-top:0.8rem">
-          <div class="ch-row"><div class="ch-dot" style="background:var(--cyan)"></div><strong>Solid</strong> — walkable ground and platforms</div>
-          <div class="ch-row"><div class="ch-dot" style="background:var(--crimson)"></div><strong>Hazard</strong> — spikes, pits, enemies</div>
-          <div class="ch-row"><div class="ch-dot" style="background:var(--gold)"></div><strong>Collectible</strong> — coins, question blocks, power-ups</div>
-          <div class="ch-row"><div class="ch-dot" style="background:#c060c0"></div><strong>Player</strong> — agent's own position in the grid</div>
-          <div class="ch-row"><div class="ch-dot" style="background:var(--green)"></div><strong>Dijkstra</strong> — pathfinding advantage map [-1, 1]</div>
+          <div class="ch-row"><div class="ch-dot" style="background:var(--cyan)"></div><strong>Solid Tiles</strong> — walkable ground and platforms</div>
+          <div class="ch-row"><div class="ch-dot" style="background:var(--crimson)"></div><strong>Hazards</strong> — spikes, enemies, pits</div>
+          <div class="ch-row"><div class="ch-dot" style="background:var(--gold)"></div><strong>Collectibles</strong> — coins, question blocks, power-ups</div>
+          <div class="ch-row"><div class="ch-dot" style="background:var(--green)"></div><strong>Dijkstra</strong> — physics-aware pathfinding distance map</div>
         </div>
-        <div class="obs-detail"><p>The Dijkstra channel is a continuous advantage map from a physics-aware flood-fill. Upward movement costs 3.5× horizontal (jumping is expensive), spikes add +18.0 penalty, platform tiles get proximity discounts. This gives the agent a "compass" that respects actual platformer physics.</p></div>
+        <div class="obs-detail"><p>The Dijkstra channel is a continuous advantage map from a physics-aware flood-fill solver. Upward movement costs 3.5× horizontal (jumping is expensive), spikes add large penalties, and platform tiles receive proximity discounts. This gives the agent a spatial compass that respects actual platformer physics — the same solver that informs the Pathfinder reward persona's dense gradient.</p></div>
       </div>
       <div class="obs-box">
-        <h3>Scalar Features</h3><span class="dim">12 values — hand-normalized</span>
-        <p>Global context the grid can't capture. VecNormalize with <code>norm_obs_keys=["scalars"]</code>.</p>
+        <h3>Scalar Features</h3><span class="dim">20 values — player &amp; game state</span>
+        <p>Global context the grid cannot capture. Includes position, velocity, lives, score, progress, and jump flags. Normalized by VecNormalize with <code>norm_obs_keys</code> targeting Box subspaces only.</p>
         <div class="scalar-grid">
           <div class="sc-item">x_position_norm</div><div class="sc-item">y_position_norm</div>
           <div class="sc-item">velocity_x_norm</div><div class="sc-item">velocity_y_norm</div>
@@ -290,6 +272,10 @@
           <div class="sc-item">on_ground</div><div class="sc-item">lives_norm</div>
           <div class="sc-item">coins_norm</div><div class="sc-item">powered_up</div>
           <div class="sc-item">time_remaining</div><div class="sc-item">level_progress</div>
+          <div class="sc-item">score_norm</div><div class="sc-item">jump_flag</div>
+          <div class="sc-item">on_platform</div><div class="sc-item">stall_timer</div>
+          <div class="sc-item">max_x_norm</div><div class="sc-item">enemy_proximity</div>
+          <div class="sc-item">hazard_below</div><div class="sc-item">curriculum_stage</div>
         </div>
         <div class="obs-detail"><p><strong>Why two streams?</strong> The grid tells the agent <em>what's nearby</em> — spatial relationships between platforms, enemies, and hazards. The scalars tell the agent <em>where it is globally</em> — progress, velocity, time, power-up state. The CNN and MLP process these independently, then concatenate before the policy head.</p></div>
       </div>
@@ -376,22 +362,16 @@
     </div>
   </section>
 
-  <!-- TEAM -->
+  <!-- TEAM placeholder - authors revealed on publication -->
   <div class="container"><hr class="section-hr"></div>
   <section class="container" id="team">
-    <h2 class="section-heading reveal">About Us</h2>
-    <p class="section-intro reveal">Code &amp; Sorcery Lab · Ontario Tech University</p>
-    <div class="team-grid stagger-kids">
-      <div class="team-card"><div class="avatar a1">AM</div><h3>Al Muqshith Shifan</h3><div class="role">AI Training · Reward Design · Debug Tools · Analytics</div><p>Reward persona engineering, observation pipeline, debug overlay system, Streamlit dashboard, training infrastructure, and agent performance analytics.</p><div class="links"><a href="https://www.linkedin.com/in/al-mohamed-shifan-5266b924b/" target="_blank">LinkedIn</a><a href="https://github.com/Code-SorceryLab" target="_blank">GitHub</a></div></div>
-      <div class="team-card"><div class="avatar a2">KC</div><h3>Kevin Christopher Chua</h3><div class="role">Game Engine · In-Game Features · MLP Research · Training Optimization</div><p>Core game engine, physics system, in-game feature implementation, MLP architecture research, level design, hyperparameter optimization, and experimental evaluation.</p><div class="links"><a href="https://www.linkedin.com/in/kevincchua/" target="_blank">LinkedIn</a><a href="https://github.com/kevincchua" target="_blank">GitHub</a></div></div>
-      <div class="team-card supervisor"><div class="avatar a3">CP</div><h3>Dr. Cristiano Politowski</h3><div class="role">Supervisor · Assistant Professor</div><p>Research interests: Video Game Development, Software Testing, AI for Software Engineering, Deep Reinforcement Learning. Ontario Tech University, Faculty of Science.</p><div class="links"><a href="https://cpoli.live/" target="_blank">Website</a><a href="https://www.linkedin.com/in/cristiano-politowski/" target="_blank">LinkedIn</a><a href="https://scholar.google.com/citations?user=B8qnQe0AAAAJ" target="_blank">Scholar</a></div></div>
-    </div>
+    <h2 class="section-heading reveal">Built With</h2>
     <p style="text-align:center;margin-top:2rem;color:var(--text-muted);font-size:0.9rem">Built on <a href="https://gymnasium.farama.org/" target="_blank">Gymnasium</a>, <a href="https://stable-baselines3.readthedocs.io/" target="_blank">Stable-Baselines3</a>, and <a href="https://www.pygame.org/" target="_blank">Pygame</a>.</p>
   </section>
 
   <footer>
     <div class="flogo">PEAK</div>
-    <p>Platformer Engine by Al &amp; Kevin · Ontario Tech University · 2025</p>
+    <p>Platformer Engine for Deep RL Research · 2025</p>
   </footer>
 </body>
 </html>

@@ -55,9 +55,7 @@ document.querySelectorAll('.count-up[data-target]').forEach(el => countObs.obser
   const cx = 210, cy = 210, R = 155, labels = ['Goal Reach', 'Speed', 'Coins', 'Kills', 'Survival'], n = labels.length;
   const data = [
     { c: '#E7575A', d: [0.95, 0.6, 0.35, 0.2, 0.8] },
-    { c: '#6ec6e6', d: [0.75, 1, 0.1, 0.15, 0.45] },
-    { c: '#ffd24d', d: [0.55, 0.3, 1, 0.25, 0.65] },
-    { c: '#ff4d6a', d: [0.4, 0.5, 0.2, 1, 0.35] },
+    { c: '#ff9f43', d: [0.65, 0.85, 0.3, 0.2, 0.7] },
     { c: '#50c878', d: [0.8, 0.55, 0.7, 0.55, 0.7] }
   ];
   const a = i => (Math.PI * 2 * i / n) - Math.PI / 2;
