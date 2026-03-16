@@ -197,7 +197,7 @@ def _wrap_with_tracker(core_fn) -> Callable:
 # =============================================================================
 
 @_wrap_with_tracker
-def delta_dijkstra(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
+def adept(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str, float]:
     """
     DIJKSTRA — follow the pathfinding gradient.
 
@@ -507,7 +507,7 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
 # Aliases
 # =============================================================================
 platformer_simple        = simple
-platformer_dijkstra      = delta_dijkstra
+platformer_adept      = adept
 platformer_enemy_hunter  = enemy_hunter
 platformer_speedrunner   = speedrunner
 platformer_completionist = completionist

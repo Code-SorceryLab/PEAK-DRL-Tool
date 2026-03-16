@@ -269,7 +269,7 @@ def simple(terminated: bool, info: Info) -> Dict[str, float]:
 
 
 @_wrap_with_tracker
-def mega(terminated: bool, info: Info) -> Dict[str, float]:
+def adept(terminated: bool, info: Info) -> Dict[str, float]:
     return _reward_template(
         terminated,
         info,
@@ -308,4 +308,4 @@ def mega(terminated: bool, info: Info) -> Dict[str, float]:
 
 default = simple
 megaman_simple = simple
-megaman_mega = mega
+megaman_adept = adept
