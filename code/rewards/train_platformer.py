@@ -506,7 +506,7 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
 # =============================================================================
 # Aliases
 # =============================================================================
-platformer_simple        = simple
+platformer_simple     = simple
 platformer_adept      = adept
 platformer_enemy_hunter  = enemy_hunter
 platformer_speedrunner   = speedrunner
