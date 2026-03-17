@@ -1138,13 +1138,14 @@ def run_agent_analyzer():
     if script_path.exists():
         cmd = [sys.executable, str(script_path)]
     elif Path("agent_analyzer.py").exists():
-        cmd = [sys.executable, "agent_analyzer.py > case-study/analysis.md"]
+        cmd = [sys.executable, "agent_analyzer.py"]
     else:
         print("❌ Cannot find 'agent_analyzer.py'. Make sure it's in the root or code/scripts/ folder.")
         return
 
     try:
-        subprocess.run(cmd)
+        with open("case-study/analysis.md", "w") as f:
+            subprocess.run(cmd, stdout=f)
     except KeyboardInterrupt:
         pass
     print("\nAnalysis complete.\n")
