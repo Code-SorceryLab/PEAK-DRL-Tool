@@ -28,7 +28,8 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QTabWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QComboBox, QLineEdit, QTextEdit, QSpinBox, QListWidget,
     QListWidgetItem, QMessageBox, QCheckBox, QGroupBox, QFormLayout, QProgressBar,
-    QTableWidget, QTableWidgetItem, QHeaderView, QSplitter, QAbstractItemView, QFrame
+    QTableWidget, QTableWidgetItem, QHeaderView, QSplitter, QAbstractItemView, QFrame,
+    QGridLayout, QStyle, QScrollArea
 )
 
 # ============================================================================
@@ -39,8 +40,8 @@ DEFAULT_TB_ROOT = "mylogs"
 MODELS_DIR = Path("models/")
 CONF_ROOT = Path("code/conf")
 GRID_CONFIG_PATH = CONF_ROOT / "grid.yaml"
-CONF_GAME_DIR = CONF_ROOT / "game"
-CONF_REWARD_DIR = CONF_ROOT / "reward"
+GAME_CONFIG_PATH = Path("code/games/game_config.yaml")
+REWARD_MODULE_DIR = Path("code/rewards")
 CONF_ALGO_DIR = CONF_ROOT / "algo"
 LOGO_PATH = Path("Screenshots/PEAK_LOGO.png")
 
@@ -59,152 +60,338 @@ REQUIRED_PACKAGES = [
 ]
 
 # ============================================================================
-# STYLING (Softer Dark Red & Black Theme)
+# STYLING (Modern Ember + Ice Theme)
 # ============================================================================
 
-DARK_RED_STYLESHEET = """
-/* --- Main Window & General --- */
+CONTROL_CENTER_STYLESHEET = """
 QWidget {
-    background-color: #121212;
-    color: #e0e0e0;
-    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    background-color: #0d1117;
+    color: #ecf2f8;
+    font-family: 'Segoe UI', 'Inter', sans-serif;
     font-size: 14px;
 }
 
-/* --- Group Boxes --- */
-QGroupBox {
-    background-color: #1e1e1e;
-    border: 1px solid #444;
-    border-radius: 6px;
-    margin-top: 24px;
-    padding-top: 15px;
+QWidget#rootWindow {
+    background-color: #091018;
 }
+
+QLabel {
+    background: transparent;
+}
+
+QFrame#heroCard, QFrame#actionDeck, QFrame#statCard {
+    background-color: #111924;
+    border: 1px solid #243246;
+    border-radius: 16px;
+}
+
+QFrame#heroCard {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #111827, stop:0.55 #191724, stop:1 #2a1320);
+    border: 1px solid #34455f;
+}
+
+QFrame#actionDeck {
+    background-color: #0f1722;
+}
+
+QFrame#statCard {
+    min-height: 96px;
+}
+
+QLabel#heroEyebrow {
+    color: #8fb9ff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+QLabel#heroTitle {
+    color: #f7fbff;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+QLabel#heroSubtitle {
+    color: #9eb0c4;
+    font-size: 13px;
+}
+
+QLabel#statusPill {
+    background-color: #132233;
+    border: 1px solid #2d4f75;
+    border-radius: 14px;
+    color: #8bd3ff;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+QLabel#statusPill[mode="busy"] {
+    background-color: #2c1f14;
+    border: 1px solid #8a5b23;
+    color: #ffbe6b;
+}
+
+QLabel#statusPill[mode="error"] {
+    background-color: #32161b;
+    border: 1px solid #8f3643;
+    color: #ff9aa8;
+}
+
+QLabel#statusPill[mode="ready"] {
+    background-color: #132233;
+    border: 1px solid #2d4f75;
+    color: #8bd3ff;
+}
+
+QLabel#chipLabel {
+    color: #8ea2b7;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+QLabel#chipValue {
+    color: #f6fbff;
+    font-size: 22px;
+    font-weight: 900;
+}
+
+QLabel#chipMeta {
+    color: #ff8d76;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QGroupBox {
+    background-color: #111924;
+    border: 1px solid #243246;
+    border-radius: 14px;
+    margin-top: 22px;
+    padding: 20px 16px 16px 16px;
+    font-weight: 600;
+}
+
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    left: 10px;
-    padding: 0 5px;
-    color: #ff7f7f;
-    font-weight: bold;
-    font-size: 15px;
+    left: 14px;
+    padding: 0 8px;
+    color: #ff8d76;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1px;
 }
 
-/* --- Tabs --- */
 QTabWidget::pane {
-    border: 1px solid #444;
-    background-color: #1e1e1e;
-    border-radius: 4px;
+    border: 1px solid #223043;
+    background-color: #0f1722;
+    border-radius: 16px;
+    top: -1px;
 }
+
 QTabBar::tab {
-    background: #2b2b2b;
-    color: #bbb;
-    padding: 10px 30px;
-    min-width: 80px;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    margin-right: 2px;
-    font-weight: 600;
+    background: #111924;
+    color: #97a7b9;
+    padding: 12px 20px;
+    min-width: 110px;
+    border: 1px solid #243246;
+    border-bottom: none;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    margin-right: 6px;
+    font-weight: 700;
 }
+
 QTabBar::tab:selected {
-    background: #802020;
-    color: white;
-    border-bottom: 2px solid #ff7f7f;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #1e2e45, stop:1 #4a1f2d);
+    color: #ffffff;
+    border: 1px solid #48658c;
+    border-bottom: 2px solid #7dd3fc;
 }
+
 QTabBar::tab:hover:!selected {
-    background: #3a3a3a;
-    color: #ff7f7f;
+    background: #172231;
+    color: #d6e4f2;
 }
 
-/* --- Buttons --- */
 QPushButton {
-    background-color: #802020;
-    color: white;
-    border: 1px solid #5a1010;
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-weight: bold;
+    background-color: #1b2635;
+    color: #f4f8fc;
+    border: 1px solid #34475f;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 800;
+    min-height: 42px;
 }
+
 QPushButton:hover {
-    background-color: #a03030;
-    border: 1px solid #ff7f7f;
+    background-color: #243246;
+    border: 1px solid #5f87b3;
 }
+
 QPushButton:pressed {
-    background-color: #501010;
+    background-color: #121c29;
 }
+
 QPushButton:disabled {
-    background-color: #333;
-    color: #555;
-    border: none;
+    background-color: #11161d;
+    color: #556170;
+    border: 1px solid #202833;
 }
 
-/* --- Input Fields --- */
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #2c2c2c;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 6px;
+QPushButton#accentButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #b9493e, stop:1 #e06b52);
+    border: 1px solid #f28c6a;
     color: white;
-    selection-background-color: #ff7f7f;
 }
+
+QPushButton#accentButton:hover {
+    background: #e5735a;
+    border: 1px solid #ffaf90;
+}
+
+QPushButton#dangerButton {
+    background-color: #38171d;
+    border: 1px solid #8f3643;
+    color: #ffb8c2;
+}
+
+QPushButton#dangerButton:hover {
+    background-color: #492028;
+    border: 1px solid #c54f63;
+}
+
+QLineEdit, QComboBox, QSpinBox {
+    background-color: #0d141d;
+    border: 1px solid #2b3b4f;
+    border-radius: 10px;
+    padding: 8px 10px;
+    color: #f5f9fd;
+    selection-background-color: #7dd3fc;
+    min-height: 38px;
+}
+
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-    border: 1px solid #ff7f7f;
-}
-QComboBox::drop-down { border: none; }
-QComboBox::down-arrow {
-    image: none;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 5px solid #ff7f7f;
-    margin-right: 8px;
+    border: 1px solid #7dd3fc;
+    background-color: #101a25;
 }
 
-/* --- Checkboxes --- */
-QCheckBox { spacing: 8px; color: #e0e0e0; }
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
+    border-left: 1px solid #2b3b4f;
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+    background-color: #132233;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #101824;
+    color: #f5f9fd;
+    border: 1px solid #34475f;
+    selection-background-color: #23364c;
+    selection-color: white;
+    padding: 4px;
+    outline: 0;
+}
+
+QCheckBox {
+    spacing: 8px;
+    color: #dbe5ee;
+}
+
 QCheckBox::indicator {
-    width: 18px; height: 18px; background: #222;
-    border: 2px solid #888; border-radius: 3px;
+    width: 18px;
+    height: 18px;
+    background: #0d141d;
+    border: 2px solid #486178;
+    border-radius: 5px;
 }
-QCheckBox::indicator:hover { border: 2px solid #ff7f7f; }
+
+QCheckBox::indicator:hover {
+    border: 2px solid #7dd3fc;
+}
+
 QCheckBox::indicator:checked {
-    background: #ff7f7f; border: 2px solid #ff7f7f; image: none;
+    background: #7dd3fc;
+    border: 2px solid #7dd3fc;
 }
 
-/* --- Progress Bar --- */
-QProgressBar {
-    border: 1px solid #444; border-radius: 4px;
-    text-align: center; background-color: #2c2c2c;
-    color: white; font-weight: bold;
-}
-QProgressBar::chunk {
-    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #802020, stop:1 #ff7f7f);
-    border-radius: 3px;
-}
-
-/* --- Text Edit --- */
 QTextEdit {
-    background-color: #0d0d0d; border: 1px solid #444;
-    color: #ccc; font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 13px; border-radius: 4px;
+    background-color: #081019;
+    border: 1px solid #223043;
+    color: #cfe0ef;
+    font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 12px;
+    border-radius: 14px;
+    padding: 6px;
 }
 
-/* --- Tables --- */
 QTableWidget {
-    background-color: #1e1e1e; gridline-color: #444; border: 1px solid #444;
-}
-QTableWidget::item { padding: 5px; }
-QTableWidget::item:selected { background-color: #802020; color: white; }
-QHeaderView::section {
-    background-color: #2c2c2c; color: #ff7f7f;
-    padding: 6px; border: 1px solid #444; font-weight: bold;
+    background-color: #0d141d;
+    gridline-color: #233141;
+    border: 1px solid #243246;
+    border-radius: 10px;
 }
 
-/* --- Scrollbars --- */
-QScrollBar:vertical { border: none; background: #121212; width: 12px; }
-QScrollBar::handle:vertical {
-    background: #444; min-height: 20px; border-radius: 6px; margin: 2px;
+QTableWidget::item {
+    padding: 6px;
 }
-QScrollBar::handle:vertical:hover { background: #ff7f7f; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+
+QTableWidget::item:selected {
+    background-color: #23364c;
+    color: white;
+}
+
+QHeaderView::section {
+    background-color: #111924;
+    color: #8bd3ff;
+    padding: 8px;
+    border: none;
+    border-bottom: 1px solid #223043;
+    font-weight: 800;
+}
+
+QSplitter::handle {
+    background-color: #162131;
+    width: 8px;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: #091018;
+    width: 12px;
+    margin: 2px 0 2px 0;
+}
+
+QScrollBar::handle:vertical {
+    background: #32485e;
+    min-height: 24px;
+    border-radius: 6px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #7dd3fc;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollArea {
+    border: none;
+    background: transparent;
+}
 """
 
 # ============================================================================
@@ -246,6 +433,24 @@ def load_grid_config():
     except Exception:
         return None
 
+def load_game_config():
+    if not GAME_CONFIG_PATH.exists():
+        return None
+    try:
+        return OmegaConf.load(GAME_CONFIG_PATH)
+    except Exception:
+        return None
+
+def _game_defined(game_cfg, game: str) -> bool:
+    if game_cfg is None:
+        return False
+    try:
+        if game == "platformer":
+            return bool(game_cfg.get("levels"))
+        return bool(game_cfg.get(game))
+    except Exception:
+        return False
+
 def get_available_algos_from_grid():
     cfg = load_grid_config()
     if cfg is None or 'models' not in cfg:
@@ -258,7 +463,13 @@ def get_available_personas_from_grid():
     if cfg is None or 'personas' not in cfg:
         return []
     grid_personas = list(cfg.personas) if cfg.personas else []
-    return sorted([p for p in grid_personas if (CONF_REWARD_DIR / f"{p}.yaml").exists()])
+    personas = []
+    for persona in grid_personas:
+        persona_name = str(persona)
+        game_prefix = persona_name.split("_", 1)[0]
+        if (REWARD_MODULE_DIR / f"train_{game_prefix}.py").exists():
+            personas.append(persona_name)
+    return personas
 
 def get_personas_for_game(game: str):
     all_personas = get_available_personas_from_grid()
@@ -266,9 +477,21 @@ def get_personas_for_game(game: str):
     return filtered if filtered else all_personas
 
 def get_available_games():
-    if not CONF_GAME_DIR.exists():
-        return []
-    return sorted([f.stem for f in CONF_GAME_DIR.glob("*.yaml")])
+    grid_cfg = load_grid_config()
+    game_cfg = load_game_config()
+
+    candidates = list(grid_cfg.games) if grid_cfg is not None and grid_cfg.get("games") else [
+        "platformer", "megaman", "sonic"
+    ]
+    available = [str(game) for game in candidates if _game_defined(game_cfg, str(game))]
+    if available:
+        return list(dict.fromkeys(available))
+
+    fallback = []
+    for game in ("platformer", "megaman", "sonic"):
+        if _game_defined(game_cfg, game):
+            fallback.append(game)
+    return fallback
 
 def get_trained_models_count():
     best_dir = MODELS_DIR / "best"
@@ -294,8 +517,7 @@ def get_trained_games_from_models_flat():
 class AnimatedMountainWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # CHANGED: Reduced height to 200px for a more compact view
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(140)
         
         self._progress = 0.0
         self._step_counter = 0
@@ -344,8 +566,8 @@ class AnimatedMountainWidget(QWidget):
 
         # 1. Background
         gradient = QLinearGradient(0, 0, 0, h)
-        gradient.setColorAt(0.0, QColor("#080808")) 
-        gradient.setColorAt(1.0, QColor("#1c1c1c")) 
+        gradient.setColorAt(0.0, QColor("#0a1320"))
+        gradient.setColorAt(1.0, QColor("#131b26"))
         painter.fillRect(0, 0, w, h, QBrush(gradient))
 
         # 2. Mountain
@@ -358,12 +580,12 @@ class AnimatedMountainWidget(QWidget):
         path.append(QPointF(peak_x, peak_y))
         path.append(QPointF(w, base_y))
         
-        painter.setBrush(QBrush(QColor("#2a2a2a")))
-        painter.setPen(QPen(QColor("#621414"), 3))
+        painter.setBrush(QBrush(QColor("#1d2a3a")))
+        painter.setPen(QPen(QColor("#34506f"), 3))
         painter.drawPolygon(path)
 
         # 3. Snow
-        painter.setBrush(QBrush(QColor("#e0e0e0")))
+        painter.setBrush(QBrush(QColor("#eef7ff")))
         painter.setPen(Qt.NoPen)
         snow_path = QPolygonF()
         snow_path.append(QPointF(peak_x, peak_y))
@@ -403,29 +625,29 @@ class AnimatedMountainWidget(QWidget):
         painter.setPen(Qt.NoPen)
         
         # Body (Blue)
-        painter.setBrush(QColor("#ff7f7f"))
+        painter.setBrush(QColor("#e06b52"))
         painter.drawRect(int(man_x), int(man_y + 8), int(man_w), 10)
         
         # Head (Flesh)
-        painter.setBrush(QColor("#ffccaa"))
+        painter.setBrush(QColor("#ffd0b2"))
         painter.drawRect(int(man_x + 2), int(man_y), 8, 8)
         
         # Hair (Retro Brown)
-        painter.setBrush(QColor("#4e342e")) 
+        painter.setBrush(QColor("#5b3d35")) 
         painter.drawRect(int(man_x + 1), int(man_y - 2), 10, 4) # Top hair
         painter.drawRect(int(man_x + 1), int(man_y), 2, 6)      # Sideburn L
         painter.drawRect(int(man_x + 9), int(man_y), 2, 6)      # Sideburn R
 
         # Legs (Dark Grey)
-        painter.setBrush(QColor("#555"))
+        painter.setBrush(QColor("#8ea2b7"))
         painter.drawRect(int(man_x + 2 + leg_offset), int(man_y + 18), 3, 6)
         painter.drawRect(int(man_x + 7 - leg_offset), int(man_y + 18), 3, 6)
 
         # 6. Flag
         if self._progress >= 0.99:
-            painter.setBrush(QColor("#888"))
+            painter.setBrush(QColor("#8ea2b7"))
             painter.drawRect(int(peak_x + 2), int(peak_y - 30), 2, 30)
-            painter.setBrush(QColor("#ff0000"))
+            painter.setBrush(QColor("#7dd3fc"))
             flag_poly = QPolygonF()
             flag_poly.append(QPointF(peak_x + 4, peak_y - 30))
             flag_poly.append(QPointF(peak_x + 24, peak_y - 22))
@@ -505,11 +727,12 @@ class ProcWorker(QThread):
 class RLManagerGUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.setObjectName("rootWindow")
         self.setWindowTitle("PEAK Agents — Control Center")
         self.resize(1600, 900)  # Made window wider for side-by-side layout
         
-        # Apply the Refined Dark Red theme
-        self.setStyleSheet(DARK_RED_STYLESHEET)
+        # Apply the updated control-center theme
+        self.setStyleSheet(CONTROL_CENTER_STYLESHEET)
 
         # Set Window Icon if exists
         if LOGO_PATH.exists():
@@ -530,6 +753,9 @@ class RLManagerGUI(QWidget):
         
         # --- Main Tabs ---
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setMovable(False)
+        self.tabs.setUsesScrollButtons(True)
         
         # Initialize tabs
         self.tab_status = self._build_status_tab()
@@ -541,53 +767,111 @@ class RLManagerGUI(QWidget):
         self.tab_bulk = self._build_bulk_tab()
         self.tab_maint = self._build_maint_tab()
 
-        self.tabs.addTab(self.tab_status, "STATUS")
-        self.tabs.addTab(self.tab_train, "TRAIN")
-        self.tabs.addTab(self.tab_eval, "EVALUATE")
-        self.tabs.addTab(self.tab_tensorboard, "TENSORBOARD")
-        self.tabs.addTab(self.tab_manual, "MANUAL PLAY")
-        self.tabs.addTab(self.tab_watch, "WATCH AGENT")
-        self.tabs.addTab(self.tab_bulk, "TRAIN ALL")
-        self.tabs.addTab(self.tab_maint, "MAINTENANCE")
+        self.tabs.addTab(self._wrap_tab(self.tab_status), "STATUS")
+        self.tabs.addTab(self._wrap_tab(self.tab_train), "TRAIN")
+        self.tabs.addTab(self._wrap_tab(self.tab_eval), "EVALUATE")
+        self.tabs.addTab(self._wrap_tab(self.tab_tensorboard), "TENSORBOARD")
+        self.tabs.addTab(self._wrap_tab(self.tab_manual), "MANUAL PLAY")
+        self.tabs.addTab(self._wrap_tab(self.tab_watch), "WATCH AGENT")
+        self.tabs.addTab(self._wrap_tab(self.tab_bulk), "TRAIN ALL")
+        self.tabs.addTab(self._wrap_tab(self.tab_maint), "MAINTENANCE")
+        self._apply_tab_icons()
 
-        # --- Top Control Bar ---
+        # --- Top Shell ---
         top_row = QHBoxLayout()
-        top_row.setContentsMargins(0, 0, 0, 5)
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(16)
 
-        # 1. Logo & Title on Left
+        hero_card = QFrame()
+        hero_card.setObjectName("heroCard")
+        hero_layout = QHBoxLayout(hero_card)
+        hero_layout.setContentsMargins(22, 18, 22, 18)
+        hero_layout.setSpacing(18)
+
         if LOGO_PATH.exists():
             logo_lbl = QLabel()
             pixmap = QPixmap(str(LOGO_PATH))
-            scaled = pixmap.scaledToHeight(50, Qt.SmoothTransformation) # Scale nicely
+            scaled = pixmap.scaledToHeight(58, Qt.SmoothTransformation)
             logo_lbl.setPixmap(scaled)
-            top_row.addWidget(logo_lbl)
-            top_row.addSpacing(10)
+            hero_layout.addWidget(logo_lbl, 0, Qt.AlignTop)
 
-        title_lbl = QLabel("CONTROL CENTER")
-        title_lbl.setStyleSheet("font-size: 20px; font-weight: 900; color: #ff7f7f; letter-spacing: 2px;")
-        top_row.addWidget(title_lbl)
-        top_row.addSpacing(30)
+        hero_text = QVBoxLayout()
+        hero_text.setSpacing(4)
+        eyebrow = QLabel("PEAK ENGINE")
+        eyebrow.setObjectName("heroEyebrow")
+        title_lbl = QLabel("Agent Control Center")
+        title_lbl.setObjectName("heroTitle")
+        subtitle_lbl = QLabel("Train, watch, debug, and maintain every game pipeline from one desktop cockpit.")
+        subtitle_lbl.setObjectName("heroSubtitle")
+        subtitle_lbl.setWordWrap(True)
+        hero_text.addWidget(eyebrow)
+        hero_text.addWidget(title_lbl)
+        hero_text.addWidget(subtitle_lbl)
+        hero_layout.addLayout(hero_text, 1)
 
-        # 2. Control Buttons
-        refresh_btn = QPushButton("↺ Refresh Configs"); refresh_btn.clicked.connect(self._refresh_all)
-        req_btn = QPushButton("📝 Write Requirements"); req_btn.clicked.connect(lambda: write_requirements(self.log, overwrite=True))
-        req_install_btn = QPushButton("⬇ Install Deps"); req_install_btn.clicked.connect(lambda: self._install_requirements_safe())
-        
-        self.stop_btn = QPushButton("🛑 STOP JOB"); self.stop_btn.clicked.connect(self._stop_proc); self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet("background-color: #501010; border: 1px solid #802020; color: #ff9999;") # Distinct style
-        
-        self.clear_log_btn = QPushButton("Clear Log"); self.clear_log_btn.clicked.connect(self.log_clear)
+        self.job_status_pill = QLabel("READY")
+        self.job_status_pill.setObjectName("statusPill")
+        self.job_status_pill.setProperty("mode", "ready")
+        self.job_status_pill.setAlignment(Qt.AlignCenter)
+        self.job_status_pill.setMinimumWidth(120)
+        hero_layout.addWidget(self.job_status_pill, 0, Qt.AlignTop | Qt.AlignRight)
 
-        top_row.addWidget(refresh_btn)
-        top_row.addWidget(req_btn)
-        top_row.addWidget(req_install_btn)
-        
-        # Spacer
-        top_row.addStretch(1)
-        
-        # Right side buttons
-        top_row.addWidget(self.clear_log_btn)
-        top_row.addWidget(self.stop_btn)
+        action_deck = QFrame()
+        action_deck.setObjectName("actionDeck")
+        action_deck.setMinimumWidth(300)
+        action_layout = QVBoxLayout(action_deck)
+        action_layout.setContentsMargins(16, 16, 16, 16)
+        action_layout.setSpacing(10)
+
+        deck_title = QLabel("Quick Actions")
+        deck_title.setObjectName("chipLabel")
+        action_layout.addWidget(deck_title)
+
+        btn_row_1 = QHBoxLayout()
+        btn_row_1.setSpacing(8)
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        refresh_btn.clicked.connect(self._refresh_all)
+        refresh_btn.setObjectName("accentButton")
+        req_btn = QPushButton("Requirements")
+        req_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        req_btn.clicked.connect(lambda: write_requirements(self.log, overwrite=True))
+        btn_row_1.addWidget(refresh_btn)
+        btn_row_1.addWidget(req_btn)
+        action_layout.addLayout(btn_row_1)
+
+        btn_row_2 = QHBoxLayout()
+        btn_row_2.setSpacing(8)
+        req_install_btn = QPushButton("Install Deps")
+        req_install_btn.setIcon(self.style().standardIcon(QStyle.SP_ArrowDown))
+        req_install_btn.clicked.connect(lambda: self._install_requirements_safe())
+        self.clear_log_btn = QPushButton("Clear Log")
+        self.clear_log_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        self.clear_log_btn.clicked.connect(self.log_clear)
+        btn_row_2.addWidget(req_install_btn)
+        btn_row_2.addWidget(self.clear_log_btn)
+        action_layout.addLayout(btn_row_2)
+
+        self.stop_btn = QPushButton("Stop Job")
+        self.stop_btn.setIcon(self.style().standardIcon(QStyle.SP_BrowserStop))
+        self.stop_btn.clicked.connect(self._stop_proc)
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.setObjectName("dangerButton")
+        action_layout.addWidget(self.stop_btn)
+
+        top_row.addWidget(hero_card, 1)
+        top_row.addWidget(action_deck, 0)
+
+        stats_row = QHBoxLayout()
+        stats_row.setSpacing(12)
+        self.stat_games = self._create_stat_card("Games", "0", "configured")
+        self.stat_algos = self._create_stat_card("Algorithms", "0", "available")
+        self.stat_models = self._create_stat_card("Models", "0", "best checkpoints")
+        self.stat_runtime = self._create_stat_card("Runtime", "--", "default")
+        stats_row.addWidget(self.stat_games, 1)
+        stats_row.addWidget(self.stat_algos, 1)
+        stats_row.addWidget(self.stat_models, 1)
+        stats_row.addWidget(self.stat_runtime, 1)
 
         # --- Log Window ---
         self.log = QTextEdit()
@@ -596,6 +880,7 @@ class RLManagerGUI(QWidget):
 
         # --- Layout Assembly (Side-by-Side) ---
         splitter = QSplitter(Qt.Horizontal) # CHANGED: Horizontal split
+        splitter.setChildrenCollapsible(False)
         
         # Left section (Tabs)
         tabs_wrap = QWidget()
@@ -609,21 +894,25 @@ class RLManagerGUI(QWidget):
         ll.setContentsMargins(10, 0, 0, 0) # Left margin for spacing
         
         log_header = QLabel("SYSTEM OUTPUT LOG:")
-        log_header.setStyleSheet("color: #ff7f7f; font-weight: bold; letter-spacing: 1px;")
+        log_header.setObjectName("chipLabel")
         ll.addWidget(log_header)
         ll.addWidget(self.log)
 
         splitter.addWidget(tabs_wrap)
         splitter.addWidget(log_wrap)
-        
+        tabs_wrap.setMinimumWidth(920)
+        log_wrap.setMinimumWidth(320)
+
         # Set initial sizes (70% Tabs, 30% Log)
         splitter.setStretchFactor(0, 7)
         splitter.setStretchFactor(1, 3)
+        splitter.setSizes([1260, 360])
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
-        root.setSpacing(15)
+        root.setSpacing(16)
         root.addLayout(top_row)
+        root.addLayout(stats_row)
         root.addWidget(splitter)
 
         self._refresh_all()
@@ -640,7 +929,60 @@ class RLManagerGUI(QWidget):
     def _lbl(self, text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setProperty('role', 'form-left')
+        lbl.setMinimumWidth(110)
         return lbl
+
+    def _wrap_tab(self, widget: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(widget)
+        return scroll
+
+    def _create_stat_card(self, title: str, value: str, meta: str) -> QFrame:
+        card = QFrame()
+        card.setObjectName("statCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(2)
+
+        title_lbl = QLabel(title.upper())
+        title_lbl.setObjectName("chipLabel")
+        value_lbl = QLabel(value)
+        value_lbl.setObjectName("chipValue")
+        meta_lbl = QLabel(meta)
+        meta_lbl.setObjectName("chipMeta")
+
+        layout.addWidget(title_lbl)
+        layout.addWidget(value_lbl)
+        layout.addWidget(meta_lbl)
+        layout.addStretch(1)
+
+        card.value_label = value_lbl
+        card.meta_label = meta_lbl
+        return card
+
+    def _set_job_status(self, text: str, mode: str = "ready"):
+        self.job_status_pill.setText(text.upper())
+        self.job_status_pill.setProperty("mode", mode)
+        self.job_status_pill.style().unpolish(self.job_status_pill)
+        self.job_status_pill.style().polish(self.job_status_pill)
+        self.job_status_pill.update()
+
+    def _apply_tab_icons(self):
+        icons = [
+            QStyle.SP_ComputerIcon,
+            QStyle.SP_MediaPlay,
+            QStyle.SP_DialogApplyButton,
+            QStyle.SP_BrowserReload,
+            QStyle.SP_ArrowForward,
+            QStyle.SP_FileDialogContentsView,
+            QStyle.SP_DialogYesButton,
+            QStyle.SP_MessageBoxWarning,
+        ]
+        for idx, icon_type in enumerate(icons):
+            self.tabs.setTabIcon(idx, self.style().standardIcon(icon_type))
 
     def _append_cmd(self, cmd_list):
         pretty = " ".join(str(x) for x in cmd_list)
@@ -745,6 +1087,7 @@ class RLManagerGUI(QWidget):
             QMessageBox.warning(self, "Busy", "Another job is running.")
             return
         self._append_cmd(cmd)
+        self._set_job_status("Running", "busy")
 
         self._progress_mode = purpose
         self._progress_total = progress_total
@@ -777,7 +1120,6 @@ class RLManagerGUI(QWidget):
         self.proc.line.connect(self._on_proc_line_received)
         self.proc.finished.connect(self._on_proc_finished)
         self.stop_btn.setEnabled(True)
-        self.stop_btn.setStyleSheet("background-color: #802020; font-weight: bold; border: 1px solid #ff7f7f; color: white;")
         self.proc.start()
 
     def _stop_proc(self):
@@ -785,6 +1127,7 @@ class RLManagerGUI(QWidget):
             self._timer.stop() 
             self.proc.stop()
             self.log.append("[!] Termination requested.")
+            self._set_job_status("Stopping", "error")
             
             # --- RESET ANIMATION HERE ---
             if hasattr(self, 'train_mountain'):
@@ -796,7 +1139,7 @@ class RLManagerGUI(QWidget):
         self._timer.stop() 
         self._update_log_and_progress_from_buffer() 
         self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet("background-color: #501010; border: 1px solid #802020; color: #ff9999;")
+        self._set_job_status("Ready" if code == 0 else "Attention", "ready" if code == 0 else "error")
         
         # --- SOUND LOGIC ---
         if HAS_WINSOUND and code == 0:
@@ -845,6 +1188,8 @@ class RLManagerGUI(QWidget):
         combo.clear()
         for g in get_available_games():
             combo.addItem(g)
+        if combo.count() > 0:
+            combo.setCurrentIndex(0)
 
     def _populate_algos(self, combo: QComboBox):
         combo.clear()
@@ -861,6 +1206,8 @@ class RLManagerGUI(QWidget):
         combo.clear()
         for p in get_personas_for_game(game):
             combo.addItem(p)
+        if combo.count() > 0:
+            combo.setCurrentIndex(0)
 
     # ---------------- Train Tab ----------------
     def _build_train_tab(self) -> QWidget:
@@ -915,10 +1262,9 @@ class RLManagerGUI(QWidget):
         # --------------------------------------------------
         
         btn_train = QPushButton("INITIATE TRAINING SEQUENCE"); 
-        # CHANGED: Reduced button height for better layout
-        btn_train.setFixedHeight(30)
-        # CHANGED: Reduced font size slightly
-        btn_train.setStyleSheet("font-size: 13px; letter-spacing: 1px;")
+        btn_train.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        btn_train.setObjectName("accentButton")
+        btn_train.setFixedHeight(48)
         btn_train.clicked.connect(self._on_train_clicked)
 
         v.addWidget(self.train_prog_label)
@@ -1022,6 +1368,8 @@ class RLManagerGUI(QWidget):
         grp.setLayout(form)
         
         run_btn = QPushButton("RUN EVALUATION (Best Models)"); 
+        run_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        run_btn.setObjectName("accentButton")
         run_btn.setFixedHeight(50)
         run_btn.clicked.connect(self._on_eval_clicked)
         
@@ -1091,6 +1439,8 @@ class RLManagerGUI(QWidget):
         grp.setLayout(form)
         
         run_btn = QPushButton("LAUNCH TENSORBOARD"); 
+        run_btn.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        run_btn.setObjectName("accentButton")
         run_btn.setFixedHeight(50)
         run_btn.clicked.connect(self._on_tb_clicked)
         
@@ -1124,6 +1474,8 @@ class RLManagerGUI(QWidget):
         grp.setLayout(form)
         
         run_btn = QPushButton("LAUNCH MANUAL PLAY"); 
+        run_btn.setIcon(self.style().standardIcon(QStyle.SP_ArrowForward))
+        run_btn.setObjectName("accentButton")
         run_btn.setFixedHeight(50)
         run_btn.clicked.connect(self._on_manual_clicked)
         
@@ -1159,6 +1511,8 @@ class RLManagerGUI(QWidget):
         grp.setLayout(form)
         
         run_btn = QPushButton("VISUALIZE AGENT"); 
+        run_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogContentsView))
+        run_btn.setObjectName("accentButton")
         run_btn.setFixedHeight(50)
         run_btn.clicked.connect(self._on_watch_clicked)
         
@@ -1213,6 +1567,8 @@ class RLManagerGUI(QWidget):
         grp.setLayout(form)
         
         run_btn = QPushButton("EXECUTE BULK TRAINING (NOVICE + EXPERT)"); 
+        run_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogYesButton))
+        run_btn.setObjectName("accentButton")
         run_btn.setFixedHeight(50)
         run_btn.clicked.connect(self._on_bulk_clicked)
         
@@ -1262,13 +1618,27 @@ class RLManagerGUI(QWidget):
     # ---------------- Status Tab ----------------
     def _build_status_tab(self) -> QWidget:
         w = QWidget(); root = QVBoxLayout(w)
-        
+
         overview = QGroupBox("Project Overview")
-        og = QGridLayoutLike()
-        self.ov_games = QLabel(""); self._bold_label_left(og, "Games Configured", self.ov_games)
-        self.ov_algos = QLabel(""); self._bold_label_left(og, "Algorithms Configured", self.ov_algos)
-        self.ov_trained = QLabel(""); self._bold_label_left(og, "Models Trained", self.ov_trained)
-        overview.setLayout(og.layout)
+        overview_grid = QGridLayout()
+        overview_grid.setHorizontalSpacing(12)
+        overview_grid.setVerticalSpacing(12)
+
+        overview_games = self._create_stat_card("Games", "0", "configured")
+        overview_algos = self._create_stat_card("Algorithms", "0", "ready")
+        overview_models = self._create_stat_card("Models", "0", "trained")
+        overview_trained_games = self._create_stat_card("Trained Games", "0", "with best model")
+
+        self.ov_games = overview_games.value_label
+        self.ov_algos = overview_algos.value_label
+        self.ov_trained = overview_models.value_label
+        self.ov_trained_games = overview_trained_games.value_label
+
+        overview_grid.addWidget(overview_games, 0, 0)
+        overview_grid.addWidget(overview_algos, 0, 1)
+        overview_grid.addWidget(overview_models, 1, 0)
+        overview_grid.addWidget(overview_trained_games, 1, 1)
+        overview.setLayout(overview_grid)
 
         games_box = QGroupBox("Games Status")
         self.games_table = QTableWidget(0, 2)
@@ -1288,6 +1658,8 @@ class RLManagerGUI(QWidget):
         v2 = QVBoxLayout(); v2.addWidget(self.alg_table); alg_box.setLayout(v2)
 
         refresh = QPushButton("REFRESH STATUS DATA"); 
+        refresh.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        refresh.setObjectName("accentButton")
         refresh.setFixedHeight(40)
         refresh.clicked.connect(self._refresh_status)
 
@@ -1308,9 +1680,29 @@ class RLManagerGUI(QWidget):
         algos = get_available_algos_from_grid()
         trained = get_trained_games_from_models_flat()
         trained_models = get_trained_models_count()
+        default_device = "cpu"
+        default_n_envs = 1
+        cfg = load_grid_config()
+        if cfg is not None:
+            try:
+                default_n_envs = max(1, int(cfg.get("n_envs", 1)))
+            except Exception:
+                default_n_envs = 1
+            default_device = str(cfg.get("device", "cpu") or "cpu").lower()
+
         self.ov_games.setText(str(len(games)))
         self.ov_algos.setText(str(len(algos)))
         self.ov_trained.setText(str(trained_models))
+        if hasattr(self, "ov_trained_games"):
+            self.ov_trained_games.setText(str(len(trained)))
+        self.stat_games.value_label.setText(str(len(games)))
+        self.stat_games.meta_label.setText("configured")
+        self.stat_algos.value_label.setText(str(len(algos)))
+        self.stat_algos.meta_label.setText("available")
+        self.stat_models.value_label.setText(str(trained_models))
+        self.stat_models.meta_label.setText(f"{len(trained)} games with checkpoints")
+        self.stat_runtime.value_label.setText(f"{default_n_envs} · {default_device.upper()}")
+        self.stat_runtime.meta_label.setText("grid default")
 
         self.games_table.setRowCount(0)
         for g in games:
@@ -1342,7 +1734,7 @@ class RLManagerGUI(QWidget):
         self.chk_del_models = QCheckBox("Delete Trained Models (models/)")
         
         del_btn = QPushButton("PERFORM DELETION"); 
-        del_btn.setStyleSheet("background-color: #501010; color: #ff5555; font-weight: 900; border: 1px solid #ff5555;")
+        del_btn.setObjectName("dangerButton")
         del_btn.clicked.connect(self._on_delete_clicked)
         
         v.addWidget(warn)

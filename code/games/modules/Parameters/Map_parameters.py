@@ -7,6 +7,7 @@ TILE_PLATFORM = 2
 TILE_GOAL     = 3
 TILE_SPIKE    = 4
 TILE_QBLOCK   = 5
+TILE_PIT      = 6
 
 # Colors (simple debug palette)
 COLOR_SKY        = (107, 140, 255)

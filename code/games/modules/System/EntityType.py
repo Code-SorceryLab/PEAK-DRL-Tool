@@ -11,3 +11,5 @@ class EntityType(Enum):
     GOAL = auto()
     SPIKE = auto()
     PROJECTILE = auto()
+    PIT = auto()
+    LADDER = auto()

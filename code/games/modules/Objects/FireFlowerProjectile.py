@@ -1,7 +1,8 @@
 from __future__ import annotations
 import pygame
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from ..Objects.GameObject import GameObject
+from ..Objects.Projectile import Projectile
 from ..System.EntityType import EntityType
 
 # ── Tunable parameters ────────────────────────────────────────────────────────
@@ -28,7 +29,7 @@ PROJECTILE_HEIGHT   = 12
 
 
 @dataclass
-class FireFlowerProjectile:
+class FireFlowerProjectile(Projectile):
     """
     A fireball fired by the player when in Fire state.
 
@@ -50,14 +51,13 @@ class FireFlowerProjectile:
 
     Spawn via FireFlowerProjectile.from_player(player).
     """
-    gObj:      GameObject
-    vx:        float = 0.0
-    vy:        float = 0.0          # starts at 0; gravity pulls it into the first bounce
-    on_ground: bool  = False        # written True by PhysicsManager on floor contact
-    _age:      float = field(default=0.0, repr=False)
-
-    def __post_init__(self):
-        self.gObj.type_id = EntityType.PROJECTILE
+    gObj: GameObject
+    vx: float = 0.0
+    vy: float = 0.0
+    on_ground: bool = False
+    owner: str = "player"
+    damage: int = 1
+    lifetime: float = PROJECTILE_LIFETIME
 
     # ------------------------------------------------------------------
     # Factory
@@ -87,6 +87,9 @@ class FireFlowerProjectile:
             gObj=GameObject(cx, cy, PROJECTILE_WIDTH, PROJECTILE_HEIGHT, True),
             vx=vx,
             vy=jump_vel,    # launch immediately upward on spawn
+            owner="player",
+            damage=1,
+            lifetime=PROJECTILE_LIFETIME,
         )
 
     # ------------------------------------------------------------------
@@ -98,9 +101,8 @@ class FireFlowerProjectile:
             return
 
         # Lifetime expiry
-        self._age += dt
-        if self._age >= PROJECTILE_LIFETIME:
-            self.gObj.active = False
+        self.begin_frame()
+        if not self.tick_lifetime(dt):
             return
 
         # Wall hit: PhysicsManager zeroed vx when bounce_x=False.

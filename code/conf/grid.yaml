@@ -3,23 +3,25 @@ defaults:
   - _self_
 
 # lists of experiment dimensions
-games: [platformer]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
+games: [platformer, megaman, sonic]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
-architectures: [light, slim, peak]  # light=~18K, slim=~77K (default), peak=~922K
+architectures: [lightmobile, spatialattention, channelattention, deepchannelattention]
 personas: [
   platformer_simple,
-  platformer_dijkstra,
-  platformer_coin_hunter,
-  platformer_enemy_hunter,
-  platformer_speedrunner,
-  platformer_completionist,
+  platformer_adept,
+  megaman_simple,
+  megaman_adept,
+  sonic_simple,
+  #sonic_speedrunner,
+  #platformer_enemy_hunter,
+  #platformer_speedrunner,
+  #platformer_completionist,
 ]
 
 # skill -> training steps
 skills:
   Novice: 1_000_000
-  Expert: 2_000_000
-
+  Expert: 8_000_000
 
 # generic env params
 seed: 1234
@@ -32,7 +34,7 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # cuda or cpu
-n_envs: 3 # 1 for cpu or 16 gpu , or whatever you want
+n_envs: 2 # 1 for cpu or 16 gpu , or whatever you want
 
 
 # null values mean "no override"
@@ -40,7 +42,7 @@ model: null     # optional single selection
 persona: null   # optional single selection
 skill: null     # optional single selection2
 
-viz_enabled: true
+viz_enabled: false
 viz_freq: 10000        # adjust to taste — every 50k steps is reasonable
 viz_preview_episodes: 1
 viz_fps: 30

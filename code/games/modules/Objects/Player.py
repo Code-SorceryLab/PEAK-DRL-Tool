@@ -4,11 +4,11 @@ from .GameObject import GameObject
 import pygame
 from typing import Dict, List, Any, Optional
 from enum import Enum, auto
-
+import numpy as np
 # Imports from sibling packages
 from ..Parameters import Movement_parameters as MP
 from ..Parameters import Jump_parameters as JP
-from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR
+from ..Parameters.Map_parameters import COLOR_WHITE, COLOR_STREAK, COLOR_SENSOR, TILE_SIZE
 from ..System.PhysicsManager import PhysicsContext
 from ..System.AnimationHandler import AnimationHandler
 from ..System.PlayerStateMachine import PlayerStateMachine
@@ -35,7 +35,8 @@ class Player():
     eye_radius = 3
     on_ground: bool = False
     facing_right: bool = True
-
+    star_timer:   float = 0.0
+    iframes_timer: float = 0.0
     # --- POWER STATE ---
     # powered_up and invincible_timer are kept as plain fields because the rest
     # of the codebase (platformer_core rendering, PhysicsManager) reads them
@@ -71,6 +72,14 @@ class Player():
     # in step() to actually spawn the projectile. platformer_core is the only
     # place that should reset this flag to False after reading it.
     fire_requested: bool = False
+    hp: int = 1
+    hp_max: int = 1
+    shot_cooldown: float = 0.0
+    jump_cut: bool = False
+    on_ladder: bool = False
+    ladder_x: float = 0.0
+    can_jump: bool = False
+    grounded: bool = False
 
     def __post_init__(self):
         # 1. Initialise power state machine (no on_death yet — wired later if needed)
@@ -81,18 +90,25 @@ class Player():
         self._fire_cooldown: float = 0.0
 
         # 3. Animation paths
-        default_asset = 'code/games/assets/player1.png'
+        default_asset = 'code/games/assets/idle1.png'
 
         anim_paths = {
             PlayerAnim.IDLE: [
-                'code/games/assets/player1.png',
-                'code/games/assets/player2.png',
-                'code/games/assets/player3.png',
-                'code/games/assets/player4.png'
+                'code/games/assets/idle1.png',
+                'code/games/assets/idle2.png',
+                'code/games/assets/idle3.png',
+                'code/games/assets/idle4.png',
+                'code/games/assets/idle5.png',
+                'code/games/assets/idle6.png',
             ],
-            PlayerAnim.RUN:  [default_asset],
-            PlayerAnim.JUMP: [default_asset],
-            PlayerAnim.FALL: [default_asset]
+            PlayerAnim.RUN:  [
+                'code/games/assets/run (1).png',
+                'code/games/assets/run (2).png',
+                'code/games/assets/run (3).png',
+                'code/games/assets/run (4).png'
+            ],
+            PlayerAnim.JUMP: ['code/games/assets/jump.png'],
+            PlayerAnim.FALL: ['code/games/assets/fall.png']
         }
 
         int_keyed_paths = {state.value: paths for state, paths in anim_paths.items()}
@@ -137,6 +153,7 @@ class Player():
         # 6. Tick fire cooldown — keeps it draining even when fire key is not held
         if self._fire_cooldown > 0.0:
             self._fire_cooldown = max(0.0, self._fire_cooldown - dt)
+        self.shot_cooldown = self._fire_cooldown
 
     def _update_animation_logic(self, dt: float):
         """Decides which animation state to use based on physics."""
@@ -154,12 +171,28 @@ class Player():
 
         self.anim_handler.set_state(target_state.value)
 
-    def handle_input(self, a: int):
-        agent_left  = (a in (1, 6, 8, 9, 11, 16, 18, 19))
-        agent_right = (a in (2, 4, 5, 7, 12, 14, 15, 17))
-        agent_jump  = (a in (3, 4, 6, 7, 9, 13, 14, 16, 17, 19))
-        agent_run   = (a in (5, 7, 8, 9, 15, 17, 18, 19))
-        agent_fire  = (a in (10, 11, 12, 13, 14, 15, 16, 17, 18, 19)) 
+    def handle_input(self, a):
+        """
+        Decode a MultiDiscrete action [move, jump, fire] or fall back to
+        keyboard input in human mode.
+
+        move axis : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+        jump axis : 0=idle  1=jump
+        fire axis : 0=idle  1=fire
+        """
+        try:
+            move_idx = int(a[0])
+            jump_idx = int(a[1])
+            fire_idx = int(a[2])
+        except (TypeError, IndexError):
+            move_idx = jump_idx = fire_idx = 0
+
+        # Decode movement axis
+        agent_left  = move_idx in (1, 2)
+        agent_right = move_idx in (3, 4)
+        agent_run   = move_idx in (2, 4)   # sprint variants
+        agent_jump  = jump_idx == 1
+        agent_fire  = fire_idx == 1
 
         kb_left = kb_right = kb_jump = kb_run = kb_fire = False
 
@@ -272,9 +305,13 @@ class Player():
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
         sprite = None
         if self.anim_handler:
-            sprite = self.anim_handler.get_sprite(not self.facing_right)
+            sprite = self.anim_handler.get_sprite(self.facing_right)
 
         if sprite:
+            # Scale sprite to match current gObj dimensions (handles power-up size changes)
+            current_size = (int(self.gObj.width), int(self.gObj.height))
+            if (sprite.get_width(), sprite.get_height()) != current_size:
+                sprite = pygame.transform.scale(sprite, current_size)
             y_offset = sprite.get_height() - self.gObj.height
             surface.blit(sprite, (int(sx), int(sy - y_offset)))
             if debug:
@@ -289,7 +326,7 @@ class Player():
             )
             if debug:
                 self._debug(surface, sx, sy)
-            if self.run_pressed and abs(self.vx) > 100:
+            if self.run_held and abs(self.vx) > 100:
                 n = 3; spacing = 6; length = 10
                 for i in range(n):
                     offset = (i + 1) * spacing
@@ -311,3 +348,54 @@ class Player():
             (int(sx + self.gObj.width / 2), int(sy + self.gObj.height / 2)),
             v_end, 2
         )
+        
+    def obs_vector(self, max_run_speed: float, max_fall_speed: float) -> np.ndarray:
+        """
+        Returns a flat float32 array of all player state relevant to the obs.
+
+        Designed to be called by platformer_core._player_obs() so the obs
+        construction always stays in sync with the Player fields.
+
+        Layout (13 values):
+        [0]  x position          in tiles, unbounded (consistent across all level sizes)
+        [1]  y position          in tiles, unbounded (consistent across all level sizes)
+        [2]  velocity x          normalised [-1, 1]
+        [3]  velocity y          normalised [-1, 1]
+        [4]  on_ground           binary {0, 1}
+        [5]  powered_up          binary {0, 1}  (SUPER or FIRE state)
+        [6]  can_fire            binary {0, 1}  (FIRE state specifically)
+        [7]  invincible          binary {0, 1}  (star or i-frames active)
+        [8]  facing_right        binary {0, 1}
+        [9]  fire_cooldown       normalised [0, 1]  (0 = ready, 1 = just fired)
+        [10] invincible_timer    normalised [0, 1]  (fraction of max star duration)
+        [11] coyote_active       binary {0, 1}  (can still jump after walking off edge)
+        [12] jump_extendable     binary {0, 1}  (variable jump still accepting hold)
+        """
+
+        state = self.power_machine.state
+        is_fire       = (state == PowerState.FIRE)
+        is_powered_up = self.powered_up                         # True for SUPER and FIRE
+        is_invincible = self.invincible_timer > 0.0
+
+        # Cooldown fraction: 1.0 = just fired (full cooldown), 0.0 = ready to fire
+        cooldown_frac = np.clip(self._fire_cooldown / max(_FIRE_COOLDOWN, 1e-6), 0.0, 1.0)
+
+        # Star timer normalised — 10 s is the typical max star duration
+        _MAX_STAR = 10.0
+        inv_frac = np.clip(self.invincible_timer / _MAX_STAR, 0.0, 1.0)
+
+        return np.array([
+            self.gObj.x / TILE_SIZE,               # [0]  x pos in tiles
+            self.gObj.y / TILE_SIZE,               # [1]  y pos in tiles
+            np.clip(self.vx / max_run_speed,  -1.0,  1.0),    # [2]  vx
+            np.clip(self.vy / max_fall_speed, -1.0,  1.0),    # [3]  vy
+            1.0 if self.on_ground    else 0.0,                 # [4]  on_ground
+            1.0 if is_powered_up     else 0.0,                 # [5]  powered_up
+            1.0 if is_fire           else 0.0,                 # [6]  can_fire
+            1.0 if is_invincible     else 0.0,                 # [7]  invincible
+            1.0 if self.facing_right else 0.0,                 # [8]  facing_right
+            cooldown_frac,                                     # [9]  fire_cooldown
+            inv_frac,                                          # [10] invincible_timer
+            1.0 if self.coyote > 0   else 0.0,                 # [11] coyote_active
+            1.0 if self.jump_hold > 0 else 0.0,               # [12] jump_extendable
+        ], dtype=np.float32)

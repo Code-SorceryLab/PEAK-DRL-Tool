@@ -40,7 +40,13 @@ os.environ.pop("SDL_VIDEODRIVER", None)
 # Parse (game, algo, persona, skill) from the model folder/filename
 # ---------------------------------------------------------------------------
 # Known extractor tags (the last segment added to run_id by train.py)
-_EXTRACTOR_TAGS = {"light", "slim", "peak", "mlp"}
+_EXTRACTOR_TAGS = {
+    "lightmobile",
+    "spatialattention",
+    "channelattention",
+    "deepchannelattention",
+    "mlp",
+}
 # Known skill levels (the second-to-last segment)
 _SKILL_LEVELS   = {"novice", "expert", "custom"}
 
@@ -132,10 +138,28 @@ def load_model(model_path: str, algo: str = "ppo"):
         classes["recurrent_ppo"] = RecurrentPPO
     cls = classes.get(algo.lower(), PPO)
     try:
-        return cls.load(model_path)
+        return cls.load(model_path, device="cpu")
     except Exception as e:
         print(f"[WARN] Failed to load as {algo.upper()}: {e} — trying PPO")
-        return PPO.load(model_path)
+        return PPO.load(model_path, device="cpu")
+
+
+# ---------------------------------------------------------------------------
+# Action logging helpers
+# ---------------------------------------------------------------------------
+def _action_for_log(action):
+    arr = np.asarray(action)
+    if arr.ndim == 0:
+        value = int(arr)
+        return value, str(value)
+
+    flat = arr.reshape(-1)
+    if flat.size == 1:
+        value = int(flat[0])
+        return value, str(value)
+
+    values = [int(v) for v in flat.tolist()]
+    return values, ",".join(str(v) for v in values)
 
 
 # ---------------------------------------------------------------------------
@@ -190,12 +214,19 @@ def build_env(game: str, persona: str, fps: int, vecnorm_path: Optional[Path], r
     except Exception as e:
         print(f"[WARN] Could not load reward module: {e}")
 
+    env_kwargs = {
+        "persona": persona,
+        "random_start_world": random_start_world,
+    }
+    if game in {"megaman", "sonic"}:
+        # Watching should mirror normal play progression, not the training curriculum.
+        env_kwargs["curriculum_enabled"] = False
+
     raw_env = GameEnv(
         GameCoreClass,
         render_mode="human",
         fps=fps,
-        persona=persona,
-        random_start_world=random_start_world,
+        **env_kwargs,
         **({"reward_fn": reward_fn} if reward_fn else {}),
     )
 
@@ -235,7 +266,6 @@ def watch_agent_play(
     except Exception as e:
         print(f"[WARN] Could not parse model info: {e}")
         p_game, p_algo, p_persona, skill = "unknown", "ppo", "default", "unknown"
-
     if game    is None: game    = p_game
     if algo    is None: algo    = p_algo
     if persona is None: persona = p_persona
@@ -255,6 +285,13 @@ def watch_agent_play(
     print(f"[INFO] Watching {episodes} episode(s) at {fps} FPS — ESC or close to stop.\n")
 
     total_score, completed = 0, 0
+
+    # ── Session Recording ─────────────────────────────────────────────────
+    # Captures every action the agent takes, along with position, level,
+    # score, and events. Saved to sessions/ as a separate CSV from training logs.
+    import csv as _csv
+    import datetime as _dt
+    session_log = []
 
     try:
         for ep in range(episodes):
@@ -304,6 +341,36 @@ def watch_agent_play(
                 score = info_dict.get("score", score)
                 steps += 1
 
+                # ── Record this frame ─────────────────────────────────────
+                act_val, act_id = _action_for_log(action)
+                act_name = info_dict.get("action_name", act_id)
+                # Get action name from core if available
+                if core and hasattr(core, 'ACTION_NAMES') and isinstance(act_val, int):
+                    act_name = core.ACTION_NAMES.get(act_val, str(act_val))
+                elif core and hasattr(core, 'action_to_str') and not info_dict.get("action_name"):
+                    try:
+                        act_name = core.action_to_str(act_val)
+                    except Exception:
+                        act_name = act_id
+
+                session_log.append({
+                    "episode":  ep + 1,
+                    "step":     steps,
+                    "action_id": act_id,
+                    "action":   act_name,
+                    "level":    info_dict.get("level", ""),
+                    "x":        round(info_dict.get("x_position", 0.0), 2),
+                    "y":        round(info_dict.get("y_position", 0.0), 2),
+                    "vx":       round(info_dict.get("velocity_x", 0.0), 2),
+                    "vy":       round(info_dict.get("velocity_y", 0.0), 2),
+                    "score":    score,
+                    "reward":   round(float(reward[0]) if hasattr(reward, '__len__') else float(reward), 4),
+                    "event":    info_dict.get("event", ""),
+                    "cause":    info_dict.get("cause", ""),
+                    "lives":    info_dict.get("lives", 0),
+                    "coins":    info_dict.get("coins_collected", 0),
+                })
+
             completed += 1
             total_score += score
             print(f"Episode {ep + 1} done — score={score}  steps={steps}")
@@ -316,8 +383,21 @@ def watch_agent_play(
         try: pygame.quit()
         except Exception: pass
 
+    # ── Save session log ──────────────────────────────────────────────────
+    if session_log:
+        sessions_dir = Path("sessions")
+        sessions_dir.mkdir(exist_ok=True)
+        timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"session_{persona}_{skill}_{timestamp}.csv"
+        filepath = sessions_dir / filename
+        with open(filepath, 'w', newline='') as f:
+            writer = _csv.DictWriter(f, fieldnames=session_log[0].keys())
+            writer.writeheader()
+            writer.writerows(session_log)
+        print(f"\n📋 Session recorded → {filepath}  ({len(session_log)} frames)")
+
     if completed:
-        print(f"\nDone — {completed} ep(s)  avg score={total_score / completed:.2f}")
+        print(f"Done — {completed} ep(s)  avg score={total_score / completed:.2f}")
 
 
 # ---------------------------------------------------------------------------

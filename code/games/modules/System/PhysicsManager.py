@@ -180,16 +180,22 @@ class PhysicsManager:
             step_dt = dt / step_count
 
             for _ in range(step_count):
-                pre_y = player.gObj.y          # save Y before update
+                pre_y      = player.gObj.y       # save Y before update
+                pre_height = player.gObj.height  # save height before update
 
                 player.update(step_dt, ctx)    # moves both X and Y
 
-                post_y = player.gObj.y         # save post-update Y
+                post_y      = player.gObj.y       # save post-update Y (includes anchor correction)
+                post_height = player.gObj.height  # save post-update height
 
                 # ── Pass 1: X only ────────────────────────────────────────────
-                # Y is reset to pre-update so only X has changed.
-                # Every collision must be a wall — push out horizontally.
-                player.gObj.y = pre_y
+                # Restore Y to pre-update value, BUT account for any height change
+                # that apply_to_player() made. Without this, the anchor correction
+                # is lost and the player sits at the wrong Y for the X pass,
+                # causing false wall overlaps that snap the X position.
+                height_delta = post_height - pre_height
+                player.gObj.y      = pre_y - height_delta  # keep feet at same spot
+                player.gObj.height = post_height
                 self._resolve_player_world_x(core, level_data)
 
                 # ── Pass 2: Y only ────────────────────────────────────────────
@@ -204,6 +210,14 @@ class PhysicsManager:
         self.update_list(dt, level_data.moving_platforms)
         self.update_list(dt, level_data.projectiles)
 
+        # ── Pit / out-of-bounds death ─────────────────────────────────────────
+        # Checked here (inside the physics step) rather than in
+        # _check_termination so death fires on the same frame the player
+        # crosses the kill plane, before the observation is built.
+        # This also handles high-speed falls that could overshoot the boundary
+        # check in _check_termination by an arbitrary amount.
+        self._check_oob(core, level_data)
+
     def update_list(self, dt: float, objects: List[Any]):
         """
         Helper to iterate through a list of objects and call their update method
@@ -217,6 +231,46 @@ class PhysicsManager:
                     obj.update(dt, ctx)
                 except TypeError:
                     obj.update(dt)
+
+    def _check_oob(self, core, level_data):
+        """
+        Out-of-bounds / pit kill plane — owned by the physics manager.
+
+        Kill plane geometry
+        ───────────────────
+        Bottom:  player bottom edge > level_data.height + PIT_GRACE_PX
+                 Grace buffer absorbs sub-pixel overshoot at high fall speeds
+                 without adding visible delay at normal speeds.
+
+        Left/Right: player exits the map horizontally by more than one tile.
+                 Platforms that extend slightly beyond the grid don't kill;
+                 the extra-tile margin absorbs normal edge cases.
+
+        Enemies that fall off the map are silently deactivated (no death event
+        needed — they simply disappear, consistent with classic platformer feel).
+        """
+        # ── Player ───────────────────────────────────────────────────────────
+        player = core.player
+        if player and player.gObj.active and core.alive:
+            PIT_GRACE_PX  = 48          # pixels below level bottom before kill fires
+            OOB_MARGIN_PX = level_data.tile_size if hasattr(level_data, 'tile_size') else 32
+
+            fell_out    = player.gObj.y > level_data.height + PIT_GRACE_PX
+            left_out    = player.gObj.x + player.gObj.width < -OOB_MARGIN_PX
+            right_out   = player.gObj.x > level_data.width  + OOB_MARGIN_PX
+
+            if fell_out or left_out or right_out:
+                cause = "Pit" if fell_out else "OOB"
+                core._handle_death(cause)
+                return   # no further physics this frame
+
+        # ── Enemies ──────────────────────────────────────────────────────────
+        # Enemies that walk off ledges or get knocked below the map are deactivated
+        # so they don't accumulate as invisible, still-collidable phantoms.
+        kill_y = level_data.height + 64
+        for enemy in level_data.enemies:
+            if enemy.gObj.active and enemy.gObj.y > kill_y:
+                enemy.gObj.active = False
 
     # =========================================================================
     # COLLISION RESOLUTION LOOP
@@ -320,6 +374,7 @@ class PhysicsManager:
                 player.vy       = 0
                 player.on_ground = True
                 player.jump_hold = 0
+                player._on_moving_platform = True
 
             else:
                 # ── Ceiling hit (jumping into underside) ──────────────────────
@@ -490,7 +545,8 @@ class PhysicsManager:
 
             if tile_type == EntityType.SPIKE:
                 if not player.power_machine.is_invincible:
-                    core._handle_death("Spike")
+                    if not player.power_machine.take_hit():
+                        core._handle_death("Spike")
                     return
                 continue
 
@@ -640,20 +696,37 @@ class PhysicsManager:
         Handles logic when Player hits an Enemy.
 
         Resolution order:
-          1. Stomp    — player was falling AND feet above enemy centre → kill enemy, bounce player.
-          2. Star     — player.power_machine.is_invincible → kill enemy, no damage to player.
-          3. Damage   — player.power_machine.take_hit():
-                          True  → survived (downgraded or i-frames absorbed)
-                          False → dead, core._handle_death() already called by machine
-                                  (or we call it here if on_death was not set on machine)
+          0. State-machine enemies (e.g. Koopa) -- duck-typed via on_stomp / on_touch.
+             These handle their own scoring, bouncing, and damage internally.
+          1. Stomp    -- player was falling AND feet above enemy centre -> kill enemy, bounce player.
+          2. Star     -- player.power_machine.is_star_active -> kill enemy, no damage to player.
+          3. Damage   -- player.power_machine.take_hit():
+                          True  -> survived (downgraded or i-frames absorbed)
+                          False -> dead, core._handle_death() called by PhysicsManager
         """
         if not enemy.gObj.active:
+            return
+
+        # 0. Duck-type dispatch for state-machine enemies (Koopa etc.)
+        #    on_stomp / on_touch own all logic for these enemies -- do not fall through.
+        if hasattr(enemy, 'on_stomp'):
+            player_bottom = player.gObj.y + player.gObj.height
+            enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
+            # A flying enemy can rise INTO the player rather than the player falling
+            # onto it. In that case player_was_falling is False even though the player
+            # is clearly above the enemy. Treat upward enemy movement as equivalent to
+            # the player falling for the purposes of stomp detection.
+            enemy_rising  = hasattr(enemy, 'vy') and enemy.vy < 0
+            if (player_was_falling or enemy_rising) and player_bottom < enemy_center + 10:
+                enemy.on_stomp(player, core)
+            else:
+                enemy.on_touch(player, core)
             return
 
         player_bottom = player.gObj.y + player.gObj.height
         enemy_center  = enemy.gObj.y  + enemy.gObj.height / 2
 
-        # 1. Stomp — falling and feet above enemy midpoint
+        # 1. Stomp -- falling and feet above enemy midpoint
         if player_was_falling and player_bottom < enemy_center + 10:
             enemy.gObj.active = False
             player.vy = JUMP_VEL_MIN * 0.6   # bounce
@@ -662,8 +735,8 @@ class PhysicsManager:
                 core.kills_step += 1
             return
 
-        # 2. Star — kill enemy without taking damage
-        if player.power_machine.is_invincible:
+        # 2. Star -- kill enemy without taking damage
+        if player.power_machine.is_star_active:
             enemy.gObj.active = False
             core.score += 100
             if hasattr(core, 'kills_step'):
@@ -673,7 +746,6 @@ class PhysicsManager:
         # 3. Take a hit through the state machine
         survived = player.power_machine.take_hit()
         if not survived:
-            # on_death may not be wired on the machine — call core directly
             core._handle_death("Enemy")
 
     def _handle_player_coin(self, core, player, coin):
@@ -838,7 +910,7 @@ class PhysicsManager:
         tid passed downstream must be:
           EntityType.SPIKE  — so _resolve_player_world death-check fires
           TILE_QBLOCK (int) — so _hit_qblock fires
-          TILE_PLATFORM (int) — so one-way pass-through fires
+          TILE_PLATFORM (int) — treated as fully solid on all sides (same as TILE_GROUND)
           anything else     — treated as solid ground
         """
         nearby_objects = level_data.static_hash.query(obj)

@@ -1,5 +1,5 @@
 # Jump parameters
-JUMP_VEL_MIN       = -550.0
+JUMP_VEL_MIN       = -600.0
 JUMP_VEL_MAX       = -800.0
 JUMP_HOLD_FRAMES   = 16
 SPEED_JUMP_BONUS   = 0.15

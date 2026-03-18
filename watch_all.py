@@ -8,7 +8,7 @@ VecNormalize stats, and renders them in a tiled pygame grid window.
 Place at REPO ROOT (next to menu.py, watch_agent.py).
 
 Usage (from repo root):
-    python watch_all.py [--fps 20] [--episodes 5]
+    python watch_all.py [--fps 20] [--episodes 5] [--game platformer]
 
 Controls:
     ESC / close window  — quit
@@ -47,15 +47,27 @@ if _HAS_RPPO:
 GAME_W, GAME_H = 800, 600
 
 # Grid visual settings
-LABEL_H        = 28          # height of label bar above each cell
-CELL_PAD       = 4           # padding between cells
-BG_COLOR       = (18, 8, 24) # dark purple background
-LABEL_BG       = (30, 14, 42)
-LABEL_FG       = (200, 210, 230)
-BORDER_ACTIVE  = (80, 200, 120)
-BORDER_DONE    = (120, 40, 40)
-SCORE_COLOR    = (255, 210, 80)
-PAUSED_COLOR   = (255, 80, 80)
+HEADER_H       = 42
+FOOTER_H       = 30
+LABEL_H        = 34
+CELL_PAD       = 6
+BG_COLOR       = (8, 12, 20)
+HEADER_BG      = (14, 20, 32)
+CARD_BG        = (12, 18, 28)
+LABEL_BG       = (18, 26, 40)
+LABEL_FG       = (228, 236, 248)
+BORDER_ACTIVE  = (72, 174, 255)
+BORDER_DONE    = (132, 64, 90)
+SCORE_COLOR    = (255, 220, 120)
+PAUSED_COLOR   = (255, 110, 110)
+
+_ARCH_TAGS = {
+    "lightmobile",
+    "spatialattention",
+    "channelattention",
+    "deepchannelattention",
+    "mlp",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +80,9 @@ def parse_model_info(model_path: str):
         parts = folder.split("_")
     else:
         parts = path.stem.replace("_model", "").replace("best", "").split("_")
+
+    if len(parts) >= 5 and parts[-1].lower() in _ARCH_TAGS:
+        parts = parts[:-1]
 
     if len(parts) >= 4:
         game  = parts[0]
@@ -156,11 +171,16 @@ class ModelSlot:
 
         try:
             from code.wrappers.generic_env import GameEnv
+            env_kwargs = {
+                "persona": self.persona,
+            }
+            if self.game in {"megaman", "sonic"}:
+                env_kwargs["curriculum_enabled"] = False
             self.raw_env = GameEnv(
                 GameCls,
                 render_mode="none",
                 fps=None,
-                persona=self.persona,
+                **env_kwargs,
                 **({"reward_fn": reward_fn} if reward_fn else {}),
             )
         except Exception as e:
@@ -201,6 +221,14 @@ class ModelSlot:
         self.steps = 0
         self.ok = True
 
+        # Lifetime stats for radar plot
+        self.total_wins = 0
+        self.total_deaths = 0
+        self.total_stalls = 0
+        self.total_coins = 0
+        self.total_kills = 0
+        self.scores_history = []
+
     def reset(self):
         """Reset the environment and episode counters."""
         if not self.ok:
@@ -237,6 +265,11 @@ class ModelSlot:
         if not self.ok or self.done:
             return False
         try:
+            game = self.raw_env.game if hasattr(self.raw_env, 'game') else None
+            dm = getattr(game, 'debug_manager', None) if game else None
+            if dm:
+                dm.update_input()
+
             if self.is_recurrent:
                 action, self.lstm_states = self.model.predict(
                     self.obs, state=self.lstm_states,
@@ -244,6 +277,9 @@ class ModelSlot:
                 self.ep_start = np.zeros((1,), dtype=bool)
             else:
                 action, _ = self.model.predict(self.obs, deterministic=True)
+
+            if dm and dm.free_cam_active:
+                action = self._neutral_action(action)
 
             if self.is_vec:
                 self.obs, reward, dones, infos = self.env.step(action)
@@ -256,17 +292,36 @@ class ModelSlot:
             self.score = info.get("score", self.score) if isinstance(info, dict) else self.score
             self.steps += 1
 
+            # Track stats from info
+            if isinstance(info, dict):
+                self.total_coins = info.get("coins_collected", self.total_coins)
+                self.total_kills += int(info.get("enemies_killed_step", 0))
+                if info.get("event", "") == "WIN":
+                    self.total_wins += 1
+                if info.get("cause", "") == "Stall":
+                    self.total_stalls += 1
+
             # Force camera update (game core skips this in non-human mode)
             self._force_camera_update()
 
             if ep_done:
                 self.ep_count += 1
                 self.done = True
+                self.scores_history.append(self.score)
+                if isinstance(info, dict) and info.get("event", "") == "DIED":
+                    self.total_deaths += 1
                 return True
         except Exception as e:
             self.error = f"Step error: {e}"
             self.done = True
         return False
+
+    def _neutral_action(self, action):
+        if isinstance(action, np.ndarray):
+            return np.zeros_like(action)
+        if isinstance(action, (list, tuple)):
+            return type(action)(0 for _ in action)
+        return 0
 
     def _force_camera_update(self):
         """Manually update camera position on the game core.
@@ -286,6 +341,14 @@ class ModelSlot:
         level_w = game.level_data.width
         level_h = game.level_data.height
 
+        dm = getattr(game, 'debug_manager', None)
+        if dm and getattr(dm, 'free_cam_active', False):
+            dx, dy = getattr(dm, 'current_cam_move', [0.0, 0.0])
+            dt = getattr(game, 'dt', 1 / 60.0)
+            game.camera_x = max(0, min(game.camera_x + dx * dt, max(0, level_w - GAME_W)))
+            game.camera_y = max(0, min(game.camera_y + dy * dt, max(0, level_h - GAME_H)))
+            return
+
         smoothing = getattr(game, 'camera_smoothing', 0.15)
 
         # Horizontal: player at 1/3 from left
@@ -299,7 +362,7 @@ class ModelSlot:
             game.camera_y += (target_y - game.camera_y) * smoothing
             game.camera_y = max(0, min(game.camera_y, max(0, level_h - GAME_H)))
 
-    def render_to_surface(self, show_hitboxes=False, show_grid=False):
+    def render_to_surface(self):
         """Draw the current game state onto self.game_surf, with optional overlays."""
         if not self.ok:
             return
@@ -307,16 +370,32 @@ class ModelSlot:
             game = self.raw_env.game if hasattr(self.raw_env, 'game') else None
             if game and hasattr(game, 'render'):
                 game.render(self.game_surf, blit_only=True)
-
-                # Render debug overlays directly onto the game surface,
-                # bypassing DebugManager.render_overlays() which guards
-                # on render_mode == "human".
                 dm = getattr(game, 'debug_manager', None)
                 if dm:
-                    if show_grid and hasattr(dm, 'grid_overlay'):
+                    # Agent vision is useful in single-agent debugging, but it
+                    # overwhelms the grid viewer and blocks the actual gameplay.
+                    dm.agent_view_overlay.max_view = False
+                    if getattr(dm, 'show_grid', False) and hasattr(dm, 'grid_overlay'):
                         dm.grid_overlay.render(self.game_surf, game)
-                    if show_hitboxes and hasattr(dm, 'hitbox_overlay'):
+                    if getattr(dm, 'show_hitboxes', False) and hasattr(dm, 'hitbox_overlay'):
                         dm.hitbox_overlay.render(self.game_surf, game)
+                    if getattr(dm, 'show_sensors', False) and hasattr(dm, 'jump_arc_overlay'):
+                        dm.jump_arc_overlay.render(self.game_surf, game)
+                    if getattr(dm, 'show_sensors', False) and hasattr(game, 'last_rays'):
+                        from code.games.modules.System.debugging_mods.overlays import (
+                            RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL)
+                        ray_surf = pygame.Surface((GAME_W, GAME_H), pygame.SRCALPHA)
+                        for start, end, found, rtype in game.last_rays:
+                            if   rtype == 0.0: color = RAY_EMPTY
+                            elif rtype == 1.0: color = RAY_SOLID
+                            elif rtype == 2.0: color = RAY_HAZARD
+                            elif rtype == 3.0: color = RAY_COIN
+                            elif rtype == 4.0: color = RAY_GOAL
+                            else:              color = RAY_EMPTY
+                            s_cam = (start[0] - game.camera_x, start[1] - game.camera_y)
+                            e_cam = (end[0]   - game.camera_x, end[1]   - game.camera_y)
+                            pygame.draw.line(ray_surf, color, s_cam, e_cam, 1)
+                        self.game_surf.blit(ray_surf, (0, 0))
         except Exception:
             self.game_surf.fill((40, 10, 30))
 
@@ -328,6 +407,205 @@ class ModelSlot:
                 self.raw_env.close()
         except Exception:
             pass
+
+    def get_radar_metrics(self):
+        """Return normalised metrics dict for the radar plot."""
+        ep = max(1, self.ep_count)
+        return {
+            "Win Rate":   self.total_wins / ep,
+            "Survival":   1.0 - (self.total_deaths / ep),
+            "Coins":      min(1.0, self.total_coins / max(1, ep * 10)),
+            "Kills":      min(1.0, self.total_kills / max(1, ep * 3)),
+            "Avg Score":  min(1.0, (sum(self.scores_history) / max(1, len(self.scores_history))) / 500),
+            "Anti-Stall": 1.0 - min(1.0, self.total_stalls / max(1, ep * 3)),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Radar (Spider) Chart Drawing
+# ---------------------------------------------------------------------------
+def draw_radar_chart(surface, center, radius, metrics: dict, label: str,
+                     font, color=(80, 200, 120), bg_alpha=200):
+    """
+    Draw a spider/radar chart onto a pygame surface.
+
+    metrics: dict of {axis_name: value} where value is 0.0–1.0
+    """
+    import math as _math
+
+    n = len(metrics)
+    if n < 3:
+        return
+
+    names = list(metrics.keys())
+    values = [max(0.0, min(1.0, metrics[k])) for k in names]
+    cx, cy = center
+    angle_step = 2 * _math.pi / n
+
+    # Background circle
+    bg_surf = pygame.Surface((radius * 2 + 40, radius * 2 + 40), pygame.SRCALPHA)
+    bx, by = radius + 20, radius + 20
+    pygame.draw.circle(bg_surf, (10, 6, 18, bg_alpha), (bx, by), radius + 10)
+    surface.blit(bg_surf, (cx - bx, cy - by))
+
+    # Grid rings (25%, 50%, 75%, 100%)
+    for ring in (0.25, 0.5, 0.75, 1.0):
+        r = int(radius * ring)
+        pygame.draw.circle(surface, (50, 40, 65), (cx, cy), r, 1)
+
+    # Axis lines + labels
+    axis_points = []
+    for i in range(n):
+        angle = -_math.pi / 2 + i * angle_step  # start from top
+        ex = cx + int(radius * _math.cos(angle))
+        ey = cy + int(radius * _math.sin(angle))
+        axis_points.append((angle, ex, ey))
+        pygame.draw.line(surface, (50, 40, 65), (cx, cy), (ex, ey), 1)
+
+        # Label
+        lbl = font.render(names[i], True, (160, 170, 200))
+        lx = cx + int((radius + 14) * _math.cos(angle)) - lbl.get_width() // 2
+        ly = cy + int((radius + 14) * _math.sin(angle)) - lbl.get_height() // 2
+        surface.blit(lbl, (lx, ly))
+
+    # Data polygon
+    data_pts = []
+    for i in range(n):
+        angle = -_math.pi / 2 + i * angle_step
+        v = values[i]
+        dx = cx + int(radius * v * _math.cos(angle))
+        dy = cy + int(radius * v * _math.sin(angle))
+        data_pts.append((dx, dy))
+
+    # Filled polygon (semi-transparent)
+    if len(data_pts) >= 3:
+        poly_surf = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        pygame.draw.polygon(poly_surf, (*color, 60), data_pts)
+        pygame.draw.polygon(poly_surf, (*color, 200), data_pts, 2)
+        surface.blit(poly_surf, (0, 0))
+
+    # Data points
+    for pt in data_pts:
+        pygame.draw.circle(surface, color, pt, 3)
+
+    # Title label
+    title = font.render(label, True, (220, 230, 255))
+    surface.blit(title, (cx - title.get_width() // 2, cy + radius + 22))
+
+
+def draw_multi_radar_overlay(surface, rect, slots, font_title, font_body, mouse_pos, focus_key=None):
+    radar_colors = [
+        (80, 200, 120), (200, 110, 120), (90, 150, 255),
+        (240, 190, 90), (180, 120, 240), (90, 210, 210),
+        (255, 130, 90), (180, 220, 110),
+    ]
+
+    panel = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    panel.fill((8, 14, 22, 236))
+    pygame.draw.rect(panel, (72, 174, 255, 220), panel.get_rect(), 2, border_radius=14)
+    surface.blit(panel, rect.topleft)
+
+    title = font_title.render("MODEL COMPARISON RADAR  (N to close)", True, LABEL_FG)
+    surface.blit(title, (rect.x + 18, rect.y + 14))
+    subtitle = font_body.render("Hover a row to spotlight it. Click to lock or clear focus.", True, (166, 182, 206))
+    surface.blit(subtitle, (rect.x + 20, rect.y + 52))
+
+    ok_slots = [s for s in slots if s.ok]
+    if not ok_slots:
+        return None, {}
+
+    metrics_names = list(ok_slots[0].get_radar_metrics().keys())
+    n = len(metrics_names)
+    chart_area_w = int(rect.width * 0.6)
+    chart_cx = rect.x + chart_area_w // 2
+    chart_cy = rect.y + rect.height // 2 + 10
+    radius = min(chart_area_w // 3, rect.height // 3)
+    angle_step = 2 * math.pi / n
+
+    for ring in (0.25, 0.5, 0.75, 1.0):
+        r = int(radius * ring)
+        pygame.draw.circle(surface, (58, 72, 96), (chart_cx, chart_cy), r, 1)
+
+    axis_points = []
+    for i, name in enumerate(metrics_names):
+        angle = -math.pi / 2 + i * angle_step
+        ex = chart_cx + int(radius * math.cos(angle))
+        ey = chart_cy + int(radius * math.sin(angle))
+        axis_points.append((angle, ex, ey))
+        pygame.draw.line(surface, (58, 72, 96), (chart_cx, chart_cy), (ex, ey), 1)
+
+        lbl = font_body.render(name, True, (168, 182, 208))
+        lx = chart_cx + int((radius + 18) * math.cos(angle)) - lbl.get_width() // 2
+        ly = chart_cy + int((radius + 18) * math.sin(angle)) - lbl.get_height() // 2
+        surface.blit(lbl, (lx, ly))
+
+    legend_x = rect.x + chart_area_w + 12
+    legend_y = rect.y + 92
+    row_h = 96
+    small_font = pygame.font.SysFont("Consolas", 15)
+    row_map = {}
+    hovered_key = None
+    slot_colors = {}
+
+    for idx, slot in enumerate(ok_slots):
+        slot_key = slot.path.parent.name
+        slot_colors[slot_key] = radar_colors[idx % len(radar_colors)]
+        row_y = legend_y + idx * row_h
+        row_rect = pygame.Rect(legend_x, row_y, rect.right - legend_x - 16, row_h - 10)
+        row_map[slot_key] = row_rect
+        if row_rect.collidepoint(mouse_pos):
+            hovered_key = slot_key
+
+    active_key = focus_key or hovered_key
+
+    for idx, slot in enumerate(ok_slots):
+        slot_key = slot.path.parent.name
+        color = slot_colors[slot_key]
+        metrics = slot.get_radar_metrics()
+        points = []
+        for i, name in enumerate(metrics_names):
+            angle = -math.pi / 2 + i * angle_step
+            value = max(0.0, min(1.0, metrics[name]))
+            dx = chart_cx + int(radius * value * math.cos(angle))
+            dy = chart_cy + int(radius * value * math.sin(angle))
+            points.append((dx, dy))
+
+        is_active = active_key is None or active_key == slot_key
+        poly_alpha = 62 if is_active else 16
+        line_alpha = 236 if is_active else 70
+        point_alpha = 255 if is_active else 110
+        poly = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        pygame.draw.polygon(poly, (*color, poly_alpha), points)
+        pygame.draw.polygon(poly, (*color, line_alpha), points, 3 if is_active else 1)
+        surface.blit(poly, (0, 0))
+        for pt in points:
+            pygame.draw.circle(surface, (*color[:3],), pt, 4 if is_active else 2)
+
+        row_rect = row_map[slot_key]
+        row_bg = (18, 28, 42) if is_active else (14, 22, 34)
+        pygame.draw.rect(surface, row_bg, row_rect, border_radius=10)
+        pygame.draw.rect(surface, (*color,), row_rect, 3 if is_active else 2, border_radius=10)
+        pygame.draw.rect(surface, color, (row_rect.x + 10, row_rect.y + 12, 12, 12), border_radius=3)
+
+        label = f"{slot.persona} [{slot.skill}]"
+        line1 = font_body.render(label, True, LABEL_FG)
+        avg_score = int(sum(slot.scores_history) / max(1, len(slot.scores_history))) if slot.scores_history else slot.score
+        stat_text = f"Wins {slot.total_wins}   Deaths {slot.total_deaths}   Kills {slot.total_kills}   Coins {slot.total_coins}   Avg {avg_score}"
+        metric_line_a = f"Win {metrics['Win Rate']:.2f}   Survival {metrics['Survival']:.2f}   Coins {metrics['Coins']:.2f}"
+        metric_line_b = f"Kills {metrics['Kills']:.2f}   AvgScore {metrics['Avg Score']:.2f}   AntiStall {metrics['Anti-Stall']:.2f}"
+        line2 = small_font.render(stat_text, True, (188, 200, 220))
+        line3 = small_font.render(metric_line_a, True, color)
+        line4 = small_font.render(metric_line_b, True, color)
+        surface.blit(line1, (row_rect.x + 32, row_rect.y + 8))
+        surface.blit(line2, (row_rect.x + 32, row_rect.y + 31))
+        surface.blit(line3, (row_rect.x + 32, row_rect.y + 52))
+        surface.blit(line4, (row_rect.x + 32, row_rect.y + 70))
+
+        if focus_key == slot_key:
+            lock_text = small_font.render("LOCKED", True, color)
+            surface.blit(lock_text, (row_rect.right - lock_text.get_width() - 14, row_rect.y + 10))
+
+    return hovered_key, row_map
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +625,7 @@ def compute_grid(n_models: int, screen_w: int, screen_h: int):
 # ---------------------------------------------------------------------------
 # Discover all trained models
 # ---------------------------------------------------------------------------
-def discover_models() -> List[Path]:
+def discover_models(game_filter: str | None = None) -> List[Path]:
     best_dir = Path("models/best")
     if not best_dir.exists():
         return []
@@ -356,6 +634,13 @@ def discover_models() -> List[Path]:
         if folder.is_dir():
             zip_path = folder / "best_model.zip"
             if zip_path.exists():
+                if game_filter:
+                    try:
+                        game, _, _, _ = parse_model_info(str(zip_path))
+                    except Exception:
+                        continue
+                    if game.lower() != game_filter.lower():
+                        continue
                 models.append(zip_path)
     return models
 
@@ -363,13 +648,14 @@ def discover_models() -> List[Path]:
 # ---------------------------------------------------------------------------
 # Main grid viewer
 # ---------------------------------------------------------------------------
-def run_grid(fps: int = 20, max_episodes: int = 5):
+def run_grid(fps: int = 20, max_episodes: int = 5, game_filter: str | None = None):
     # Remove headless driver
     os.environ.pop("SDL_VIDEODRIVER", None)
 
-    model_paths = discover_models()
+    model_paths = discover_models(game_filter=game_filter)
     if not model_paths:
-        print("[GridViewer] No models found in models/best/. Train first.")
+        scope = f" for game '{game_filter}'" if game_filter else ""
+        print(f"[GridViewer] No models found in models/best/{scope}. Train first.")
         return
 
     print(f"[GridViewer] Found {len(model_paths)} trained model(s):")
@@ -385,14 +671,15 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
     screen_w = min(int(disp_info.current_w * 0.85), 1920)
     screen_h = min(int(disp_info.current_h * 0.85), 1080)
 
-    cols, rows, cell_w, cell_h = compute_grid(len(model_paths), screen_w, screen_h)
+    cols, rows, cell_w, cell_h = compute_grid(len(model_paths), screen_w, screen_h - HEADER_H - FOOTER_H - CELL_PAD)
     # cell_h includes the label bar
     game_cell_h = cell_h - LABEL_H
 
     print(f"[GridViewer] Grid: {cols}×{rows}  |  Cell: {cell_w}×{cell_h}px")
 
     screen = pygame.display.set_mode((screen_w, screen_h))
-    pygame.display.set_caption(f"PEAK — Model Grid  ({len(model_paths)} agents)")
+    title_scope = game_filter if game_filter else "all games"
+    pygame.display.set_caption(f"PEAK Model Grid - {title_scope} ({len(model_paths)} agents)")
     clock = pygame.time.Clock()
 
     # Fonts
@@ -429,15 +716,17 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
 
     print(f"\n[GridViewer] Running — {max_episodes} episodes per agent @ {fps} FPS")
     print("  ESC = quit  |  SPACE = pause  |  R = reset all")
-    print("  H = hitboxes  |  G = grid  |  D = all debug\n")
+    print("  F1-F4 = debug toggles  |  D = all debug  |  N = radar plots\n")
 
     paused = False
     running = True
     frame_count = 0
 
     # ── Debug overlay toggles ──
-    show_hitboxes = False
-    show_grid     = False
+    show_radar = False
+    radar_focus_key = None
+    radar_hover_key = None
+    radar_row_map = {}
 
     while running:
         # ── Events ──
@@ -453,15 +742,34 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                     for s in slots:
                         if s.ok:
                             s.reset()
-                elif event.key == pygame.K_h:
-                    show_hitboxes = not show_hitboxes
-                elif event.key == pygame.K_g:
-                    show_grid = not show_grid
                 elif event.key == pygame.K_d:
-                    # Toggle all debug overlays at once
-                    all_on = show_hitboxes and show_grid
-                    show_hitboxes = not all_on
-                    show_grid     = not all_on
+                    for s in slots:
+                        if not s.ok:
+                            continue
+                        dm = getattr(getattr(s.raw_env, "game", None), "debug_manager", None)
+                        if not dm:
+                            continue
+                        all_on = (
+                            dm.show_sensors
+                            and dm.show_hitboxes
+                            and dm.show_grid
+                        )
+                        new_state = not all_on
+                        dm.show_sensors = new_state
+                        dm.show_hitboxes = new_state
+                        dm.show_grid = new_state
+                elif event.key == pygame.K_n:
+                    show_radar = not show_radar
+                    if not show_radar:
+                        radar_focus_key = None
+                        radar_hover_key = None
+                        radar_row_map = {}
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and show_radar:
+                    hit_key = next((key for key, row_rect in radar_row_map.items() if row_rect.collidepoint(event.pos)), None)
+                    if hit_key is not None:
+                        radar_focus_key = None if radar_focus_key == hit_key else hit_key
+                    else:
+                        radar_focus_key = None
 
         if not running:
             break
@@ -496,15 +804,22 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
             row = idx // cols
 
             x = CELL_PAD + col * (cell_w + CELL_PAD)
-            y = CELL_PAD + row * (cell_h + CELL_PAD)
+            y = HEADER_H + CELL_PAD + row * (cell_h + CELL_PAD)
+
+            pygame.draw.rect(
+                screen,
+                CARD_BG,
+                pygame.Rect(x - 2, y - 2, cell_w + 4, cell_h + 4),
+                border_radius=8,
+            )
 
             # Label bar
             label_rect = pygame.Rect(x, y, cell_w, LABEL_H)
-            pygame.draw.rect(screen, LABEL_BG, label_rect)
+            pygame.draw.rect(screen, LABEL_BG, label_rect, border_top_left_radius=6, border_top_right_radius=6)
 
             if slot.ok:
                 # Model name (left)
-                lbl = font_label.render(slot.label, True, LABEL_FG)
+                lbl = font_label.render(f"{slot.game.upper()}  {slot.label}", True, LABEL_FG)
                 screen.blit(lbl, (x + 6, y + 3))
 
                 # Algo badge (right of name)
@@ -520,10 +835,7 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                 game_rect = pygame.Rect(x, y + LABEL_H, cell_w, game_cell_h)
 
                 # Render game state with overlays
-                slot.render_to_surface(
-                    show_hitboxes=show_hitboxes,
-                    show_grid=show_grid,
-                )
+                slot.render_to_surface()
 
                 # Scale the 800×600 game surface to fit the cell
                 scaled = pygame.transform.smoothscale(slot.game_surf, (cell_w, game_cell_h))
@@ -531,7 +843,19 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
 
                 # Border color: green if running, red if done
                 border_col = BORDER_DONE if (slot.done and slot.ep_count >= max_episodes) else BORDER_ACTIVE
-                pygame.draw.rect(screen, border_col, pygame.Rect(x-1, y-1, cell_w+2, cell_h+2), 2)
+                pygame.draw.rect(screen, border_col, pygame.Rect(x-1, y-1, cell_w+2, cell_h+2), 2, border_radius=8)
+
+                # Stats bar at bottom of cell
+                stats = []
+                if slot.total_wins > 0:   stats.append(f"W:{slot.total_wins}")
+                if slot.total_deaths > 0: stats.append(f"D:{slot.total_deaths}")
+                if slot.total_coins > 0:  stats.append(f"C:{slot.total_coins}")
+                if stats:
+                    stat_txt = font_sub.render("  ".join(stats), True, (200, 220, 255))
+                    sbg = pygame.Surface((stat_txt.get_width() + 8, stat_txt.get_height() + 4), pygame.SRCALPHA)
+                    sbg.fill((0, 0, 0, 170))
+                    screen.blit(sbg, (x + 2, y + LABEL_H + game_cell_h - stat_txt.get_height() - 6))
+                    screen.blit(stat_txt, (x + 6, y + LABEL_H + game_cell_h - stat_txt.get_height() - 4))
 
             else:
                 # Error slot — show error
@@ -539,32 +863,74 @@ def run_grid(fps: int = 20, max_episodes: int = 5):
                 screen.blit(err_surf, (x + 6, y + 3))
                 pygame.draw.rect(screen, BORDER_DONE, pygame.Rect(x, y + LABEL_H, cell_w, game_cell_h))
 
+        # ── Radar Plot Overlay (N key) ──
+        if show_radar:
+            ok_slots = [s for s in slots if s.ok and s.ep_count > 0]
+            if ok_slots:
+                radar_rect = pygame.Rect(60, 80, screen_w - 120, screen_h - HEADER_H - FOOTER_H - 120)
+                radar_hover_key, radar_row_map = draw_multi_radar_overlay(
+                    screen,
+                    radar_rect,
+                    ok_slots,
+                    font_big,
+                    font_sub,
+                    pygame.mouse.get_pos(),
+                    radar_focus_key,
+                )
+            else:
+                radar_hover_key = None
+                radar_row_map = {}
+        else:
+            radar_hover_key = None
+            radar_row_map = {}
+
+        header = pygame.Rect(0, 0, screen_w, HEADER_H)
+        pygame.draw.rect(screen, HEADER_BG, header)
+        title = font_big.render(f"PEAK WATCH ALL  [{title_scope.upper()}]", True, LABEL_FG)
+        screen.blit(title, (12, 6))
+        summary = font_sub.render(
+            f"{len([s for s in slots if s.ok])} loaded  |  {cols}x{rows} grid  |  {fps} FPS",
+            True,
+            (140, 156, 184),
+        )
+        screen.blit(summary, (screen_w - summary.get_width() - 14, 14))
+
         # Pause overlay
         if paused:
             pause_surf = font_big.render("▐▐  PAUSED  (SPACE to resume)", True, PAUSED_COLOR)
             px = (screen_w - pause_surf.get_width()) // 2
-            py = screen_h - 80
+            py = screen_h - FOOTER_H - 90
             bg_rect = pygame.Rect(px - 10, py - 5, pause_surf.get_width() + 20, pause_surf.get_height() + 10)
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
             screen.blit(pause_surf, (px, py))
 
         # ── Controls HUD bar (bottom of screen) ──
-        bar_h = 24
+        bar_h = FOOTER_H
         bar_y = screen_h - bar_h
         bar_surf = pygame.Surface((screen_w, bar_h))
-        bar_surf.fill((16, 8, 22))
+        bar_surf.fill((12, 18, 28))
         bar_surf.set_alpha(220)
         screen.blit(bar_surf, (0, bar_y))
         pygame.draw.line(screen, (60, 40, 80), (0, bar_y), (screen_w, bar_y))
 
-        # Build toggle items
+        first_dm = None
+        for slot in slots:
+            if slot.ok:
+                first_dm = getattr(getattr(slot.raw_env, "game", None), "debug_manager", None)
+                if first_dm:
+                    break
+
+        sensor_label = getattr(first_dm, "_sensor_short_label", lambda: "rays+arc")() if first_dm else "rays+arc"
         hud_items = [
             ("ESC", "quit",     None),
             ("SPACE", "pause",  None),
             ("R", "reset",      None),
-            ("H", "hitboxes",   show_hitboxes),
-            ("G", "grid",       show_grid),
-            ("D", "all debug",  show_hitboxes and show_grid),
+            ("F1", sensor_label, getattr(first_dm, "show_sensors", False) if first_dm else False),
+            ("F2", "cam",       getattr(first_dm, "free_cam_active", False) if first_dm else False),
+            ("F3", "slow",      getattr(first_dm, "slow_motion", False) if first_dm else False),
+            ("F4", "hitboxes",  getattr(first_dm, "show_hitboxes", False) if first_dm else False),
+            ("N", "radar",      show_radar),
+            ("D", "all debug",  bool(first_dm and first_dm.show_sensors and first_dm.show_hitboxes and first_dm.show_grid)),
         ]
         hx = 12
         for key, label, active in hud_items:
@@ -604,9 +970,10 @@ def main():
     ap = argparse.ArgumentParser(description="PEAK Grid Viewer — watch all trained models.")
     ap.add_argument("--fps",      type=int, default=20,  help="Render FPS (default 20)")
     ap.add_argument("--episodes", type=int, default=5,   help="Episodes per agent (default 5, 0=infinite)")
+    ap.add_argument("--game",     type=str, default=None, help="Optional game filter (platformer, megaman, or sonic)")
     args = ap.parse_args()
 
-    run_grid(fps=args.fps, max_episodes=args.episodes)
+    run_grid(fps=args.fps, max_episodes=args.episodes, game_filter=args.game)
 
 
 if __name__ == "__main__":

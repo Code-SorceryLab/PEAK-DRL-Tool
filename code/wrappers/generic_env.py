@@ -24,7 +24,7 @@ class GameEnv(gym.Env):
         **game_kwargs,
     ):
         assert render_mode in self.metadata["render_modes"]
-        self.game = game_cls(render_mode = render_mode, **game_kwargs)
+        self.game = game_cls(render_mode = render_mode, max_steps=max_steps, **game_kwargs)
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps
@@ -81,7 +81,10 @@ class GameEnv(gym.Env):
                 action = int(action)
 
         obs, base, terminated, truncated, info = self.game.step(action)
-        truncated = bool(self.max_steps and self._step_count >= self.max_steps)
+        # FIX: OR with game's own truncated rather than overwriting it entirely.
+        # If the game sets truncated=True (e.g. internal timer), the wrapper was
+        # previously silently discarding it.
+        truncated = truncated or bool(self.max_steps and self._step_count >= self.max_steps)
 
         # --- REWARD PROCESSING (THE FIX) ---
         # 1. Get raw reward from Persona (Could be Float OR Dict)
@@ -106,9 +109,17 @@ class GameEnv(gym.Env):
         info["reward_breakdown"] = reward_breakdown
 
         # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
-        act_name = action
-        if hasattr(self.game, "ACTION_NAMES"):
-            act_name = self.game.ACTION_NAMES.get(int(action), action)
+        act_name = info.get("action_name")
+        if act_name is None:
+            if hasattr(self.game, "action_to_str"):
+                act_name = self.game.action_to_str(action)
+            elif hasattr(self.game, "ACTION_NAMES"):
+                try:
+                    act_name = self.game.ACTION_NAMES.get(int(action), str(action))
+                except (TypeError, ValueError):
+                    act_name = str(action)
+            else:
+                act_name = str(action)
 
 
         info["action_name"] = str(act_name)

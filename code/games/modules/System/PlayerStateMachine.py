@@ -30,7 +30,7 @@ Star + damage
     star active     →  hit absorbed, stack untouched
     i-frames active →  hit absorbed, stack untouched
     BIG or FIRE     →  pop → SMALL (or previous state), start i-frame window
-    SMALL           →  call on_death callback, return False
+    SMALL           →  return False (PhysicsManager calls core._handle_death)
 
 Integration
 -----------
@@ -45,6 +45,9 @@ Integration
     player.power_machine.collect_mushroom()   # or collect_flower / collect_star
     
     # In PhysicsManager._handle_player_enemy():
+    #   is_star_active  → contact kills the enemy (star power only)
+    #   is_invincible   → player absorbs the hit (star OR i-frames)
+    #   These are intentionally different: i-frames absorb damage but do NOT kill enemies.
     survived = player.power_machine.take_hit()
     if not survived:
         core._handle_death("Enemy")
@@ -53,7 +56,7 @@ Integration
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 
 # ── Power state enum ──────────────────────────────────────────────────────────
@@ -85,10 +88,6 @@ class PlayerStateMachine:
 
     Parameters
     ----------
-    on_death : callable, optional
-        Called with a string reason when a SMALL player takes a hit.
-        Signature: on_death(reason: str)
-        If None, the caller is responsible for checking take_hit() → False.
     star_duration : float
         How long star power lasts in seconds.
     hit_iframes : float
@@ -97,14 +96,12 @@ class PlayerStateMachine:
 
     def __init__(
         self,
-        on_death:      Optional[Callable[[str], None]] = None,
         star_duration: float = STAR_DURATION,
         hit_iframes:   float = HIT_IFRAMES,
     ) -> None:
         # Stack — SMALL is the permanent floor
         self._stack:         List[PowerState] = [PowerState.SMALL]
 
-        self._on_death       = on_death
         self._star_dur       = star_duration
         self._hit_iframes    = hit_iframes
 
@@ -121,7 +118,12 @@ class PlayerStateMachine:
 
     @property
     def is_invincible(self) -> bool:
-        """True while star timer is running."""
+        """True if the player will absorb the next hit — either star or i-frames."""
+        return self._star_timer > 0.0 or self._iframes_timer > 0.0
+
+    @property
+    def is_star_active(self) -> bool:
+        """True only during star power — use this to decide whether to kill enemies on contact."""
         return self._star_timer > 0.0
 
     @property
@@ -193,6 +195,8 @@ class PlayerStateMachine:
         bool
             True if the player survived, False if they died.
         """
+        if self.is_invincible:
+            return True
         # 1. Star absorbs all damage
         if self._star_timer > 0.0:
             return True
@@ -208,8 +212,6 @@ class PlayerStateMachine:
             return True
 
         # 4. SMALL — no protection left
-        if self._on_death:
-            self._on_death("hit")
         return False
 
     # ── Per-frame update ──────────────────────────────────────────────────────
@@ -232,8 +234,10 @@ class PlayerStateMachine:
         Write current machine state to the Player dataclass fields.
 
         Writes:
-          player.powered_up        — True when BIG, FIRE, or STAR active
-          player.invincible_timer  — star time remaining, or i-frame time remaining
+          player.powered_up        — True when BIG or FIRE (star excluded)
+          player.star_timer        — seconds of star power remaining
+          player.iframes_timer     — seconds of i-frame window remaining
+          player.invincible_timer  — max of the two (drives blink effect)
           player.gObj.height       — SMALL_HEIGHT or BIG_HEIGHT
 
         Height change anchor: feet stay in place (gObj.y adjusted upward) so the
@@ -245,27 +249,29 @@ class PlayerStateMachine:
         """
         s = self.state
 
-        # powered_up — BIG, FIRE, or star overlay
-        player.powered_up = (s != PowerState.SMALL) or (self._star_timer > 0.0)
+        # powered_up — BIG or FIRE only; star is transient and does not count
+        player.powered_up = (s != PowerState.SMALL)
 
         # invincible_timer — drives the blink effect in platformer_core._draw_player
-        if self._star_timer > 0.0:
-            player.invincible_timer = self._star_timer
-        else:
-            player.invincible_timer = self._iframes_timer
+        # star_timer and iframes_timer written separately so rendering can
+        # distinguish "STAR" label (star only) from the shared blink effect.
+        player.star_timer    = self._star_timer
+        player.iframes_timer = self._iframes_timer
+        player.invincible_timer = max(self._star_timer, self._iframes_timer)
 
-        # Height — determine new height first, then anchor feet in place
+        # Height — only shift y when GROWING (BIG/FIRE) so the feet stay
+        # anchored to the ground. When SHRINKING, leave gObj.y untouched —
+        # shifting it down embeds the player in the floor, which causes the
+        # wall resolver to push them out sideways, snapping the x position.
+        new_height = SMALL_HEIGHT if s == PowerState.SMALL else BIG_HEIGHT
         old_height = player.gObj.height
-        if s == PowerState.SMALL:
-            new_height = SMALL_HEIGHT
-        else:
-            new_height = BIG_HEIGHT
 
         if new_height != old_height:
-            # Shift gObj.y up by the difference so the bottom (feet) stays fixed.
-            # Growing: new_height > old_height → y moves up (negative direction).
-            # Shrinking: new_height < old_height → y moves down (feet stay grounded).
-            player.gObj.y     -= (new_height - old_height)
+            if new_height > old_height:
+                # Growing: shift y up so feet stay on the ground
+                player.gObj.y -= (new_height - old_height)
+            # Shrinking: leave y alone — top of hitbox just drops down,
+            # feet naturally stay at the same position without any y correction
             player.gObj.height = new_height
 
     # ── Reset ────────────────────────────────────────────────────────────────
@@ -273,7 +279,6 @@ class PlayerStateMachine:
     def reset(self) -> None:
         """
         Full reset to SMALL. Call on episode reset / new game.
-        Does NOT call on_death — this is an administrative reset.
         """
         self._stack         = [PowerState.SMALL]
         self._star_timer    = 0.0

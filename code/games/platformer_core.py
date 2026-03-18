@@ -25,7 +25,7 @@ from .modules.Objects.Enemy import Enemy
 from .modules.Objects.Powerup import Powerup
 from .modules.Objects.Coin import Coin
 from .modules.Objects.QuestionBlock import QuestionBlock
-from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile   # NEW
+from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile
 
 # System
 from .modules.System.LevelLoader import LevelLoader, LevelData
@@ -130,11 +130,11 @@ class DijkstraSolver:
 
                 # --- Ground-proximity discount (independent if-checks, not elif) ---
                 if ny + 1 < self.rows and self.grid[ny + 1][nx] in SOLID:
-                    step_cost -= 0.6
+                    step_cost -= 1.0
                 if ny + 2 < self.rows and self.grid[ny + 2][nx] in SOLID:
-                    step_cost -= 0.25
+                    step_cost -= 0.5
                 if ny + 3 < self.rows and self.grid[ny + 3][nx] in SOLID:
-                    step_cost -= 0.1
+                    step_cost -= 0.2
 
                 # --- Floating-tile penalty for upward steps ---
                 # If moving up and there is no solid surface within jump height
@@ -163,37 +163,205 @@ class DijkstraSolver:
         return -1.0
 
 # =============================================================================
+# Jump Arc Precomputation (Physics-Aware Dijkstra Boost)
+# =============================================================================
+class JumpArcComputer:
+    """
+    Precomputes physically-accurate jump parabolas at multiple speed tiers
+    and directions, then at runtime applies an ADDITIVE boost to the
+    Dijkstra advantage channel on tiles the player can reach via jump.
+
+    This nudges the gradient toward physically-traversable paths without
+    destroying the existing signal. Unlike multiplicative masking, additive
+    boosting works correctly on the signed [-1, 1] Dijkstra range:
+      - Negative tiles become slightly less negative (less repulsive)
+      - Positive tiles become slightly more positive (more attractive)
+      - Tiles not on any arc are completely untouched
+
+    Arc encoding (internal):
+        0.0  — not reachable by any jump arc
+        0.5  — in-flight tile (arc passes through, no landing here)
+        1.0  — valid landing tile (arc descending + solid ground below)
+    """
+
+    SPEED_FRACTIONS = [0.0, 0.5, 1.0]   # standing, walking, sprinting
+    MAX_SIM_FRAMES  = 200                # ~3.3s at 60fps
+    DT              = 1.0 / 60.0
+
+    def __init__(self, physics_context, tile_size: int, obs_half: int):
+        self.tile_size = tile_size
+        self.obs_half = obs_half
+        self.arcs: dict = {}
+        self._precompute(physics_context)
+
+    def recompute(self, physics_context):
+        """Re-precompute arcs after physics constants change (e.g. config reload)."""
+        self.arcs.clear()
+        self._precompute(physics_context)
+
+    def _precompute(self, ctx):
+        for direction in (-1, 1):
+            for frac in self.SPEED_FRACTIONS:
+                speed = ctx.MAX_RUN_SPEED * frac
+                arc = self._simulate_arc(direction, speed, ctx)
+                self.arcs[(direction, frac)] = arc
+
+    def _simulate_arc(self, direction, speed, ctx):
+        """
+        Simulate one max-hold jump arc. Returns list of (dx, dy, is_descending)
+        tile offsets visited, in traversal order.
+
+        Physics replicated from Player.update() + Player.handle_jump():
+          1. hold phase:  vy -= GRAVITY * 0.12 * dt   (for JUMP_HOLD_FRAMES)
+          2. gravity:     grav = FAST_FALL if vy>0 else GRAVITY
+                          vy = min(vy + grav*dt, MAX_FALL_SPEED)
+          3. position:    x += vx*dt,  y += vy*dt
+        """
+        ts = self.tile_size
+        half = self.obs_half
+
+        vx = speed * direction
+        bonus = min(2.2, abs(speed) * ctx.SPEED_JUMP_BONUS)
+        vy = ctx.JUMP_VEL_MIN - bonus
+
+        x, y = 0.0, 0.0
+        offsets = []
+        visited = {(0, 0)}
+
+        for frame in range(self.MAX_SIM_FRAMES):
+            if frame < ctx.JUMP_HOLD_FRAMES:
+                vy -= ctx.GRAVITY * 0.12 * self.DT
+
+            grav = ctx.FAST_FALL_GRAV if vy > 0 else ctx.GRAVITY
+            vy = min(vy + grav * self.DT, ctx.MAX_FALL_SPEED)
+
+            x += vx * self.DT
+            y += vy * self.DT
+
+            tx = int(x // ts) if x >= 0 else -int((-x - 1) // ts) - 1
+            ty = int(y // ts) if y >= 0 else -int((-y - 1) // ts) - 1
+
+            if abs(tx) > half or abs(ty) > half:
+                break
+
+            tile = (tx, ty)
+            if tile not in visited:
+                visited.add(tile)
+                offsets.append((tx, ty, vy > 0))
+
+        return offsets
+
+    def compute_arc_grid(self, solid_grid, on_ground, obs_pad_x, obs_pad_y):
+        """
+        Compute raw arc reachability grid (obs_height x obs_width).
+        Returns: 0.0 = unreachable, 0.5 = in-flight, 1.0 = valid landing.
+        """
+        h, w = solid_grid.shape
+        arc_grid = np.zeros((h, w), dtype=np.float32)
+
+        if not on_ground:
+            return arc_grid
+
+        cx, cy = obs_pad_x, obs_pad_y
+
+        for arc_offsets in self.arcs.values():
+            for dx, dy, is_descending in arc_offsets:
+                lx = cx + dx
+                ly = cy + dy
+
+                if not (0 <= lx < w and 0 <= ly < h):
+                    continue
+
+                if solid_grid[ly, lx] > 0.5:
+                    break
+
+                below_ly = ly + 1
+                is_landing = False
+                if is_descending and below_ly < h:
+                    if solid_grid[below_ly, lx] > 0.5:
+                        is_landing = True
+
+                if is_landing:
+                    arc_grid[ly, lx] = max(arc_grid[ly, lx], 1.0)
+                else:
+                    arc_grid[ly, lx] = max(arc_grid[ly, lx], 0.5)
+
+        return arc_grid
+
+    def boost_dijkstra(self, dijkstra_grid, solid_grid, on_ground,
+                       obs_pad_x, obs_pad_y,
+                       landing_boost=0.4, flight_boost=0.2):
+        """
+        Apply an additive boost to Dijkstra tiles on the jump arc.
+
+        Unlike multiplicative masking, this preserves the entire existing
+        gradient and only nudges arc-reachable tiles to be slightly more
+        attractive. Works correctly on signed [-1, 1] values:
+          - A tile at -0.3 with landing boost becomes -0.15 (less repulsive)
+          - A tile at +0.2 with landing boost becomes +0.35 (more attractive)
+          - Tiles not on any arc: completely untouched
+
+        Args:
+            dijkstra_grid: (H, W) advantage map, modified IN-PLACE
+            solid_grid:    (H, W) solid channel
+            on_ground:     player grounded flag
+            obs_pad_x/y:   player's local position in the grid
+            landing_boost:  added to landing tiles (default 0.15)
+            flight_boost:   added to in-flight tiles (default 0.05)
+
+        Returns:
+            (dijkstra_grid, arc_grid)
+        """
+        h, w = dijkstra_grid.shape
+
+        if not on_ground:
+            return dijkstra_grid, np.zeros((h, w), dtype=np.float32)
+
+        arc_grid = self.compute_arc_grid(
+            solid_grid, on_ground, obs_pad_x, obs_pad_y
+        )
+
+        # Only boost air tiles — solid tiles already have correct gradient
+        is_air = solid_grid <= 0.0
+
+        landing_mask = is_air & (arc_grid >= 1.0)
+        flight_mask  = is_air & (arc_grid >= 0.5) & (arc_grid < 1.0)
+
+        dijkstra_grid[landing_mask] += landing_boost
+        dijkstra_grid[flight_mask]  += flight_boost
+
+        # np.clip(dijkstra_grid, -1.0, 1.0, out=dijkstra_grid)
+
+        return dijkstra_grid, arc_grid
+
+# =============================================================================
 # Screen / Tile geometry
 # =============================================================================
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 32, 32
 DEBUG_PANEL_WIDTH = 350  # Width of the side debug panel (shown only in human mode)
 
-# Action Map for Debug Display
-ACTION_NAMES = {
-    # ── Original 10 (no fire) ─────────────────────────────────────────
-    0:  "IDLE",
-    1:  "LEFT",
-    2:  "RIGHT",
-    3:  "JUMP",
-    4:  "RIGHT+JUMP",
-    5:  "RUN+RIGHT",
-    6:  "LEFT+JUMP",
-    7:  "RUN+RIGHT+JUMP",
-    8:  "RUN+LEFT",
-    9:  "RUN+LEFT+JUMP",
-    # ── Fire variants (offset +10) ────────────────────────────────────
-    10: "FIRE",
-    11: "LEFT+FIRE",
-    12: "RIGHT+FIRE",
-    13: "JUMP+FIRE",
-    14: "RIGHT+JUMP+FIRE",
-    15: "RUN+RIGHT+FIRE",
-    16: "LEFT+JUMP+FIRE",
-    17: "RUN+RIGHT+JUMP+FIRE",
-    18: "RUN+LEFT+FIRE",
-    19: "RUN+LEFT+JUMP+FIRE",
-}
+# MultiDiscrete action axes — [move, jump, fire]
+#   move : 0=IDLE  1=LEFT  2=SPRINT_LEFT  3=RIGHT  4=SPRINT_RIGHT
+#   jump : 0=IDLE  1=JUMP
+#   fire : 0=IDLE  1=FIRE
+MD_MOVE_NAMES = {0: "IDLE", 1: "LEFT", 2: "SPRINT_L", 3: "RIGHT", 4: "SPRINT_R"}
+MD_JUMP_NAMES = {0: "",     1: "JUMP"}
+MD_FIRE_NAMES = {0: "",     1: "FIRE"}
+
+def action_to_str(a) -> str:
+    """Convert a MultiDiscrete action [move, jump, fire] to a readable string."""
+    try:
+        move, jump, fire = int(a[0]), int(a[1]), int(a[2])
+        parts = [MD_MOVE_NAMES.get(move, "?")]
+        if jump: parts.append(MD_JUMP_NAMES[1])
+        if fire: parts.append(MD_FIRE_NAMES[1])
+        return "+".join(p for p in parts if p)
+    except Exception:
+        return str(a)
+
+# Keep for legacy / logging compat
+ACTION_NAMES = {i: action_to_str([i % 5, (i // 5) % 2, i // 10]) for i in range(20)}
 
 class PlatformerCore(gymnasium.Env):
     WIDTH, HEIGHT = SCREEN_WIDTH, SCREEN_HEIGHT
@@ -225,7 +393,11 @@ class PlatformerCore(gymnasium.Env):
         self.config_manager = ConfigManager("game_config.yaml")
         self.loader = LevelLoader()
         self.physics_manager = PhysicsManager()
-        self.debug_manager = DebugManager(default_active=(render_mode=="human"), print_help=(render_mode=="human"))
+        self.debug_manager = DebugManager(
+            default_active=(render_mode=="human"),
+            print_help=(render_mode=="human"),
+            sensor_mode="rays",
+        )
 
         # 2. Config & State Containers
         self.level_data = LevelData() # Empty initial state
@@ -240,6 +412,48 @@ class PlatformerCore(gymnasium.Env):
         self.world = str(kwargs.pop("world", _default_world))
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
+
+        # ── Mastery-gated curriculum ──────────────────────────────────────────
+        # Each level keeps a sliding window of the last N episode outcomes (1=win,
+        # 0=loss). At every episode boundary the win rate over that window drives
+        # the level selection decision:
+        #
+        #   win_rate >= ADVANCE_THRESHOLD  → move forward one level
+        #   win_rate <= FALLBACK_THRESHOLD → step back one level (if not at 0)
+        #   otherwise                      → stay and keep practising
+        #
+        # EXPLORE_PROB: with this probability the curriculum is ignored entirely
+        # and a uniformly random level is picked. Prevents the agent from
+        # catastrophically forgetting earlier levels once they are "mastered",
+        # and ensures all levels see at least some training traffic.
+        #
+        # Knobs exposed as kwargs so they can be tuned from the config YAML
+        # without touching this file.
+        self._curriculum_window_size  =   int(kwargs.pop("curriculum_window" ,   5))
+        self._advance_threshold       = float(kwargs.pop("advance_threshold" , 0.6))
+        self._fallback_threshold      = float(kwargs.pop("fallback_threshold", 0.2))
+        self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
+
+        # Per-level outcome windows — persist across episodes, never reset.
+        self._level_window = {
+            lvl: deque(maxlen=self._curriculum_window_size)
+            for lvl in self.level_order
+        }
+
+        # ── Progressive level unlocking ───────────────────────────────────────
+        # _max_unlocked_index is the highest level index the agent is currently
+        # allowed to visit. Starts at 0 (only the first level available) and
+        # advances when the agent masters the current frontier.
+        #
+        # Exploration is capped to [0, _max_unlocked_index] so random picks
+        # never send the agent to levels it has no chance of completing.
+        # A new level is unlocked only when the agent masters the current
+        # hardest available level (current_index == _max_unlocked_index and
+        # win_rate >= advance_threshold).
+        #
+        # start_unlocked: pre-unlock N levels at init (useful for resuming a
+        # run or skipping trivial early levels). Default 0 = start from level 1.
+        self._max_unlocked_index = int(kwargs.pop("start_unlocked", 0))
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -248,6 +462,8 @@ class PlatformerCore(gymnasium.Env):
         self.persona = str(kwargs.pop("persona", "simple")).lower()
         if self.persona == "default":
             self.persona = "simple"
+        # Architecture tag — passed from training config for debug overlay
+        self.arch_tag = str(kwargs.pop("arch_tag", "slim")).lower()
         # reward_fn is owned by generic_env (the wrapper), not the core game.
         # Kept as None here so the persona label is still accessible via self.persona.
         self.reward_fn = None
@@ -261,14 +477,18 @@ class PlatformerCore(gymnasium.Env):
         self.max_lives = 3
         self.lives = self.max_lives
 
-        # ── Curriculum sampling ───────────────────────────────────────────────
-        # sticky_prob: chance of staying on the same level after an episode ends.
-        # max_consecutive: hard cap — after this many episodes in a row on the
-        #   same level the env MUST switch, preventing any env from locking onto
-        #   one level forever (critical when n_envs > 1).
-        self.sticky_prob       = float(kwargs.pop("sticky_prob", 0.50))
-        self.max_consecutive   = int(kwargs.pop("max_consecutive", 4))
-        self._consecutive_same = 0          # episodes on current level in a row
+        # ── Batch Curriculum ───────────────────────────────────────────────
+        self._batch_window            = int(kwargs.pop("batch_window", 10))
+        self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
+        self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
+        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))  # reduced from 3
+        self._review_prob             = float(kwargs.pop("review_prob", 0.25))
+        self._curriculum_position     = 0
+        self._batch_results: list     = []
+        self._episode_won_current     = False
+        self._is_review_episode       = False
+        self._windows_on_level        = 0
+        self._consecutive_fallbacks   = {}
         self._level_visits     = {lvl: 0 for lvl in self.level_order}
         self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
@@ -287,18 +507,18 @@ class PlatformerCore(gymnasium.Env):
         self._obs_check_interval = 5000   # Check every N steps
         self._obs_check_counter = 0
         self._obs_stats = {               # Latest stats, exposed via _info()
-            "grid_player_mean": 0.0, "grid_player_std": 0.0,
-            "grid_player_min": 0.0, "grid_player_max": 0.0,
-            "grid_solid_mean": 0.0, "grid_solid_std": 0.0,
-            "grid_solid_min": 0.0, "grid_solid_max": 0.0,
+            # 4 grid channels: solid, collectible, hazard, dijkstra
+            "grid_solid_mean": 0.0,       "grid_solid_std": 0.0,
+            "grid_solid_min": 0.0,        "grid_solid_max": 0.0,
             "grid_collectible_mean": 0.0, "grid_collectible_std": 0.0,
-            "grid_collectible_min": 0.0, "grid_collectible_max": 0.0,
-            "grid_hazard_mean": 0.0, "grid_hazard_std": 0.0,
-            "grid_hazard_min": 0.0, "grid_hazard_max": 0.0,
-            "grid_dijkstra_mean": 0.0, "grid_dijkstra_std": 0.0,
-            "grid_dijkstra_min": 0.0, "grid_dijkstra_max": 0.0,
+            "grid_collectible_min": 0.0,  "grid_collectible_max": 0.0,
+            "grid_hazard_mean": 0.0,      "grid_hazard_std": 0.0,
+            "grid_hazard_min": 0.0,       "grid_hazard_max": 0.0,
+            "grid_dijkstra_mean": 0.0,    "grid_dijkstra_std": 0.0,
+            "grid_dijkstra_min": 0.0,     "grid_dijkstra_max": 0.0,
+            # scalars
             "scalar_mean": 0.0, "scalar_std": 0.0,
-            "scalar_min": 0.0, "scalar_max": 0.0,
+            "scalar_min": 0.0,  "scalar_max": 0.0,
             "dijkstra_val": 0.0, "obs_warnings": "",
         }
 
@@ -318,34 +538,64 @@ class PlatformerCore(gymnasium.Env):
         self.ray_angles = np.linspace(0, 2 * math.pi, self.num_rays, endpoint=False)
         self.last_rays = [] # For debug drawing
 
-        # NEW: Dijkstra Map Storage
+        # Dijkstra Map Storage
         self.dijkstra = None
-        self.dijkstra_current_tile= 0.0
-        self._obs_space = spaces.Dict({
-            # 5 Channels (in order): Player, Solids, Collectible, Hazard, Dijkstra-Advantage
-            #   0 - Player       : tiles occupied by the player bounding box
-            #   1 - Solids       : ground, static platforms, moving platforms, question blocks
-            #   2 - Collectible  : coins, powerups, goals
-            #   3 - Hazard       : enemies, spikes
-            #   4 - Dijkstra     : relative advantage map in [-1, 1]
-            # low=-1.0 because channel 4 spans [-1, 1]; channels 0-3 are binary {0, 1}.
-            "grids": spaces.Box(low=-1.0, high=1.0, shape=(5, self.obs_height, self.obs_width), dtype=np.float32),
+        self.dijkstra_current_tile = 0.0
 
-            # Scalars: 18 (Player=5, Tracking=13)
-            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32),
+        # Jump arc precomputation — boosts Dijkstra on reachable jump tiles.
+        # Recomputed in load_level after config changes.
+        self.jump_arc_computer = JumpArcComputer(
+            self.physics_manager.context,
+            TILE_SIZE,
+            self.obs_pad_x
+        )
+
+        self._obs_space = spaces.Dict({
+            # 4 Channels (in order): Solids, Collectibles, Hazards, Dijkstra
+            #
+            #   0 - Solids       : ground, static platforms, moving platforms,
+            #                      question blocks  → binary {0.0, 1.0}
+            #
+            #   1 - Collectibles : importance-weighted, single channel
+            #                      goal    = 1.0   (level exit — highest priority)
+            #                      powerup = 0.69  (changes player capability)
+            #                      coin    = 0.35  (bonus reward)
+            #                      empty   = 0.0
+            #
+            #   2 - Hazards      : sign encodes agent's viable response
+            #                      enemy  = +1.0   (defeatable by stomp / fireball)
+            #                      spike  = -1.0   (always lethal, never avoidable)
+            #                      empty  =  0.0
+            #
+            #   3 - Dijkstra     : relative advantage map in [-1, 1]
+            #                      +1.0 = tile much closer to goal than player
+            #                       0.0 = same distance / unreachable (neutral)
+            #                      -1.0 = tile much further from goal than player
+            #
+            # All channels span [-1, 1] so low=-1.0 covers spikes and Dijkstra.
+            "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.obs_height, self.obs_width), dtype=np.float32),
+
+            # Scalars: 20  (Player=13: obs_vector  +  Tracking=7: e_dist,goal_dist,timer,dir_y,dijkstra,step_dx,step_dy)
+            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(20,), dtype=np.float32),
 
             # Raycasts: [dist, type, dist, type, ...] -> Size = num_rays * 2
             # "raycasts": spaces.Box(low=0.0, high=4.0, shape=(self.num_rays * 2,), dtype=np.float32)
         })
 
-        # FIX: Action Space is 10 to match ACTION_NAMES (0 through 9)
-        self._act_space = spaces.Discrete(ACTION_NAMES.__len__())
+        # Action Space: MultiDiscrete [move, jump, fire]
+        #   move : 0=idle 1=left 2=run_left 3=right 4=run_right
+        #   jump : 0=idle 1=jump
+        #   fire : 0=idle 1=fire
+        self._act_space = spaces.MultiDiscrete([5, 2, 2])
 
         self.ui_font = pygame.font.SysFont("arial", 20, bold=True)
         self.qblock_font = pygame.font.SysFont("arial", 26, bold=True)
 
         self._dijkstra_window_cache = None
-        
+        self._solid_window_cache    = None   # set by _grid_obs_window each step
+        self._hazard_window_cache   = None   # set by _grid_obs_window each step
+        self._jump_arc_cache        = None   # set by _obs each step
+
         self.reset()
 
     def reset_metrics(self):
@@ -358,7 +608,7 @@ class PlatformerCore(gymnasium.Env):
         self.game_over = False; self.reached_goal = False
         self.last_x = 0.0; self.last_score = 0; self.score_delta = 0
         self.kills_step = self.coins_step = self.powerups_step = 0
-        self._last_action = 0
+        self._last_action = [0, 0, 0]
         self.max_x_seen = 0.0; self.stall_timer = 0
         self.stall_windows_count = 0; self.stalled_this_frame = False
         self.progress_x_best = 0.0; self.progress_y_best = 0.0
@@ -366,6 +616,7 @@ class PlatformerCore(gymnasium.Env):
         self.lives = self.max_lives  # restore lives on every full episode reset
         self.best_dist_to_goal = float('inf')  # stall tracker anchor
         self._needs_level_transition = False   # set True when goal reached mid-episode
+        self._pending_next_level_index = None  # set by complete_level, applied after _info()
         # --- Velocity Alignment (cached from _tracking_obs each step) ---
         self._step_dx = 0.0   # unit vector toward cheapest reachable 8-direction tile, X
         self._step_dy = 0.0   # unit vector toward cheapest reachable 8-direction tile, Y
@@ -382,10 +633,7 @@ class PlatformerCore(gymnasium.Env):
 
     def step(self, action: int):
         if not self.alive:
-            # Need to return raycasts in dead obs too
-            # dead_rays = np.zeros(self.num_rays * 2, dtype=np.float32)
             dead_obs = self._obs()
-            # dead_obs['raycasts'] = dead_rays
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
@@ -400,34 +648,44 @@ class PlatformerCore(gymnasium.Env):
         if self.debug_manager.slow_motion:
             self.dt *= 0.5
 
-        self.frame += 1
+        # Normalise action — accept both MD arrays ([move, jump, fire]) and
+        # legacy flat ints (e.g. keyboard shortcuts, old test code).
+        _LEGACY_INT_TO_MD = {
+            0: [0,0,0], 1: [1,0,0], 2: [3,0,0], 3: [0,1,0],
+            4: [3,1,0], 5: [4,0,0], 6: [1,1,0], 7: [4,1,0],
+            8: [2,0,0], 9: [2,1,0],
+        }
+        if isinstance(action, (int, float)) or (
+                hasattr(action, '__len__') is False):
+            action = _LEGACY_INT_TO_MD.get(int(action), [0, 0, 0])
+        action = [int(action[0]), int(action[1]), int(action[2])]
+
+
 
         if self.use_timer: self.timer -= self.dt
         if self.render_mode == "human": self.debug_manager.update_input()
 
         # Step Metrics Reset
-        self._last_action = int(action)
+        self._last_action = action  # already normalised to [move, jump, fire] above
         self.last_x = self.player.gObj.x if self.player else 0.0
         self.kills_step = self.coins_step = self.powerups_step = 0
         self.stalled_this_frame = False
+        # Reset per-frame platform flag — PhysicsManager sets it True if riding one
+        if self.player:
+            self.player._on_moving_platform = False
 
         # PHYSICS & LOGIC
         # All three dynamic spatial hashes are rebuilt every frame.
         #
         # Why not use a dirty flag for collectible_hash?
         # Powerups move (mushrooms walk, stars bounce) so their hash
-        # positions go stale every frame — the same problem that caused
-        # the enemy-hash bug. The cost of rebuilding coins+goals alongside
-        # powerups is ~20μs for 200 entities (O(1) hash inserts each),
-        # which is negligible compared to the conv forward pass.
+        # positions go stale every frame. The cost of rebuilding coins+goals
+        # alongside powerups is negligible (~20μs for 200 entities).
 
         # --- hazard_hash: enemies + spikes ---
         # Rebuilt every frame because enemies move. Spikes are static but live
-        # here so the hazard_hash.query_rect in _grid_obs_window picks them up
-        # in channel 1 (hazard) without a separate tile-grid scan. The cached
-        # spike list avoids scanning the full tile grid each frame.
-        # NOTE: _resolve_dynamic_interactions skips SPIKE targets to prevent
-        # double-death (spikes are already lethal via _resolve_player_world).
+        # here so hazard_hash.query_rect in _grid_obs_window picks them up
+        # without a separate tile-grid scan each frame.
         self.physics_manager.hazard_hash.clear()
         for enemy in self.level_data.enemies:
             if enemy.gObj.active:
@@ -443,10 +701,6 @@ class PlatformerCore(gymnasium.Env):
                 self.physics_manager.platform_hash.insert(plat)
 
         # --- collectible_hash: coins, powerups, goals ---
-        # BUG FIX: Powerups were previously inserted into hazard_hash,
-        # causing the CNN to see mushrooms/stars/flowers as threats in
-        # channel 1 (hazard) instead of rewards in channel 2 (collectible).
-        # Now correctly placed here alongside coins and goals.
         self.physics_manager.collectible_hash.clear()
         for coin in self.level_data.coins:
             if coin.gObj.active and not coin.collected:
@@ -459,15 +713,11 @@ class PlatformerCore(gymnasium.Env):
 
         if self.player:
             if not self.debug_manager.free_cam_active:
-                self.player.handle_input(a = int(action))
+                self.player.handle_input(a=action)
             else:
                 self.player.vx = 0; self.player.jump_hold = 0
 
             # --- Fire Flower projectile spawn ---
-            # Player.handle_input() sets fire_requested via try_fire() when the
-            # Z key is pressed (human mode) or try_fire() is called externally
-            # (RL mode). We consume the flag here — the core is the only place
-            # that should read and clear it, keeping Player free of level/list refs.
             if self.player.fire_requested:
                 self.player.fire_requested = False
                 proj = FireFlowerProjectile.from_player(self.player)
@@ -476,23 +726,17 @@ class PlatformerCore(gymnasium.Env):
         self.physics_manager.update_system(self.dt, self)
         self.physics_manager.resolve_collisions(self)
 
-        # Cleanup Inactive Entities — remove dead objects so the per-frame
-        # hash rebuild on the next step doesn't insert ghosts.
+        # Cleanup Inactive Entities
         self.level_data.enemies[:]  = [e for e in self.level_data.enemies  if e.gObj.active]
         self.level_data.coins[:]    = [c for c in self.level_data.coins    if c.gObj.active]
         self.level_data.powerups[:] = [p for p in self.level_data.powerups if p.gObj.active]
-
-        # Prune dead projectiles so the list doesn't grow unbounded.
-        # No dirty flag needed — projectiles are not in any spatial hash.
         self.level_data.projectiles[:] = [
             p for p in self.level_data.projectiles if p.gObj.active
         ]
 
-        # PERF: Cache goal distance once per step.
-        # _get_dist_to_goal() was called 3x per step (stall metrics, tracking obs,
-        # _info). All three now read self._goal_dist_cache instead.
+        # PERF: Cache goal distance once per step — read by stall metrics,
+        # tracking obs, and _info() so it only gets computed once.
         self._goal_dist_cache = self._get_dist_to_goal()
-
 
         self._update_camera()
         if self.anti_stall: self._update_stall_metrics()
@@ -500,7 +744,6 @@ class PlatformerCore(gymnasium.Env):
         # Check Truncation & Termination
         terminated = self._check_termination()
 
-        # FIX: Truncation is exclusively tied to max_steps, not death.
         truncated = False
         if self.max_steps and self.frame >= self.max_steps:
             truncated = True
@@ -508,7 +751,7 @@ class PlatformerCore(gymnasium.Env):
         self.score_delta = self.score - self.last_score
         self.last_score = self.score
 
-        # Build observation BEFORE _info() so that _check_obs_sanity can
+        # Build observation BEFORE _info() so _check_obs_sanity can
         # populate self._obs_stats in time for _info() to spread them.
         obs = self._obs()
         self._check_obs_sanity(obs)
@@ -516,15 +759,15 @@ class PlatformerCore(gymnasium.Env):
         info = self._info()
 
         # Inline level transition on win.
-        # complete_level() (called by PhysicsManager this frame) set
-        # _needs_level_transition=True and pre-selected the next level index.
-        # We do the actual load NOW, after _info() has captured the WIN event,
-        # so the WIN is visible in this step's info dict.
-        # lives and score are naturally preserved because load_level() never
-        # touches them.
+        # Advance self.world AFTER _info() so WIN is logged on the right level.
         if self._needs_level_transition:
             self._needs_level_transition = False
-            self.load_level(preserve_power=True)   # win — keep power state
+            if self._pending_next_level_index is not None:
+                self.current_index_world = self._pending_next_level_index
+                self.world = self.level_order[self.current_index_world]
+                self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+                self._pending_next_level_index = None
+            self.load_level(preserve_power=True)
 
         if terminated:
             info["episode_end"] = True
@@ -535,63 +778,84 @@ class PlatformerCore(gymnasium.Env):
 
         return obs, base_reward, bool(terminated), bool(truncated), info
 
-
     def reset(self, seed=None, options=None) -> np.ndarray:
-        """
-        Called by SB3 only when the episode truly ends:
-          - lives = 0 (terminated=True from _handle_death)
-          - max_steps hit (truncated=True)
-
-        Level completion no longer calls reset() -- the episode continues
-        with the next level loaded inline in step(). The was_win branch
-        is therefore dead code and has been removed.
-        """
         super().reset(seed=seed)
 
-        # Full reset: restore lives/score, then pick the next training level.
-        #
-        # Strategy — sticky + performance-weighted + forced rotation:
-        #   1. If consecutive episodes on this level < max_consecutive AND
-        #      random roll < sticky_prob  → stay (agent gets repeated practice).
-        #   2. Otherwise                 → performance-weighted random switch.
-        #      Levels with lower win-rates get higher sampling weight so the
-        #      agent focuses effort where it's actually struggling.
-        #   3. Locked level (editor playtest) always overrides everything.
+        # Record episode result into batch — only if it was a curriculum episode
+        # (NOT a review episode, which played a different level)
+        if self.level_order and not self.locked_level and not self._is_review_episode:
+            self._batch_results.append(self._episode_won_current)
+
+        # Evaluate batch when window is full
+        if len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
+            self._evaluate_curriculum_batch()
+
         self.reset_metrics()
+        self._episode_won_current = False
+        self._is_review_episode = False
+
         if self.locked_level:
             self.world = self.locked_level
             if self.locked_level in self.level_order:
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-            self._consecutive_same = 0
         elif self.level_order:
-            force_switch = self._consecutive_same >= self.max_consecutive
-            if not force_switch and random.random() < self.sticky_prob:
-                # Stay on the same level
-                self._consecutive_same += 1
+            self._curriculum_position = max(0, min(
+                self._curriculum_position, len(self.level_order) - 1))
+
+            # ── Review rotation: 25% chance to play a random earlier level ──
+            # Keeps skills sharp on mastered levels, distributes visits,
+            # prevents catastrophic forgetting. Results don't count for batch.
+            if (self._curriculum_position > 0
+                    and random.random() < self._review_prob):
+                review_idx = random.randint(0, self._curriculum_position - 1)
+                self.current_index_world = review_idx
+                self._is_review_episode = True
             else:
-                # Performance-weighted pick from the OTHER levels
-                # weight = 1 - win_rate  (struggling levels weighted higher)
-                # Unvisited levels get weight 1.0 (worst possible score assumed)
-                idxs = [i for i in range(len(self.level_order))
-                        if i != self.current_index_world]
-                if idxs:
-                    weights = []
-                    for i in idxs:
-                        lvl = self.level_order[i]
-                        v = self._level_visits.get(lvl, 0)
-                        w = self._level_wins.get(lvl, 0)
-                        win_rate = w / v if v > 0 else 0.0
-                        weights.append(max(0.1, 1.0 - win_rate))
-                    total = sum(weights)
-                    probs = [x / total for x in weights]
-                    self.current_index_world = random.choices(idxs, weights=probs, k=1)[0]
-                self._consecutive_same = 0
+                self.current_index_world = self._curriculum_position
+
             self.world = self.level_order[self.current_index_world]
+
         self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
+
+    def _evaluate_curriculum_batch(self):
+        wins = sum(1 for r in self._batch_results if r)
+        total = len(self._batch_results)
+        win_rate = wins / total if total > 0 else 0.0
+        pos = self._curriculum_position
+        level_name = self.level_order[pos] if pos < len(self.level_order) else "?"
+        consec_fb = self._consecutive_fallbacks.get(pos, 0)
+
+        effective_advance = self._batch_advance_threshold
+        if consec_fb >= 2:
+            effective_advance = max(0.10, effective_advance - 0.10)
+
+        if win_rate >= effective_advance and pos < len(self.level_order) - 1:
+            self._curriculum_position += 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = 0
+            print(f"  🎓 [Curriculum] ADVANCE → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"({wins}/{total} = {win_rate:.0%})")
+        elif win_rate <= self._batch_fallback_threshold and pos > 0:
+            self._curriculum_position -= 1
+            self._windows_on_level = 0
+            self._consecutive_fallbacks[pos] = consec_fb + 1
+            print(f"  ⬇️  [Curriculum] FALLBACK → Lvl {self._curriculum_position} "
+                  f"'{self.level_order[self._curriculum_position]}' "
+                  f"({wins}/{total} = {win_rate:.0%}, fb={consec_fb + 1})")
+        else:
+            self._windows_on_level += 1
+            if self._windows_on_level >= self._max_stay_windows and pos > 0:
+                self._curriculum_position -= 1
+                self._windows_on_level = 0
+                print(f"  ⏳ [Curriculum] FORCE FALLBACK → Lvl {self._curriculum_position} "
+                      f"(stuck {self._max_stay_windows} windows)")
+
+        self._batch_results.clear()
 
     def load_level(self, preserve_power: bool = False):
         self.alive = True
@@ -602,8 +866,7 @@ class PlatformerCore(gymnasium.Env):
         config = self.config_manager.get_level_config(self.world)
         self.level_data = self.loader.load_level(config)
 
-        # Clear any fireballs from the previous level — they belong to the old
-        # world and should not carry over or linger across level transitions.
+        # Clear any fireballs from the previous level.
         self.level_data.projectiles = []
 
         # --- Cache spike objects for hazard_hash ---
@@ -625,22 +888,11 @@ class PlatformerCore(gymnasium.Env):
             px = float(config['spawn'].get('x', px))
             py = float(config['spawn'].get('y', py))
 
-        # PERF: Reuse the Player object across soft resets (deaths) rather than
-        # destroying and recreating it. Player.__post_init__ calls
-        # AnimationHandler.load_animations which does pygame.image.load() (disk I/O)
-        # for every sprite frame. In early training the agent dies constantly,
-        # making this the hottest path in load_level.
-        #
-        # Strategy:
-        #   - First call (self.player is None): create and initialise normally.
-        #   - Subsequent calls (soft reset): just teleport to spawn and reset physics state.
-        #
+        # PERF: Reuse the Player object across soft resets (deaths).
         if self.player is None:
-            # First episode — full construction including AnimationHandler / image I/O
             self.player = Player(gObj=GameObject(px, py, PLATFORMER_WIDTH, PLATFORMER_HEIGHT, True))
             self.player.__post_init__()
         else:
-            # Reuse existing object — only reset mutable state
             self.player.gObj.x       = float(px)
             self.player.gObj.y       = float(py)
             self.player.gObj.active  = True
@@ -654,25 +906,22 @@ class PlatformerCore(gymnasium.Env):
             self.player.input_dir    = 0
             self.player.run_held     = False
             self.player.jump_pressed = False
-            # Reset fire state so a held key from last life can't instantly re-fire
             self.player.fire_requested  = False
             self.player._fire_cooldown  = 0.0
 
             if preserve_power:
-                # Level completion — keep power state (stack + star timer).
-                # Only clear the i-frame window since there's no pending hit
-                # to carry over into the new level.
                 self.player.power_machine._iframes_timer = 0.0
             else:
-                # Death or full episode reset — wipe power state back to SMALL.
                 self.player.power_machine.reset()
                 self.player.powered_up       = False
                 self.player.invincible_timer = 0
 
         self.physics_manager.reset_to_defaults()
         self.physics_manager.apply_config_dict(config)
-        # Force hash rebuild on the first step of the new level.
         self.physics_manager.rebuild_dynamic_hashes(self.level_data, self._cached_spikes)
+
+        # Recompute jump arcs for the (possibly updated) physics context
+        self.jump_arc_computer.recompute(self.physics_manager.context)
 
         self.progress_x_best = self.player.gObj.x
         self.progress_y_best = self.level_data.height - self.player.gObj.y
@@ -706,7 +955,6 @@ class PlatformerCore(gymnasium.Env):
             gy = int(g.gObj.y // TILE_SIZE)
             goal_positions.append((gx, gy))
 
-        # Collect coin positions for Dijkstra weighting
         coin_positions = set()
         for c in self.level_data.coins:
             cx = int(c.gObj.x // TILE_SIZE)
@@ -716,58 +964,48 @@ class PlatformerCore(gymnasium.Env):
         self.dijkstra.compute_map(goal_positions, coin_positions)
 
     def complete_level(self):
-        """
-        Called by PhysicsManager the moment the player touches the goal tile.
-        Selects the next level using a random curriculum walk but does NOT load
-        it yet -- that happens inline in step() after _info() has captured the
-        WIN event for this frame.
-
-        The episode continues into the next level; only lives = 0 ends it.
-        """
-        # Record the win for the level just completed
         self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
 
-        # Advance to the next level in order; wrap at the end so long episodes
-        # cycle through the full curriculum without ending prematurely.
-        self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
-        self.world = self.level_order[self.current_index_world]
-        # Count the new level visit immediately so win-rates stay accurate mid-episode
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
+        # Batch curriculum: mark win if this is the current curriculum level
+        if self._curriculum_position < len(self.level_order):
+            if self.world == self.level_order[self._curriculum_position]:
+                self._episode_won_current = True
 
-        # Signal step() to load the next level after _info() runs this frame.
+        # Store next level index but do NOT advance self.world yet.
+        # self.world must stay as the completed level until _info() is called
+        # so the WIN event is logged against the correct level.
+        #
+        # When locked_level is set (editor playtest), loop back to the same
+        # level instead of advancing — the player should restart the level
+        # they just completed, not be pushed into the next registered level.
+        if self.locked_level:
+            next_idx = self.current_index_world  # stay on the same level
+        else:
+            next_idx = (self.current_index_world + 1) % len(self.level_order)
+        self._pending_next_level_index = next_idx
         self._needs_level_transition = True
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
         """
         Decrements lives and either soft-resets (lives > 0) or ends the episode.
-
-        Returns True only when lives reach 0, signalling _check_termination
-        to return True so SB3 calls reset() for a full episode restart.
+        Returns True only when lives reach 0.
         """
         self.death_cause = cause
         self.lives = max(0, self.lives - 1)
         if self.lives > 0:
             self._soft_reset()
-            return False   # episode continues
+            return False
         else:
-            # Lives exhausted -- end the episode.
-            # Do NOT call reset() here; SB3 does that after terminated=True.
             self.alive     = False
             self.game_over = True
-            return True    # episode ends
+            return True
 
     def _soft_reset(self):
-        """
-        Reloads the current level after a death, preserving lives and score.
-
-        load_level() never modifies self.lives or self.score, so no explicit
-        save/restore is needed. The old save/restore pattern was redundant.
-        """
+        """Reloads the current level after a death, preserving lives and score."""
         self.load_level()
 
     def _update_camera(self):
-        # PERF: Camera state is only consumed by render(), which is never called
-        # during headless training. Skip all camera math in non-human modes.
+        # Camera math is only needed in human mode.
         if self.render_mode != "human":
             return
 
@@ -796,7 +1034,6 @@ class PlatformerCore(gymnasium.Env):
     def _get_dist_to_goal(self) -> float:
         if not self.player: return float('inf')
         if not self.level_data.goals:
-            # Fallback: treat right edge as goal, ignore Y (no Y info available)
             return self.level_data.width - self.player.gObj.x
 
         px = self.player.gObj.x
@@ -808,15 +1045,22 @@ class PlatformerCore(gymnasium.Env):
             d = math.sqrt((gx - px) ** 2 + (gy - py) ** 2)
             if d < min_d:
                 min_d = d
-
         return min_d
 
     def _update_stall_metrics(self):
-        """FIX: Stall logic now uses X-distance to goal."""
+        """Stall detection — suppressed when riding a moving platform."""
         if not self.player: return
 
         if self.player.gObj.x > self.max_x_seen:
             self.max_x_seen = self.player.gObj.x
+
+        # FIX: If riding a moving platform, reset stall timer — the player
+        # IS making progress, just not under their own velocity. Without this,
+        # the agent gets stall-killed for being patient on platforms.
+        if getattr(self.player, '_on_moving_platform', False):
+            self.stall_timer = 0
+            self.stalled_this_frame = False
+            return
 
         # PERF: Read from cache set at the top of step() instead of recomputing.
         current_dist = getattr(self, '_goal_dist_cache', self._get_dist_to_goal())
@@ -836,19 +1080,19 @@ class PlatformerCore(gymnasium.Env):
     def _check_termination(self) -> bool:
         """
         Returns True only when the episode should end (lives = 0, or no player).
-        Goal completion is NOT a termination — it transitions to the next level
-        inline inside step() so the episode continues uninterrupted.
+        Goal completion is NOT a termination — it transitions inline in step().
         """
         player = self.player
         if not player:
             return True
 
-        # 1. TIME LIMIT — counts as a death
         if self.use_timer and self.timer <= 0:
             return self._handle_death("Timeout")
 
-        # 2. PIT DEATH
         if player.gObj.y > self.level_data.height:
+            # Fallback: PhysicsManager._check_oob() should have caught this
+            # first, but this guard ensures no frame is missed if the physics
+            # manager is bypassed (e.g. render-only mode, test harness).
             return self._handle_death("Pit")
 
         # 4. STALL DEATH
@@ -864,7 +1108,9 @@ class PlatformerCore(gymnasium.Env):
             return
 
         warnings_list = []
-        grid_names = ["player", "solid", "collectible", "hazard", "dijkstra"]
+
+        # Channel names match the 4-channel layout declared in _obs_space
+        grid_names = ["solid", "collectible", "hazard", "dijkstra"]
         grids = obs.get("grids")
         if grids is not None:
             for i, name in enumerate(grid_names):
@@ -874,7 +1120,9 @@ class PlatformerCore(gymnasium.Env):
                 self._obs_stats[f"grid_{name}_min"]  = float(ch.min())
                 self._obs_stats[f"grid_{name}_max"]  = float(ch.max())
 
-                if float(ch.std()) < 1e-6 and i < 2:
+                # Only flag solid (ch 0) as DEAD — other channels are
+                # legitimately sparse or zero when nothing is nearby.
+                if float(ch.std()) < 1e-6 and i == 0:
                     warnings_list.append(f"Grid '{name}' DEAD")
                 if float(ch.max()) > 1.01:
                     warnings_list.append(f"Grid '{name}' >1.0")
@@ -885,14 +1133,15 @@ class PlatformerCore(gymnasium.Env):
             self._obs_stats["scalar_std"]  = float(scalars.std())
             self._obs_stats["scalar_min"]  = float(scalars.min())
             self._obs_stats["scalar_max"]  = float(scalars.max())
-            self._obs_stats["dijkstra_val"] = float(scalars[-1])
+            # dijkstra_dist is at index 17 (13 player scalars + 4th tracking value)
+            self._obs_stats["dijkstra_val"] = float(scalars[17])
 
             if float(scalars.std()) < 1e-8:
                 warnings_list.append("Scalars DEAD")
             if abs(float(scalars.max())) > 100:
                 warnings_list.append("Scalars unnormalized")
 
-            dijk_val = float(scalars[-1])
+            dijk_val = float(scalars[17])
             if hasattr(self, '_last_dijk_nonzero'):
                 if self._last_dijk_nonzero and dijk_val == 0.0:
                     self._dijk_zero_streak = getattr(self, '_dijk_zero_streak', 0) + 1
@@ -905,145 +1154,168 @@ class PlatformerCore(gymnasium.Env):
         self._obs_stats["obs_warnings"] = "|".join(warnings_list) if warnings_list else ""
 
     def _obs(self) -> Dict[str, np.ndarray]:
-        # NULL Check Safety
         if not self.player:
             return {
-                # 5 channels: player, solids, collectible, hazard, dijkstra-advantage.
-                "grids": np.zeros((5, self.obs_height, self.obs_width), dtype=np.float32),
-                "scalars": np.zeros(12, dtype=np.float32),  # 5 (player) + 7 (tracking)
+                # 4 channels: solid, collectible, hazard, dijkstra
+                "grids":   np.zeros((4, self.obs_height, self.obs_width), dtype=np.float32),
+                # 20 scalars: 13 (player obs_vector) + 7 (tracking)
+                "scalars": np.zeros(20, dtype=np.float32),
             }
 
-        p_obs    = self._player_obs()
+        p_obs     = self._player_obs()
         track_obs = self._tracking_obs()
 
-        # _grid_obs_window returns the unpadded map tile coordinates of the window
-        # so that _dijkstra_obs_window can slice dist_map at the identical region.
-        hazard_grid, collect_grid, player_grid, solid_grid, map_row_start, map_col_start = \
+        solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start = \
             self._grid_obs_window()
 
         dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # Stack order: Player, Solids, Collectible, Hazard, Dijkstra-Advantage  (5 channels)
-        # Channels 0-3 are binary {0, 1}. Channel 4 (Dijkstra) is in [-1, 1].
-        stacked_grids = np.stack(
-            [player_grid, solid_grid, collect_grid, hazard_grid, dijkstra_grid], axis=0
-        ).astype(np.float32)
+        # ── Physics-aware Dijkstra boost ──────────────────────────────────
+        # Add a small positive value to air tiles the player can physically
+        # reach via jump. Landing tiles get +0.15, in-flight tiles get +0.05.
+        # This nudges the gradient toward jumpable paths without destroying
+        # the existing signal. Solid tiles and unreachable air are untouched.
+        # When airborne, no boost is applied (arc only valid from ground).
+        on_ground = self.player.on_ground if self.player else False
+        dijkstra_grid, arc_grid = self.jump_arc_computer.boost_dijkstra(
+            dijkstra_grid, solid_grid, on_ground,
+            self.obs_pad_x, self.obs_pad_y
+        )
+        self._dijkstra_window_cache = dijkstra_grid
+        self._jump_arc_cache = arc_grid
+
+        # Stack order: Solids, Collectibles, Hazards, Dijkstra  (4 channels)
+        #   Ch 0 solid       : {-0.5, 0.0, 1.0}  — pit / air / wall+platform
+        #   Ch 1 collectible : {0.0, 0.35, 0.69, 1.0}  — coin / powerup / goal
+        #   Ch 2 hazard      : {-1.0, -0.5, 0.0, +1.0} — spike / pit / empty / enemy
+        #   Ch 3 dijkstra    : continuous [-1.0, 1.0]
+        #
+        # Pit encoding (-0.5) sits between safe air (0.0) and lethal spike (-1.0)
+        # on both solid and hazard channels so the CNN learns a clear danger gradient.
+        stacked_grids = np.stack([
+            solid_grid,
+            collect_grid,
+            hazard_grid,
+            dijkstra_grid,
+        ], axis=0).astype(np.float32)
 
         scalars = np.concatenate([p_obs, track_obs]).astype(np.float32)
 
         return {
-            "grids": stacked_grids,
+            "grids":   stacked_grids,
             "scalars": scalars,
         }
 
     def _player_obs(self) -> np.ndarray:
         p = self.player
-        if not p: return np.zeros(5, dtype=np.float32)
+        if not p:
+            return np.zeros(13, dtype=np.float32)
 
-        w = max(1.0, float(self.level_data.width))
-        h = max(1.0, float(self.level_data.height))
-
-        max_run = max(1.0, getattr(self.physics_manager.context, 'MAX_RUN_SPEED', 240.0))
+        max_run  = max(1.0, getattr(self.physics_manager.context, 'MAX_RUN_SPEED',  240.0))
         max_fall = max(1.0, getattr(self.physics_manager.context, 'MAX_FALL_SPEED', 400.0))
 
-        return np.array([
-            np.clip(p.gObj.x / w, 0.0, 1.0),
-            np.clip(p.gObj.y / h, 0.0, 1.0),
-            np.clip(p.vx / max_run, -1.0, 1.0),
-            np.clip(p.vy / max_fall, -1.0, 1.0),
-            1.0 if p.on_ground else 0.0,
-        ], dtype=np.float32)
+        return p.obs_vector(max_run, max_fall)
 
-    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
+    def _grid_obs_window(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
         """
-        Returns (hazard, collect, player, solid, map_row_start, map_col_start).
+        Returns (solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start).
 
-        All four binary grids share the same coordinate frame:
-          player  — tiles occupied by the player bounding box
-          solid   — ground, static platforms (incl. question blocks), moving platforms
-          collect — coins + powerups + goals (from collectible_hash)
-          hazard  — enemies + spikes (from hazard_hash)
+        solid_grid   — binary {0.0, 1.0}
+                    ground, static platforms, question blocks, moving platforms
 
-        map_row_start / map_col_start are the unpadded map tile coordinates of
-        the top-left corner of the observation window, centered on the player.
-        Returned so _dijkstra_obs_window can slice dist_map at the same region.
+        collect_grid — importance-weighted float, single channel:
+                    goal    = 1.0   (level exit — highest priority)
+                    powerup = 0.69  (changes player capability)
+                    coin    = 0.35  (bonus reward)
+                    empty   = 0.0
+                    If two entities share a tile, the higher value wins.
+
+        hazard_grid  — sign encodes the agent's viable response:
+                    enemy  = +1.0  (defeatable by stomp or fireball)
+                    spike  = -1.0  (always lethal, never safe to touch)
+                    empty  =  0.0
+                    If spike and enemy share a tile, spike wins (more dangerous).
+
+        map_row_start / map_col_start: unpadded map tile coordinates of the
+        top-left corner of the 21×21 window centered on the player. Passed
+        to _dijkstra_obs_window so both functions slice the same region.
         Coordinates can be negative when the player is near the top/left edge.
+
+        All entity lookups use spatial hashes — only objects within the window
+        are visited, keeping per-step overhead minimal.
         """
         p = self.player
         if not p:
             z = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-            return z, z, z, z, 0, 0
+            return z, z, z, 0, 0
 
         px = int(p.gObj.x // TILE_SIZE)
         py = int(p.gObj.y // TILE_SIZE)
 
-        # The observation window is always centered exactly on the player.
-        # We no longer clamp to map boundaries, so the agent always stays
-        # perfectly centered in its own vision (translation invariance).
+        # Window always centered on player — no edge clamping (translation invariance)
         map_row_start = py - self.obs_pad_y
         map_col_start = px - self.obs_pad_x
 
-        hazard_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        player_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
         solid_grid   = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        collect_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        hazard_grid  = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
 
-        # World-pixel origin of the window (used for entity spatial-hash queries)
+        # World-pixel origin and dimensions of the window
         wx = map_col_start * TILE_SIZE
         wy = map_row_start * TILE_SIZE
+        ww = self.obs_width  * TILE_SIZE
+        wh = self.obs_height * TILE_SIZE
 
-        window_rect = pygame.Rect(wx, wy, self.obs_width * TILE_SIZE, self.obs_height * TILE_SIZE)
-
-        # --- Hazard channel: enemies + spikes (from hazard_hash) ---
-        nearby_hazards = self.physics_manager.hazard_hash.query_rect(
-            window_rect.x, window_rect.y, window_rect.width, window_rect.height
-        )
-        for h in nearby_hazards:
-            if not h.gObj.active: continue
-            hx = int(h.gObj.x // TILE_SIZE)
-            hy = int(h.gObj.y // TILE_SIZE)
-            local_x = hx - map_col_start
-            local_y = hy - map_row_start
-            if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
-                hazard_grid[local_y, local_x] = 1.0
-
-        # --- Collectible channel: coins + powerups + goals (from collectible_hash) ---
-        nearby_items = self.physics_manager.collectible_hash.query_rect(
-            window_rect.x, window_rect.y, window_rect.width, window_rect.height
-        )
-        for c in nearby_items:
-            if not c.gObj.active: continue
-            if hasattr(c, 'collected') and c.collected: continue
-            cx = int(c.gObj.x // TILE_SIZE)
-            cy = int(c.gObj.y // TILE_SIZE)
-            local_x = cx - map_col_start
-            local_y = cy - map_row_start
-            if 0 <= local_x < self.obs_width and 0 <= local_y < self.obs_height:
-                collect_grid[local_y, local_x] = 1.0
-
-        # --- Solid channel: static geometry (ground, platforms, qblocks) ---
-        # Query static_hash — covers all immovable geometry inserted at load time.
-        # Spikes live in static_hash too but belong in the hazard channel, so skip them.
-        nearby_solids = self.level_data.static_hash.query_rect(
-            window_rect.x, window_rect.y, window_rect.width, window_rect.height
-        )
-        for obj in nearby_solids:
-            if isinstance(obj, Spike): continue   # spikes → hazard channel
-            sx = int(obj.gObj.x // TILE_SIZE)
-            sy = int(obj.gObj.y // TILE_SIZE)
-            lx = sx - map_col_start
-            ly = sy - map_row_start
+        # ── Helper: world pixel coords → local grid cell, write value ────────
+        # Keeps the highest-magnitude value when two entities share a tile.
+        # For hazards this means spike (-1.0) beats enemy (+1.0) on equal
+        # magnitude via the strict > check, so spike always wins conflicts.
+        def _place(grid, obj_x, obj_y, value):
+            lx = int(obj_x // TILE_SIZE) - map_col_start
+            ly = int(obj_y // TILE_SIZE) - map_row_start
             if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height:
-                solid_grid[ly, lx] = 1.0
+                if abs(value) > abs(grid[ly, lx]):
+                    grid[ly, lx] = value
 
-        # Moving platforms (from platform_hash — positions update every frame).
-        # platform_hash is rebuilt each step() so positions are always current.
+        # ── Hazard hash: enemies (+1.0) and spikes (-1.0) ────────────────────
+        # Single query, dispatched by type. Spike beats enemy on tile conflicts
+        # because |-1.0| is not > |+1.0|, so spike value written first is kept.
+        # Insert spikes after enemies so spike overwrites on equal magnitude.
+        for h in self.physics_manager.hazard_hash.query_rect(wx, wy, ww, wh):
+            if not h.gObj.active:
+                continue
+            if isinstance(h, Enemy):
+                _place(hazard_grid, h.gObj.x, h.gObj.y, +1.0)
+            elif isinstance(h, Spike):
+                _place(hazard_grid, h.gObj.x, h.gObj.y, -1.0)
+
+        # ── Collectible hash: goal (1.0), powerup (0.69), coin (0.35) ────────
+        # Single query, dispatched by type. Goal wins all tile conflicts.
+        for c in self.physics_manager.collectible_hash.query_rect(wx, wy, ww, wh):
+            if not c.gObj.active:
+                continue
+            if hasattr(c, 'collected') and c.collected:
+                continue
+            if isinstance(c, Coin):
+                _place(collect_grid, c.gObj.x, c.gObj.y, 0.35)
+            elif isinstance(c, Powerup):
+                _place(collect_grid, c.gObj.x, c.gObj.y, 0.69)
+            else:
+                # Goal or any unknown collectible — treat as highest importance
+                _place(collect_grid, c.gObj.x, c.gObj.y, 1.0)
+
+        # ── Static hash: ground, platforms, qblocks (skip spikes) ────────────
+        # Spikes live in static_hash but are already handled via hazard_hash.
+        for obj in self.level_data.static_hash.query_rect(wx, wy, ww, wh):
+            if isinstance(obj, Spike):
+                continue
+            _place(solid_grid, obj.gObj.x, obj.gObj.y, 1.0)
+
+        # ── Moving platforms: mark all covered tile columns ───────────────────
         # Multi-tile platforms span several columns — iterate all covered tiles.
-        nearby_plats = self.physics_manager.platform_hash.query_rect(
-            window_rect.x, window_rect.y, window_rect.width, window_rect.height
-        )
-        for plat in nearby_plats:
-            if not plat.gObj.active: continue
+        for plat in self.physics_manager.platform_hash.query_rect(wx, wy, ww, wh):
+            if not plat.gObj.active:
+                continue
             pc0 = int(plat.gObj.x // TILE_SIZE)
             pc1 = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
             pr  = int(plat.gObj.y // TILE_SIZE)
@@ -1053,140 +1325,222 @@ class PlatformerCore(gymnasium.Env):
                 if 0 <= lx < self.obs_width and 0 <= ly < self.obs_height:
                     solid_grid[ly, lx] = 1.0
 
-        # --- Player channel ---
-        p_rect      = p.gObj.get_rect()
-        rel_x       = p_rect.x - wx
-        rel_y       = p_rect.y - wy
-        p_start_col = int(rel_x // TILE_SIZE)
-        p_start_row = int(rel_y // TILE_SIZE)
-        p_w_tiles   = math.ceil(p.gObj.width  / TILE_SIZE)
-        p_h_tiles   = math.ceil(p.gObj.height / TILE_SIZE)
+        # ── Pit detection ─────────────────────────────────────────────────────
+        # A "pit" cell is an air tile that has no solid ground within
+        # PIT_SCAN_DEPTH tiles directly below it (i.e. the agent would fall
+        # to its death or off-screen if it stepped there).
+        #
+        # We write -0.5 into the hazard channel for these tiles so the agent
+        # can distinguish "safe air" (hazard=0) from "fatal gap" (hazard=-0.5),
+        # complementing the existing spike signal (-1.0).
+        #
+        # The value -0.5 sits between:
+        #   0.0  = empty air   (safe)
+        #  -0.5  = pit/gap     (lethal fall — this addition)
+        #  -1.0  = spike tile  (always lethal)
+        #
+        # Both the solid channel AND the hazard channel are updated so the
+        # agent gets the signal on two separate input planes.
+        #   solid[ly, lx]  = -0.5  (was 0.0 = air, visually identical to safe air)
+        #   hazard[ly, lx] = -0.5  (new — now agent can see the danger explicitly)
+        #
+        # PIT_SCAN_DEPTH: how many rows to scan downward per column.
+        # 6 tiles ≈ 192px ≈ 3 player heights — enough to detect any
+        # meaningful drop without scanning the entire level height.
+        PIT_SCAN_DEPTH = 6
 
-        for r in range(p_start_row, p_start_row + p_h_tiles):
-            for c in range(p_start_col, p_start_col + p_w_tiles):
-                if 0 <= r < self.obs_height and 0 <= c < self.obs_width:
-                    player_grid[r, c] = 1.0
+        grid     = self.level_data.grid
+        map_rows = self.level_data.rows
+        map_cols = self.level_data.cols
 
-        return hazard_grid, collect_grid, player_grid, solid_grid, map_row_start, map_col_start
+        # Precompute: a tile is solid if it is NOT air (TILE_AIR = 0) AND not spike.
+        # We treat spikes as non-solid for the pit test because landing on a spike
+        # IS a hazard (it's already in hazard_grid) — we don't want to suppress
+        # the pit signal just because a spike sits at the bottom of a gap.
+        def _is_solid_floor(map_row, map_col):
+            if map_row < 0 or map_row >= map_rows:
+                return False
+            if map_col < 0 or map_col >= map_cols:
+                return False
+            t = grid[map_row][map_col]
+            return t not in (TILE_AIR, TILE_SPIKE)
+
+        for ly in range(self.obs_height):
+            for lx in range(self.obs_width):
+                # Only check cells that are currently air (solid=0) and
+                # not already flagged as a hazard (enemy/spike)
+                if solid_grid[ly, lx] != 0.0:
+                    continue
+                if hazard_grid[ly, lx] != 0.0:
+                    continue
+
+                map_row = map_row_start + ly
+                map_col = map_col_start + lx
+
+                # Skip tiles outside map bounds entirely (already OOB)
+                if map_col < 0 or map_col >= map_cols:
+                    continue
+
+                # Scan downward for solid ground
+                found_floor = False
+                for scan in range(1, PIT_SCAN_DEPTH + 1):
+                    scan_row = map_row + scan
+                    if _is_solid_floor(scan_row, map_col):
+                        found_floor = True
+                        break
+
+                if not found_floor:
+                    # No floor within PIT_SCAN_DEPTH — this is a pit.
+                    # Write pit marker into BOTH channels:
+                    #   solid:  -0.5  (distinguishes from safe air 0.0)
+                    #   hazard: -0.5  (distinguishes from spike -1.0 and enemy +1.0)
+                    solid_grid[ly,  lx] = -0.5
+                    hazard_grid[ly, lx] = -0.5
+
+        # Cache for debug overlay visualization (AgentViewOverlay reads these)
+        self._solid_window_cache  = solid_grid
+        self._hazard_window_cache = hazard_grid
+
+        return solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start
 
     def _dijkstra_obs_window(self, map_row_start: int, map_col_start: int) -> np.ndarray:
-            """
-            Returns a (obs_height, obs_width) float32 advantage map in [-1, 1].
+        """
+        Returns a (obs_height, obs_width) float32 advantage map in [-1, 1].
 
-            Each cell encodes how much closer (positive) or further (negative) that
-            tile is from the goal compared to the player's current tile:
+        Each cell encodes how much closer (positive) or further (negative) that
+        tile is from the goal compared to the player's current tile:
 
-                delta[r, c] = player_dist - window_dist
-                            = player_tile_cost - neighbour_tile_cost
+            delta[r, c] = player_dist - window_dist
 
-            Interpretation for the CNN:
-            +1.0  → tile is much closer to the goal than the player  (go here)
-            0.0  → same distance as player, or unreachable tile     (neutral)
-            -1.0  → tile is much further from the goal than player   (avoid)
+        Interpretation for the CNN:
+        +1.0  → tile is much closer to the goal than the player  (go here)
+         0.0  → same distance as player, or unreachable tile     (neutral)
+        -1.0  → tile is much further from the goal than player   (avoid)
 
-            All patching (moving-platform compensation) is done in raw cost space.
-            Normalisation and clipping to [-1, 1] happen exactly once at the end.
+        All patching (moving-platform compensation) is done in raw cost space.
+        Normalisation and clipping to [-1, 1] happen exactly once at the end.
 
-            Tiles with inf cost (walls, unreachable air pockets) are set to 0 so
-            they are neutral rather than misleadingly negative.
-            """
-            zero = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        Tiles with inf cost (walls, unreachable air pockets) are set to 0 so
+        they are neutral rather than misleadingly negative.
+        """
+        zero = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
 
-            if self.dijkstra is None or not self.player:
-                return zero
+        if self.dijkstra is None or not self.player:
+            return zero
 
-            # Player tile cost — if unreachable (inf), the whole window is meaningless
-            px_tile = int(self.player.gObj.x // TILE_SIZE)
-            py_tile = int(self.player.gObj.y // TILE_SIZE)
-            player_dist = self.dijkstra.dist_map[py_tile, px_tile] \
-                if (0 <= py_tile < self.level_data.rows and 0 <= px_tile < self.level_data.cols) \
-                else np.inf
+        px_tile = int(self.player.gObj.x // TILE_SIZE)
+        py_tile = int(self.player.gObj.y // TILE_SIZE)
+        player_dist = self.dijkstra.dist_map[py_tile, px_tile] \
+            if (0 <= py_tile < self.level_data.rows and 0 <= px_tile < self.level_data.cols) \
+            else np.inf
 
-            if not np.isfinite(player_dist):
-                # Player is on an unreachable tile (e.g. first frame before physics
-                # settles). Return neutral zeros — don't emit misleading gradients.
-                return zero
+        if not np.isfinite(player_dist):
+            return zero
 
-            # Clamp window to valid map bounds.
-            # map_row_start can be negative when the player is near the top/left edge.
-            r0 = max(0, map_row_start)
-            c0 = max(0, map_col_start)
-            r1 = min(self.level_data.rows, map_row_start + self.obs_height)
-            c1 = min(self.level_data.cols, map_col_start + self.obs_width)
+        r0 = max(0, map_row_start)
+        c0 = max(0, map_col_start)
+        r1 = min(self.level_data.rows, map_row_start + self.obs_height)
+        c1 = min(self.level_data.cols, map_col_start + self.obs_width)
 
-            # How many rows/cols of the output window are actually inside the map
-            valid_rows = r1 - r0
-            valid_cols = c1 - c0
+        valid_rows = r1 - r0
+        valid_cols = c1 - c0
 
-            if valid_rows <= 0 or valid_cols <= 0:
-                return zero
+        if valid_rows <= 0 or valid_cols <= 0:
+            return zero
 
-            # Direct numpy slice — no Python loop over tiles.
-            # PERF: No .copy() needed here — the subtraction below (player_dist - dist_slice)
-            # produces a new array without modifying dist_map in-place.
-            dist_slice = self.dijkstra.dist_map[r0:r1, c0:c1]
+        dist_slice = self.dijkstra.dist_map[r0:r1, c0:c1]
+        delta = player_dist - dist_slice
+        delta[~np.isfinite(delta)] = 0.0
 
-            # Compute raw relative advantage (NOT normalised yet).
-            # Positive = closer to goal than player, negative = further.
-            delta = player_dist - dist_slice
+        out = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+        out_r0 = r0 - map_row_start
+        out_c0 = c0 - map_col_start
+        out[out_r0 : out_r0 + valid_rows, out_c0 : out_c0 + valid_cols] = delta
 
-            # Walls / unreachable tiles have cost=inf → delta = -inf → set to 0 (neutral).
-            # Done BEFORE writing to out so inf values never enter the output array.
-            delta[~np.isfinite(delta)] = 0.0
+        # -----------------------------------------------------------------
+        # Moving-platform compensation (raw cost space)
+        # Mirrors DijkstraSolver's treatment of static solid tiles so the
+        # gradient connects across gaps that moving platforms bridge.
+        # -----------------------------------------------------------------
+        if self.level_data.moving_platforms:
+            wx = map_col_start * TILE_SIZE
+            wy = map_row_start * TILE_SIZE
+            ww = self.obs_width  * TILE_SIZE
+            wh = self.obs_height * TILE_SIZE
 
-            # Place the valid slice into the full output window, leaving edge-padding
-            # as zeros when the window extends outside the map.
-            out = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-            out_r0 = r0 - map_row_start   # offset into output array
-            out_c0 = c0 - map_col_start
-            out[out_r0 : out_r0 + valid_rows, out_c0 : out_c0 + valid_cols] = delta
+            nearby_plats = self.physics_manager.platform_hash.query_rect(wx, wy, ww, wh)
 
-            # -----------------------------------------------------------------
-            # Moving-platform compensation (raw cost space)
-            # -----------------------------------------------------------------
-            # Mirrors the DijkstraSolver's treatment of static solid tiles:
-            #   - Platform surface tiles → 0.0 (impassable, same as walls)
-            #   - 1 tile above → ground-proximity discount -0.6
-            #   - 2 tiles above → -0.25
-            #   - 3 tiles above → -0.1
-            #
-            # For tiles that are unreachable in the static map (inf cost),
-            # we interpolate from the nearest reachable tile in the same row
-            # so the gradient connects across the gap the platform bridges.
-            # -----------------------------------------------------------------
-            if self.level_data.moving_platforms:
-                wx = map_col_start * TILE_SIZE
-                wy = map_row_start * TILE_SIZE
-                ww = self.obs_width  * TILE_SIZE
-                wh = self.obs_height * TILE_SIZE
+            if nearby_plats:
+                HORIZ_COST = 2.0
+                MAX_SCAN   = self.obs_width * 2
+                dm         = self.dijkstra.dist_map
+                dm_rows, dm_cols = dm.shape
 
-                nearby_plats = self.physics_manager.platform_hash.query_rect(
-                    wx, wy, ww, wh
-                )
+                PROXIMITY = [(1, 0.6), (2, 0.25), (3, 0.1)]
 
-                if nearby_plats:
-                    HORIZ_COST = 2.0
-                    MAX_SCAN   = self.obs_width * 2
-                    dm         = self.dijkstra.dist_map
-                    dm_rows, dm_cols = dm.shape
+                for plat in nearby_plats:
+                    if not plat.gObj.active:
+                        continue
 
-                    # (rows_above_surface, discount) — matches compute_map exactly
-                    PROXIMITY = [(1, 0.6), (2, 0.25), (3, 0.1)]
+                    pc0       = int(plat.gObj.x // TILE_SIZE)
+                    pc1       = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
+                    p_top_row = int(plat.gObj.y // TILE_SIZE)
 
-                    for plat in nearby_plats:
-                        if not plat.gObj.active:
+                    # Platform surface: impassable (same as walls)
+                    for pc in range(pc0, pc1):
+                        ly = p_top_row - map_row_start
+                        lx = pc - map_col_start
+                        if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
+                            out[ly, lx] = 0.0
+
+                    # Tiles above: ground-proximity discounts
+                    for offset, discount in PROXIMITY:
+                        patch_row = p_top_row - offset
+                        if patch_row < 0 or patch_row >= dm_rows:
                             continue
 
-                        pc0       = int(plat.gObj.x // TILE_SIZE)
-                        pc1       = int((plat.gObj.x + plat.gObj.width - 1) // TILE_SIZE) + 1
-                        p_top_row = int(plat.gObj.y // TILE_SIZE)
-
-                        # --- Platform surface: impassable (same as walls) ---
                         for pc in range(pc0, pc1):
-                            ly = p_top_row - map_row_start
+                            ly = patch_row - map_row_start
+                            lx = pc - map_col_start
+                            if not (0 <= ly < self.obs_height and 0 <= lx < self.obs_width):
+                                continue
+
+                            if 0 <= pc < dm_cols:
+                                raw_cost = float(dm[patch_row, pc])
+                            else:
+                                raw_cost = np.inf
+
+                            if np.isfinite(raw_cost):
+                                patched_cost = max(1.0, raw_cost - discount)
+                                out[ly, lx] = player_dist - patched_cost
+                            else:
+                                best_est = np.inf
+                                for dc in range(1, MAX_SCAN + 1):
+                                    for sign in (-1, 1):
+                                        nc = pc + dc * sign
+                                        if 0 <= nc < dm_cols:
+                                            anchor = float(dm[patch_row, nc])
+                                            if np.isfinite(anchor):
+                                                est = anchor + dc * HORIZ_COST - discount
+                                                if est < best_est:
+                                                    best_est = est
+                                    if np.isfinite(best_est):
+                                        break
+
+                                if np.isfinite(best_est):
+                                    best_est = max(1.0, best_est)
+                                    out[ly, lx] = player_dist - best_est
+
+                    # Secondary proximity boosts (2 and 3 tiles above)
+                    for offset, discount in [(2, 0.25), (3, 0.1)]:
+                        boost_row = p_top_row - offset
+                        if boost_row < 0:
+                            continue
+                        for pc in range(pc0, pc1):
+                            ly = boost_row - map_row_start
                             lx = pc - map_col_start
                             if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                out[ly, lx] = 0.0
+                                out[ly, lx] += discount
 
                         # --- Tiles above: ground-proximity discounts ---
                         for offset, discount in PROXIMITY:
@@ -1229,33 +1583,20 @@ class PlatformerCore(gymnasium.Env):
                                     if np.isfinite(best_est):
                                         best_est = max(1.0, best_est)
                                         out[ly, lx] = player_dist - best_est
-                                        
-                        # --- Secondary proximity boosts (2 and 3 tiles above) ---
-                        for offset, discount in [(2, 0.25), (3, 0.1)]:
-                            boost_row = p_top_row - offset
-                            if boost_row < 0:
-                                continue
-                            for pc in range(pc0, pc1):
-                                ly = boost_row - map_row_start
-                                lx = pc - map_col_start
-                                if 0 <= ly < self.obs_height and 0 <= lx < self.obs_width:
-                                    out[ly, lx] += discount
 
-            # --- Single normalisation pass (after ALL patches) ---
-            max_cost = max(
-                (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
-                (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
-            )
-            np.clip(out / max_cost, -1.0, 1.0, out=out)
-            self._dijkstra_window_cache = out  # cache for debugging visualization
-            return out.astype(np.float32)
+        # --- Single normalisation pass (after ALL patches) ---
+        max_cost = max(
+            (self.obs_width  // 2) * 2.0,   # horizontal half-span × horiz cost
+            (self.obs_height // 2) * 3.5,   # vertical half-span × upward cost
+        )
+        np.clip(out / max_cost, -1.0, 1.0, out=out)
+        self._dijkstra_window_cache = out  # cache for debugging visualization
+        return out.astype(np.float32)
 
     def _tracking_obs(self) -> np.ndarray:
-        """
-        Returns 13 scalar features used by the MLP branch of the extractor.
-        """
+        """Returns 7 scalar features (+ 5 from _player_obs = 12 total)."""
         p = self.player
-        if not p: return np.zeros(7, dtype=np.float32)  # FIXED: 7 active scalars
+        if not p: return np.zeros(7, dtype=np.float32)
 
         SEARCH_RADIUS = math.sqrt(
             (self.obs_width  * TILE_SIZE) ** 2 +
@@ -1298,10 +1639,10 @@ class PlatformerCore(gymnasium.Env):
 
         dx = closest_goal_x - p.gObj.x
         dy = closest_goal_y - p.gObj.y
-        dir_x      = np.sign(dx)
-        dist_y_norm = np.clip(dy / self.level_data.height, -1.0, 1.0)
+        dir_x       = np.sign(dx)
+        dist_y_norm = np.clip(dy / self.level_data.height, -1.0, 1.0) if self.level_data.height > 0 else 0.0
 
-        dijkstra_dist = 1.0  # default: treat as far if unavailable
+        dijkstra_dist = 1.0
         if self.dijkstra:
             px_tile = int(p.gObj.x // TILE_SIZE)
             py_tile = int(p.gObj.y // TILE_SIZE)
@@ -1341,14 +1682,25 @@ class PlatformerCore(gymnasium.Env):
         self._step_dy = step_dy
 
         return np.array([
-            np.clip(e_dist       / norm_dist, 0.0, 1.0),
-            np.clip(raw_goal_dist/ norm_dist, 0.0, 1.0),
-            np.clip(self.timer   / max(1.0, self.timer_seconds), 0.0, 1.0),
-            dist_y_norm,
-            dijkstra_dist,
-            step_dx,
-            step_dy,
+            np.clip(e_dist        / norm_dist, 0.0, 1.0),  # [0] enemy dist
+            np.clip(raw_goal_dist / norm_dist, 0.0, 1.0),  # [1] goal dist
+            np.clip(self.timer    / max(1.0, self.timer_seconds), 0.0, 1.0),  # [2] timer
+            dist_y_norm,                                    # [3] goal delta-Y
+            dijkstra_dist,                                  # [4] dijkstra dist
+            step_dx,                                        # [5] best step X
+            step_dy,                                        # [6] best step Y
         ], dtype=np.float32)
+
+    def _curriculum_win_rate(self) -> float:
+        """
+        Returns the win rate over the current level's sliding window [0.0, 1.0].
+        Returns -1.0 if the window is empty (no data yet for this level).
+        Useful for TensorBoard and CSV logging via _info().
+        """
+        window = self._level_window.get(self.world, deque())
+        if not window:
+            return -1.0
+        return sum(window) / len(window)
 
     def _info(self) -> Dict:
         p = self.player
@@ -1368,7 +1720,7 @@ class PlatformerCore(gymnasium.Env):
                 "x_position": 0.0, "y_position": 0.0, "velocity_x": 0.0, "velocity_y": 0.0,
                 "coins_collected": self.coins_total, "enemies_killed_step": self.kills_step,
                 "powered_up": False, "terminated": not self.alive, "won": False,
-                "action": self._last_action, "time_left": math.ceil(self.timer),
+                "action": self._last_action, "action_name": action_to_str(self._last_action), "time_left": math.ceil(self.timer),
                 "max_x_seen": self.max_x_seen, "stall_windows": self.stall_windows_count,
                 "stalled": self.stalled_this_frame, "persona": self.persona,
                 "level": self.world, "goal_dist": 0.0, "lives": self.lives,
@@ -1376,6 +1728,9 @@ class PlatformerCore(gymnasium.Env):
                 "on_ground": False,
                 "step_dx":   0.0,
                 "step_dy":   0.0,
+                "curriculum_level_idx": self.current_index_world,
+                "curriculum_win_rate":  self._curriculum_win_rate(),
+                "curriculum_max_unlocked": self._max_unlocked_index,
                 **self._obs_stats
             }
 
@@ -1388,7 +1743,7 @@ class PlatformerCore(gymnasium.Env):
             if d >= 0:
                 dijkstra_dist = np.clip(d / (self.level_data.cols * 2), 0.0, 1.0)
             else:
-                dijkstra_dist = -1.0   # sentinel: unreachable / off-grid
+                dijkstra_dist = -1.0
 
         return {
             "score": self.score,
@@ -1404,6 +1759,7 @@ class PlatformerCore(gymnasium.Env):
             "terminated": not self.alive,
             "won": self.reached_goal,
             "action": self._last_action,
+            "action_name": action_to_str(self._last_action),
             "time_left": math.ceil(self.timer),
             "max_x_seen": self.max_x_seen,
             "stall_windows": self.stall_windows_count,
@@ -1411,18 +1767,53 @@ class PlatformerCore(gymnasium.Env):
             "persona": self.persona,
             "level": self.world,
             "goal_dist": getattr(self, '_goal_dist_cache', self._get_dist_to_goal()) / ts,
-            "lives" : self.lives,
+            "lives": self.lives,
             "event": event,
             "cause": cause,
             "dijkstra_dist": dijkstra_dist,
             "on_ground": p.on_ground,
+            "on_moving_platform": getattr(p, '_on_moving_platform', False),
             "step_dx":   self._step_dx,
             "step_dy":   self._step_dy,
+            # Curriculum diagnostics — useful for TensorBoard / CSV logging
+            "curriculum_level_idx": self.current_index_world,
+            "curriculum_win_rate":  self._curriculum_win_rate(),
+            "curriculum_max_unlocked": self._max_unlocked_index,
             **self._obs_stats
         }
 
+    def get_jump_arc_debug_state(self) -> dict:
+        if not self.player:
+            return {}
+
+        p = self.player
+        ctx = self.physics_manager.context
+        origin_x = p.gObj.x + p.gObj.width * 0.5
+        origin_y = p.gObj.y + p.gObj.height
+        grounded = bool(p.on_ground)
+        can_jump = bool(p.on_ground or p.coyote > 0)
+        preview_jump = grounded and can_jump
+
+        if preview_jump:
+            preview_speed = max(180.0, float(getattr(ctx, "MAX_RUN_SPEED", 240.0)) * 0.6)
+            preview_vx = p.vx if abs(p.vx) > 10.0 else (preview_speed if p.facing_right else -preview_speed)
+            preview_vy = float(getattr(ctx, "JUMP_VEL_MIN", -620.0))
+        else:
+            preview_vx = p.vx
+            preview_vy = p.vy
+
+        return {
+            "x": float(origin_x),
+            "y": float(origin_y),
+            "vx": float(preview_vx),
+            "vy": float(preview_vy),
+            "grounded": grounded,
+            "can_jump": can_jump,
+            "preview_jump": preview_jump,
+            "color": (80, 220, 80) if preview_jump else (80, 190, 255),
+        }
+
     def render(self, surface: pygame.Surface, blit_only: bool = True):
-        # In human mode, draw game content into the left portion only
         if self.render_mode == "human":
             game_surf = surface.subsurface(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         else:
@@ -1436,7 +1827,6 @@ class PlatformerCore(gymnasium.Env):
         if self.debug_manager:
             self.debug_manager.render_overlays(surface, self)
 
-            # Draw sensor rays — colour-coded, respects F1 toggle
             if self.debug_manager.show_sensors and hasattr(self, 'last_rays'):
                 from .modules.System.debugging_mods.overlays import (
                     RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL)
@@ -1495,11 +1885,7 @@ class PlatformerCore(gymnasium.Env):
 
         for proj in self.level_data.projectiles:
             if proj.gObj.active:
-                proj.render(
-                    surface,
-                    proj.gObj.x - cx,
-                    proj.gObj.y - cy,
-                )
+                proj.render(surface, proj.gObj.x - cx, proj.gObj.y - cy)
 
     def _draw_player(self, surface: pygame.Surface):
         p = self.player
@@ -1513,7 +1899,8 @@ class PlatformerCore(gymnasium.Env):
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
     def _draw_ui(self, surface: pygame.Surface):
-        status = "STAR" if (self.player and self.player.invincible_timer > 0) else ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
+        status = "STAR" if (self.player and self.player.star_timer > 0) else \
+                ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
         text = self.ui_font.render(
             f"Lives:{self.lives}  Score:{self.score}  Coins:{self.coins_total}  {status}  Time:{int(self.timer)}",
             True, COLOR_WHITE
@@ -1526,14 +1913,14 @@ class PlatformerCore(gymnasium.Env):
         surface.blit(bg, (5, y))
         surface.blit(text, (10, y + 3))
 
-    def _world_to_screen(self, gObj:GameObject) -> Tuple[float, float, bool]:
+    def _world_to_screen(self, gObj: GameObject) -> Tuple[float, float, bool]:
         screen_x = gObj.x - self.camera_x
         screen_y = gObj.y - self.camera_y
         on_screen = (
-                screen_x < SCREEN_WIDTH and
-                screen_x + gObj.width > 0 and
-                screen_y < SCREEN_HEIGHT and
-                screen_y + gObj.height > 0)
+            screen_x < SCREEN_WIDTH and
+            screen_x + gObj.width > 0 and
+            screen_y < SCREEN_HEIGHT and
+            screen_y + gObj.height > 0)
         return screen_x, screen_y, on_screen
 
     def close(self):

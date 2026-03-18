@@ -1,7 +1,9 @@
 import pygame
+import math
 from .....wrappers.RewardHub import RewardHub
 from .overlays import (
     HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay,
+    ArchOverlay, JumpArcOverlay,
     _PAD, _GAP, _BANNER_H, _HDR_H,
     _card, _section_hdr,
     _C_BG, _C_CARD, _C_HDR, _C_BORDER, _C_SEP,
@@ -12,9 +14,10 @@ from .overlays import (
 
 
 class DebugManager:
-    def __init__(self, default_active=True, print_help=True):
+    def __init__(self, default_active=True, print_help=True, sensor_mode="rays"):
         self.active = True
         self.hub    = None  # injected by GameEnv wrapper
+        self.sensor_mode = "shot" if str(sensor_mode).lower() == "shot" else "rays"
 
         # ── Always-on ──────────────────────────────────────
         self.show_agent_view = True
@@ -23,11 +26,12 @@ class DebugManager:
         self.show_reward_log = True
         self.show_obs_values = True
 
-        # ── Toggleable (F1–F4) ─────────────────────────────
+        # ── Toggleable (F1–F4, F5) ─────────────────────────────
         self.show_sensors    = False   # F1 — sensor rays
         self.free_cam_active = False   # F2 — free camera
         self.slow_motion     = False   # F3 — slow motion
         self.show_hitboxes   = True    # F4 — hitboxes (default on)
+        # F5 max-view is owned by agent_view_overlay.max_view (toggled below)
 
         self.cam_move_speed   = 600.0
         self.current_cam_move = [0.0, 0.0]
@@ -55,20 +59,65 @@ class DebugManager:
         self.agent_view_overlay = AgentViewOverlay()
         self.info_overlay       = InfoPanelOverlay()
         self.obs_values_overlay = ObsValuesOverlay()
+        self.arch_overlay       = ArchOverlay()
+        self.jump_arc_overlay   = JumpArcOverlay()
+        self._overlay_errors_seen = set()
 
         if print_help:
             self._print_help_to_terminal()
 
+    def _sensor_short_label(self):
+        return "shot+arc" if self.sensor_mode == "shot" else "rays+arc"
+
+    def _sensor_row_label(self):
+        return "Shot Line + Arc   (toggle)" if self.sensor_mode == "shot" else "Rays + Jump Arc   (toggle)"
+
+    def _sensor_status_label(self):
+        return "Shot Line + Arc" if self.sensor_mode == "shot" else "Rays + Jump Arc"
+
+    def _sensor_badge_label(self):
+        return "SHOT LINE + JUMP ARC  (F1)" if self.sensor_mode == "shot" else "RAYS + JUMP ARC  (F1)"
+
     # ─────────────────────────────────────────────────────────
     def _print_help_to_terminal(self):
-        print("\n" + "═"*40)
-        print("  PEAK ENGINE — DRL INSPECTOR")
-        print("═"*40)
-        print("  F1  Sensor rays   (toggle)")
-        print("  F2  Free camera   (IJKL to move)")
-        print("  F3  Slow motion   (0.5×)")
-        print("  F4  Hitboxes      (toggle)")
-        print("═"*40 + "\n")
+        # Lazy import — colour helpers live in menu.py which imports manager.py,
+        # so we define minimal equivalents inline to avoid circular imports.
+        def _c(code, t): return f"\033[{code}m{t}\033[0m"
+        dim  = lambda t: _c("2",  t)
+        bold = lambda t: _c("1",  t)
+        cyan = lambda t: _c("96", t)
+        red  = lambda t: _c("91", t)
+        yel  = lambda t: _c("93", t)
+        wht  = lambda t: _c("97", t)
+        grn  = lambda t: _c("92", t)
+
+        W = 44
+        print()
+        print(dim("    ╔" + "═" * W + "╗"))
+        print(dim("    ║") + red(f"  PEAK ENGINE  ·  DRL INSPECTOR".center(W)) + dim("║"))
+        print(dim("    ╠" + "═" * W + "╣"))
+
+        def row(key, desc, active=None):
+            k = yel(f"  {key:<4}")
+            d = wht(f"{desc}")
+            state = ""
+            if active is not None:
+                state = grn(" [ON]") if active else dim(" [off]")
+            inner = f"{k}  {d}{state}"
+            # pad to W chars (strip ANSI for length)
+            import re
+            visible = re.sub(r'\033\[[^m]*m', '', inner)
+            pad = " " * max(0, W - len(visible))
+            print(dim("    ║") + inner + pad + dim("║"))
+
+        row("F1", self._sensor_row_label())
+        row("F2", "Free camera       (IJKL to move)")
+        row("F3", "Slow motion       (0.5×)")
+        row("F4", "Hitboxes          (toggle)")
+        row("F5", "Agent Vision      (Max View toggle)")
+        row("Esc", "Max View off      (if open)")
+        print(dim("    ╚" + "═" * W + "╝"))
+        print()
 
     # ─────────────────────────────────────────────────────────
     def update_input(self):
@@ -77,21 +126,37 @@ class DebugManager:
         pygame.event.pump()
         keys = pygame.key.get_pressed()
 
+        def _c(code, t): return f"\033[{code}m{t}\033[0m"
+        dim = lambda t: _c("2",  t)
+        grn = lambda t: _c("92", t)
+        red = lambda t: _c("91", t)
+
         def rising(k):
             return keys[k] and not self._prev_keys[k]
 
         if rising(pygame.K_F1):
             self.show_sensors = not self.show_sensors
-            print(f"[Debug] Sensor Rays: {self.show_sensors}")
+            state = grn("ON") if self.show_sensors else dim("off")
+            print(f"  {dim('F1')}  {self._sensor_status_label()}  →  {state}")
         if rising(pygame.K_F2):
             self.free_cam_active = not self.free_cam_active
-            print(f"[Debug] Free Cam:    {self.free_cam_active}")
+            state = grn("ON") if self.free_cam_active else dim("off")
+            print(f"  {dim('F2')}  Free Camera      →  {state}")
         if rising(pygame.K_F3):
             self.slow_motion = not self.slow_motion
-            print(f"[Debug] Slow Motion: {self.slow_motion}")
+            state = grn("ON") if self.slow_motion else dim("off")
+            print(f"  {dim('F3')}  Slow Motion      →  {state}")
         if rising(pygame.K_F4):
             self.show_hitboxes = not self.show_hitboxes
-            print(f"[Debug] Hitboxes:    {self.show_hitboxes}")
+            state = grn("ON") if self.show_hitboxes else dim("off")
+            print(f"  {dim('F4')}  Hitboxes         →  {state}")
+        if rising(pygame.K_F5):
+            self.agent_view_overlay.max_view = not self.agent_view_overlay.max_view
+            state = grn("ON") if self.agent_view_overlay.max_view else dim("off")
+            print(f"  {dim('F5')}  Agent Max View   →  {state}")
+        if rising(pygame.K_ESCAPE) and self.agent_view_overlay.max_view:
+            self.agent_view_overlay.max_view = False
+            print(f"  {dim('Esc')} Agent Max View   →  {dim('closed')}")
 
         self.current_cam_move = [0.0, 0.0]
         if self.free_cam_active:
@@ -135,10 +200,11 @@ class DebugManager:
 
         # F-key hint chips (right-aligned in banner)
         toggles = [
-            ("F1", "rays",  self.show_sensors),
-            ("F2", "cam",   self.free_cam_active),
-            ("F3", "slow",  self.slow_motion),
-            ("F4", "hbox",  self.show_hitboxes),
+            ("F1", self._sensor_short_label(), self.show_sensors),
+            ("F2", "cam",      self.free_cam_active),
+            ("F3", "slow",     self.slow_motion),
+            ("F4", "hbox",     self.show_hitboxes),
+            ("F5", "max",      self.agent_view_overlay.max_view),
         ]
         hx = debug_x + panel_w - 6
         sf = self.small_font
@@ -156,15 +222,21 @@ class DebugManager:
         self._render_hud_strip(surface, core, debug_x, panel_w)
 
         # ── Game-area overlays ────────────────────────────────
-        self.grid_overlay.render(surface, core)
+        if self.show_grid:
+            self._safe_overlay("grid", self.grid_overlay.render, surface, core)
         if self.show_hitboxes:
-            self.hitbox_overlay.render(surface, core)
+            self._safe_overlay("hitboxes", self.hitbox_overlay.render, surface, core)
+
+        # ── Jump arc — toggled with F1 (shot+arc) ──────────────
+        if self.show_sensors:
+            self._safe_overlay("jump_arc", self.jump_arc_overlay.render, surface, core)
 
         # ── Panel overlays ────────────────────────────────────
-        self.agent_view_overlay.render(surface, core)
-        self.info_overlay.render(surface, core)
-        self.obs_values_overlay.render(surface, core)
-        self._render_reward_strip(surface, core, debug_x, panel_w)
+        self._safe_overlay("agent_view", self.agent_view_overlay.render, surface, core)
+        self._safe_overlay("info_panel", self.info_overlay.render, surface, core)
+        self._safe_overlay("obs_values", self.obs_values_overlay.render, surface, core)
+        # NOTE: arch_overlay not rendered — ARCH strip removed for more reward trace space
+        self._safe_overlay("reward_strip", self._render_reward_strip, surface, core, debug_x, panel_w)
 
         # ── Status badges (game area, top-centre) ─────────────
         by = 6
@@ -173,7 +245,20 @@ class DebugManager:
         if self.slow_motion:
             by = self._badge(surface, core, "SLOW MOTION",       (185, 110, 0), y=by) + 4
         if self.show_sensors:
-            self._badge(surface, core, "RAYS ON", (0, 145, 80), y=by)
+            self._badge(surface, core, self._sensor_badge_label(), (0, 145, 80), y=by)
+
+        # ── Max-view draws last so it covers everything ────────
+        # (AgentViewOverlay.render already dispatches; this badge confirms state)
+        if self.agent_view_overlay.max_view:
+            self._badge(surface, core, "AGENT MAX VIEW  (F5/Esc)", (30, 55, 150), y=6)
+
+    def _safe_overlay(self, name, fn, *args):
+        try:
+            fn(*args)
+        except Exception as exc:
+            if name not in self._overlay_errors_seen:
+                print(f"[Debug Overlay:{name}] {exc}")
+                self._overlay_errors_seen.add(name)
 
     # ─────────────────────────────────────────────────────────
     def _render_hud_strip(self, surface, core, debug_x, panel_w):
@@ -196,29 +281,40 @@ class DebugManager:
 
         sf = self.small_font
 
-        # Pull values from core
-        lives  = max(0, getattr(core, 'lives', 0))
-        score  = getattr(core, 'score', 0)
-        coins  = getattr(core, 'coins_total', 0)
-        timer  = int(getattr(core, 'timer', 0))
-        player = getattr(core, 'player', None)
-        if player:
-            status = "STAR" if player.invincible_timer > 0 else ("SUPER" if player.powered_up else "SMALL")
-        else:
-            status = "—"
+        items = None
+        item_fn = getattr(core, "get_debug_hud_strip_items", None)
+        if callable(item_fn):
+            try:
+                custom_items = item_fn()
+                if custom_items:
+                    items = list(custom_items)
+            except Exception:
+                items = None
 
-        # Warn colours
-        lives_col = _C_NEG if lives <= 1 else _C_VAL
-        time_col  = _C_NEG if timer < 60  else _C_VAL
+        if not items:
+            # Pull values from core
+            lives  = max(0, getattr(core, 'lives', 0))
+            score  = getattr(core, 'score', 0)
+            coins  = getattr(core, 'coins_total', 0)
+            timer  = int(getattr(core, 'timer', 0))
+            player = getattr(core, 'player', None)
+            if player:
+                status = "STAR" if player.invincible_timer > 0 else ("SUPER" if player.powered_up else "SMALL")
+            else:
+                status = "—"
 
-        # Build label/value pairs and space them evenly
-        items = [
-            ("LIVES",  str(lives),  lives_col),
-            ("SCORE",  str(score),  _C_VAL),
-            ("COINS",  str(coins),  (220, 190, 60)),
-            ("STATUS", status,      _C_ACT),
-            ("TIME",   str(timer),  time_col),
-        ]
+            # Warn colours
+            lives_col = _C_NEG if lives <= 1 else _C_VAL
+            time_col  = _C_NEG if timer < 60  else _C_VAL
+
+            # Build label/value pairs and space them evenly
+            items = [
+                ("LIVES",  str(lives),  lives_col),
+                ("SCORE",  str(score),  _C_VAL),
+                ("COINS",  str(coins),  (220, 190, 60)),
+                ("STATUS", status,      _C_ACT),
+                ("TIME",   str(timer),  time_col),
+            ]
 
         slot_w = pw // len(items)
 

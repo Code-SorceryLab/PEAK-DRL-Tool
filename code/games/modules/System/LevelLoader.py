@@ -7,7 +7,7 @@ from typing import List, Tuple, Dict, Any, Union
 from .EntityType import EntityType
 
 from ..Parameters.Map_parameters import (
-    TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
+    TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK, TILE_PIT,
     COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE, 
     COLOR_QBLOCK, TILE_SIZE
 )
@@ -16,6 +16,7 @@ from ..Objects.Spike import Spike
 from ..Objects.MovingPlatform import MovingPlatform
 from ..Objects.GameObject import GameObject
 from ..Objects.Enemy import Enemy
+from ..Objects.Koopa import Koopa        # ← add this
 from ..Objects.Coin import Coin
 from ..Objects.QuestionBlock import QuestionBlock
 from ..Objects.Mushroom import Mushroom
@@ -23,6 +24,9 @@ from ..Objects.LifeUp import LifeUp
 from ..Objects.StarPowerUp import StarPowerUp
 from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
+from ..Objects.Ladder import Ladder
+from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
+from ..Objects.Spring import Spring
 from .SpatialHash import SpatialHash
 
 @dataclass
@@ -44,6 +48,10 @@ class LevelData:
     qblocks:          List[QuestionBlock]      = field(default_factory=list)
     powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
+    ladders:          List[Ladder]             = field(default_factory=list)
+    slope_tiles:      List[SlopeTile]          = field(default_factory=list)
+    springs:          List[Spring]             = field(default_factory=list)
+    pits:             List[Any]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
@@ -58,7 +66,7 @@ class LevelLoader:
     Responsible for parsing level files (TXT and YAML) and creating the corresponding
     game objects, tiles, and initial state data.
     """
-    def __init__(self, base_dir=None):
+    def __init__(self, base_dir=None, tile_size=None):
         if base_dir is None:
             # Current file: .../games/modules/System/LevelLoader.py
             self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -66,6 +74,7 @@ class LevelLoader:
             self.base_dir = base_dir
         
         self.level_path = os.path.join(self.base_dir, "levels")
+        self.tile_size = tile_size or TILE_SIZE
         
         # --- DICTIONARY MAPPING FOR STATIC TILES ---
         # Char -> (TileType, Color, Solid, EntityType)
@@ -73,6 +82,7 @@ class LevelLoader:
         self.TILE_MAP = {
             '#': (TILE_GROUND,   COLOR_GROUND,   True,  EntityType.TILE),
             '=': (TILE_PLATFORM, COLOR_PLATFORM, True,  EntityType.TILE),
+            'D': (TILE_GOAL,     COLOR_GOAL,     False, EntityType.GOAL), # Boss Door
         }
 
         # QBlock char → what the block contains
@@ -84,6 +94,40 @@ class LevelLoader:
             'F': 'flower',
             'L': 'life',
         }
+
+    def resolve_level_path(self, raw_file: str) -> str:
+        """Resolve absolute, nested, and legacy flat level paths."""
+        if not raw_file:
+            return ""
+
+        normalized = os.path.normpath(raw_file)
+        basename = os.path.basename(normalized)
+        candidates = []
+
+        if os.path.isabs(normalized):
+            candidates.append(normalized)
+        else:
+            candidates.extend([
+                normalized,
+                os.path.join(self.base_dir, normalized),
+                os.path.join(self.level_path, normalized),
+                os.path.join(self.level_path, basename),
+            ])
+
+        seen = set()
+        for candidate in candidates:
+            probe = os.path.normpath(candidate)
+            if probe in seen:
+                continue
+            seen.add(probe)
+            if os.path.exists(probe):
+                return probe
+
+        if os.path.isabs(normalized):
+            return normalized
+        if normalized.startswith("levels" + os.sep) or normalized.startswith("levels/"):
+            return os.path.join(self.base_dir, normalized)
+        return os.path.join(self.level_path, normalized)
 
     def load_level(self, source: Union[Dict[str, Any], str]) -> LevelData:
         """
@@ -101,28 +145,37 @@ class LevelLoader:
         filename = ""
         config   = {}
 
+        # If config has tile_size, use it
+        if isinstance(source, dict) and 'tile_size' in source:
+            self.tile_size = source['tile_size']
+
         # 1. Determine input type
         if isinstance(source, dict):
             config   = source
             raw_file = config.get('file', '')
-            filename = os.path.basename(raw_file)
+            filename = raw_file
         elif isinstance(source, str):
             config = {}
             # Absolute or existing path → use directly; otherwise join with level_path
-            if os.path.isabs(source) or os.path.exists(source):
-                txt_path = source
-            else:
-                filename = os.path.basename(source)
-                txt_path = os.path.join(self.level_path, filename)
+            filename = source
+            txt_path = self.resolve_level_path(source)
 
         # 2. Build full path (dict source only — str source sets txt_path above)
         if isinstance(source, dict):
-            txt_path = os.path.join(self.level_path, filename)
+            if not filename:
+                print(f"[LevelLoader] Error: Level config has no 'file' entry — cannot load. Check game_config.yaml.")
+                return data
+            # If raw_file is an absolute path that exists, use it directly.
+            # This allows editor play-test injection without copying files.
+            txt_path = self.resolve_level_path(raw_file)
 
-        if os.path.exists(txt_path):
+        # Guard: never try to open a directory as a file
+        if os.path.isfile(txt_path):
             self._parse_ascii_map(txt_path, data)
+        elif os.path.isdir(txt_path):
+            print(f"[LevelLoader] Error: '{txt_path}' is a directory, not a level file. The level is missing a 'file:' entry in game_config.yaml.")
         else:
-            print(f"[LevelLoader] Warning: Level file {txt_path} not found.")
+            print(f"[LevelLoader] Warning: Level file '{txt_path}' not found.")
 
         # 3. Load sidecar YAML ([level_name].yaml next to the .txt)
         sidecar_path = txt_path.rsplit('.', 1)[0] + '.yaml'
@@ -173,8 +226,8 @@ class LevelLoader:
 
         data.rows = len(lines)
         data.cols = max(len(ln) for ln in lines) if data.rows else 0
-        data.width = data.cols * TILE_SIZE
-        data.height = data.rows * TILE_SIZE
+        data.width = data.cols * self.tile_size
+        data.height = data.rows * self.tile_size
         
         data.grid = [[TILE_AIR for _ in range(data.cols)] for _ in range(data.rows)]
         data.tiles = [[None for _ in range(data.cols)] for _ in range(data.rows)]
@@ -184,10 +237,14 @@ class LevelLoader:
             curr_row = lines[row]
             for col in range(len(curr_row)):
                 ascii_char = curr_row[col]
+
+                if ascii_char in ('.', ' '):
+                    data.grid[row][col] = TILE_AIR
+                    continue
                 
                 # 1. Handle Spikes with dedicated Spike class
                 if ascii_char == '^':
-                    spike = Spike.from_tile(col * TILE_SIZE, row * TILE_SIZE)
+                    spike = Spike.from_tile(col * self.tile_size, row * self.tile_size)
                     data.grid[row][col] = TILE_SPIKE
                     data.tiles[row][col] = spike
                     # Spikes go into static_hash only — PhysicsManager._resolve_player_world
@@ -196,11 +253,39 @@ class LevelLoader:
                     data.static_hash.insert(spike)
 
                 # 2. Handle other Static Tiles via Dictionary
+                elif ascii_char in SLOPE_CHAR_MAP:
+                    slope_type = SLOPE_CHAR_MAP[ascii_char]
+                    slope_tile = SlopeTile.create(col, row, slope_type, self.tile_size)
+                    slope_tile.gObj.type_id = EntityType.TILE
+                    data.grid[row][col] = slope_tile.type_id
+                    data.tiles[row][col] = slope_tile
+                    data.slope_tiles.append(slope_tile)
+                    data.static_hash.insert(slope_tile)
+
+                elif ascii_char == 'S':
+                    spring = Spring(
+                        gObj=GameObject(
+                            col * self.tile_size,
+                            row * self.tile_size + (self.tile_size // 2),
+                            self.tile_size,
+                            self.tile_size // 2,
+                            True,
+                        )
+                    )
+                    data.springs.append(spring)
+
+                # 3. Handle other Static Tiles via Dictionary
+                elif ascii_char == 'H':
+                    ladder = Ladder.from_tile(col * self.tile_size, row * self.tile_size, self.tile_size)
+                    data.grid[row][col] = TILE_AIR
+                    data.ladders.append(ladder)
+
+                # 4. Handle other Static Tiles via Dictionary
                 elif ascii_char in self.TILE_MAP:
                     t_type, color, solid, e_type = self.TILE_MAP[ascii_char]
                     
                     data.grid[row][col] = t_type
-                    new_tile = create_tile(t_type, col * TILE_SIZE, row * TILE_SIZE, solid, color)
+                    new_tile = create_tile(t_type, col * self.tile_size, row * self.tile_size, solid, color)
                     
                     # IMPORTANT: new_tile.type_id is the int constant (TILE_GROUND,
                     # TILE_PLATFORM etc.) set by create_tile — do NOT overwrite it.
@@ -215,31 +300,78 @@ class LevelLoader:
                     if solid:
                         data.static_hash.insert(new_tile)
 
-                # 3. Handle Complex Entities (QBlocks, Enemies, Start Pos)
+                # 5. Handle Complex Entities (QBlocks, Enemies, Start Pos)
                 elif ascii_char in self.QBLOCK_CONTAINS:
                     contains = self.QBLOCK_CONTAINS[ascii_char]
                     data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True), contains=contains)
+                    qb = QuestionBlock(gObj=GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), contains=contains)
                     qb.gObj.type_id = EntityType.QBLOCK
                     data.qblocks.append(qb)
                     data.static_hash.insert(qb)
 
                 elif ascii_char == 'C':
-                    c = Coin(gObj=GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 16, 16, True))
+                    c = Coin(gObj=GameObject(col * self.tile_size + self.tile_size//2, row * self.tile_size + self.tile_size//2, self.tile_size//2, self.tile_size//2, True))
                     c.gObj.type_id = EntityType.COIN
                     data.coins.append(c)
 
                 elif ascii_char == 'E':
-                    e = Enemy(GameObject(col * TILE_SIZE + 8, row * TILE_SIZE + 8, 25, 20, True), vx=-60.0)
+                    e = Enemy(GameObject(col * self.tile_size + 8, row * self.tile_size + 8, 25, 20, True), vx=-60.0)
                     e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "enemy"
                     data.enemies.append(e)
+
+                elif ascii_char == 'k':
+                    k = Koopa(gObj=GameObject(col * self.tile_size + 8, row * self.tile_size + 8, 22, 30, True))
+                    k.gObj.type_id = EntityType.ENEMY
+                    data.enemies.append(k)
+
+                elif ascii_char == 'K':
+                    k = Koopa(gObj=GameObject(col * self.tile_size + 8, row * self.tile_size + 8, 22, 30, True), flying=True)
+                    k.gObj.type_id = EntityType.ENEMY
+                    data.enemies.append(k)
                 
                 elif ascii_char == 'P':
-                    data.player_start = (float(col * TILE_SIZE), float(row * TILE_SIZE))
+                    data.player_start = (float(col * self.tile_size), float(row * self.tile_size))
 
-                elif ascii_char == 'G':
-                    g = Goal(gObj=GameObject(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, True))
+                elif ascii_char == 'G' or ascii_char == 'D':
+                    data.grid[row][col] = TILE_GOAL
+                    g = Goal(gObj=GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True))
                     data.goals.append(g)
+
+                elif ascii_char == 'M':
+                    # Met spawn (generic Enemy for now, MegaManCore will convert)
+                    e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
+                    e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "met"
+                    data.enemies.append(e)
+
+                elif ascii_char == 'B':
+                    # Bat spawn (generic Enemy for now, MegaManCore will convert)
+                    e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
+                    e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "bat"
+                    data.enemies.append(e)
+
+                elif ascii_char == 'X':
+                    # Boss spawn placeholder. MegaManCore upgrades this into the
+                    # real boss object during level load.
+                    e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
+                    e.gObj.type_id = EntityType.ENEMY
+                    e.spawn_tag = "boss"
+                    data.enemies.append(e)
+
+                elif ascii_char == 'O':
+                    # PIT: non-solid kill zone. Transparent in game, visible in editor.
+                    # Not inserted into static_hash (no collision blocking) — inserted
+                    # into hazard_hash by platformer_core.load_level() so the observation
+                    # hazard channel picks it up, and PhysicsManager triggers death on overlap.
+                    pit_obj = GameObject(
+                        float(col * self.tile_size), float(row * self.tile_size),
+                        self.tile_size, self.tile_size, False  # solid=False
+                    )
+                    pit_obj.type_id = EntityType.PIT
+                    data.grid[row][col] = TILE_PIT
+                    data.pits.append(pit_obj)
 
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """
@@ -281,8 +413,8 @@ class LevelLoader:
                 start  = mp_data.get('start',  [0, 0])
                 end    = mp_data.get('end',    [64, 0])
                 speed  = float(mp_data.get('speed',  80.0))
-                width  = int(mp_data.get('width',  TILE_SIZE * 3))
-                height = int(mp_data.get('height', TILE_SIZE // 2))
+                width  = int(mp_data.get('width',  self.tile_size * 3))
+                height = int(mp_data.get('height', self.tile_size // 2))
                 plat = MovingPlatform.from_points(
                     start=tuple(start),
                     end=tuple(end),

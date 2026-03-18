@@ -25,85 +25,148 @@ level_file = args.file  or os.environ.get('PEAK_PLAY_FILE',  None)
 if args.game == "mario":
     args.game = "platformer"
 
-# Enable manual play mode for mario/platformer
-if args.game == "platformer":
+# Enable manual play mode for platformer-like games
+if args.game in {"platformer", "megaman"}:
     os.environ["MARIO_MANUAL_PLAY"] = "1"
 
 # --- Load game core class dynamically
 game_mod = importlib.import_module(f"code.games.{args.game}_core")
 GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
 
-# try:
-#     game_mod = importlib.import_module(f"code.games.{args.game}_core")
-#     GameCls = getattr(game_mod, next(attr for attr in dir(game_mod) if attr.endswith("Core")))
-# except ImportError:
-#     print(f"Error: Could not load game module 'code.games.{args.game}_core'.")
-#     exit(1)
-
 # --- Init pygame BEFORE key handling
 pygame.init()
 clock = pygame.time.Clock()
 
-def _platformer_action(keys: pygame.key.ScancodeWrapper) -> int:
-        k = pygame.key.get_pressed()
-        
-        # STRICT CONTROL SCHEME:
-        # Player Movement: WASD + Space
-        # Debug Camera: Arrow Keys (handled internally by Core/DebugManager)
-        
-        # ARROW KEYS REMOVED from movement logic
-        left  = k[pygame.K_a]
-        right = k[pygame.K_d]
-        jump  = k[pygame.K_SPACE] or k[pygame.K_w]
-        run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+def _platformer_action(keys) -> list:
+    """
+    Return a MultiDiscrete action [move, jump, fire].
+      move : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      jump : 0=idle  1=jump
+      fire : 0=idle  1=fire   (Z key)
+    """
+    k = pygame.key.get_pressed()
 
-        # IMPORTANT: run is a modifier; by itself it does nothing
-        if right and run and jump: 
-            return 7  # Run+Right+Jump
-        if right and run:          
-            return 5  # Run+Right
-        if right and jump:         
-            return 4  # Right+Jump
-        if left  and jump:         
-            return 6  # Left+Jump
-        if jump:                   
-            return 3  # Jump only
-        if right:                  
-            return 2  # Right
-        if left:                   
-            return 1 # left
-        if left and run and jump:
-            return 7
-        if left and run:          
-            return 5  # Run+left
-        if left and jump:         
-            return 4  # left+Jump
-        return 0                   # Noop
+    left  = k[pygame.K_a]
+    right = k[pygame.K_d]
+    jump  = k[pygame.K_SPACE] or k[pygame.K_w]
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    fire  = k[pygame.K_z]
+
+    # Move axis
+    if left and right:
+        move = 0                        # cancel out
+    elif left:
+        move = 2 if run else 1          # sprint_left / left
+    elif right:
+        move = 4 if run else 3          # sprint_right / right
+    else:
+        move = 0
+
+    return [move, int(bool(jump)), int(bool(fire))]
+
+
+def _megaman_action(keys) -> list:
+    """
+    Return a MultiDiscrete action [move, climb, jump, fire].
+      move  : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      climb : 0=idle  1=up    2=down
+      jump  : 0=idle  1=jump
+      fire  : 0=idle  1=fire
+    """
+    k = pygame.key.get_pressed()
+
+    left  = k[pygame.K_a]
+    right = k[pygame.K_d]
+    up    = k[pygame.K_w] or k[pygame.K_UP]
+    down  = k[pygame.K_s] or k[pygame.K_DOWN]
+    jump  = k[pygame.K_SPACE]
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    fire  = k[pygame.K_z]
+
+    if left and right:
+        move = 0
+    elif left:
+        move = 2 if run else 1
+    elif right:
+        move = 4 if run else 3
+    else:
+        move = 0
+
+    if up and not down:
+        climb = 1
+    elif down and not up:
+        climb = 2
+    else:
+        climb = 0
+
+    return [move, climb, int(bool(jump)), int(bool(fire))]
+
+
+def _sonic_action(keys) -> list:
+    """
+    Return a Sonic action [move, jump, down].
+      move : 0=idle  1=left  2=sprint_left  3=right  4=sprint_right
+      jump : 0=idle  1=jump
+      down : 0=idle  1=down / spin dash
+    """
+    k = pygame.key.get_pressed()
+
+    left = k[pygame.K_a]
+    right = k[pygame.K_d]
+    jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
+    run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+    down = k[pygame.K_s] or k[pygame.K_DOWN]
+
+    if left and right:
+        move = 0
+    elif left:
+        move = 2 if run else 1
+    elif right:
+        move = 4 if run else 3
+    else:
+        move = 0
+
+    return [move, int(bool(jump)), int(bool(down))]
+
 
 ACTION_MAPPING = {
     "platformer": _platformer_action,
-    "mario": _platformer_action
+    "mario": _platformer_action,
+    "megaman": _megaman_action,
+    "sonic": _sonic_action,
 }
 
 CONTROL_DESCRIPTIONS = {
     "platformer": "\n[PLAYER] WASD to Move, SPACE to Jump, SHIFT to Run\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
+    "megaman": "\n[MEGA MAN] A / D to Move, W / S to Climb Ladders, SPACE to Jump, Z to Shoot\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
+    "sonic": "\n[SONIC] A / D to Move, SHIFT to Run, S / DOWN to Crouch or Spin Dash, SPACE to Jump\n[DEBUG]  ARROWS to Pan Camera (F5 to toggle Free Cam), ESC to Quit",
 }
 
 controls = CONTROL_DESCRIPTIONS.get(args.game, "Use game-specific keys. ESC = quit")
-print(f"\n=== MANUAL PLAY: {args.game} ===")
-print(f"{controls}")
-print("=================================")
 
-# --- Build env
+
+# --- Validate level_file early
+TEMP_ID = '__editor_test__'
+if level_file:
+    _fp = Path(level_file).resolve()
+    if not _fp.exists():
+        print(f"[Play] ERROR: level file not found: {level_file}")
+        level_file = None
+    else:
+        level_file = str(_fp)  # normalise to absolute string
+
+# --- Build env (let it load the default first level on __init__)
 env_kwargs = {}
 if level_id:
     env_kwargs['world'] = level_id
-    env_kwargs['lock_level'] = True   # stay on this level on every reset
+    env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
-if level_file:
-    env_kwargs['level_file'] = level_file
-    env_kwargs['lock_level'] = True   # always replay the same file
-    print(f"[Play] Loading level file: {level_file}")
+elif args.game == "megaman":
+    env_kwargs['curriculum_enabled'] = False
+elif args.game == "sonic":
+    env_kwargs['curriculum_enabled'] = False
+# NOTE: do NOT pass world='__editor_test__' here — it doesn't exist in config
+# yet so platformer_core.__init__ -> reset() would load an empty level.
 env = GameEnv(GameCls, render_mode="human", persona="simple", fps=args.fps, **env_kwargs)
 
 # Helper to find the actual game core instance through wrappers
@@ -129,44 +192,24 @@ if level_id and core_game and hasattr(core_game, 'world'):
         print(f"[Play] Forced level override: {level_id}")
 
 # ── Handle raw file path (unlisted level) ────────────────────────
+# Strategy: inject the entry directly into the live config_manager instance
+# (post-construction), then call load_level() to switch to the editor file.
+# LevelLoader supports absolute paths in the 'file' field, so no file copying.
 if level_file and core_game:
     fp = Path(level_file)
-    if not fp.exists():
-        print(f"[Play] ERROR: file not found: {level_file}")
-    else:
-        # Inject a synthetic config entry so the existing load pipeline works.
-        # The LevelLoader builds path as: levels_dir / basename, so we must
-        # ensure the file is accessible there — either it's already in levels/,
-        # or we inject the FULL path into yaml_data so loader can find it.
-        import shutil as _shutil
-        levels_dir = Path(core_game.loader.level_path)
-        dest = levels_dir / fp.name
-        if not dest.exists() or dest.resolve() != fp.resolve():
-            try:
-                _shutil.copy2(str(fp), str(dest))
-                print(f"[Play] Copied {fp.name} → {dest}")
-            except Exception as _e:
-                print(f"[Play] Could not copy file: {_e}")
-        # Register as '__editor_test__' in the config manager's in-memory dict
-        TEMP_ID = '__editor_test__'
-        if 'levels' not in core_game.config_manager.yaml_data:
-            core_game.config_manager.yaml_data['levels'] = {}
-        core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
-            'file': fp.name,
-            'time_limit': 300,
-        }
-        if TEMP_ID not in core_game.config_manager.get_level_order():
-            core_game.config_manager.yaml_data['levels'][TEMP_ID] = {
-                'file': fp.name, 'time_limit': 300
-            }
-        # Update level_order in-place if it is cached
-        if hasattr(core_game, 'level_order') and TEMP_ID not in core_game.level_order:
-            core_game.level_order.append(TEMP_ID)
-        core_game.world = TEMP_ID
-        core_game.locked_level = TEMP_ID
-        if hasattr(core_game, 'load_level'):
-            core_game.load_level()
-        print(f"[Play] Loaded file: {fp.name} as '{TEMP_ID}'")
+    cm = core_game.config_manager
+    if 'levels' not in cm.yaml_data:
+        cm.yaml_data['levels'] = {}
+    cm.yaml_data['levels'][TEMP_ID] = {
+        'file': str(fp),   # absolute path — LevelLoader handles this directly
+        'time_limit': 300,
+    }
+    if hasattr(core_game, 'level_order') and TEMP_ID not in core_game.level_order:
+        core_game.level_order.append(TEMP_ID)
+    core_game.world = TEMP_ID
+    core_game.locked_level = TEMP_ID
+    core_game.load_level()
+    print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
 obs, _ = env.reset()
 running = True
@@ -192,7 +235,7 @@ while running:
     if core_game and hasattr(core_game, 'debug_manager'):
         # If the user has enabled Free Cam (F5), force the player action to IDLE (0).
         if core_game.debug_manager.free_cam_active:
-            action = 0 
+            action = [0, 0, 0, 0] if args.game == "megaman" else [0, 0, 0]
 
     # Step the environment
     step_result = env.step(action)
@@ -218,4 +261,3 @@ while running:
 
 env.close()
 pygame.quit()
-print("Game session ended.\n")

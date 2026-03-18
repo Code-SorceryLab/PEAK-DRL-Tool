@@ -10,6 +10,11 @@ class Enemy():
     gObj: GameObject
     vx: float = -60.0  
     vy: float = 0.0
+    on_ground: bool = False
+    facing_right: bool = False
+    hp: int = 1
+    hp_max: int = 1
+    contact_damage: int = 1
     color = MapP.COLOR_ENEMY
     
     @property
@@ -25,6 +30,7 @@ class Enemy():
 
     def update(self, dt: float, context):
         if not self.gObj.active: return
+        self.facing_right = self.vx >= 0.0
         
         # Use context parameters for gravity
         grav = context.GRAVITY
