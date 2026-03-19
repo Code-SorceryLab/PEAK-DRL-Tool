@@ -1,6 +1,4 @@
 from ...action_map import ACTION_NAMES
-import csv
-import os
 
 class LevelStatsObserver:
     def __init__(self, levelName):
@@ -81,9 +79,7 @@ class LevelStatsObserver:
         else:
             return self.sum_vx / self.count_vx
 
-    def write_to_csv(self, filename):
-        file_exists = os.path.isfile(filename)
-
+    def to_dict(self):
         row = {
             "level": self.levelName,
             "jumps": self.jumps,
@@ -94,18 +90,11 @@ class LevelStatsObserver:
             "cause_of_death": self.deathCause
         }
 
-        for action_id, count in self.actions.items():
-            row[f"action_{ACTION_NAMES[action_id]}"] = count
+        for action_id in ACTION_NAMES:
+            row[f"action_{ACTION_NAMES[action_id]}"] = self.actions.get(action_id, 0)
 
-        with open(filename, "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=row.keys())
+        return row
 
-            # Write header only if file doesn't exist yet
-            if not file_exists:
-                writer.writeheader()
-
-            writer.writerow(row)
-        
     def reset(self):
         exclude = {"deaths"}  # keep elapsed time
         for attr, value in self.__dict__.items():
