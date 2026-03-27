@@ -4,7 +4,6 @@ import time
 import csv
 import os
 
-
 class stats_observer:
     def __init__(self, config_path, csv_path="stats.csv"):
         self.currentAttempt = None
@@ -36,7 +35,7 @@ class stats_observer:
             return
 
         row = self.currentAttempt.to_dict()
-        row["elapsed_time"] = self.get_elapsed_time()
+        row["elapsed_time"] = round(self.get_elapsed_time(),2)
 
         file_exists = os.path.exists(self.csv_path)
 

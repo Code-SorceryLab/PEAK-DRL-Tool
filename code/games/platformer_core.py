@@ -601,7 +601,6 @@ class PlatformerCore(gymnasium.Env):
         stats_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../stats/platformer_stats.yaml"))
         self.stats_observer = stats_observer(stats_config_path)
         self.stats_observer.reset(self.world)
-
         self.reset()
 
     def reset_metrics(self):

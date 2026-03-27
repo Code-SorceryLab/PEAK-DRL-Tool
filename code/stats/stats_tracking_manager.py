@@ -8,13 +8,12 @@ def load_tracking_config(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+
 def make_tracker_wrapper(func, recorder_name, tracked_arg_names, stats_observer):
     sig = inspect.signature(func)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
-
         bound = sig.bind(*args, **kwargs)
         bound.apply_defaults()
 
@@ -30,9 +29,12 @@ def make_tracker_wrapper(func, recorder_name, tracked_arg_names, stats_observer)
             recorder_kwargs[arg_name] = arguments[arg_name]
 
         stats_observer.dispatch_record(recorder_name, **recorder_kwargs)
+
+        result = func(*args, **kwargs)
         return result
 
     return wrapper
+
 
 def apply_tracking_from_config(config, stats_observer):
     for entry in config.get("tracks", []):
@@ -62,3 +64,4 @@ def apply_tracking_from_config(config, stats_observer):
         )
 
         setattr(cls, method_name, wrapped_method)
+        
