@@ -267,16 +267,16 @@ class Player():
                        (self.vx < 0 and self.input_dir > 0)
 
             if self.on_ground and skidding:
-                self.vx += self.input_dir * ctx.SKID_DECEL * dt
+                self.set_horizontal_velocity(self.vx + self.input_dir * ctx.SKID_DECEL * dt)
             else:
                 if self.input_dir > 0:
-                    self.vx = min(self.vx + accel_rate * dt,  target_max)
+                    self.set_horizontal_velocity(min(self.vx + accel_rate * dt,  target_max))
                 else:
-                    self.vx = max(self.vx - accel_rate * dt, -target_max)
+                    self.set_horizontal_velocity(max(self.vx - accel_rate * dt, -target_max))
         else:
             friction = (ctx.GROUND_FRICTION if self.on_ground else ctx.AIR_FRICTION) * dt
-            if self.vx > 0:   self.vx = max(0.0, self.vx - friction)
-            elif self.vx < 0: self.vx = min(0.0, self.vx + friction)
+            if self.vx > 0:   self.set_horizontal_velocity(max(0.0, self.vx - friction))
+            elif self.vx < 0: self.set_horizontal_velocity(min(0.0, self.vx + friction))
 
         self.handle_jump(dt, ctx)
 
@@ -399,3 +399,6 @@ class Player():
             1.0 if self.coyote > 0   else 0.0,                 # [11] coyote_active
             1.0 if self.jump_hold > 0 else 0.0,               # [12] jump_extendable
         ], dtype=np.float32)
+
+    def set_horizontal_velocity(self, vx):
+        self.vx = vx

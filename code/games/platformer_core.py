@@ -42,6 +42,8 @@ from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATF
     COLOR_POWERUP_MUSH, COLOR_POWERUP_STAR, COLOR_COIN, COLOR_HITBOX,
     COLOR_SENSOR, COLOR_AGENT_PANEL, COLOR_STREAK, TILE_SIZE)
 
+from ..stats.stats_observer import stats_observer
+
 # =============================================================================
 # Dijkstra Pathfinding Helper (Global Distance Map)
 # =============================================================================
@@ -596,6 +598,10 @@ class PlatformerCore(gymnasium.Env):
         self._hazard_window_cache   = None   # set by _grid_obs_window each step
         self._jump_arc_cache        = None   # set by _obs each step
 
+        stats_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../stats/platformer_stats.yaml"))
+        self.stats_observer = stats_observer(stats_config_path)
+        self.stats_observer.reset(self.world)
+
         self.reset()
 
     def reset_metrics(self):
@@ -715,7 +721,7 @@ class PlatformerCore(gymnasium.Env):
             if not self.debug_manager.free_cam_active:
                 self.player.handle_input(a=action)
             else:
-                self.player.vx = 0; self.player.jump_hold = 0
+                self.player.set_horizontal_velocity(0); self.player.jump_hold = 0
 
             # --- Fire Flower projectile spawn ---
             if self.player.fire_requested:
@@ -984,6 +990,7 @@ class PlatformerCore(gymnasium.Env):
             next_idx = (self.current_index_world + 1) % len(self.level_order)
         self._pending_next_level_index = next_idx
         self._needs_level_transition = True
+        self.stats_observer.reset(self.world)
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
         """
@@ -992,6 +999,7 @@ class PlatformerCore(gymnasium.Env):
         """
         self.death_cause = cause
         self.lives = max(0, self.lives - 1)
+        self.stats_observer.reset(self.world)
         if self.lives > 0:
             self._soft_reset()
             return False

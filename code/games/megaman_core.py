@@ -1399,7 +1399,7 @@ class MegamanCore(gymnasium.Env):
 
         if p.on_ladder:
             p.gObj.x = p.ladder_x
-            p.vx = 0.0
+            p.set_horizontal_velocity(0.0)
             if climb_up:
                 p.vy = -self.climb_speed
             elif climb_down:
@@ -1432,14 +1432,14 @@ class MegamanCore(gymnasium.Env):
 
         if target_vx != 0.0:
             if p.vx < target_vx:
-                p.vx = min(target_vx, p.vx + self.accel * self.dt)
+                p.set_horizontal_velocity(min(target_vx, p.vx + self.accel * self.dt))
             elif p.vx > target_vx:
-                p.vx = max(target_vx, p.vx - self.accel * self.dt)
+                p.set_horizontal_velocity(max(target_vx, p.vx - self.accel * self.dt))
         else:
             if p.vx > 0:
-                p.vx = max(0.0, p.vx - self.friction * self.dt)
+                p.set_horizontal_velocity(max(0.0, p.vx - self.friction * self.dt))
             elif p.vx < 0:
-                p.vx = min(0.0, p.vx + self.friction * self.dt)
+                p.set_horizontal_velocity(min(0.0, p.vx + self.friction * self.dt))
 
         if jump and p.on_ground:
             p.vy = self.jump_velocity
