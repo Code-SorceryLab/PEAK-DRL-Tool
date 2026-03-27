@@ -2,3 +2,19 @@ tracks:
   - target: code.games.modules.Objects.Player.Player.set_horizontal_velocity
     recorder: record_horizontal_velocity
     args: [vx]
+  
+  - target: code.games.platformer_core.PlatformerCore._handle_death
+    recorder: record_death
+    args: [cause]
+
+  - target: code.games.modules.Objects.Player.Player.start_jump
+    recorder: record_jump
+    arg: []
+
+  - target: code.games.modules.System.PhysicsManager.PhysicsManager._handle_player_kill_enemy
+    recorder: record_enemies_killed
+    arg: []
+
+  - target: code.games.modules.System.PhysicsManager.PhysicsManager._collect_coin
+    recorder: record_coins_collected
+    arg: []

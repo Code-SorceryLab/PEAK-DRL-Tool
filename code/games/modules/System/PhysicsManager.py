@@ -728,19 +728,13 @@ class PhysicsManager:
 
         # 1. Stomp -- falling and feet above enemy midpoint
         if player_was_falling and player_bottom < enemy_center + 10:
-            enemy.gObj.active = False
             player.vy = JUMP_VEL_MIN * 0.6   # bounce
-            core.score += 100
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            self._handle_player_kill_enemy(core, enemy)
             return
 
         # 2. Star -- kill enemy without taking damage
         if player.power_machine.is_star_active:
-            enemy.gObj.active = False
-            core.score += 100
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            self._handle_player_kill_enemy(core, enemy)
             return
 
         # 3. Take a hit through the state machine
@@ -748,16 +742,24 @@ class PhysicsManager:
         if not survived:
             core._handle_death("Enemy")
 
+    def _handle_player_kill_enemy(self, core, enemy):
+        enemy.gObj.active = False
+        core.score += 100     
+        if hasattr(core, 'kills_step'): core.kills_step += 1
+
     def _handle_player_coin(self, core, player, coin):
         """
         Collects coin, increments score and coin counters.
         """
         if not coin.collected:
-            coin.gObj.active = False
-            coin.collected = True
-            core.score += 10
-            core.coins_step += 1
-            core.coins_total += 1
+            self._collect_coin(core, coin)
+
+    def _collect_coin(self, core, coin):
+        coin.gObj.active = False
+        coin.collected = True
+        core.score += 10
+        core.coins_step += 1
+        core.coins_total += 1
 
     def _handle_projectile_enemy(self, core, proj, enemy):
         """
@@ -766,11 +768,8 @@ class PhysicsManager:
         - Enemy is killed (active = False) and awards 100pts + kills_step counter.
         - Projectile is deactivated so it cannot hit a second enemy the same frame.
         """
-        enemy.gObj.active = False
         proj.gObj.active  = False
-        core.score += 100
-        if hasattr(core, 'kills_step'):
-            core.kills_step += 1
+        self._handle_player_kill_enemy(core,enemy)
 
     def _handle_player_powerup(self, core, player, powerup):
         """

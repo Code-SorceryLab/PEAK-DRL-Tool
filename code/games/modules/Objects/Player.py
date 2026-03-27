@@ -288,19 +288,22 @@ class Player():
         if self.jump_buffer > 0: self.jump_buffer -= 1
 
         if self.coyote > 0 and self.jump_hold == 0 and self.jump_buffer > 0:
-            base  = ctx.JUMP_VEL_MIN
-            bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
-            self.vy        = base - bonus
-            self.on_ground = False
-            self.coyote    = 0
-            self.jump_hold = ctx.JUMP_HOLD_FRAMES
-            self.jump_buffer = 0
+            self.start_jump(ctx)
 
         if self.jump_hold > 0:
             if self.jump_pressed:
                 # Variable jump height — hold for high, tap for short
                 self.vy -= ctx.GRAVITY * 0.12 * dt
             self.jump_hold -= 1
+
+    def start_jump(self, ctx: PhysicsContext):
+        base = ctx.JUMP_VEL_MIN
+        bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
+        self.vy = base - bonus 
+        self.on_ground = False
+        self.coyote = 0
+        self.jump_hold = ctx.JUMP_HOLD_FRAMES
+        self.jump_buffer = 0
 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
         sprite = None
