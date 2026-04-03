@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import logging
 from functools import wraps
 import yaml
 
@@ -14,21 +15,26 @@ def make_tracker_wrapper(func, recorder_name, tracked_arg_names, stats_observer)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        bound = sig.bind(*args, **kwargs)
-        bound.apply_defaults()
+        try:
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
 
-        arguments = dict(bound.arguments)
-        arguments.pop("self", None)
+            arguments = dict(bound.arguments)
+            arguments.pop("self", None)
 
-        recorder_kwargs = {}
-        for arg_name in tracked_arg_names:
-            if arg_name not in arguments:
-                raise KeyError(
-                    f"Argument '{arg_name}' not found in function '{func.__qualname__}'"
-                )
-            recorder_kwargs[arg_name] = arguments[arg_name]
+            recorder_kwargs = {}
+            for arg_name in tracked_arg_names:
+                if arg_name not in arguments:
+                    raise KeyError(arg_name)
+                recorder_kwargs[arg_name] = arguments[arg_name]
 
-        stats_observer.dispatch_record(recorder_name, **recorder_kwargs)
+            stats_observer.dispatch_record(recorder_name, **recorder_kwargs)
+        except Exception:
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                func.__qualname__,
+                tracked_arg_names,
+            )
 
         return func(*args, **kwargs)
 
@@ -40,20 +46,36 @@ def make_reset_wrapper(func, stats_observer):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        bound = sig.bind(*args, **kwargs)
-        bound.apply_defaults()
+        try:
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
 
-        arguments = dict(bound.arguments)
-        self_obj = arguments.get("self")
+            arguments = dict(bound.arguments)
+            self_obj = arguments.get("self")
+        except Exception:
+            self_obj = None
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                func.__qualname__,
+                ["world"],
+            )
 
         result = func(*args, **kwargs)
 
-        world = getattr(self_obj, "world", None)
-        stats_observer.reset(world)
+        try:
+            world = getattr(self_obj, "world", None)
+            stats_observer.reset(world)
+        except Exception:
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                func.__qualname__,
+                ["world"],
+            )
 
         return result
 
     return wrapper
+
 
 def apply_wrapper_to_target(target, wrapper_factory, *factory_args):
     parts = target.split(".")
@@ -76,24 +98,37 @@ def apply_wrapper_to_target(target, wrapper_factory, *factory_args):
 
 def apply_tracking_from_config(config, stats_observer):
     for entry in config.get("tracks", []):
-        target = entry["target"]
-        recorder_name = entry["recorder"]
-        tracked_arg_names = entry.get("args", [])
+        try:
+            target = entry["target"]
+            recorder_name = entry["recorder"]
+            tracked_arg_names = entry.get("args", [])
 
-        apply_wrapper_to_target(
-            target,
-            make_tracker_wrapper,
-            recorder_name,
-            tracked_arg_names,
-            stats_observer,
-        )
+            apply_wrapper_to_target(
+                target,
+                make_tracker_wrapper,
+                recorder_name,
+                tracked_arg_names,
+                stats_observer,
+            )
+        except Exception:
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                entry.get("target", "<unknown>"),
+                entry.get("args", []),
+            )
 
     for entry in config.get("resets", []):
-        target = entry["target"]
-        reset_arg_names = entry.get("args", [])
+        try:
+            target = entry["target"]
 
-        apply_wrapper_to_target(
-            target,
-            make_reset_wrapper,
-            stats_observer,
-        )
+            apply_wrapper_to_target(
+                target,
+                make_reset_wrapper,
+                stats_observer,
+            )
+        except Exception:
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                entry.get("target", "<unknown>"),
+                entry.get("args", []),
+            )

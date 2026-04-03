@@ -3,6 +3,7 @@ from .stats_tracking_manager import load_tracking_config, apply_tracking_from_co
 import time
 import csv
 import os
+import logging
 
 class stats_observer:
     def __init__(self, config_path, csv_path="stats.csv"):
@@ -19,13 +20,18 @@ class stats_observer:
         if self.currentAttempt is None:
             return
 
-        recorder = getattr(self.currentAttempt, recorder_name, None)
-        if recorder is None:
-            raise AttributeError(
-                f"{type(self.currentAttempt).__name__} has no method '{recorder_name}'"
-            )
+        try:
+            recorder = getattr(self.currentAttempt, recorder_name, None)
+            if recorder is None:
+                raise AttributeError(recorder_name)
 
-        recorder(**data)
+            recorder(**data)
+        except Exception:
+            logging.warning(
+                "Stats Observer Cannot Find Function %s with arguments %s",
+                recorder_name,
+                list(data.keys()),
+            )
 
     def get_elapsed_time(self):
         return time.time() - self.last_reset_time
