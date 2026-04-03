@@ -989,7 +989,6 @@ class PlatformerCore(gymnasium.Env):
             next_idx = (self.current_index_world + 1) % len(self.level_order)
         self._pending_next_level_index = next_idx
         self._needs_level_transition = True
-        self.stats_observer.reset(self.world)
 
     def _handle_death(self, cause: str = "Unknown") -> bool:
         """
@@ -998,7 +997,6 @@ class PlatformerCore(gymnasium.Env):
         """
         self.death_cause = cause
         self.lives = max(0, self.lives - 1)
-        self.stats_observer.reset(self.world)
         if self.lives > 0:
             self._soft_reset()
             return False
@@ -1006,6 +1004,8 @@ class PlatformerCore(gymnasium.Env):
             self.alive     = False
             self.game_over = True
             return True
+
+
 
     def _soft_reset(self):
         """Reloads the current level after a death, preserving lives and score."""
