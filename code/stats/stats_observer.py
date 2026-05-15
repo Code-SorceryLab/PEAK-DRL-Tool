@@ -6,13 +6,28 @@ import logging
 import importlib
 
 class stats_observer:
-    def __init__(self, config_path, csv_path="stats.csv"):
+    def __init__(self, config_path, csv_dir="code/stats/results", player = "player", game = "game"):
         self.currentAttempt = None
         self.last_reset_time = time.time()
-        self.csv_path = csv_path
+        self.csv_path = self._get_next_csv_path(csv_dir)
         self.stats_class = None
         self._setup_tracking(config_path)
+        self.player = player
+        self.game = game
 
+    def _get_next_csv_path(self, csv_dir):
+        os.makedirs(csv_dir, exist_ok=True)
+
+        base_name = "stats"
+        extension = ".csv"
+
+        counter = 1
+        while True:
+            csv_path = os.path.join(csv_dir, f"{base_name}{counter}{extension}")
+            if not os.path.exists(csv_path):
+                return csv_path
+            counter += 1
+    
     def _resolve_stats_class(self, stats_class_path):
         try:
             parts = stats_class_path.split(".")
@@ -66,8 +81,14 @@ class stats_observer:
             return
 
         try:
-            row = self.currentAttempt.to_dict()
-            row["elapsed_time"] = round(self.get_elapsed_time(), 2)
+            stats_row = self.currentAttempt.to_dict()
+
+            row = {
+                "player": self.player,
+                "game": self.game,
+                **stats_row,
+                "elapsed_time": round(self.get_elapsed_time(), 2),
+            }
 
             file_exists = os.path.exists(self.csv_path)
 
@@ -78,6 +99,7 @@ class stats_observer:
                     writer.writeheader()
 
                 writer.writerow(row)
+
         except Exception:
             logging.warning(
                 "Stats Observer Cannot Find Function %s with arguments %s",
@@ -85,7 +107,7 @@ class stats_observer:
                 ["to_dict"],
             )
 
-    def reset(self, world):
+    def reset(self, world, goal_pos):
         self._write_current_attempt_to_csv()
 
         if self.stats_class is None:
@@ -97,7 +119,7 @@ class stats_observer:
             self.currentAttempt = None
         else:
             try:
-                self.currentAttempt = self.stats_class(world)
+                self.currentAttempt = self.stats_class(world, goal_pos)
             except Exception:
                 logging.warning(
                     "Stats Observer Cannot Find Function %s with arguments %s",

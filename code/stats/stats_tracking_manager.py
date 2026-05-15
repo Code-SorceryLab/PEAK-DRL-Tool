@@ -64,7 +64,8 @@ def make_reset_wrapper(func, stats_observer):
 
         try:
             world = getattr(self_obj, "world", None)
-            stats_observer.reset(world)
+            goal_pos = getattr(self_obj, "level_data", None).goals[0].gObj.x
+            stats_observer.reset(world, goal_pos)
         except Exception:
             logging.warning(
                 "Stats Observer Cannot Find Function %s with arguments %s",

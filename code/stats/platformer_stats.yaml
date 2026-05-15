@@ -21,6 +21,10 @@ tracks:
     recorder: record_coins_collected
     args: []
 
+  - target: code.games.platformer_core.PlatformerCore._set_max_x_seen
+    recorder: record_max_x_seen
+    args: [value]
+
 resets:
   - target: code.games.platformer_core.PlatformerCore.complete_level
   - target: code.games.platformer_core.PlatformerCore._handle_death

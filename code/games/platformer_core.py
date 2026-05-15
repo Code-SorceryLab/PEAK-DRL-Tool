@@ -599,9 +599,10 @@ class PlatformerCore(gymnasium.Env):
         self._jump_arc_cache        = None   # set by _obs each step
 
         stats_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../stats/platformer_stats.yaml"))
-        self.stats_observer = stats_observer(stats_config_path)
-        self.stats_observer.reset(self.world)
+        self.stats_observer = stats_observer(stats_config_path, game = "Mario")
+
         self.reset()
+        self.stats_observer.reset(self.world, self.level_data.goals[0].gObj.x)
 
     def reset_metrics(self):
         """Helper to clear metrics on reset/death."""
@@ -1059,7 +1060,7 @@ class PlatformerCore(gymnasium.Env):
         if not self.player: return
 
         if self.player.gObj.x > self.max_x_seen:
-            self.max_x_seen = self.player.gObj.x
+            self._set_max_x_seen(self.player.gObj.x)
 
         # FIX: If riding a moving platform, reset stall timer — the player
         # IS making progress, just not under their own velocity. Without this,
@@ -1083,6 +1084,9 @@ class PlatformerCore(gymnasium.Env):
                 self.stalled_this_frame = True
                 self.stall_timer = 0
                 self.stall_windows_count += 1
+
+    def _set_max_x_seen(self, value):
+        self.max_x_seen = value
 
     def _check_termination(self) -> bool:
         """
