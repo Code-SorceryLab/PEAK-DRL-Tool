@@ -1,18 +1,16 @@
-game: code.stats.MarioStats.MarioStats
+path: code/stats/results/
 
 metrics:
   B1_fairness:
+    personas: simple_novice, simple_expert
     thresholds:
       target_gap_min: 0.15
       target_gap_max: 0.40
       warning_gap_low: 0.05
       warning_gap_high: 0.55
       novice_min_win_rate: 0.03
-      expert_max_win_rate: 0.60
 
   B2_challenge_success:
     thresholds:
-      target_best_progress_min: 1.0
-      target_worst_progress_min: 0.20
-      warning_average_progress_low: 0.4
-      warning_average_progress_high: 0.8
+      balanced_min: 0.60
+      warning_min: 0.35
