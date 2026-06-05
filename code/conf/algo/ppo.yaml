@@ -3,8 +3,8 @@ name: ppo
 policy: MultiInputPolicy
 
 n_steps: 2048          # was 4096 — faster update cycle, better for noisy rewards
-batch_size: 256        # was 512 — scale down with n_steps
-n_epochs: 8            # was 6 — slightly more passes since batches are smaller
+batch_size: 512        # was 256 — bigger batches use CPU vector units better
+n_epochs: 4            # was 8 — fewer SGD passes; profile showed train_s ≈ 72% of wall time
 learning_rate: 0.0003  # keep for now, add schedule after reward fix
 gae_lambda: 0.95
 gamma: 0.99

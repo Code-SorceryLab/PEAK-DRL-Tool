@@ -1,5 +1,6 @@
 import os
 from code.callbacks.logging_callback import CsvLoggerCallback
+from code.callbacks.profiling_callback import ProfilingCallback, EvalTimerCallback
 
 try:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -78,6 +79,51 @@ def _pretty_steps(n: int) -> str:
     if n >= 1_000_000:
         return f"{n // 1_000_000}M"
     return f"{n // 1_000}k"
+
+
+def _resolve_device(spec, *, verbose: bool = True) -> str:
+    """Resolve a device spec string to a concrete torch device.
+
+    Accepts: "auto", "cpu", "cuda", "mps".  Anything else (incl. None)
+    falls back to "cpu" with a warning.
+
+    When the resolved device is "mps", sets PYTORCH_ENABLE_MPS_FALLBACK=1
+    so ops without MPS kernels fall back to CPU instead of crashing.
+    """
+    spec_l = str(spec or "").strip().lower() or "cpu"
+    cuda_ok = torch.cuda.is_available()
+    mps_ok = (
+        hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+        and torch.backends.mps.is_built()
+    )
+
+    if spec_l == "auto":
+        if cuda_ok:
+            resolved, why = "cuda", "CUDA detected"
+        elif mps_ok:
+            resolved, why = "mps", "Apple Silicon detected"
+        else:
+            resolved, why = "cpu", "no GPU detected"
+    elif spec_l == "cuda":
+        resolved, why = ("cuda", "") if cuda_ok else ("cpu", "CUDA not available")
+    elif spec_l == "mps":
+        resolved, why = ("mps", "Apple Silicon detected") if mps_ok else ("cpu", "MPS not available")
+    elif spec_l == "cpu":
+        resolved, why = "cpu", ""
+    else:
+        resolved, why = "cpu", f"unknown device spec '{spec}'"
+
+    if resolved == "mps":
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        suffix = f" ({why}, MPS fallback enabled)" if why else " (MPS fallback enabled)"
+    else:
+        suffix = f" ({why})" if why else ""
+
+    if verbose:
+        print(f"[INFO] Device requested: '{spec}' → resolved: '{resolved}'{suffix}")
+
+    return resolved
 
 
 ARCH_ALIASES = {
@@ -858,11 +904,11 @@ def main(cfg: DictConfig):
     models_dir = repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    device = cfg.get("device", "cpu")
-    if device == "cuda" and not torch.cuda.is_available():
-        print("[WARNING] CUDA not available, falling back to CPU.")
-        device = "cpu"
-    print(f"[INFO] Training device: {device}")
+    device = _resolve_device(cfg.get("device", "auto"))
+
+    profile_enabled = bool(cfg.get("profile", False))
+    if profile_enabled:
+        print("[INFO] Profiling ON — per-rollout breakdown will be written to profiling_log.csv")
 
     tb_root   = str(cfg.get("tb_root", "runs"))
     eval_freq = int(cfg.get("eval_freq", 20_000))
@@ -1154,7 +1200,18 @@ def main(cfg: DictConfig):
                 if viz_enabled:
                     print("[INFO] Preview ON — window opens on each new best.")
 
-                current_callbacks = [eval_cb, ckpt_cb, csv_logger]
+                if profile_enabled:
+                    # Profile CSV + TB go alongside the existing CSV logger output.
+                    profiler = ProfilingCallback(
+                        log_dir=str(csv_dir / run_id),
+                        device=device,
+                        verbose=1,
+                    )
+                    # Wrap eval_cb so its wall time is reported back to profiler.
+                    eval_cb_for_run = EvalTimerCallback(inner_cb=eval_cb, profiler=profiler)
+                    current_callbacks = [eval_cb_for_run, ckpt_cb, csv_logger, profiler]
+                else:
+                    current_callbacks = [eval_cb, ckpt_cb, csv_logger]
 
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir
@@ -1163,12 +1220,23 @@ def main(cfg: DictConfig):
                 model = Algo(policy, env, **train_kwargs)
                 tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
 
+                if bool(cfg.get("compile", False)):
+                    try:
+                        model.policy = torch.compile(model.policy)
+                        print("[INFO] torch.compile enabled on policy (first rollout will warm up)")
+                    except Exception as exc:
+                        print(f"[WARN] torch.compile failed, continuing uncompiled: {type(exc).__name__}: {exc}")
+
                 model.learn(
                     total_timesteps=int(total_timesteps),
                     callback=current_callbacks,
                     tb_log_name=tb_run_name,
                     progress_bar=True,
                 )
+
+                # Unwrap compiled policy before save so checkpoints load on any torch version.
+                if hasattr(model.policy, "_orig_mod"):
+                    model.policy = model.policy._orig_mod
 
                 filename = f"{run_id}.zip"
                 save_path = models_dir / filename

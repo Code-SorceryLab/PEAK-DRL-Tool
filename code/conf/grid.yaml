@@ -33,8 +33,10 @@ tb_root: mylogs     # folder where TensorBoard logs go (tensorboard --logdir run
 eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
-device: cpu      # cuda or cpu
-n_envs: 2 # 1 for cpu or 16 gpu , or whatever you want
+device: cpu      # auto | cpu | cuda | mps  (cpu is fastest on this Mac; mps crashes SpatialAttention)
+n_envs: 6         # 1 for cpu, 16 for gpu, etc.
+profile: true    # true → enable ProfilingCallback (TB scalars + profiling_log.csv)
+compile: false   # true → torch.compile(model.policy) (warm-up cost first rollout; 20-40% train speedup after)
 
 
 # null values mean "no override"
