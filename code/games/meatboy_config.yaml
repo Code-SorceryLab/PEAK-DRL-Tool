@@ -1,0 +1,44 @@
+# Super Meat Boy character — modular ability loadout + level list.
+# Registration order matters: WallSlide -> WallJump -> Move -> Jump.
+tile_size: 32
+player:
+  width: 18
+  height: 26
+physics:
+  gravity: 2600.0
+  fast_fall_grav: 2600.0
+  max_fall_speed: 1200.0
+abilities:
+  - type: WallSlide
+    name: wallslide
+    start_active: true
+    slide_max_speed: 140.0
+  - type: WallJump
+    name: walljump
+    start_active: true
+    wall_jump_vy: 720.0
+    wall_jump_push: 320.0
+    control_lockout_frames: 3
+  - type: Move
+    name: move
+    start_active: true
+    walk_accel: 1800.0
+    run_accel: 2600.0
+    max_walk_speed: 170.0
+    max_run_speed: 360.0
+    air_control: 1.0
+    ground_friction: 2400.0
+    air_friction: 240.0
+    skid_decel: 4200.0
+  - type: Jump
+    name: jump
+    start_active: true
+    jump_vel: 760.0
+    cut_vel: 220.0
+    coyote_frames: 6
+    buffer_frames: 6
+    max_jumps: 1
+levels:
+  - meatboy/wall_shaft.txt
+max_steps: 4000
+time_limit_seconds: 60
