@@ -34,9 +34,19 @@ class Move(Ability):
             if state.on_ground and skidding:
                 state.vx += it.move_x * p.get("skid_decel", accel * 2.0) * dt
             elif it.move_x > 0:
-                state.vx = min(state.vx + accel * dt, target_max)
+                if state.vx <= target_max:
+                    state.vx = min(state.vx + accel * dt, target_max)
+                else:
+                    # Above the cap (wall-jump boost): bleed off with friction
+                    # instead of clamping, so the launch momentum is usable.
+                    fr = (p["ground_friction"] if state.on_ground else p["air_friction"]) * dt
+                    state.vx = max(target_max, state.vx - fr)
             else:
-                state.vx = max(state.vx - accel * dt, -target_max)
+                if state.vx >= -target_max:
+                    state.vx = max(state.vx - accel * dt, -target_max)
+                else:
+                    fr = (p["ground_friction"] if state.on_ground else p["air_friction"]) * dt
+                    state.vx = min(-target_max, state.vx + fr)
         else:
             friction = (p["ground_friction"] if state.on_ground else p["air_friction"]) * dt
             if state.vx > 0:

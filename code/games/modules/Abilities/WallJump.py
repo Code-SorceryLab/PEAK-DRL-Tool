@@ -39,8 +39,13 @@ class WallJump(Ability):
         if wall == 0:
             return
         p = self.params
+        push = float(p["wall_jump_push"])
+        # Holding away from the wall = long jump (the reference remake boosts
+        # the push 1.5x vs 1.2x when the player pre-holds the away direction).
+        if state.intents.move_x == -wall:
+            push = float(p.get("wall_jump_push_away", push))
         state.vy = -float(p["wall_jump_vy"])
-        state.vx = -wall * float(p["wall_jump_push"])  # away from the wall
+        state.vx = -wall * push                        # away from the wall
         state.facing_right = (wall < 0)                # face away from wall
         state.air_lockout = int(p.get("control_lockout_frames", 6))
         state.ext["wall_jumped_this_frame"] = True

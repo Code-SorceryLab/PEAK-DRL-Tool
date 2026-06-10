@@ -39,6 +39,26 @@ Use these characters in `.txt` level files and in the level editor.
 | `D` | Boss door / exit door |
 | `X` | Boss spawn |
 
+## Meat Boy
+
+| Char | Meaning |
+| --- | --- |
+| `*` | Static saw blade (2 tiles in diameter, centred in the tile) |
+| `%` | Crumble block (dissolves ~0.5 s after the player touches it) |
+| `G` | Bandage Girl (goal) |
+
+Moving or custom-sized saws go in the level's sidecar YAML:
+
+```yaml
+dynamics:
+  saws:
+    - x: 416          # centre, world px
+      y: 240
+      diameter: 96    # optional (default 64)
+      end: [416, 80]  # optional -> ping-pong moving saw
+      period: 4.0     # optional, seconds per full cycle
+```
+
 ## Sonic
 
 | Char | Meaning |

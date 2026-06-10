@@ -1,9 +1,9 @@
 from __future__ import annotations
 import math
 import pygame
-from ..Parameters.Map_parameters import TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK
+from ..Parameters.Map_parameters import TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE
 
-_SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
+_SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
 
 
 class ModularPhysicsManager:

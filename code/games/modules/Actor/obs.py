@@ -3,8 +3,11 @@ from collections import deque
 import numpy as np
 from ..Parameters.Map_parameters import (
     TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_SPIKE, TILE_PIT, TILE_GOAL,
+    TILE_CRUMBLE,
 )
 
+# Crumble tiles are solid to the player NOW but dissolve on touch, so they
+# render as solid in ch0 yet stay passable for the BFS goal gradient.
 _SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
 _HAZARD = {TILE_SPIKE, TILE_PIT}
 _CORE_SCALARS = 11   # see build_scalars layout below
@@ -43,7 +46,9 @@ class ObsBuilder:
         self._dist = dist
         self._dist_max = max(1.0, float(dist.max()))
 
-    def build_grids(self, grid, player_tile, goal_tiles):
+    def build_grids(self, grid, player_tile, goal_tiles, hazard_cells=None):
+        """hazard_cells: optional iterable of (col, row) world cells covered by
+        dynamic hazards (e.g. saw blades) to overlay on the hazard channel."""
         if self._dist is None:
             self.prepare(grid, goal_tiles)
         W = self.window
@@ -62,7 +67,7 @@ class ObsBuilder:
                     out[0, j, i] = 1.0
                     continue
                 t = grid[gy][gx]
-                if t in _SOLID:
+                if t in _SOLID or t == TILE_CRUMBLE:
                     out[0, j, i] = 1.0
                 if t == TILE_GOAL:
                     out[1, j, i] = 1.0
@@ -70,6 +75,12 @@ class ObsBuilder:
                     out[2, j, i] = -1.0
                 d = self._dist[gy, gx]
                 out[3, j, i] = (1.0 - d / self._dist_max) if d >= 0 else 0.0
+        if hazard_cells:
+            for (cx, cy) in hazard_cells:
+                i = cx - (px - half)
+                j = cy - (py - half)
+                if 0 <= i < W and 0 <= j < W:
+                    out[2, j, i] = -1.0
         return out
 
     def build_scalars(self, state, controller, player_xy, goal_xy, level_wh) -> np.ndarray:
