@@ -8,8 +8,9 @@ from .EntityType import EntityType
 
 from ..Parameters.Map_parameters import (
     TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK, TILE_PIT,
-    COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE, 
-    COLOR_QBLOCK, TILE_SIZE
+    TILE_CRUMBLE,
+    COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE,
+    COLOR_QBLOCK, COLOR_CRUMBLE, TILE_SIZE
 )
 from ..Objects.Tile import Tile, create_tile
 from ..Objects.Spike import Spike
@@ -27,6 +28,7 @@ from ..Objects.Goal import Goal
 from ..Objects.Ladder import Ladder
 from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
 from ..Objects.Spring import Spring
+from ..Objects.Saw import Saw
 from .SpatialHash import SpatialHash
 
 @dataclass
@@ -52,6 +54,7 @@ class LevelData:
     slope_tiles:      List[SlopeTile]          = field(default_factory=list)
     springs:          List[Spring]             = field(default_factory=list)
     pits:             List[Any]               = field(default_factory=list)
+    saws:             List[Saw]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
@@ -82,6 +85,7 @@ class LevelLoader:
         self.TILE_MAP = {
             '#': (TILE_GROUND,   COLOR_GROUND,   True,  EntityType.TILE),
             '=': (TILE_PLATFORM, COLOR_PLATFORM, True,  EntityType.TILE),
+            '%': (TILE_CRUMBLE,  COLOR_CRUMBLE,  True,  EntityType.TILE),  # crumbles after touch (meatboy)
             'D': (TILE_GOAL,     COLOR_GOAL,     False, EntityType.GOAL), # Boss Door
         }
 
@@ -360,6 +364,12 @@ class LevelLoader:
                     e.spawn_tag = "boss"
                     data.enemies.append(e)
 
+                elif ascii_char == '*':
+                    # SAW: static circular kill hazard centred in this tile
+                    # (2 tiles in diameter by default). Not in static_hash —
+                    # it doesn't block; the core kills on circle overlap.
+                    data.saws.append(Saw.from_tile(col, row, self.tile_size))
+
                 elif ascii_char == 'O':
                     # PIT: non-solid kill zone. Transparent in game, visible in editor.
                     # Not inserted into static_hash (no collision blocking) — inserted
@@ -407,6 +417,18 @@ class LevelLoader:
                 pup  = cls(gObj=GameObject(x, y, 20, 20, True))
                 pup.gObj.type_id = EntityType.POWERUP
                 data.powerups.append(pup)
+
+        if 'saws' in dynamics:
+            for s in dynamics['saws']:
+                end = s.get('end')
+                saw = Saw(
+                    cx=float(s.get('x', 0)),
+                    cy=float(s.get('y', 0)),
+                    diameter=float(s.get('diameter', 64.0)),
+                    end=tuple(end) if end else None,
+                    period=float(s.get('period', 4.0)),
+                )
+                data.saws.append(saw)
 
         if 'moving_platforms' in dynamics:
             for mp_data in dynamics['moving_platforms']:

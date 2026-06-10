@@ -13,3 +13,4 @@ class EntityType(Enum):
     PROJECTILE = auto()
     PIT = auto()
     LADDER = auto()
+    SAW = auto()

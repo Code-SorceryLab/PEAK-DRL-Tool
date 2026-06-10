@@ -8,6 +8,7 @@ TILE_GOAL     = 3
 TILE_SPIKE    = 4
 TILE_QBLOCK   = 5
 TILE_PIT      = 6
+TILE_CRUMBLE  = 7
 
 # Colors (simple debug palette)
 COLOR_SKY        = (107, 140, 255)
@@ -15,6 +16,7 @@ COLOR_GROUND     = (139, 69, 19)
 COLOR_PLATFORM   = (205, 133, 63)
 COLOR_GOAL       = (255, 215, 0)
 COLOR_SPIKE      = (50, 50, 50)
+COLOR_CRUMBLE    = (190, 170, 130)
 COLOR_WHITE      = (255, 255, 255)
 COLOR_BLACK      = (0, 0, 0)
 COLOR_QBLOCK     = (255, 165, 0)

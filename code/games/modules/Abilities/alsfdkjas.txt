@@ -1,0 +1,379 @@
+' Re-Animate 2026
+Screen Open 1,800,600,8,Hires
+Curs Off
+Double Buffer
+Autoback 0
+Paper 0 : Palette $0,$00A,$FF0,$FF0,$BBB,$AAA,$BBB,$CCC
+Load "test4.abk"
+
+'Player
+player_x = 400
+player_y = 300
+player_radius = 8
+player_speed = 5
+player_lives = 3
+player_hit_timer = 0
+player_aim_x = 0
+player_aim_y = 0-1
+player_power = 1
+player_fire_delay = 20
+player_fire_timer = player_fire_delay
+
+'Enemies
+max_enemies = 10
+enemy_radius = 8
+enemy_fire_delay = 25
+enemy_fire_timer = enemy_fire_delay
+enemy_fire_next = 1
+Dim ENEMY_X(max_enemies)
+Dim ENEMY_Y(max_enemies)
+Dim ENEMY_TYPE(max_enemies)
+
+'Enemy projectiles
+max_enemy_proj = 10
+Dim EP_ACTIVE(max_enemy_proj)
+Dim EP_X(max_enemy_proj)
+Dim EP_Y(max_enemy_proj)
+Dim EP_VX(max_enemy_proj)
+Dim EP_VY(max_enemy_proj)
+Dim EP_RADIUS(max_enemy_proj)
+
+'Player projectiles
+max_player_proj = 10
+Dim PP_ACTIVE(max_player_proj)
+Dim PP_X(max_player_proj)
+Dim PP_Y(max_player_proj)
+Dim PP_VX(max_player_proj)
+Dim PP_VY(max_player_proj)
+Dim PP_RADIUS(max_player_proj)
+
+Global player_x, player_y, player_radius, player_speed, player_lives, player_hit_timer
+Global player_aim_x, player_aim_y, player_power
+Global max_enemies, enemy_radius, ENEMY_X, ENEMY_Y, ENEMY_TYPE
+Global max_enemy_proj, EP_ACTIVE, EP_X, EP_Y, EP_VX, EP_VY, EP_RADIUS
+Global max_player_proj, PP_ACTIVE, PP_X, PP_Y, PP_VX, PP_VY, PP_RADIUS
+
+'Init enemies
+For i = 1 To max_enemies
+    ENEMY_X(i) = 100 + Rnd(600)
+    ENEMY_Y(i) = 100 + Rnd(400)
+    ENEMY_TYPE(i) = 1 + Rnd(1)
+Next
+
+'--------Fire a player projectile in the aim direction.
+Procedure PLAYER_FIRE[a]
+    slot = 0
+    For j = 1 To max_player_proj
+        If PP_ACTIVE(j) = 0
+            slot = j
+        End If
+    Next
+    If slot > 0
+        PP_ACTIVE(slot) = 1
+        PP_X(slot) = player_x
+        PP_Y(slot) = player_y
+        sp = 7
+        PP_VX(slot) = player_aim_x * sp
+        PP_VY(slot) = player_aim_y * sp
+        PP_RADIUS(slot) = 2
+    End If
+End Proc
+
+'--------Fire an enemy projectile from enemy EN at player.
+'Type 1 = small and fast, type 2 = big and slow.
+Procedure ENEMY_FIRE[en]
+    slot = 0
+    For j = 1 To max_enemy_proj
+        If EP_ACTIVE(j) = 0
+            slot = j
+        End If
+    Next
+    If slot > 0
+        dx = player_x - ENEMY_X(en)
+        dy = player_y - ENEMY_Y(en)
+        adx = dx
+        If adx < 0
+            adx = 0 - adx
+        End If
+        ady = dy
+        If ady < 0
+            ady = 0 - ady
+        End If
+        If adx > ady
+            d = adx + ady/2
+        Else
+            d = ady + adx/2
+        End If
+        If d < 1
+            d = 1
+        End If
+        sp = 2
+        r = 8
+        If ENEMY_TYPE(en) = 1
+            sp = 6
+            r = 3
+        End If
+        EP_ACTIVE(slot) = 1
+        EP_X(slot) = ENEMY_X(en) * 16
+        EP_Y(slot) = ENEMY_Y(en) * 16
+        EP_VX(slot) = dx * sp * 16 / d
+        EP_VY(slot) = dy * sp * 16 / d
+        EP_RADIUS(slot) = r
+    End If
+End Proc
+
+'--------Move all projectiles, deactivate off-screen ones
+Procedure MOVE_PROJECTILES[a]
+    For j = 1 To max_player_proj
+        If PP_ACTIVE(j) = 1
+            PP_X(j) = PP_X(j) + PP_VX(j)
+            PP_Y(j) = PP_Y(j) + PP_VY(j)
+            If PP_X(j) < 0
+                PP_ACTIVE(j) = 0
+            End If
+            If PP_X(j) > 800
+                PP_ACTIVE(j) = 0
+            End If
+            If PP_Y(j) < 0
+                PP_ACTIVE(j) = 0
+            End If
+            If PP_Y(j) > 600
+                PP_ACTIVE(j) = 0
+            End If
+        End If
+    Next
+    For j = 1 To max_enemy_proj
+        If EP_ACTIVE(j) = 1
+            EP_X(j) = EP_X(j) + EP_VX(j)
+            EP_Y(j) = EP_Y(j) + EP_VY(j)
+            sx = EP_X(j) / 16
+            sy = EP_Y(j) / 16
+            If sx < 0
+                EP_ACTIVE(j) = 0
+            End If
+            If sx > 800
+                EP_ACTIVE(j) = 0
+            End If
+            If sy < 0
+                EP_ACTIVE(j) = 0
+            End If
+            If sy > 600
+                EP_ACTIVE(j) = 0
+            End If
+        End If
+    Next
+End Proc
+
+Procedure PLAYER_HIT[a]
+    player_lives = player_lives - 1
+    player_hit_timer = 50
+    player_x = 400
+    player_y = 300
+    Play 37,1
+End Proc
+
+'--------All collisions use squared distance
+'dx*dx + dy*dy < (r1+r2)*(r1+r2)
+Procedure CHECK_COLLISIONS[a]
+    If player_hit_timer = 0
+        'player vs enemy bodies
+        cd = player_radius + enemy_radius
+        cd2 = cd * cd
+        For i = 1 To max_enemies
+            dx = player_x - ENEMY_X(i)
+            dy = player_y - ENEMY_Y(i)
+            d2 = dx*dx + dy*dy
+            If d2 < cd2
+                PLAYER_HIT[1]
+            End If
+        Next
+        '--------enemy projectiles vs player
+        For j = 1 To max_enemy_proj
+            If EP_ACTIVE(j) = 1
+                dx = player_x - EP_X(j)/16
+                dy = player_y - EP_Y(j)/16
+                cd = player_radius + EP_RADIUS(j)
+                d2 = dx*dx + dy*dy
+                If d2 < cd*cd
+                    EP_ACTIVE(j) = 0
+                    PLAYER_HIT[1]
+                End If
+            End If
+        Next
+    End If
+    '--------player projectiles vs enemies
+    For j = 1 To max_player_proj
+        If PP_ACTIVE(j) = 1
+            For i = 1 To max_enemies
+                dx = PP_X(j) - ENEMY_X(i)
+                dy = PP_Y(j) - ENEMY_Y(i)
+                cd = PP_RADIUS(j) + enemy_radius
+                d2 = dx*dx + dy*dy
+                If d2 < cd*cd
+                    PP_ACTIVE(j) = 0
+                    Play 37,1
+                    ENEMY_X(i) = 100 + Rnd(600)
+                    ENEMY_Y(i) = 100 + Rnd(400)
+                    ENEMY_TYPE(i) = 1 + Rnd(1)
+                End If
+            Next
+        End If
+    Next
+End Proc
+
+Procedure DRAW_PLAYER[a]
+    temp_x = player_x - 8
+    temp_y = player_y - 8
+    Sprite 0, temp_x, temp_y, 0
+End Proc
+
+Procedure DRAW_ENEMIES[a]
+    tempx = ENEMY_X(1)-8
+    tempy = ENEMY_Y(1)-8
+    Sprite 2, tempx, tempy, 1
+    tempx = ENEMY_X(2)-8
+    tempy = ENEMY_Y(2)-8
+    Sprite 3, tempx, tempy, 1
+    tempx = ENEMY_X(3)-8
+    tempy = ENEMY_Y(3)-8
+    Sprite 4, tempx, tempy, 1
+    tempx = ENEMY_X(4)-8
+    tempy = ENEMY_Y(4)-8
+    Sprite 5, tempx, tempy, 1
+    tempx = ENEMY_X(5)-8
+    tempy = ENEMY_Y(5)-8
+    Sprite 6, tempx, tempy, 1
+    tempx = ENEMY_X(6)-8
+    tempy = ENEMY_Y(6)-8
+    Sprite 7, tempx, tempy, 1
+    tempx = ENEMY_X(7)-8
+    tempy = ENEMY_Y(7)-8
+    Sprite 8, tempx, tempy, 1
+    tempx = ENEMY_X(8)-8
+    tempy = ENEMY_Y(8)-8
+    Sprite 9, tempx, tempy, 1
+    tempx = ENEMY_X(9)-8
+    tempy = ENEMY_Y(9)-8
+    Sprite 10, tempx, tempy, 1
+    tempx = ENEMY_X(10)-8
+    tempy = ENEMY_Y(10)-8
+    Sprite 11, tempx, tempy, 1
+End Proc
+
+Procedure DRAW_PP[a]
+    Ink 3
+    For i = 1 To max_player_proj
+        If PP_ACTIVE(i) = 1
+            Circle PP_X(i), PP_Y(i), PP_RADIUS(i)
+        End If
+    Next
+End Proc
+
+Procedure DRAW_EP[a]
+    Ink 4
+    For j = i To max_enemy_proj
+        If EP_ACTIVE(i) = 1
+            Circle EP_X(i)/16, EP_Y(i)/16, EP_RADIUS(i)
+        End If
+    Next
+End Proc
+
+
+'--------Draw everything
+Procedure DRAW[a]
+    Cls
+    Text 740, 580, player_lives
+    DRAW_PLAYER[1]
+    DRAW_ENEMIES[1]
+    'DRAW_PP[2]
+    'DRAW_EP[3]
+    
+End Proc
+
+Procedure MOVE_ENEMIES[a]
+    For i = 1 To max_enemies
+        If ENEMY_X(i) > player_x
+            ENEMY_X(i) = ENEMY_X(i)   
+        ENEMY_Y(i) = ENEMY_Y(i) + dy
+    Next
+End Proc
+
+
+'--------Game Loop
+Do
+    '--------Clear and Draw
+    DRAW[1]
+
+    '--------Check input
+    moved_x = 0
+    moved_y = 0
+    If Key State($1F)
+        player_y = player_y + player_speed
+        moved_y = 1
+    End If
+    If Key State($11)
+        player_y = player_y - player_speed
+        moved_y = 0 - 1
+    End If
+    If Key State($20)
+        player_x = player_x + player_speed
+        moved_x = 1
+    End If
+    If Key State($1E)
+        player_x = player_x - player_speed
+        moved_x = 0 - 1
+    End If
+    If moved_x <> 0
+        player_aim_x = moved_x
+        player_aim_y = moved_y
+    End If
+    If moved_y <> 0
+        player_aim_x = moved_x
+        player_aim_y = moved_y
+    End If
+
+    '--------player fire timer
+    player_fire_timer = player_fire_timer - 1
+    If player_fire_timer < 1
+        PLAYER_FIRE[1]
+        delay = player_fire_delay - player_power*2
+        If delay < 5
+            delay = 5
+        End If
+        player_fire_timer = delay
+    End If
+
+    '--------enemy fire timer
+    enemy_fire_timer = enemy_fire_timer - 1
+    If enemy_fire_timer < 1
+        ENEMY_FIRE[enemy_fire_next]
+        enemy_fire_next = enemy_fire_next + 1
+        If enemy_fire_next > max_enemies
+            enemy_fire_next = 1
+        End If
+        enemy_fire_timer = enemy_fire_delay
+    End If
+
+    '--------invincibility countdown
+    If player_hit_timer > 0
+        player_hit_timer = player_hit_timer - 1
+    End If
+    'Move all the things
+    MOVE_ENEMIES[1]
+    MOVE_PROJECTILES[1]
+    
+    'After Moving Check Collisions
+    CHECK_COLLISIONS[1]
+
+    'If player_lives < 1
+    '    Goto GAMEOVER
+    'End If
+
+    Wait 4
+Loop
+
+GAMEOVER:
+Cls
+Text 360, 300, "GAME OVER"
+Wait Key
+End
