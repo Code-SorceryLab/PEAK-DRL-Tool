@@ -70,6 +70,18 @@ if PERFCHECK:
     SEEDS = [1234]
     EVAL_EPISODES = 30
 
+# (extractor, persona) pairs to run. Default = full 2x2 (A-H over both budgets).
+# --priority = the reviewer's stated minimum: C/D (LightMobile+Pathfinder) and
+# E/F (SpatialAttention+Simple) only -> half the compute.
+PRIORITY = "--priority" in sys.argv
+if PRIORITY:
+    CONFIG_PAIRS = [
+        ("lightmobile", "platformer_adept"),        # C (Novice), D (Expert)
+        ("spatialattention", "platformer_simple"),  # E (Novice), F (Expert)
+    ]
+else:
+    CONFIG_PAIRS = [(e, p) for e in EXTRACTORS for p in PERSONAS]
+
 
 def log(msg: str) -> None:
     line = f"[{time.strftime('%H:%M:%S')}] {msg}"
@@ -129,7 +141,7 @@ def run_train(cmd, log_path: Path, timeout_s: float) -> tuple:
 
 
 def all_jobs():
-    for ext, persona, skill, seed in itertools.product(EXTRACTORS, PERSONAS, BUDGETS, SEEDS):
+    for (ext, persona), skill, seed in itertools.product(CONFIG_PAIRS, BUDGETS, SEEDS):
         yield {
             "ext": ext, "persona": persona, "skill": skill, "seed": seed,
             "budget": BUDGETS[skill],
