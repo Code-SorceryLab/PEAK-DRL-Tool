@@ -22,6 +22,18 @@ OBS_SANITY_COLS = {
     'grid_dijkstra_mean','grid_dijkstra_std','grid_dijkstra_min','grid_dijkstra_max',
     'scalar_mean','scalar_std','scalar_min','scalar_max','dijkstra_val','obs_warnings',
 }
+# Telemetry columns that leak into the per-step CSV but are NOT reward components.
+# Counting these as reward was the bug behind the misleading "Max Rew" share:
+# max_x_seen (a monotonic position counter, mean ~1386) dominated the reward
+# "share" at ~99%, making it look like the reward was all horizontal distance.
+TELEMETRY_COLS = {
+    'env_idx', 'progress', 'max_x_seen', 'dijkstra_dist', 'dijkstra_valid',
+    'step_dx', 'step_dy', 'first_completion_step',
+    'boss_level', 'boss_active', 'boss_hp_ratio', 'boss_damage_step',
+    'hp', 'lives', 'score', 'goal_dx', 'goal_dy',
+    'x_position', 'y_position', 'velocity_x', 'velocity_y',
+    'enemies_killed_step', 'damage_taken_step', 'life_lost',
+}
 _ARCH_TAGS = {
     "lightmobile": "lightmobile",
     "spatialattention": "spatialattention",
@@ -76,7 +88,11 @@ def _parse_run_id(fp):
     return {"label": " | ".join(lp), "persona": persona, "skill": skill or "?", "arch": arch or "?", "game": game}
 
 def _reward_cols(df):
-    return [c for c in df.columns if c.lower() not in STANDARD_COLS and c.lower() not in OBS_SANITY_COLS and "unnamed" not in c.lower()]
+    # Only true reward-breakdown components (movement, alive, time, win, death,
+    # potential, coin, kill, ...) — NOT telemetry. Excluding telemetry removes the
+    # inflated "Max Rew" (max_x_seen) reward-share artifact.
+    excl = STANDARD_COLS | OBS_SANITY_COLS | TELEMETRY_COLS
+    return [c for c in df.columns if c.lower() not in excl and "unnamed" not in c.lower()]
 
 # ═══════════════════════════════════════════════════════════════
 # Episode Builder
@@ -286,6 +302,9 @@ def _compare(sums):
     if len(ranked) >= 2:
         print(f"\n  🏆 Best:  {ranked[0][0]} ({ranked[0][1]['win_rate']:.1f}%)")
         print(f"  💀 Worst: {ranked[-1][0]} ({ranked[-1][1]['win_rate']:.1f}%)")
+    print("\n  ⚠ AvgRwd is NOT comparable across personas: Pathfinder's potential-based")
+    print("    shaping inflates reward magnitude vs Simple. Compare WR% / failure modes,")
+    print("    not raw reward, across personas.")
 
     # By architecture
     ba = {}
