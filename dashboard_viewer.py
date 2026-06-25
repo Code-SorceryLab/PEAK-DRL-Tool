@@ -199,6 +199,7 @@ def _build_level_rows(data_so_far: pd.DataFrame) -> list[dict]:
             "ENEMY": int((died_causes == "Enemy").sum()),
             "PIT": int((died_causes == "Pit").sum()),
             "SPIKE": int((died_causes == "Spike").sum()),
+            "SAW": int((died_causes == "Saw").sum()),
             "TIMEOUT": int((died_causes == "Timeout").sum()),
             "WIN RATE": f"{win_rate:.1f}%",
             "PROGRESS": _progress_bar(progress_ratio),
@@ -376,14 +377,15 @@ if 'level' in df.columns and 'event' in df.columns:
         d_enemy   = int((died_rows['cause']=='Enemy').sum())   if 'cause' in df.columns else 0
         d_pit     = int((died_rows['cause']=='Pit').sum())     if 'cause' in df.columns else 0
         d_spike   = int((died_rows['cause']=='Spike').sum())   if 'cause' in df.columns else 0
+        d_saw     = int((died_rows['cause']=='Saw').sum())     if 'cause' in df.columns else 0
         d_timeout = int((died_rows['cause']=='Timeout').sum()) if 'cause' in df.columns else 0
         rows_list.append({"LEVEL": str(lvl),"VISITS":visits,"WINS":wins,"DEATHS":deaths,
-            "STALL":d_stall,"ENEMY":d_enemy,"PIT":d_pit,"SPIKE":d_spike,"TIMEOUT":d_timeout,
+            "STALL":d_stall,"ENEMY":d_enemy,"PIT":d_pit,"SPIKE":d_spike,"SAW":d_saw,"TIMEOUT":d_timeout,
             "WIN RATE":f"{win_rate:.1f}%","PROGRESS":_progress_bar(progress_ratio)})
 
     if rows_list:
         level_table = pd.DataFrame(rows_list)
-        death_cause_cols = {"STALL","ENEMY","PIT","SPIKE","TIMEOUT"}
+        death_cause_cols = {"STALL","ENEMY","PIT","SPIKE","SAW","TIMEOUT"}
         def _style_row(r):
             try: wr = float(r["WIN RATE"].replace("%",""))
             except: wr = 0.0
