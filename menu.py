@@ -1173,6 +1173,35 @@ def run_case_study_analysis():
         pass
     print("\nCase study complete.\n")
 
+def run_paper_matrix_menu():
+    """Launch the multi-seed paper-matrix orchestrator (run_paper_matrix.py).
+
+    Trains the A-H configs x seeds with the fixed code, then evaluates each on
+    Mario1-1/1-2 (trustworthy stochastic eval). Results -> /tmp/peak_matrix/;
+    build the tables afterward with option 14 (Full Case Study).
+    """
+    _section("RUN  ›  Paper Matrix (multi-seed A-H)")
+    modes = [
+        "Full matrix       (A-H x 3 seeds = 24 runs)",
+        "Priority          (C/D + E/F = 12 runs)",
+        "Dijkstra ablation (on/off x 3 seeds = 6 runs)",
+        "Smoke test        (1 tiny run - verify pipeline)",
+    ]
+    flags = {modes[0]: [], modes[1]: ["--priority"],
+             modes[2]: ["--ablation"], modes[3]: ["--smoke"]}
+    mode = ask_index("Which matrix run?", modes)
+    if mode is None:
+        return
+    cmd = [sys.executable, "-m", "code.scripts.run_paper_matrix"] + flags[mode]
+    print(f"\n  ⟫ {' '.join(cmd)}")
+    print(_DIM("  Long-running & resumable. Ctrl-C to stop (completed jobs are skipped)."))
+    print(_DIM("  Results → /tmp/peak_matrix/ ; then use option 14 to build the tables.\n"))
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        print("\n  Stopped (re-run to resume).")
+    print("\nMatrix run finished.\n")
+
 def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
     """
     Run a random policy in the given game and save:
@@ -2583,6 +2612,7 @@ def main():
         "11": ("tensorboard",          run_tensorboard),
         "12": ("analyzer",             run_agent_analyzer),
         "14": ("case_study",           run_case_study_analysis),
+        "15": ("paper_matrix",         run_paper_matrix_menu),
         "13": ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -2604,6 +2634,7 @@ def main():
         print(_menu_item("2",  "Train Single",        "toggle: game / algo / personas / skills / arch"))
         print(_menu_item("3",  "Train All (1 game)",  "toggle: algos / personas / skills"))
         print(_menu_item("4",  "Train Full Grid",     "all games × algos × personas"))
+        print(_menu_item("15", "Run Paper Matrix",    "multi-seed A–H → /tmp/peak_matrix (then 14 to analyze)"))
 
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
