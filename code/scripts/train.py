@@ -981,6 +981,9 @@ def main(cfg: DictConfig):
         max_stay_windows=3,
         curriculum_advance_step=2,   # levels to skip forward on mastery
         curriculum_fallback_step=2,  # levels to drop back on failure
+        # Dijkstra ablation: +dijkstra_enabled=false zeros the Dijkstra obs channel
+        # for both train and eval (flows through env_kwargs.copy()).
+        dijkstra_enabled=bool(cfg.get("dijkstra_enabled", True)),
     )
 
     os.makedirs(models_dir / "best", exist_ok=True)

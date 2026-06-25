@@ -82,6 +82,15 @@ if PRIORITY:
 else:
     CONFIG_PAIRS = [(e, p) for e in EXTRACTORS for p in PERSONAS]
 
+# --ablation: Dijkstra on/off on one strong config (SpatialAttention+Pathfinder),
+# 1M budget x 3 seeds, each run twice (channel ON vs OFF). Reviewer #4.
+ABLATION = "--ablation" in sys.argv
+if ABLATION:
+    CONFIG_PAIRS = [("spatialattention", "platformer_adept")]
+    BUDGETS = {"Novice": 1_000_000}
+    SEEDS = [1234, 2025, 31337]
+    EVAL_EPISODES = 30
+
 
 def log(msg: str) -> None:
     line = f"[{time.strftime('%H:%M:%S')}] {msg}"
@@ -141,11 +150,13 @@ def run_train(cmd, log_path: Path, timeout_s: float) -> tuple:
 
 
 def all_jobs():
-    for (ext, persona), skill, seed in itertools.product(CONFIG_PAIRS, BUDGETS, SEEDS):
+    dij_opts = [True, False] if ABLATION else [True]
+    for (ext, persona), skill, seed, dij in itertools.product(CONFIG_PAIRS, BUDGETS, SEEDS, dij_opts):
+        tag = ("__dijon" if dij else "__dijoff") if ABLATION else ""
         yield {
             "ext": ext, "persona": persona, "skill": skill, "seed": seed,
-            "budget": BUDGETS[skill],
-            "jid": f"{ext}__{persona}__{skill}__s{seed}",
+            "budget": BUDGETS[skill], "dijkstra": dij,
+            "jid": f"{ext}__{persona}__{skill}__s{seed}{tag}",
         }
 
 
@@ -165,6 +176,7 @@ def run_job(job: dict) -> tuple:
         f"skills.Novice={BUDGETS.get('Novice', 1_000_000)}",
         f"skills.Expert={BUDGETS.get('Expert', 8_000_000)}",
         "n_envs=2", "profile=false", f"+out_root={out_root}",
+        f"+dijkstra_enabled={'true' if job.get('dijkstra', True) else 'false'}",
     ]
     log(f"TRAIN start {jid} (budget={job['budget']})")
     train_log = out_root / "train.log"

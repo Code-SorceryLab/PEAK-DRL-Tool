@@ -466,6 +466,10 @@ class PlatformerCore(gymnasium.Env):
         #   instead of the inline next-level transition done during training.
         self.curriculum_enabled = bool(kwargs.pop("curriculum_enabled", True))
         self.terminate_on_goal  = bool(kwargs.pop("terminate_on_goal", False))
+        # dijkstra_enabled=False: ABLATION — zero the Dijkstra obs channel (channel 3),
+        # keeping the (4,H,W) shape so the extractor is unchanged. Lets developers test
+        # generalization without the solver-derived navigational prior (paper Req. note).
+        self.dijkstra_enabled = bool(kwargs.pop("dijkstra_enabled", True))
 
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
@@ -1205,21 +1209,27 @@ class PlatformerCore(gymnasium.Env):
         solid_grid, collect_grid, hazard_grid, map_row_start, map_col_start = \
             self._grid_obs_window()
 
-        dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
+        if self.dijkstra_enabled:
+            dijkstra_grid = self._dijkstra_obs_window(map_row_start, map_col_start)
 
-        # ── Physics-aware Dijkstra boost ──────────────────────────────────
-        # Add a small positive value to air tiles the player can physically
-        # reach via jump. Landing tiles get +0.15, in-flight tiles get +0.05.
-        # This nudges the gradient toward jumpable paths without destroying
-        # the existing signal. Solid tiles and unreachable air are untouched.
-        # When airborne, no boost is applied (arc only valid from ground).
-        on_ground = self.player.on_ground if self.player else False
-        dijkstra_grid, arc_grid = self.jump_arc_computer.boost_dijkstra(
-            dijkstra_grid, solid_grid, on_ground,
-            self.obs_pad_x, self.obs_pad_y
-        )
-        self._dijkstra_window_cache = dijkstra_grid
-        self._jump_arc_cache = arc_grid
+            # ── Physics-aware Dijkstra boost ──────────────────────────────────
+            # Add a small positive value to air tiles the player can physically
+            # reach via jump. Landing tiles get +0.15, in-flight tiles get +0.05.
+            # This nudges the gradient toward jumpable paths without destroying
+            # the existing signal. Solid tiles and unreachable air are untouched.
+            # When airborne, no boost is applied (arc only valid from ground).
+            on_ground = self.player.on_ground if self.player else False
+            dijkstra_grid, arc_grid = self.jump_arc_computer.boost_dijkstra(
+                dijkstra_grid, solid_grid, on_ground,
+                self.obs_pad_x, self.obs_pad_y
+            )
+            self._dijkstra_window_cache = dijkstra_grid
+            self._jump_arc_cache = arc_grid
+        else:
+            # ABLATION: Dijkstra channel off — zero it (shape preserved).
+            dijkstra_grid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+            self._dijkstra_window_cache = dijkstra_grid
+            self._jump_arc_cache = None
 
         # Stack order: Solids, Collectibles, Hazards, Dijkstra  (4 channels)
         #   Ch 0 solid       : {-0.5, 0.0, 1.0}  — pit / air / wall+platform
