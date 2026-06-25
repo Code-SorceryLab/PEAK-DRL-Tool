@@ -1150,6 +1150,29 @@ def run_agent_analyzer():
         pass
     print("\nAnalysis complete.\n")
 
+def run_case_study_analysis():
+    """Full multi-seed case-study analysis of the paper matrix.
+
+    Aggregates run_paper_matrix.py results into the corrected Table 1 (design) and
+    Table 2 (per-run stochastic win-rate mean +/- 95% CI per level, failure-mode
+    taxonomy, training time), and exports a markdown report + CSV to
+    case-study/regenerated/.
+    """
+    _section("ANALYZE  ›  Full Case Study (multi-seed matrix)")
+    try:
+        from code.scripts import case_study
+    except Exception as e:
+        print(f"❌ Could not import case_study: {e}")
+        return
+    default_dir = case_study.DEFAULT_RESULTS_DIR
+    raw = input(f"    Matrix results dir [{default_dir}]: ").strip()
+    results_dir = raw or default_dir
+    try:
+        case_study.run_case_study(results_dir, out_dir="case-study/regenerated")
+    except KeyboardInterrupt:
+        pass
+    print("\nCase study complete.\n")
+
 def record_random_agent_video(game: str, episodes: int = 5, fps: int = 30):
     """
     Run a random policy in the given game and save:
@@ -2559,6 +2582,7 @@ def main():
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("tensorboard",          run_tensorboard),
         "12": ("analyzer",             run_agent_analyzer),
+        "14": ("case_study",           run_case_study_analysis),
         "13": ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -2591,7 +2615,8 @@ def main():
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "TensorBoard",          "mylogs/"))
-        print(_menu_item("12", "Analyze Performance",  "CSV log deep-dive"))
+        print(_menu_item("12", "Analyze Performance",  "single-run CSV deep-dive"))
+        print(_menu_item("14", "Full Case Study",      "multi-seed matrix → Tables 1 & 2 + CIs"))
         print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
