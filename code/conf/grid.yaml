@@ -35,7 +35,7 @@ eval_freq: 10000  # evaluate every N steps (EvalCallback)
 save_freq: 20000  # save model every N steps (CheckpointCallback)
 
 device: cpu      # auto | cpu | cuda | mps  (cpu is fastest on this Mac; mps crashes SpatialAttention)
-n_envs: 6         # 1 for cpu, 16 for gpu, etc.
+n_envs: 12        # 8-16 parallel SubprocVecEnv workers (Phase-1). CPU device: workers share cores with the learner.
 profile: true    # true → enable ProfilingCallback (TB scalars + profiling_log.csv)
 compile: false   # true → torch.compile(model.policy) (warm-up cost first rollout; 20-40% train speedup after)
 

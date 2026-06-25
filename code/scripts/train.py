@@ -1,6 +1,7 @@
 import os
 from code.callbacks.logging_callback import CsvLoggerCallback
 from code.callbacks.profiling_callback import ProfilingCallback, EvalTimerCallback
+from code.callbacks.RecurrentEvalCallback import RecurrentEvalCallback
 
 try:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -897,11 +898,41 @@ class EvalPreviewCallback(BaseCallback):
             print(f"[EvalPreview] Preview error: {type(exc).__name__}: {exc}")
 
 
+# TRAIN clip_reward must exceed the win bonus (5.0) so the terminal win
+# signal survives normalization-time clipping. 10.0 is the SB3 default and
+# clears every persona win bonus (5.0 default, 7.0 megaman, 8.0 balanced_win).
+_VECNORM_TRAIN_CLIP_REWARD = 10.0
+
+
+def _build_vecnorm_kwargs(uses_dict_obs, obs_space, *, training):
+    """Construct VecNormalize kwargs.
+
+    training=True  -> norm_reward=True  (+ clip_reward=10.0 > win bonus 5.0)
+    training=False -> norm_reward=False (interpretable eval rewards)
+    """
+    kwargs = dict(
+        norm_obs=True,
+        clip_obs=10.0,
+        norm_reward=bool(training),
+        clip_reward=_VECNORM_TRAIN_CLIP_REWARD,
+    )
+    if uses_dict_obs:
+        norm_keys = [k for k, v in obs_space.spaces.items()
+                     if isinstance(v, spaces.Box)]
+        if norm_keys:
+            kwargs["norm_obs_keys"] = norm_keys
+    return kwargs
+
+
 @hydra.main(version_base=None, config_path="../conf", config_name="grid")
 def main(cfg: DictConfig):
     repo_root = Path(get_original_cwd())
     conf_root = repo_root / "code" / "conf"
-    models_dir = repo_root / "models"
+    # out_root: optional override of the model output root so concurrent runs
+    # (e.g. a multi-seed experiment matrix) can write to isolated directories.
+    # Defaults to repo_root/"models" (unchanged behaviour when unset).
+    _out_root = cfg.get("out_root", None)
+    models_dir = Path(_out_root) if _out_root else repo_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
     device = _resolve_device(cfg.get("device", "auto"))
@@ -983,11 +1014,8 @@ def main(cfg: DictConfig):
     probe_env.close()
     uses_dict_obs = isinstance(obs_space, spaces.Dict)
 
-    vecnorm_kwargs = dict(norm_obs=True, norm_reward=False, clip_obs=10.0)
-    if uses_dict_obs:
-        norm_keys = [k for k, v in obs_space.spaces.items() if isinstance(v, spaces.Box)]
-        if norm_keys:
-            vecnorm_kwargs["norm_obs_keys"] = norm_keys
+    train_vecnorm_kwargs = _build_vecnorm_kwargs(uses_dict_obs, obs_space, training=True)
+    eval_vecnorm_kwargs  = _build_vecnorm_kwargs(uses_dict_obs, obs_space, training=False)
 
     run_count = 0
     for model_name in selected_models:
@@ -1124,30 +1152,41 @@ def main(cfg: DictConfig):
             else:
                 raw_env = DummyVecEnv([make_env()])
 
-            env = VecNormalize(raw_env, **vecnorm_kwargs)
+            env = VecNormalize(raw_env, **train_vecnorm_kwargs)
 
-            def make_monitored_env(render_mode=None):
+            # Eval env is pinned to ONE level with the curriculum OFF and goal
+            # made terminal, so best_model scores reflect single-level skill and
+            # cannot drift via curriculum state. See PlatformerCore eval flags.
+            _eval_level = cfg.get("eval_level") or (
+                env_kwargs.get("world") or None
+            )
+            def make_monitored_env(render_mode=None, _level=_eval_level):
                 """Factory that wraps the env with Monitor for proper eval logging."""
                 kw = env_kwargs.copy()
                 if render_mode is not None:
                     kw['render_mode'] = render_mode
+                kw["curriculum_enabled"] = False
+                kw["terminate_on_goal"] = True
+                if _level is not None:
+                    kw["world"] = _level
                 def _init():
                     return Monitor(GameEnv(game_cls, reward_fn=active_reward_fn, **kw))
                 return _init
 
-            eval_raw_env = DummyVecEnv([make_monitored_env()])
-            eval_env = VecNormalize(eval_raw_env, **vecnorm_kwargs)
-            # FIX: sync running obs statistics from the training wrapper so the
-            # eval agent sees identical normalised observations. Without this,
-            # eval_env accumulates its own obs_rms from scratch and best_model
-            # scores are measured against a different normalisation than training.
-            eval_env.obs_rms    = env.obs_rms
-            eval_env.ret_rms    = env.ret_rms
-            eval_env.training   = False
-            eval_env.norm_reward = False
-
             for skill, total_timesteps in selected_skills.items():
                 run_count += 1
+
+                # Fresh eval env per run — no state leaks across runs.
+                eval_raw_env = DummyVecEnv([make_monitored_env()])
+                eval_env = VecNormalize(eval_raw_env, **eval_vecnorm_kwargs)
+                # FIX: sync running obs statistics from the training wrapper so the
+                # eval agent sees identical normalised observations. Without this,
+                # eval_env accumulates its own obs_rms from scratch and best_model
+                # scores are measured against a different normalisation than training.
+                eval_env.obs_rms     = env.obs_rms   # share TRAIN obs normalisation
+                eval_env.ret_rms     = env.ret_rms
+                eval_env.training    = False
+                eval_env.norm_reward = False         # keep eval rewards un-normalised
                 tb_dir = os.path.join(tb_root, f"{game_name}_{model_name}_{persona}")
                 os.makedirs(tb_dir, exist_ok=True)
 
@@ -1158,7 +1197,9 @@ def main(cfg: DictConfig):
                 run_id = f"{game_name}_{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
 
                 log_name = f"training_log_{run_id}.csv"
-                csv_dir = repo_root / "csv"
+                # Isolate per-step CSV under out_root when set (so concurrent
+                # multi-seed runs don't race on the same csv); default unchanged.
+                csv_dir = (Path(_out_root) / "csv") if _out_root else (repo_root / "csv")
                 csv_dir.mkdir(parents=True, exist_ok=True)
                 csv_logger = CsvLoggerCallback(log_dir=str(csv_dir), file_name=log_name)
 

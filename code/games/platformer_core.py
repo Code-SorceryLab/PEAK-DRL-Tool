@@ -430,11 +430,15 @@ class PlatformerCore(gymnasium.Env):
         # Knobs exposed as kwargs so they can be tuned from the config YAML
         # without touching this file.
         self._curriculum_window_size  =   int(kwargs.pop("curriculum_window" ,   5))
-        self._advance_threshold       = float(kwargs.pop("advance_threshold" , 0.6))
-        self._fallback_threshold      = float(kwargs.pop("fallback_threshold", 0.2))
+        # NOTE: advance_threshold / fallback_threshold are intentionally NOT
+        # popped here. They are consumed by the ACTIVE batch curriculum below
+        # (self._batch_advance_threshold / self._batch_fallback_threshold).
+        # Popping them here was a dead "mastery-gated" path that silently
+        # starved the batch curriculum of its YAML-configured thresholds.
         self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
 
-        # Per-level outcome windows — persist across episodes, never reset.
+        # Per-level outcome windows — diagnostic sliding window feeding
+        # curriculum_win_rate() in _info(). Persist across episodes, never reset.
         self._level_window = {
             lvl: deque(maxlen=self._curriculum_window_size)
             for lvl in self.level_order
@@ -454,6 +458,15 @@ class PlatformerCore(gymnasium.Env):
         # start_unlocked: pre-unlock N levels at init (useful for resuming a
         # run or skipping trivial early levels). Default 0 = start from level 1.
         self._max_unlocked_index = int(kwargs.pop("start_unlocked", 0))
+
+        # ── Eval-trust flags (Task 1) ─────────────────────────────────────────
+        # curriculum_enabled=False: reset() pins to self.world and never touches
+        #   the shared curriculum/batch state. Mirrors sonic_core/megaman_core.
+        # terminate_on_goal=True: reaching the goal ENDS the episode (eval only),
+        #   instead of the inline next-level transition done during training.
+        self.curriculum_enabled = bool(kwargs.pop("curriculum_enabled", True))
+        self.terminate_on_goal  = bool(kwargs.pop("terminate_on_goal", False))
+
         self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
         self.physics_manager.speed_mult = self.speed_mult
 
@@ -479,6 +492,8 @@ class PlatformerCore(gymnasium.Env):
 
         # ── Batch Curriculum ───────────────────────────────────────────────
         self._batch_window            = int(kwargs.pop("batch_window", 10))
+        # SOLE consumer of advance_threshold / fallback_threshold kwargs (see
+        # the curriculum block above). Defaults apply only when YAML omits them.
         self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
         self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
         self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))  # reduced from 3
@@ -760,7 +775,7 @@ class PlatformerCore(gymnasium.Env):
 
         # Inline level transition on win.
         # Advance self.world AFTER _info() so WIN is logged on the right level.
-        if self._needs_level_transition:
+        if self._needs_level_transition and not self.terminate_on_goal:
             self._needs_level_transition = False
             if self._pending_next_level_index is not None:
                 self.current_index_world = self._pending_next_level_index
@@ -783,11 +798,20 @@ class PlatformerCore(gymnasium.Env):
 
         # Record episode result into batch — only if it was a curriculum episode
         # (NOT a review episode, which played a different level)
-        if self.level_order and not self.locked_level and not self._is_review_episode:
+        if self.curriculum_enabled and self.level_order and not self.locked_level and not self._is_review_episode:
             self._batch_results.append(self._episode_won_current)
 
+        # Record into the per-level diagnostic window (feeds curriculum_win_rate
+        # in _info()). self.world still names the level that was just played —
+        # it is reassigned to the next level later in this method. Use setdefault
+        # so levels not present in level_order (edge cases) still get a window.
+        if self.level_order and not self.locked_level:
+            win_dq = self._level_window.setdefault(
+                self.world, deque(maxlen=self._curriculum_window_size))
+            win_dq.append(1 if self._episode_won_current else 0)
+
         # Evaluate batch when window is full
-        if len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
+        if self.curriculum_enabled and len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
             self._evaluate_curriculum_batch()
 
         self.reset_metrics()
@@ -800,6 +824,13 @@ class PlatformerCore(gymnasium.Env):
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
+        elif not self.curriculum_enabled and self.level_order:
+            # Eval / playback: stay on the level we were constructed with.
+            if self.world in self.level_order:
+                self.current_index_world = self.level_order.index(self.world)
+            else:
+                self.current_index_world = 0
+                self.world = self.level_order[self.current_index_world]
         elif self.level_order:
             self._curriculum_position = max(0, min(
                 self._curriculum_position, len(self.level_order) - 1))
@@ -1080,10 +1111,16 @@ class PlatformerCore(gymnasium.Env):
     def _check_termination(self) -> bool:
         """
         Returns True only when the episode should end (lives = 0, or no player).
-        Goal completion is NOT a termination — it transitions inline in step().
+        Goal completion is NOT a termination during training — it transitions
+        inline in step(). In eval (terminate_on_goal=True) the goal ENDS the
+        episode instead.
         """
         player = self.player
         if not player:
+            return True
+
+        # Eval-only: reaching the goal ends the episode.
+        if self.terminate_on_goal and self.reached_goal:
             return True
 
         if self.use_timer and self.timer <= 0:

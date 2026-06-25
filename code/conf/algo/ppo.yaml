@@ -4,13 +4,13 @@ policy: MultiInputPolicy
 
 n_steps: 2048          # was 4096 — faster update cycle, better for noisy rewards
 batch_size: 512        # was 256 — bigger batches use CPU vector units better
-n_epochs: 4            # was 8 — fewer SGD passes; profile showed train_s ≈ 72% of wall time
+n_epochs: 8            # raised 4->8: more value-fit passes to support longer gamma=0.997 horizon (Task 5)
 learning_rate: 0.0003  # keep for now, add schedule after reward fix
-gae_lambda: 0.95
-gamma: 0.99
+gae_lambda: 0.97       # raised 0.95->0.97: lower-bias GAE for the longer horizon (Task 5)
+gamma: 0.997           # raised 0.99->0.997: ~333-step effective horizon. MUST equal POTENTIAL_GAMMA in train_platformer.py
 clip_range: 0.2
 ent_coef: 0.01         # was 0.02 — reduce once reward signal is stronger
-vf_coef: 0.25          # was implicit 0.5 — reduce while value loss is high
+vf_coef: 0.5           # raised 0.25->0.5: stronger value fitting for longer-horizon returns (Task 5)
 verbose: 1
 
 policy_kwargs:

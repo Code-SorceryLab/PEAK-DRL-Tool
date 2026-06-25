@@ -4,6 +4,11 @@ from typing import Callable, Tuple, Dict, Any
 
 Info = Dict[str, Any]
 
+# PBRS shaping discount. MUST equal PPO `gamma` in code/conf/algo/ppo.yaml
+# (potential-based shaping is policy-invariant only when these are equal —
+# Ng, Harada & Russell 1999). Guarded by code/tests/test_gamma_sync.py.
+POTENTIAL_GAMMA = 0.997
+
 # =============================================================================
 # Score Tracker
 # =============================================================================
@@ -86,6 +91,13 @@ class _ScoreTracker:
         dijkstra_valid = (raw_dijkstra >= 0.0)
         info["dijkstra_valid"] = dijkstra_valid
 
+        # Capture the PREVIOUS step's anchor before ANY modification.
+        # This is used for the PBRS potential below so that dijkstra_dist_prev
+        # always reflects the distance from the step BEFORE this one, not the
+        # current step.  (Bug was: last_dijkstra was overwritten first, so
+        # dijkstra_dist_prev ended up equal to curr_d every step.)
+        prev_dijkstra_anchor = self.last_dijkstra
+
         if self.last_dijkstra is None:
             self.last_dijkstra = raw_dijkstra if dijkstra_valid else None
 
@@ -110,8 +122,12 @@ class _ScoreTracker:
         # The persona reads info["dijkstra_dist"] for curr and this for prev.
         # Set to -1.0 (sentinel) when no valid previous reading exists so the
         # persona can skip the computation on the first step of an episode/level.
+        #
+        # NOTE: we use prev_dijkstra_anchor (captured before any write above)
+        # so that this always reflects the PRIOR step's distance, not the current.
         info["dijkstra_dist_prev"] = (
-            self.last_dijkstra if (self.last_dijkstra is not None and dijkstra_valid)
+            prev_dijkstra_anchor
+            if (prev_dijkstra_anchor is not None and dijkstra_valid)
             else -1.0
         )
         # --- End Potential-Based Reward Shaping ---
@@ -217,7 +233,6 @@ def adept(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str
     on_platform = info.get("on_moving_platform", False)
 
     # ── Potential-based shaping (THE FIX: scale 3.0 → 0.3) ───────────────
-    POTENTIAL_GAMMA = 0.99
     POTENTIAL_SCALE = 0.3     # was 3.0 — dominated everything
 
     r_potential = 0.0
@@ -293,13 +308,19 @@ def simple(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[st
     life_lost   = info.get("life_lost", False)
     on_platform = info.get("on_moving_platform", False)
 
-    # ── Movement (clamped so it can't dominate) ───────────────────────────
-    r_move = progress * 0.003
-    
-    
+    # ── Movement (sharply down-weighted + tightly clamped) ────────────────
+    # TASK 3: the raw horizontal-progress bonus previously let an agent that
+    # just runs right out-earn the win bonus (+0.01/step × ~6212 steps ≈ 62 ≫
+    # win 5.0). Cap it so cumulative movement over a full episode stays well
+    # below a single win, forcing win + dijkstra-progress (PBRS) to dominate.
+    # NOTE: this is the NON-PBRS distance term. The dijkstra PBRS potential in
+    # adept/speedrunner/completionist is intentionally left untouched.
+    MOVE_SCALE = 0.00005   # was 0.003
+    MOVE_CLAMP = 0.0005    # was 0.01 — caps cumulative to ~3.1 over 6212 steps
+    r_move = progress * MOVE_SCALE
     if progress < 0:
-        r_move *= 1.5              # soft backtrack penalty
-    r_move = max(-0.01, min(0.01, r_move))   # CLAMP — prevents runaway
+        r_move *= 1.5              # soft backtrack penalty (kept)
+    r_move = max(-MOVE_CLAMP, min(MOVE_CLAMP, r_move))   # CLAMP — prevents runaway
 
     # ── Stall penalty (not on platforms) ──────────────────────────────────
     if not on_platform and abs(progress) < 0.5:
@@ -409,7 +430,6 @@ def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
     r_velocity = min(0.005, r_velocity)  # clamp
 
     # ── Dijkstra potential for direction ──────────────────────────────────
-    POTENTIAL_GAMMA = 0.99
     POTENTIAL_SCALE = 0.3              # was 0.8
 
     r_potential = 0.0
@@ -463,7 +483,6 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
     dijkstra_valid = info.get("dijkstra_valid", False)
 
     # ── Moderate dijkstra potential ──────────────────────────────────────
-    POTENTIAL_GAMMA = 0.99
     POTENTIAL_SCALE = 0.3        # was 0.6 — same fix as dijkstra persona
 
     r_potential = 0.0
