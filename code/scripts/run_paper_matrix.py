@@ -42,6 +42,10 @@ RESULTS = MATRIX_ROOT / "results"
 LOGFILE = MATRIX_ROOT / "orchestrator.log"
 
 MAX_CONCURRENT = 3            # ~3 cores/run on a 10-core CPU-bound Mac
+# Per-run parallel envs. Default 2 (SubprocVecEnv). If the server hits the cv2/
+# multiprocessing crash even with the fork fix, set PEAK_MATRIX_NENVS=1 to use
+# DummyVecEnv (no worker processes) — slower per run, but multiprocessing-free.
+N_ENVS = int(os.environ.get("PEAK_MATRIX_NENVS", "2"))
 EVAL_EPISODES = 30
 LEVELS = ["Mario1-1", "Mario1-2"]
 
@@ -175,7 +179,7 @@ def run_job(job: dict) -> tuple:
         f"+architecture={job['ext']}",
         f"skills.Novice={BUDGETS.get('Novice', 1_000_000)}",
         f"skills.Expert={BUDGETS.get('Expert', 8_000_000)}",
-        "n_envs=2", "profile=false", f"+out_root={out_root}",
+        f"n_envs={N_ENVS}", "profile=false", f"+out_root={out_root}",
         f"+dijkstra_enabled={'true' if job.get('dijkstra', True) else 'false'}",
     ]
     log(f"TRAIN start {jid} (budget={job['budget']})")

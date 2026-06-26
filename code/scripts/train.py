@@ -1151,7 +1151,18 @@ def main(cfg: DictConfig):
 
             n_envs = int(cfg.get("n_envs", 1))
             if n_envs > 1:
-                raw_env = SubprocVecEnv([make_env() for _ in range(n_envs)])
+                # Force 'fork' for the env workers on Linux. The default
+                # (forkserver/spawn) RE-IMPORTS this module in every worker, which
+                # on Python 3.10 triggers a cv2/typing circular-import crash
+                # (cv2.typing shadows stdlib typing during the re-import). 'fork'
+                # inherits the already-imported parent and sidesteps it entirely.
+                # We are on CPU with no live CUDA context, so fork is safe here.
+                import multiprocessing as _mp, platform as _plat
+                _start = ("fork" if (_plat.system() == "Linux"
+                                     and "fork" in _mp.get_all_start_methods())
+                          else None)
+                raw_env = SubprocVecEnv(
+                    [make_env() for _ in range(n_envs)], start_method=_start)
             else:
                 raw_env = DummyVecEnv([make_env()])
 
