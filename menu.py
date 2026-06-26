@@ -2634,7 +2634,6 @@ def main():
         print(_menu_item("2",  "Train Single",        "toggle: game / algo / personas / skills / arch"))
         print(_menu_item("3",  "Train All (1 game)",  "toggle: algos / personas / skills"))
         print(_menu_item("4",  "Train Full Grid",     "all games × algos × personas"))
-        print(_menu_item("15", "Run Paper Matrix",    "multi-seed A–H → /tmp/peak_matrix (then 14 to analyze)"))
 
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
@@ -2647,6 +2646,7 @@ def main():
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "TensorBoard",          "mylogs/"))
         print(_menu_item("12", "Analyze Performance",  "single-run CSV deep-dive"))
+        print(_menu_item("15", "Run Paper Matrix",     "multi-seed A–H → /tmp/peak_matrix"))
         print(_menu_item("14", "Full Case Study",      "multi-seed matrix → Tables 1 & 2 + CIs"))
         print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
