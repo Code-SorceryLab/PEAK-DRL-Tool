@@ -907,13 +907,16 @@ _VECNORM_TRAIN_CLIP_REWARD = 10.0
 def _build_vecnorm_kwargs(uses_dict_obs, obs_space, *, training):
     """Construct VecNormalize kwargs.
 
-    training=True  -> norm_reward=True  (+ clip_reward=10.0 > win bonus 5.0)
-    training=False -> norm_reward=False (interpretable eval rewards)
+    Reward is NOT normalized (norm_reward=False) for train OR eval — reverted to
+    main. Normalizing the training reward buried the dense movement signal (which
+    is the agent's only rightward-navigation cue) and degraded the policy.
+    The `training` arg is kept for call-site compatibility but no longer changes
+    norm_reward.
     """
     kwargs = dict(
         norm_obs=True,
         clip_obs=10.0,
-        norm_reward=bool(training),
+        norm_reward=False,
         clip_reward=_VECNORM_TRAIN_CLIP_REWARD,
     )
     if uses_dict_obs:
