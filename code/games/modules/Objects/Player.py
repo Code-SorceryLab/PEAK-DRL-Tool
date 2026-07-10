@@ -146,14 +146,17 @@ class Player():
         grav = context.FAST_FALL_GRAV if self.vy > 0 else context.GRAVITY
         self.vy = min(self.vy + (grav * dt), context.MAX_FALL_SPEED)
 
-        self.gObj.x += self.vx * dt
-        self.gObj.y += self.vy * dt
+        self._update_position(self.gObj.x + self.vx * dt, self.gObj.y + self.vy * dt)
         self.on_ground = False
 
         # 6. Tick fire cooldown — keeps it draining even when fire key is not held
         if self._fire_cooldown > 0.0:
             self._fire_cooldown = max(0.0, self._fire_cooldown - dt)
         self.shot_cooldown = self._fire_cooldown
+
+    def _update_position(self, posX, posY):
+        self.gObj.x = posX
+        self.gObj.y = posY
 
     def _update_animation_logic(self, dt: float):
         """Decides which animation state to use based on physics."""

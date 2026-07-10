@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+"""Data loading utilities and path constants for the PEAK dashboard."""
+
+import os
+import glob
+import ast
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import yaml
+
+
+# Path constants
+
+CONFIG_PATH = "code/stats/MarioThresholds.yaml"
+GAME_CONFIG_PATH = "code/games/game_config.yaml"
+LEVELS_ROOT = "code/games/levels"
+TILE_SIZE = 32
+SOLID_CHARS = set("#=?<>F")
+
+
+# Loaders
+
+@st.cache_data
+def load_config(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+
+@st.cache_data
+def load_game_config(path):
+    """Load the game config to get world->level-file mappings."""
+    try:
+        with open(path, "r") as f:
+            cfg = yaml.safe_load(f)
+        mapping = {}
+        for section_key in ("levels", "disabled_levels"):
+            section = cfg.get(section_key, {})
+            if isinstance(section, dict):
+                for world_id, world_cfg in section.items():
+                    if isinstance(world_cfg, dict) and "file" in world_cfg:
+                        mapping[world_id] = world_cfg["file"]
+        return mapping
+    except Exception:
+        return {}
+
+
+@st.cache_data
+def load_level_grid(level_file_path):
+    """Parse a level .txt file into a 2D numpy array.
+    Returns (grid, rows, cols) where grid values:
+      1 = solid, -1 = pit/void, 0 = air/empty
+    """
+    try:
+        with open(level_file_path, "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return None, 0, 0
+    rows_raw = [line.rstrip("\n") for line in lines]
+    if not rows_raw:
+        return None, 0, 0
+    max_cols = max(len(r) for r in rows_raw)
+    grid = np.zeros((len(rows_raw), max_cols), dtype=np.int8)
+    for r, row_str in enumerate(rows_raw):
+        for c, ch in enumerate(row_str):
+            if ch in SOLID_CHARS:
+                grid[r, c] = 1
+            elif ch == "O":
+                grid[r, c] = -1
+    return grid, len(rows_raw), max_cols
+
+
+def parse_route(route_str):
+    """Parse a route string like '[(x,y), ...]' into a list of (x,y) floats."""
+    if not isinstance(route_str, str) or not route_str.strip():
+        return []
+    try:
+        return ast.literal_eval(route_str.strip())
+    except Exception:
+        return []
+
+
+@st.cache_data
+def load_all_csvs(data_path):
+    """Read all CSVs from the data path, concatenate into one DataFrame."""
+    pattern = os.path.join(data_path, "*.csv")
+    files = glob.glob(pattern)
+    if not files:
+        return pd.DataFrame()
+    dfs = []
+    for fp in files:
+        try:
+            df = pd.read_csv(fp)
+            dfs.append(df)
+        except Exception:
+            continue
+    if not dfs:
+        return pd.DataFrame()
+    return pd.concat(dfs, ignore_index=True)
+
+
+# Helpers
+
+def win_rate(df, world, persona):
+    """Win rate = fraction of runs where cause_of_death == 'Success'."""
+    sub = df[(df["world"] == world) & (df["persona"] == persona)]
+    if len(sub) == 0:
+        return None
+    successes = sub["cause_of_death"].str.lower()
+    wins = (successes == "success").sum()
+    return wins / len(sub)

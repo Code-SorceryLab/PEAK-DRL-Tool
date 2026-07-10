@@ -12,3 +12,5 @@ class MarioStats(PlatformerStats):
         data = super().to_dict()
         data["enemies_killed"] = self.enemies_killed
         return data
+    
+    

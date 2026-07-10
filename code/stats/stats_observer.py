@@ -84,7 +84,7 @@ class stats_observer:
             stats_row = self.currentAttempt.to_dict()
 
             row = {
-                "player": self.player,
+                "persona": self.player,
                 "game": self.game,
                 **stats_row,
                 "elapsed_time": round(self.get_elapsed_time(), 2),
