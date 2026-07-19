@@ -42,11 +42,17 @@ def build_eval_env(
     level: str,
     max_steps: int,
     vecnorm_path: Optional[Path],
+    frame_skip: int = 1,
+    stall_metric: str = "euclid",
 ):
     """
     Build a headless DummyVecEnv pinned to *level* with curriculum disabled
     and terminate_on_goal=True.  Mirrors watch_agent.build_env but headless
     and with eval-specific kwargs.
+
+    frame_skip MUST match the value the model was trained with (recorded in
+    model_info.json) — a skip-4 policy stepped per-frame acts 4x too often
+    and its behaviour is meaningless.
     """
     game_module = importlib.import_module(f"code.games.{game}_core")
     GameCoreClass = getattr(game_module, f"{game.capitalize()}Core")
@@ -55,6 +61,9 @@ def build_eval_env(
         "world": level,
         "curriculum_enabled": False,
         "terminate_on_goal": True,
+        # euclid = legacy benchmark rules (comparable to historical numbers);
+        # path = corrected rules (vertical play counts as anti-stall progress).
+        "stall_metric": stall_metric,
     }
 
     def _make():
@@ -62,6 +71,7 @@ def build_eval_env(
             GameCoreClass,
             render_mode="none",
             max_steps=max_steps,
+            frame_skip=frame_skip,
             **game_kwargs,
         )
 
@@ -244,6 +254,14 @@ def main() -> None:
     ap.add_argument("--max_steps", type=int, default=8000, help="Max steps per episode (default: 8000)")
     ap.add_argument("--out",       default=None, help="Optional JSON output path")
     ap.add_argument("--stochastic", action="store_true", help="Use stochastic actions (default: deterministic)")
+    ap.add_argument("--frame-skip", type=int, default=None, dest="frame_skip",
+                    help="Action repeat — MUST match training (model_info.json). "
+                         "Auto-detected from model_info.json beside the model; defaults to 1.")
+    ap.add_argument("--stall-metric", choices=["euclid", "path"], default="euclid",
+                    dest="stall_metric",
+                    help="Anti-stall progress test for the EVAL env. euclid = legacy "
+                         "benchmark rules (comparable to historical numbers); path = "
+                         "corrected rules (vertical play counts as progress).")
     args = ap.parse_args()
 
     model_path = Path(args.model)
@@ -261,9 +279,24 @@ def main() -> None:
     game = args.game or p_game
     algo = args.algo or p_algo
 
+    # Resolve frame_skip: explicit CLI > model_info.json beside the model > 1.
+    # A skip-4 policy stepped per-frame acts 4x too often — silently wrong.
+    frame_skip = args.frame_skip
+    if frame_skip is None:
+        info_path = model_path.parent / "model_info.json"
+        if info_path.exists():
+            try:
+                frame_skip = int(json.loads(info_path.read_text()).get("frame_skip", 1))
+                print(f"[INFO] frame_skip={frame_skip} (from {info_path.name})")
+            except Exception:
+                frame_skip = 1
+        else:
+            frame_skip = 1
+
     print(f"[INFO] game={game}  algo={algo.upper()}")
     print(f"[INFO] level={args.level}  episodes={args.episodes}  "
-          f"max_steps={args.max_steps}  deterministic={not args.stochastic}")
+          f"max_steps={args.max_steps}  deterministic={not args.stochastic}  "
+          f"frame_skip={frame_skip}")
 
     # Load model
     model = load_model(str(model_path), algo)
@@ -284,6 +317,8 @@ def main() -> None:
         level=args.level,
         max_steps=args.max_steps,
         vecnorm_path=vn_path,
+        frame_skip=frame_skip,
+        stall_metric=args.stall_metric,
     )
 
     # Run

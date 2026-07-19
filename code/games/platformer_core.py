@@ -489,6 +489,13 @@ class PlatformerCore(gymnasium.Env):
         # Timer knobs
         self.use_timer = bool(kwargs.pop("use_timer", True))
         self.timer_seconds = int(kwargs.pop("timer_seconds", 400))
+        # Episode time-horizon override (game-clock units). When set, it wins
+        # over each level's time_limit from game_config.yaml — makes the
+        # in-game episode horizon a run parameter (+time_limit=150) instead
+        # of a per-level constant. Also drives the obs timer normalisation.
+        self._time_limit_override = kwargs.pop("time_limit", None)
+        if self._time_limit_override is not None:
+            self.timer_seconds = int(self._time_limit_override)
         self.timer_warn_threshold = int(kwargs.pop("timer_warn_threshold", 100))
 
         self.max_lives = 3
@@ -521,6 +528,15 @@ class PlatformerCore(gymnasium.Env):
         self.anti_stall = bool(kwargs.pop("anti_stall", True))
         self.stall_window = float(kwargs.pop("stall_window", 2))
         self.stall_kill_windows = int(kwargs.pop("stall_kill_windows", 10))
+        # Stall progress metric: "euclid" (legacy straight-line px) or "path"
+        # (Dijkstra path distance). Euclidean falsely kills correct VERTICAL
+        # play — riding a platform or climbing a shaft on Mario1-2 does not
+        # shrink straight-line distance to the goal, so the watchdog executes
+        # the agent for progressing (measured: 14/28 eval failures on 1-2).
+        # Path distance counts any movement along the solver's route as
+        # progress; falls back to Euclidean while the tile reading is invalid
+        # (mid-air / unreachable), so genuine stalls still die.
+        self.stall_metric = str(kwargs.pop("stall_metric", "euclid")).lower()
 
         # Observation sanity checker
         self._obs_check_interval = 5000   # Check every N steps
@@ -633,7 +649,8 @@ class PlatformerCore(gymnasium.Env):
         self.progress_x_best = 0.0; self.progress_y_best = 0.0
         self.death_cause = ""
         self.lives = self.max_lives  # restore lives on every full episode reset
-        self.best_dist_to_goal = float('inf')  # stall tracker anchor
+        self.best_dist_to_goal = float('inf')  # stall tracker anchor (Euclidean px)
+        self.best_path_dist = float('inf')     # stall tracker anchor (Dijkstra cost, path mode)
         self._needs_level_transition = False   # set True when goal reached mid-episode
         self._pending_next_level_index = None  # set by complete_level, applied after _info()
         # --- Velocity Alignment (cached from _tracking_obs each step) ---
@@ -682,6 +699,12 @@ class PlatformerCore(gymnasium.Env):
 
 
         if self.use_timer: self.timer -= self.dt
+        # Physics-frame counter. Was never incremented before (latent bug):
+        # the frame-based max_steps truncation below never fired (the GameEnv
+        # wrapper's decision counter masked it) and info["frame_count"] logged
+        # 0 forever. With frame-skip, max_steps must count FRAMES so the
+        # in-game episode budget is invariant to the skip value.
+        self.frame += 1
         if self.render_mode == "human": self.debug_manager.update_input()
 
         # Step Metrics Reset
@@ -965,13 +988,20 @@ class PlatformerCore(gymnasium.Env):
         self.stalled_this_frame = False
         self.max_x_seen = px
         self.best_dist_to_goal = self._get_dist_to_goal()
+        self.best_path_dist = float('inf')   # re-anchor path-stall on level (re)load
 
         self.camera_x = 0.0
         self.camera_y = 0.0
         self.last_score = 0
         self.last_x = self.player.gObj.x
 
-        self.timer = config.get('time_limit', self.timer_seconds) if self.use_timer else math.inf
+        if not self.use_timer:
+            self.timer = math.inf
+        elif self._time_limit_override is not None:
+            # Run-level horizon parameter beats the per-level config value.
+            self.timer = float(self._time_limit_override)
+        else:
+            self.timer = config.get('time_limit', self.timer_seconds)
 
         # --- CALCULATE DIJKSTRA MAP ---
         self._calculate_dijkstra_map()
@@ -1097,12 +1127,31 @@ class PlatformerCore(gymnasium.Env):
             self.stalled_this_frame = False
             return
 
-        # PERF: Read from cache set at the top of step() instead of recomputing.
-        current_dist = getattr(self, '_goal_dist_cache', self._get_dist_to_goal())
-        threshold = TILE_SIZE / 2.0
+        # Progress test. "path" mode measures along the Dijkstra route (in
+        # tile-cost units; 0.5 ≈ the 16px Euclidean threshold) so correct
+        # vertical play counts as progress; it falls back to the Euclidean
+        # test whenever the tile reading is invalid (mid-air / unreachable),
+        # keeping the watchdog live against genuine stalls.
+        made_progress = False
+        used_path = False
+        if self.stall_metric == "path" and self.dijkstra:
+            d = self.dijkstra.get_dist(int(self.player.gObj.x // TILE_SIZE),
+                                       int(self.player.gObj.y // TILE_SIZE))
+            if d >= 0:
+                used_path = True
+                if d < (self.best_path_dist - 0.5):
+                    self.best_path_dist = d
+                    made_progress = True
 
-        if current_dist < (self.best_dist_to_goal - threshold):
-            self.best_dist_to_goal = current_dist
+        if not used_path:
+            # PERF: Read from cache set at the top of step() instead of recomputing.
+            current_dist = getattr(self, '_goal_dist_cache', self._get_dist_to_goal())
+            threshold = TILE_SIZE / 2.0
+            if current_dist < (self.best_dist_to_goal - threshold):
+                self.best_dist_to_goal = current_dist
+                made_progress = True
+
+        if made_progress:
             self.stall_timer = 0
             self.stalled_this_frame = False
         else:
@@ -1727,6 +1776,19 @@ class PlatformerCore(gymnasium.Env):
 
         self._step_dx = step_dx
         self._step_dy = step_dy
+
+        # Dijkstra ablation (dijkstra_enabled=False) must hide the solver
+        # prior from the POLICY's scalars too — _obs() already zeroes grid
+        # channel 3, but without this gate the exact distance + unit
+        # direction-to-goal would still leak through scalars [4]/[5]/[6],
+        # silently invalidating any "without Dijkstra" ablation run.
+        # Only the OBSERVED values are masked: self._step_dx/_step_dy and
+        # the solver itself stay live because _info() -> the adept persona's
+        # PBRS/alignment reward legitimately consume them even when the
+        # observation is ablated (reward ablation is a separate axis).
+        if not self.dijkstra_enabled:
+            dijkstra_dist = 1.0            # neutral default (same as no-solver)
+            step_dx, step_dy = 0.0, 0.0
 
         return np.array([
             np.clip(e_dist        / norm_dist, 0.0, 1.0),  # [0] enemy dist

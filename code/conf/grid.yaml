@@ -29,6 +29,12 @@ seed: 1234
 render_mode: none        # none / human
 fps: 60
 max_steps: 10000
+frame_skip: 1     # action repeat: each agent decision spans N physics frames, rewards summed
+                  # (classic Mario/Atari recipe = 4). 1 = legacy per-frame decisions.
+                  # NOTE: models are skip-specific — eval with the same skip (eval_level --frame-skip).
+stall_metric: euclid  # anti-stall progress test: euclid (legacy straight-line) | path (Dijkstra
+                      # route distance — vertical play counts as progress; Euclid falsely kills
+                      # correct platform/shaft play on Mario1-2).
 
 tb_root: mylogs     # folder where TensorBoard logs go (tensorboard --logdir runs)
 eval_freq: 10000  # evaluate every N steps (EvalCallback)
@@ -45,7 +51,7 @@ model: null     # optional single selection
 persona: null   # optional single selection
 skill: null     # optional single selection2
 
-viz_enabled: false
+viz_enabled: True
 viz_freq: 10000        # adjust to taste — every 50k steps is reasonable
 viz_preview_episodes: 1
 viz_fps: 30

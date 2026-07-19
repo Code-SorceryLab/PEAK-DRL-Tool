@@ -1,8 +1,19 @@
 from __future__ import annotations
 import math
+import os
 from typing import Callable, Tuple, Dict, Any
 
 Info = Dict[str, Any]
+
+
+def _potential_gamma() -> float:
+    """PBRS shaping discount. MUST equal the agent's PPO gamma for the Ng
+    et al. policy-invariance guarantee, so train.py exports the resolved
+    gamma via PEAK_POTENTIAL_GAMMA (covers +gamma= CLI overrides). Read
+    lazily per call because SubprocVecEnv workers import this module in
+    their own process — a module-level constant would freeze before
+    train.py sets the variable. Default matches ppo.yaml's gamma: 0.99."""
+    return float(os.environ.get("PEAK_POTENTIAL_GAMMA", "0.99"))
 
 # =============================================================================
 # Score Tracker
@@ -20,6 +31,7 @@ class _ScoreTracker:
         self.prev_score    = 0
         self.last_dist     = None
         self.last_dijkstra = None
+        self.start_dijkstra = None   # Φ-anchor: first valid distance of the episode/level
         self.last_x        = None
         self.max_x         = 0.0
         self.last_coins    = 0
@@ -86,8 +98,26 @@ class _ScoreTracker:
         dijkstra_valid = (raw_dijkstra >= 0.0)
         info["dijkstra_valid"] = dijkstra_valid
 
+        # Capture the pre-update anchor BEFORE any branch below overwrites
+        # self.last_dijkstra. This is what "previous step's distance" means;
+        # publishing self.last_dijkstra AFTER the update (the old code) made
+        # prev == curr on every steady-state step, collapsing the PBRS term
+        # (prev - γ·curr)·scale into a flat stand-still bonus — the dense
+        # directional gradient was dead for adept/speedrunner/completionist.
+        prev_anchor = self.last_dijkstra
+
         if self.last_dijkstra is None:
             self.last_dijkstra = raw_dijkstra if dijkstra_valid else None
+
+        # Φ(start)=0 anchor: remember the first valid distance of this
+        # episode/level. Personas subtract the constant (1-γ)·d_start from the
+        # potential term so a stationary agent earns exactly 0 at spawn and
+        # ≤0 anywhere closer — killing the (1-γ)·d "standing income" that made
+        # farm-to-the-cap (~19.5) out-earn winning (~7) in eval. Kept across
+        # life_lost (respawn returns to the same spawn); re-anchored on won
+        # (next level has a new spawn distance).
+        if self.start_dijkstra is None and dijkstra_valid:
+            self.start_dijkstra = raw_dijkstra
 
         if life_lost:
             dijkstra_progress = 0.0
@@ -108,11 +138,17 @@ class _ScoreTracker:
         # Pass the previous step's raw Dijkstra distance so the persona can
         # compute the properly gamma-discounted potential: prev - γ*curr.
         # The persona reads info["dijkstra_dist"] for curr and this for prev.
-        # Set to -1.0 (sentinel) when no valid previous reading exists so the
-        # persona can skip the computation on the first step of an episode/level.
+        # Set to -1.0 (sentinel) when no valid previous reading exists (first
+        # step of an episode/level) or on a life-lost step (respawn teleport
+        # would otherwise produce a spurious potential spike), so the persona
+        # skips the computation — mirroring dijkstra_progress = 0.0 above.
         info["dijkstra_dist_prev"] = (
-            self.last_dijkstra if (self.last_dijkstra is not None and dijkstra_valid)
+            prev_anchor
+            if (prev_anchor is not None and dijkstra_valid and not life_lost)
             else -1.0
+        )
+        info["dijkstra_dist_start"] = (
+            self.start_dijkstra if self.start_dijkstra is not None else -1.0
         )
         # --- End Potential-Based Reward Shaping ---
 
@@ -136,6 +172,7 @@ class _ScoreTracker:
         if info.get("won", False):
             self.last_dijkstra = None
             self.last_dist     = None  # also reset euclidean anchor for same reason
+            self.start_dijkstra = None # re-anchor Φ(start)=0 on the new level
 
         # 4. Frontier
         current_x = float(info.get("x_position", 0.0))
@@ -217,14 +254,23 @@ def adept(score_inc: bool, terminated: bool, info: Info, score: int) -> Dict[str
     on_platform = info.get("on_moving_platform", False)
 
     # ── Potential-based shaping (THE FIX: scale 3.0 → 0.3) ───────────────
-    POTENTIAL_GAMMA = 0.99
+    POTENTIAL_GAMMA = _potential_gamma()   # synced to PPO gamma via env var
     POTENTIAL_SCALE = 0.3     # was 3.0 — dominated everything
 
     r_potential = 0.0
     curr_d = float(info.get("dijkstra_dist", -1.0))
     prev_d = float(info.get("dijkstra_dist_prev", -1.0))
+    start_d = float(info.get("dijkstra_dist_start", -1.0))
     if dijkstra_valid and prev_d >= 0.0:
         r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
+        if start_d >= 0.0:
+            # Φ(start)=0 anchor: subtracting the constant (1-γ)·d_start makes
+            # standing at spawn pay exactly 0 and standing anywhere closer pay
+            # slightly LESS than 0 (mild urgency) — removes the (1-γ)·d
+            # standing income that let farm-to-cap out-earn winning. The
+            # approach gradient (Δd term) is untouched; the shift is a
+            # constant per level, so shaping stays policy-invariant.
+            r_potential -= (1.0 - POTENTIAL_GAMMA) * start_d * POTENTIAL_SCALE
 
     # ── Velocity alignment (skip on platforms) ────────────────────────────
     r_alignment = 0.0
@@ -409,14 +455,18 @@ def speedrunner(score_inc: bool, terminated: bool, info: Info, score: int) -> Di
     r_velocity = min(0.005, r_velocity)  # clamp
 
     # ── Dijkstra potential for direction ──────────────────────────────────
-    POTENTIAL_GAMMA = 0.99
+    POTENTIAL_GAMMA = _potential_gamma()   # synced to PPO gamma via env var
     POTENTIAL_SCALE = 0.3              # was 0.8
 
     r_potential = 0.0
     curr_d = float(info.get("dijkstra_dist", -1.0))
     prev_d = float(info.get("dijkstra_dist_prev", -1.0))
+    start_d = float(info.get("dijkstra_dist_start", -1.0))
     if dijkstra_valid and prev_d >= 0.0:
         r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
+        if start_d >= 0.0:
+            # Φ(start)=0 anchor — kills the standing income (see adept).
+            r_potential -= (1.0 - POTENTIAL_GAMMA) * start_d * POTENTIAL_SCALE
 
     progress = float(info.get("progress", 0.0))
     r_backtrack = min(0.0, progress) * 0.01
@@ -463,14 +513,18 @@ def completionist(score_inc: bool, terminated: bool, info: Info, score: int) -> 
     dijkstra_valid = info.get("dijkstra_valid", False)
 
     # ── Moderate dijkstra potential ──────────────────────────────────────
-    POTENTIAL_GAMMA = 0.99
+    POTENTIAL_GAMMA = _potential_gamma()   # synced to PPO gamma via env var
     POTENTIAL_SCALE = 0.3        # was 0.6 — same fix as dijkstra persona
 
     r_potential = 0.0
     curr_d = float(info.get("dijkstra_dist", -1.0))
     prev_d = float(info.get("dijkstra_dist_prev", -1.0))
+    start_d = float(info.get("dijkstra_dist_start", -1.0))
     if dijkstra_valid and prev_d >= 0.0:
         r_potential = (prev_d - POTENTIAL_GAMMA * curr_d) * POTENTIAL_SCALE
+        if start_d >= 0.0:
+            # Φ(start)=0 anchor — kills the standing income (see adept).
+            r_potential -= (1.0 - POTENTIAL_GAMMA) * start_d * POTENTIAL_SCALE
 
     # ── All objectives at meaningful weight ────────────────────────────
     r_coin     = 0.15 * coins

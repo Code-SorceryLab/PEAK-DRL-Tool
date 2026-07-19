@@ -19,6 +19,7 @@ class GameEnv(gym.Env):
         render_mode: str = "none",
         fps: int | None = 30,
         max_steps: int | None = None,
+        frame_skip: int = 1,
         reward_fn: Callable[[Obs, float | None, bool, Info], float] | None = None,
         hud_fn: Callable[[pygame.Surface, "GameEnv"], None] | None = None,
         **game_kwargs,
@@ -28,6 +29,16 @@ class GameEnv(gym.Env):
         self.render_mode = render_mode
         self.fps = fps
         self.max_steps = max_steps
+        # Action repeat (classic Mario/Atari "frame-skip"): each agent decision
+        # is applied for k physics frames, rewards summed over the skip.
+        # k=1 (default) is byte-identical to the pre-frame-skip behaviour.
+        # Episode budgets: cores with a frame counter (platformer/megaman/
+        # sonic) truncate on max_steps FRAMES, so their in-game episode budget
+        # is invariant to the skip — episodes just take ~k× fewer decisions.
+        # The wrapper's own _step_count bound below counts DECISIONS and acts
+        # as a secondary guard (and the only bound for cores without a frame
+        # counter, e.g. meatboy).
+        self.frame_skip = max(1, int(frame_skip))
         self.hud_fn = hud_fn
 
         # If the reward_fn is a factory (produced by _wrap_with_tracker),
@@ -80,33 +91,57 @@ class GameEnv(gym.Env):
             if isinstance(action, (np.generic, np.ndarray)):
                 action = int(action)
 
-        obs, base, terminated, truncated, info = self.game.step(action)
-        # FIX: OR with game's own truncated rather than overwriting it entirely.
-        # If the game sets truncated=True (e.g. internal timer), the wrapper was
-        # previously silently discarding it.
-        truncated = truncated or bool(self.max_steps and self._step_count >= self.max_steps)
-
-        # --- REWARD PROCESSING (THE FIX) ---
-        # 1. Get raw reward from Persona (Could be Float OR Dict)
-        if self.reward_fn:
-            raw_reward = self.reward_fn(obs, base, terminated, info)
-        else:
-            raw_reward = self.hub.compute_default_reward(info)
-
-        # 2. Handle both formats safely
+        # --- Frame-skip loop (action repeat) ---
+        # The chosen action is applied for frame_skip physics frames; the
+        # persona reward is computed PER FRAME (tracker cadence unchanged)
+        # and summed, so discrete events inside the skip (coin, kill, death,
+        # win) are never lost. Terminal frames break out immediately — their
+        # reward (win bonus / death penalty) is captured before the break.
+        # The agent sees the LAST frame's obs/info, per Mario/Atari convention.
         final_scalar_reward = 0.0
-        reward_breakdown = {}
+        summed_breakdown: dict = {}
 
-        if isinstance(raw_reward, dict):
-            final_scalar_reward = sum(raw_reward.values())
-            reward_breakdown = raw_reward
-        else:
-            final_scalar_reward = float(raw_reward)
-            # Prefer the breakdown injected by the persona wrapper over a generic fallback
-            reward_breakdown = info.get("reward_components", {"reward": final_scalar_reward})
+        for _ in range(self.frame_skip):
+            obs, base, terminated, truncated, info = self.game.step(action)
+            # FIX: OR with game's own truncated rather than overwriting it entirely.
+            # If the game sets truncated=True (e.g. internal timer), the wrapper was
+            # previously silently discarding it.
+            truncated = truncated or bool(self.max_steps and self._step_count >= self.max_steps)
 
-        # 3. Inject Breakdown into Info (for CSV Logger)
-        info["reward_breakdown"] = reward_breakdown
+            # --- REWARD PROCESSING (THE FIX) ---
+            # 1. Get raw reward from Persona (Could be Float OR Dict)
+            if self.reward_fn:
+                raw_reward = self.reward_fn(obs, base, terminated, info)
+            else:
+                raw_reward = self.hub.compute_default_reward(info)
+
+            # 2. Handle both formats safely
+            if isinstance(raw_reward, dict):
+                frame_reward = float(sum(raw_reward.values()))
+                frame_breakdown = raw_reward
+            else:
+                frame_reward = float(raw_reward)
+                # Prefer the breakdown injected by the persona wrapper over a generic fallback
+                frame_breakdown = info.get("reward_components", {"reward": frame_reward})
+
+            final_scalar_reward += frame_reward
+            for k, v in frame_breakdown.items():
+                summed_breakdown[k] = summed_breakdown.get(k, 0.0) + float(v)
+
+            if terminated or truncated:
+                break
+
+        # 3. Inject Breakdown into Info (for CSV Logger) — summed over the skip
+        info["reward_breakdown"] = summed_breakdown
+
+        # SB3 success-rate convention: emit is_success on the terminal step so
+        # evaluate_policy fills EvalCallback's success buffer. This is what
+        # lets best-model selection rank checkpoints by WIN RATE instead of
+        # mean reward (a long stalling episode can out-earn a fast win — the
+        # historically shipped best_model.zip was exactly such an artifact).
+        # Info-only: does not touch obs, reward, or termination.
+        if terminated or truncated:
+            info["is_success"] = bool(info.get("won", False))
 
         # 4. Update Hub (Visuals) - PASS THE FLOAT SUM HERE!
         act_name = info.get("action_name")

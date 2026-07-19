@@ -255,7 +255,12 @@ class PhysicsManager:
             PIT_GRACE_PX  = 48          # pixels below level bottom before kill fires
             OOB_MARGIN_PX = level_data.tile_size if hasattr(level_data, 'tile_size') else 32
 
-            fell_out    = player.gObj.y > level_data.height + PIT_GRACE_PX
+            # Kill on the player's BOTTOM edge (matches the docstring). The
+            # old code tested gObj.y (the TOP edge), so death only fired after
+            # the whole body + grace cleared the level bottom — ~1-2 agent
+            # decisions of fall late at frame_skip=4, delaying the death
+            # penalty's credit assignment on every pit death.
+            fell_out    = player.gObj.y + player.gObj.height > level_data.height + PIT_GRACE_PX
             left_out    = player.gObj.x + player.gObj.width < -OOB_MARGIN_PX
             right_out   = player.gObj.x > level_data.width  + OOB_MARGIN_PX
 
@@ -300,6 +305,9 @@ class PhysicsManager:
         # 2. Resolve Static World Collisions (Walls/Floors)
         self._resolve_player_world(core, level_data)
         self._resolve_player_moving_platforms(core, level_data)
+        # Stabilise on_ground for a resting player (fixes the 50% flicker that
+        # corrupted the on_ground obs scalar and ground-vs-air friction).
+        self._settle_grounded(core, level_data)
         self._resolve_enemy_world(core, level_data)
         self._resolve_powerup_world(core, level_data)
         self._resolve_projectile_world(core, level_data)
@@ -308,6 +316,44 @@ class PhysicsManager:
         self._resolve_dynamic_interactions(core, player_was_falling)
 
     # --- WORLD COLLISION IMPLEMENTATION ---
+
+    def _settle_grounded(self, core, level_data):
+        """Stabilise player.on_ground for a RESTING player.
+
+        on_ground is reset False each frame and only re-set True when a floor
+        collision *resolves* that frame. A player at rest re-penetrates the
+        floor by only ~0.36px/frame, which lands on pygame's exclusive integer
+        edge every other frame → on_ground (and therefore BOTH the on_ground
+        obs scalar AND ground-vs-air friction/accel) flickers 0,1,0,1 at 50%,
+        and frame_skip=4 phase-locks the sampled value. A dedicated 2px
+        downward probe removes the flicker.
+
+        Purely ADDITIVE: only ever sets on_ground True (never False) and only
+        when the player is not moving upward, so jump launch, coyote time, and
+        genuine airborne frames are untouched.
+        """
+        player = core.player
+        if not player or player.on_ground or player.vy < -1e-6:
+            return
+
+        prect = player.gObj.get_rect()
+        probe = pygame.Rect(prect.left, prect.bottom, prect.width, 2)
+
+        for (_row, _col, trect, tid) in self._get_tile_rects_near(level_data, player.gObj):
+            if tid == EntityType.SPIKE:
+                continue                       # standing on a spike isn't "grounded"
+            if probe.colliderect(trect) and prect.bottom <= trect.top + 2:
+                player.on_ground = True
+                return
+
+        for plat in getattr(level_data, "moving_platforms", None) or []:
+            if not plat.gObj.active:
+                continue
+            trect = plat.gObj.get_rect()
+            if probe.colliderect(trect) and prect.bottom <= trect.top + 2:
+                player.on_ground = True
+                player._on_moving_platform = True
+                return
 
     def _resolve_player_moving_platforms(self, core, level_data):
         """

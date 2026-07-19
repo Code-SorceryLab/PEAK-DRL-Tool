@@ -28,6 +28,7 @@ from stable_baselines3.common.callbacks import BaseCallback, EventCallback, Eval
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, DummyVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from stable_baselines3.common.utils import set_random_seed
 from sb3_contrib import RecurrentPPO
 
 from code.wrappers.generic_env import GameEnv
@@ -816,6 +817,74 @@ class FlatVectorExtractor(BaseFeaturesExtractor):
         return self.net(observations)
 
 
+class WinRateEvalCallback(EvalCallback):
+    """EvalCallback that selects best_model by WIN RATE, not mean reward.
+
+    The stock EvalCallback ranks checkpoints by mean episode reward. Under
+    these personas a long stalling episode (alive + potential income over
+    thousands of steps) can out-earn a fast WIN — the historically shipped
+    best_model.zip was exactly such an artifact: a 480k checkpoint selected
+    on the strength of a 4,486-step STALL episode. Win rate is the metric we
+    actually optimize for, so it must be the selection key; mean reward only
+    breaks ties within an equal win rate.
+
+    Win rate comes from SB3's own success-rate convention: GameEnv emits
+    info["is_success"] on terminal steps, evaluate_policy fills
+    self._is_success_buffer via _log_success_callback. If the buffer is ever
+    empty (env without is_success), we fall back to stock reward ranking
+    rather than silently never saving a best model.
+
+    `best_marker` increments on every save — EvalPreviewCallback watches it
+    (instead of best_mean_reward) so the vecnorm snapshot + preview stay in
+    sync with win-based saves even when the new best has a LOWER reward.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.best_win_rate  = -np.inf
+        self.best_win_reward = -np.inf   # tie-break within equal win rate
+        self.best_marker    = 0          # bumps on every best-model save
+
+    def _on_step(self) -> bool:
+        is_eval_step = self.eval_freq > 0 and self.n_calls % self.eval_freq == 0
+        if not is_eval_step:
+            return super()._on_step()
+
+        # Run the stock eval (evaluate_policy, npz logging, success buffer)
+        # with the parent's reward-based save suppressed: the comparison
+        # `mean_reward > best_mean_reward` is made unwinnable for the call.
+        saved_best = self.best_mean_reward
+        self.best_mean_reward = float("inf")
+        try:
+            continue_training = super()._on_step()
+        finally:
+            self.best_mean_reward = saved_best
+
+        mean_reward = float(self.last_mean_reward)
+        win_rate = (float(np.mean(self._is_success_buffer))
+                    if len(self._is_success_buffer) > 0 else None)
+
+        if win_rate is not None:
+            new_best = (win_rate, mean_reward) > (self.best_win_rate, self.best_win_reward)
+        else:
+            new_best = mean_reward > saved_best   # fallback: stock behaviour
+
+        if new_best:
+            if win_rate is not None:
+                self.best_win_rate, self.best_win_reward = win_rate, mean_reward
+                if self.verbose >= 1:
+                    print(f"New best by WIN RATE: {win_rate:.0%} "
+                          f"(mean reward {mean_reward:.2f})")
+            self.best_mean_reward = max(saved_best, mean_reward)
+            if self.best_model_save_path is not None:
+                self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+            self.best_marker += 1
+            if self.callback_on_new_best is not None:
+                continue_training = self.callback_on_new_best.on_step() and continue_training
+
+        return continue_training
+
+
 class EvalPreviewCallback(BaseCallback):
     def __init__(self, eval_cb, vecnorm_env, best_model_save_path,
                  make_env_fn, repo_root, fps=30, n_preview_episodes=2, verbose=1):
@@ -835,7 +904,18 @@ class EvalPreviewCallback(BaseCallback):
 
     def _on_step(self):
         result = self.eval_cb.on_step()
-        current_best = getattr(self.eval_cb, "best_mean_reward", float("-inf"))
+        # WinRateEvalCallback bumps best_marker on every win-based save (a
+        # new best can have a LOWER mean reward, so best_mean_reward alone
+        # would miss it and the vecnorm snapshot would go stale). Recurrent /
+        # stock callbacks lack the marker — fall back to best_mean_reward.
+        current_best = getattr(self.eval_cb, "best_marker", None)
+        if current_best is not None:
+            # Marker baseline is 0 ("no saves yet"), not -inf — without this
+            # the wrapper fires once spuriously on the very first step.
+            if self._last_best == float("-inf"):
+                self._last_best = 0
+        else:
+            current_best = getattr(self.eval_cb, "best_mean_reward", float("-inf"))
         if current_best > self._last_best:
             self._last_best = current_best
             if self.verbose:
@@ -904,6 +984,28 @@ class EvalPreviewCallback(BaseCallback):
 _VECNORM_TRAIN_CLIP_REWARD = 10.0
 
 
+def _resolve_run_seed(cfg):
+    """Read the run seed from the Hydra config (`seed=` override; grid.yaml
+    default). Returns int, or None when unset/none — unseeded runs stay
+    possible by passing seed=none.
+
+    HISTORICAL BUG: run_paper_matrix.py passed `seed={N}` for its 3-seed
+    matrix, but train.py never consumed it — no set_random_seed, no seed
+    kwarg to the algo — so all "seeds" ran identical configs and any
+    per-seed CI computed over them was fabricated variance. The seed must
+    be plumbed (a) globally via set_random_seed and (b) into the SB3 algo
+    constructor, which re-seeds torch/numpy/random, the action space, AND
+    the VecEnv at _setup_learn time.
+    """
+    try:
+        raw = cfg.get("seed", None)
+    except AttributeError:
+        raw = None
+    if raw is None or str(raw).strip().lower() in ("none", "null", ""):
+        return None
+    return int(raw)
+
+
 def _build_vecnorm_kwargs(uses_dict_obs, obs_space, *, training):
     """Construct VecNormalize kwargs.
 
@@ -939,6 +1041,15 @@ def main(cfg: DictConfig):
     models_dir.mkdir(parents=True, exist_ok=True)
 
     device = _resolve_device(cfg.get("device", "auto"))
+
+    # Seed the run BEFORE any env/model construction so network init,
+    # action sampling, and env resets are all reproducible per seed.
+    run_seed = _resolve_run_seed(cfg)
+    if run_seed is not None:
+        set_random_seed(run_seed)
+        print(f"[INFO] Run seed = {run_seed} (python/numpy/torch + SB3 algo + VecEnv)")
+    else:
+        print("[WARN] No seed set — run is not reproducible (pass seed=<int>).")
 
     profile_enabled = bool(cfg.get("profile", False))
     if profile_enabled:
@@ -978,6 +1089,16 @@ def main(cfg: DictConfig):
         render_mode=cfg.render_mode,
         fps=None if str(cfg.fps).lower() == "none" else int(cfg.fps),
         max_steps=None if str(cfg.max_steps).lower() == "none" else int(cfg.max_steps),
+        # Action repeat (frame_skip=4 = classic Mario recipe). Consumed by
+        # GameEnv itself, NOT forwarded to the game core. Train and eval
+        # envs share base_env_kwargs, so both always use the same skip.
+        frame_skip=int(cfg.get("frame_skip", 1)),
+        # Anti-stall progress metric (euclid legacy | path). Forwarded to the
+        # game core; train and in-train-eval envs share it.
+        stall_metric=str(cfg.get("stall_metric", "euclid")),
+        # Episode time-horizon override in game-clock units (+time_limit=150).
+        # None = keep each level's own time_limit from game_config.yaml.
+        time_limit=cfg.get("time_limit", None),
         batch_window=10,
         advance_threshold=0.30,
         fallback_threshold=0.20,
@@ -1032,6 +1153,28 @@ def main(cfg: DictConfig):
         policy_kwargs = algo_conf.get("policy_kwargs", None)
         algo_kwargs   = {k: v for k, v in algo_conf.items()
                          if k not in {"_target_", "name", "policy", "policy_kwargs"}}
+
+        # ── Horizon / optimizer CLI overrides ────────────────────────────
+        # gamma, n_steps, etc. live in conf/algo/<model>.yaml, which Hydra
+        # CLI overrides can't reach. Allow per-run appends like:
+        #   +gamma=0.997 +n_steps=4096 +batch_size=512
+        # gamma is the TIME HORIZON knob (effective horizon ≈ 1/(1-gamma)
+        # decisions); n_steps × n_envs is the EXPERIENCE BUFFER per update.
+        _ALGO_OVERRIDABLE = ("gamma", "gae_lambda", "n_steps", "batch_size",
+                             "n_epochs", "ent_coef", "vf_coef", "clip_range",
+                             "learning_rate")
+        for _k in _ALGO_OVERRIDABLE:
+            _v = cfg.get(_k, None)
+            if _v is not None:
+                algo_kwargs[_k] = _v
+                print(f"[INFO] algo override: {_k} = {_v}")
+
+        # Keep the PBRS shaping discount equal to the agent's discount
+        # (Ng et al. policy-invariance needs Φ discounted by the SAME γ).
+        # Personas read this lazily per step, and SubprocVecEnv workers
+        # inherit environ — so both in-process eval envs and spawned
+        # workers stay in sync with any +gamma= override.
+        os.environ["PEAK_POTENTIAL_GAMMA"] = str(algo_kwargs.get("gamma", 0.99))
 
         extractor_tag = "mlp"  # default for non-MultiInputPolicy
         arch_override = _canonical_arch_tag(cfg.get("architecture", ""))
@@ -1229,12 +1372,14 @@ def main(cfg: DictConfig):
                         deterministic=True, render=False, verbose=1,
                     )
                 else:
-                    eval_cb = EvalCallback(
+                    # Win-rate-based best-model selection (see class docstring:
+                    # reward ranking shipped a stall artifact as "best").
+                    eval_cb = WinRateEvalCallback(
                         eval_env,
                         best_model_save_path=str(models_dir / "best" / run_id),
                         log_path=str(models_dir / "eval_logs" / run_id),
                         eval_freq=eval_freq,
-                        deterministic=True, render=False,
+                        deterministic=True, render=False, verbose=1,
                     )
 
                 ckpt_cb = CheckpointCallback(
@@ -1274,6 +1419,11 @@ def main(cfg: DictConfig):
                 train_kwargs = dict(algo_kwargs)
                 train_kwargs["tensorboard_log"] = tb_dir
                 train_kwargs["device"] = device
+                if run_seed is not None:
+                    # SB3 re-seeds global RNGs, the action space, and the
+                    # VecEnv (env.seed → per-worker reset(seed=seed+idx))
+                    # in _setup_learn when this kwarg is set.
+                    train_kwargs["seed"] = run_seed
 
                 model = Algo(policy, env, **train_kwargs)
                 tb_run_name = f"{model_name}_{persona}_{str(skill).lower()}_{extractor_tag}"
@@ -1315,6 +1465,9 @@ def main(cfg: DictConfig):
                     "extractor": extractor_tag,
                     "trained":   _dt.datetime.now().isoformat(timespec="seconds"),
                     "timesteps": int(total_timesteps),
+                    "seed":      run_seed,   # None = legacy unseeded run
+                    "frame_skip": int(cfg.get("frame_skip", 1)),  # eval MUST match
+                    "stall_metric": str(cfg.get("stall_metric", "euclid")),
                 }, indent=2))
 
                 print(f"[{run_count}] saved → {save_path}  ({_pretty_steps(int(total_timesteps))} steps)")
