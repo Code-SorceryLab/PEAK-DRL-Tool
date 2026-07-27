@@ -5,7 +5,7 @@ defaults:
 # lists of experiment dimensions
 games: [platformer, megaman, sonic, meatboy]   # other games that are setup [ platformer, shooter ]  # must match files in conf/game/*.yaml
 models: [ppo]  #other models that are setup [ rppo, trpo, a2c ]  # must match files in conf/algo/*.yaml
-architectures: [lightmobile, spatialattention, channelattention, deepchannelattention]
+architectures: [lightmobile, spatialattention, channelattention, deepchannelattention, impala]
 personas: [
   platformer_simple,
   platformer_adept,
@@ -13,6 +13,7 @@ personas: [
   megaman_adept,
   sonic_simple,
   meatboy_simple,
+  meatboy_bfs,
   #sonic_speedrunner,
   #platformer_enemy_hunter,
   #platformer_speedrunner,
@@ -44,6 +45,7 @@ device: cpu      # auto | cpu | cuda | mps  (cpu is fastest on this Mac; mps cra
 n_envs: 12        # 8-16 parallel SubprocVecEnv workers (Phase-1). CPU device: workers share cores with the learner.
 profile: true    # true → enable ProfilingCallback (TB scalars + profiling_log.csv)
 compile: false   # true → torch.compile(model.policy) (warm-up cost first rollout; 20-40% train speedup after)
+anneal: true     # true → linear LR decay + entropy/grad-clip anneal (high→low exploration). PPO/A2C only.
 
 
 # null values mean "no override"

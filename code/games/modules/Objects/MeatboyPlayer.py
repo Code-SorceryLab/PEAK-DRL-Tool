@@ -69,26 +69,41 @@ class MeatboyPlayer:
 
     # --- input ---------------------------------------------------------------
     def handle_input(self, action):
-        """Decode MultiDiscrete([3,2,2]) = [move_x, run, jump] (or keyboard).
-        move_x: 0=idle 1=left 2=right.  jump/run: 0/1 held. jump_pressed = edge."""
-        move_i = run_i = jump_i = 0
+        """Decode MultiDiscrete([3,2,2]) = [move_x, run, jump].
+        move_x: 0=idle 1=left 2=right.  jump/run: 0/1 held. jump_pressed = edge.
+
+        The AGENT ACTION always drives (so a rendered eval/watch window — which
+        runs render_mode='human' — still moves under the policy). Keyboard is
+        additive on top, for a real human in manual play (mirrors Platformer's
+        Player.handle_input). Reading keyboard instead of the action here was
+        the bug that froze the agent during eval."""
+        try:
+            a = np.asarray(action).astype(int).reshape(-1)
+            a_move, a_run, a_jump = int(a[0]), int(a[1]), int(a[2])
+        except (TypeError, ValueError, IndexError):
+            a_move = a_run = a_jump = 0
+
+        a_left, a_right = (a_move == 1), (a_move == 2)
+        run_held = bool(a_run)
+        jump_held = bool(a_jump)
+
+        # Keyboard is additive (only a real human presses keys; empty during
+        # headless training and agent-driven eval).
         if self.human_mode and pygame.get_init():
             keys = pygame.key.get_pressed()
-            left = keys[pygame.K_LEFT] or keys[pygame.K_a]
-            right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
-            move_i = 1 if (left and not right) else 2 if (right and not left) else 0
-            run_i = 1 if (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) else 0
-            jump_i = 1 if (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]) else 0
-        else:
-            try:
-                a = np.asarray(action).astype(int).reshape(-1)
-                move_i, run_i, jump_i = int(a[0]), int(a[1]), int(a[2])
-            except (TypeError, ValueError, IndexError):
-                move_i = run_i = jump_i = 0
+            a_left = a_left or keys[pygame.K_LEFT] or keys[pygame.K_a]
+            a_right = a_right or keys[pygame.K_RIGHT] or keys[pygame.K_d]
+            run_held = run_held or keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+            jump_held = jump_held or keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]
 
-        self.move_x = {0: 0, 1: -1, 2: 1}.get(move_i, 0)
-        self.run_held = bool(run_i)
-        held = bool(jump_i)
+        if a_left and not a_right:
+            self.move_x = -1
+        elif a_right and not a_left:
+            self.move_x = 1
+        else:
+            self.move_x = 0
+        self.run_held = bool(run_held)
+        held = bool(jump_held)
         self.jump_pressed = held and not self._prev_jump
         self.jump_held = held
         self._prev_jump = held

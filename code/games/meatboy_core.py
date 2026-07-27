@@ -80,6 +80,7 @@ class MeatboyCore:
         self.level_data = None
         self._dist = None
         self._dist_max = 1.0
+        self._bfs_prev = None        # shaping anchor; owned by the core (see reset)
         self.reset()
 
     # ---- level handling ----
@@ -116,9 +117,19 @@ class MeatboyCore:
         self.alive = True
         self.won = False
         self._crumble_timers = {}
+        # Clear the shaping anchor at the episode boundary. The shared
+        # _ScoreTracker only resets on `terminated`, NOT on truncation, so
+        # relying on it leaked a stale distance across timed-out episodes and
+        # produced a large spurious potential spike on step 1 of the next one.
+        # The core owns the anchor instead — it is the only thing that knows
+        # exactly when an episode begins.
+        self._bfs_prev = None
         self._load_level()
         self._spawn_player()
-        return self._obs(), self._info()
+        obs, info = self._obs(), self._info()
+        if info["bfs_dist"] >= 0.0:
+            self._bfs_prev = info["bfs_dist"]
+        return obs, info
 
     def step(self, action):
         self._steps += 1
@@ -145,7 +156,10 @@ class MeatboyCore:
         if self._steps >= self.max_steps:
             truncated = True
 
-        return self._obs(), 0.0, terminated, truncated, self._info()
+        obs, info = self._obs(), self._info()
+        if info["bfs_dist"] >= 0.0:        # advance anchor only on valid cells
+            self._bfs_prev = info["bfs_dist"]
+        return obs, 0.0, terminated, truncated, info
 
     # ---- hazards / crumble ----
     def _update_crumble(self, dt):
@@ -292,13 +306,40 @@ class MeatboyCore:
         grids = self._build_grids(px, py, self._saw_cells())
         return {"grids": grids, "scalars": self._build_scalars()}
 
+    def _bfs_norm_dist(self):
+        """Player-cell BFS distance to goal, normalised to [0,1] (0 = at goal,
+        1 = farthest reachable). Returns -1.0 when the cell is unreachable or
+        off-grid — the sentinel the shared tracker treats as "no information"
+        (mirrors the platformer dijkstra_dist convention). This is a path
+        distance (correct through walls), unlike euclidean goal_dist."""
+        if self._dist is None:
+            return -1.0
+        ts = self.tile_size
+        px = int((self.player.x + self.player.width / 2) // ts)
+        py = int((self.player.y + self.player.height / 2) // ts)
+        if not (0 <= py < self.level_data.rows and 0 <= px < self.level_data.cols):
+            return -1.0
+        raw = float(self._dist[py, px])
+        if raw < 0:
+            return -1.0
+        return raw / self._dist_max
+
     def _info(self):
+        bfs = self._bfs_norm_dist()
         return {
             "score": self.score,
             "lives": 1 if self.alive else 0,
             "won": self.won,
             "terminated": (not self.alive) or self.won,
             "goal_dist": self._goal_dist(),
+            "bfs_dist": bfs,
+            # Core-owned shaping anchor (-1.0 = none yet / episode start).
+            # Reset in reset(), so it can never leak across a truncation.
+            "bfs_dist_prev": (self._bfs_prev if self._bfs_prev is not None else -1.0),
+            # meatboy has no Dijkstra solver; expose the BFS path distance under
+            # this key so it flows through the shared tracker's potential-shaping
+            # plumbing (_ScoreTracker computes dijkstra_dist_prev / dijkstra_valid).
+            "dijkstra_dist": bfs,
             "x_position": float(self.player.x),
             "velocity_x": float(self.player.vx),
             "velocity_y": float(self.player.vy),
