@@ -12,8 +12,8 @@ slice mastery to the full level. (Same idea as ML-Agents' curriculum +
 episode-design guidance: keep episodes short, escalate difficulty.)
 
 Usage:
-    python -m code.scripts.make_level_slices          # writes *_s{1,2,3}.txt/.yaml
-    python -m code.scripts.make_level_slices --check  # dry run, print summary
+    python -m code.games.tools.make_level_slices          # writes *_s{1,2,3}.txt/.yaml
+    python -m code.games.tools.make_level_slices --check  # dry run, print summary
 """
 from __future__ import annotations
 
