@@ -41,6 +41,7 @@ Then open **http://127.0.0.1:8000/mario/index.html** — you get the live dashbo
 ### CLI
 
 ```bash
+python -m code.neuro.trainer --game sonic          # also: megaman, meatboy
 python -m code.neuro.trainer --game mario --level Mario1-2 --turbo   # start in turbo
 python -m code.neuro.trainer --resume runs/mario                     # continue a run
 python -m code.neuro.trainer --replay runs/mario/best.npz            # watch the all-time best
