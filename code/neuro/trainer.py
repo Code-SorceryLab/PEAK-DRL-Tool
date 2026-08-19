@@ -99,7 +99,8 @@ class Trainer:
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
-        self._steps_window: list[tuple[float, int]] = []  # (timestamp, env-steps) for steps/s
+        self._step_accum = 0  # cumulative env-steps, sampled by _steps_per_sec
+        self._steps_window: list[tuple[float, int]] = []  # (timestamp, cumulative steps)
 
     # ── serving helpers ──────────────────────────────────────────────────
 
@@ -160,13 +161,13 @@ class Trainer:
             envs.append(entry)
         self.state.publish(envs=envs)
 
-    def _steps_per_sec(self, n_new: int) -> float:
+    def _steps_per_sec(self) -> float:
         now = time.time()
-        self._steps_window.append((now, n_new))
-        while self._steps_window and now - self._steps_window[0][0] > 2.0:
+        self._steps_window.append((now, self._step_accum))
+        while len(self._steps_window) > 1 and now - self._steps_window[0][0] > 2.0:
             self._steps_window.pop(0)
-        span = now - self._steps_window[0][0] if len(self._steps_window) > 1 else 1.0
-        return sum(n for _, n in self._steps_window) / max(span, 1e-6)
+        t0, c0 = self._steps_window[0]
+        return (self._step_accum - c0) / max(now - t0, 1e-6)
 
     # ── core loop ────────────────────────────────────────────────────────
 
@@ -182,7 +183,6 @@ class Trainer:
         last_thumb = last_watch = last_stats = 0.0
 
         while any(s.adapter.alive for s in self.slots):
-            stepped = 0
             for slot in self.slots:
                 if not slot.adapter.alive:
                     continue
@@ -191,7 +191,7 @@ class Trainer:
                 move_x, jump = slot.net.act(vec)
                 slot.adapter.step(move_x, jump)
                 slot.frames += 1
-                stepped += 1
+                self._step_accum += 1
                 # trainer-side stuck kill (faster than the core's 20s stall watchdog)
                 fit = slot.adapter.fitness()
                 if fit > slot.stuck_anchor_x + 1.0:
@@ -217,7 +217,7 @@ class Trainer:
                     self._publish_stats(
                         [s.adapter.status for s in self.slots],
                         [s.adapter.fitness() for s in self.slots],
-                        self._steps_per_sec(stepped),
+                        self._steps_per_sec(),
                     )
                     last_stats = now
                 if not turbo:
