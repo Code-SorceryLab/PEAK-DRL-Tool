@@ -476,6 +476,11 @@ class PlatformerCore(gymnasium.Env):
 
         self.max_steps = kwargs.pop("max_steps", None)
 
+        # skip_obs=True: step() returns obs=None instead of building the (4,21,21)
+        # grid + Dijkstra window dict. For consumers that read game state directly
+        # (neuroevolution sensors) the obs build is pure overhead.
+        self.skip_obs = bool(kwargs.pop("skip_obs", False))
+
         self.persona = str(kwargs.pop("persona", "simple")).lower()
         if self.persona == "default":
             self.persona = "simple"
@@ -669,7 +674,7 @@ class PlatformerCore(gymnasium.Env):
 
     def step(self, action: int):
         if not self.alive:
-            dead_obs = self._obs()
+            dead_obs = None if self.skip_obs else self._obs()
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
         # Time Calculation
@@ -795,8 +800,11 @@ class PlatformerCore(gymnasium.Env):
 
         # Build observation BEFORE _info() so _check_obs_sanity can
         # populate self._obs_stats in time for _info() to spread them.
-        obs = self._obs()
-        self._check_obs_sanity(obs)
+        if self.skip_obs:
+            obs = None
+        else:
+            obs = self._obs()
+            self._check_obs_sanity(obs)
 
         info = self._info()
 

@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PEAK Neuroevolution</title>
+<style>
+  :root { --bg:#111318; --panel:#1a1d24; --line:#2a2f3a; --txt:#d6dae2; --dim:#8a90a0;
+          --green:#4caf50; --yellow:#e6c229; --red:#e05252; --cyan:#3ecfd6; --accent:#ff9d3b; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt); font:13px/1.4 Consolas,monospace; padding:8px; }
+  #topbar { display:flex; gap:16px; align-items:center; background:var(--panel); border:1px solid var(--line);
+            padding:6px 12px; border-radius:6px; flex-wrap:wrap; }
+  #topbar b { color:var(--accent); }
+  button { background:#242936; color:var(--txt); border:1px solid var(--line); border-radius:4px;
+           padding:4px 10px; font:inherit; cursor:pointer; }
+  button.on { background:var(--accent); color:#111; font-weight:bold; }
+  #chips { display:flex; gap:6px; margin:8px 0; flex-wrap:wrap; }
+  .chip { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:4px 8px;
+          cursor:pointer; min-width:86px; }
+  .chip.watched { border-color:var(--accent); }
+  .chip .st { font-weight:bold; }
+  #main { display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; }
+  #watchwrap { position:relative; }
+  #watch { border:1px solid var(--line); border-radius:4px; background:#000; }
+  #hud { position:absolute; top:8px; left:8px; background:rgba(10,12,16,.78); padding:8px 10px;
+         border-radius:4px; white-space:pre; font-size:12px; }
+  #side { display:flex; flex-direction:column; gap:8px; }
+  #chart { background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+  #thumbs { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
+  .thumb { position:relative; border:1px solid var(--line); border-radius:4px; overflow:hidden; cursor:pointer; }
+  .thumb canvas { display:block; width:100%; }
+  .thumb .mini { position:absolute; top:2px; left:4px; font-size:11px; background:rgba(10,12,16,.7);
+                 padding:1px 5px; border-radius:3px; white-space:pre; }
+  .RUNNING { color:var(--green); } .STUCK { color:var(--yellow); }
+  .DEAD { color:var(--red); } .WON { color:var(--cyan); }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span>GEN <b id="s_gen">0</b></span>
+  <span>ALL-TIME BEST <b id="s_atb">0</b></span>
+  <span>LAST GEN BEST <b id="s_lgb">0</b></span>
+  <span>AVG FIT <b id="s_avg">0</b></span>
+  <span>ELITE <b id="s_elite">0</b></span>
+  <span>MUT <b id="s_mut">0</b></span>
+  <span>STEPS/s <b id="s_sps">0</b></span>
+  <span>LEVEL <b id="s_level">-</b></span>
+  <button id="b_turbo">Turbo</button>
+  <button id="b_sensors" class="on">Sensors ON (debug)</button>
+  <span id="conn" style="color:var(--red)">disconnected</span>
+</div>
+<div id="chips"></div>
+<div id="main">
+  <div id="watchwrap">
+    <canvas id="watch" width="800" height="600"></canvas>
+    <div id="hud"></div>
+  </div>
+  <div id="side"><canvas id="chart" width="420" height="220"></canvas></div>
+</div>
+<div id="thumbs"></div>
+
+<script>
+const RAY_COLORS = {0:"rgba(255,157,59,.55)", 1:"#ff9d3b", 2:"#e05252"};
+const SENSOR_LABELS = ["obstacle","up30","up60","down30","down60","back","enemy","pit","grounded",
+                       "vx","vy","jump ok","qblock","bias"];
+let sensorsOn = true, turbo = false, watched = 0, nEnvs = 0;
+const thumbCanvases = [], thumbMinis = [], chipEls = [], lastImg = {};
+let ws;
+
+function send(o){ if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+
+function buildEnvUI(n){
+  nEnvs = n;
+  const chips = document.getElementById("chips"), thumbs = document.getElementById("thumbs");
+  chips.innerHTML = ""; thumbs.innerHTML = "";
+  thumbCanvases.length = thumbMinis.length = chipEls.length = 0;
+  for (let i = 0; i < n; i++){
+    const c = document.createElement("div");
+    c.className = "chip";
+    c.innerHTML = `ENV ${i+1}<br><span class="fit">FIT 0</span><br><span class="st">-</span>`;
+    c.onclick = () => { watched = i; send({cmd:"watch", env:i}); };
+    chips.appendChild(c); chipEls.push(c);
+    const t = document.createElement("div");
+    t.className = "thumb";
+    const cv = document.createElement("canvas"); cv.width = 280; cv.height = 210;
+    const mini = document.createElement("div"); mini.className = "mini";
+    t.appendChild(cv); t.appendChild(mini);
+    t.onclick = c.onclick;
+    thumbs.appendChild(t); thumbCanvases.push(cv); thumbMinis.push(mini);
+  }
+}
+
+function drawRays(ctx, rays, k){
+  if (!sensorsOn || !rays) return;
+  for (const [x1,y1,x2,y2,hit] of rays){
+    ctx.strokeStyle = RAY_COLORS[hit] || RAY_COLORS[0];
+    ctx.lineWidth = hit ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x1*k, y1*k); ctx.lineTo(x2*k, y2*k); ctx.stroke();
+    if (hit){ ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x2*k, y2*k, 3, 0, 7); ctx.fill(); }
+  }
+}
+
+function drawEnv(e, stats){
+  if (e.img){
+    const img = new Image();
+    img.onload = () => { lastImg[e.id] = {img, rays:e.rays, scale:e.scale}; paint(e, stats); };
+    img.src = "data:image/jpeg;base64," + e.img;
+  } else paint(e, stats);
+}
+
+function paint(e, stats){
+  const cache = lastImg[e.id];
+  if (e.watched){
+    const cv = document.getElementById("watch"), ctx = cv.getContext("2d");
+    if (cache){
+      ctx.drawImage(cache.img, 0, 0, cv.width, cv.height);
+      drawRays(ctx, cache.rays, cv.width / cache.img.width * (cache.scale || 1) === 1 ? 1 : cv.width / cache.img.width);
+    }
+    const hud = document.getElementById("hud");
+    let txt = `ENV ${e.id+1}  GEN ${stats.gen ?? 0}\nX ${e.x}  FIT ${e.fitness}  ` +
+              `<span class="${e.status}">${e.status}</span>\n`;
+    if (e.sensors){
+      txt += "\n";
+      for (let i = 0; i < 13; i++) txt += `${SENSOR_LABELS[i].padEnd(9)} ${e.sensors[i].toFixed(2)}\n`;
+    }
+    hud.innerHTML = txt;
+  }
+  const cv = thumbCanvases[e.id];
+  if (cv && cache){
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(cache.img, 0, 0, cv.width, cv.height);
+    drawRays(ctx, cache.rays, cv.width / (cache.img.width / (cache.scale || 1)));
+  }
+  if (thumbMinis[e.id])
+    thumbMinis[e.id].innerHTML =
+      `ENV ${e.id+1}  X ${e.x}\nFIT ${e.fitness}  <span class="${e.status}">${e.status}</span>`;
+}
+
+function drawChart(history){
+  const cv = document.getElementById("chart"), ctx = cv.getContext("2d");
+  ctx.fillStyle = "#1a1d24"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "#8a90a0"; ctx.fillText("fitness / generation  (orange=best, gray=avg)", 10, 14);
+  if (!history || history.length < 2) return;
+  const max = Math.max(...history.map(h => h[0]), 1);
+  const px = i => 8 + i * (cv.width - 16) / (history.length - 1);
+  const py = v => cv.height - 8 - v / max * (cv.height - 32);
+  for (const [j, color] of [[1, "#8a90a0"], [0, "#ff9d3b"]]){
+    ctx.strokeStyle = color; ctx.lineWidth = j ? 1 : 2; ctx.beginPath();
+    history.forEach((h, i) => i ? ctx.lineTo(px(i), py(h[j])) : ctx.moveTo(px(i), py(h[j])));
+    ctx.stroke();
+  }
+}
+
+function onUpdate(m){
+  const s = m.stats || {};
+  if (s.pop_size && s.pop_size !== nEnvs) buildEnvUI(s.pop_size);
+  for (const [id, v] of [["s_gen", s.gen], ["s_atb", s.all_time_best], ["s_lgb", s.last_gen_best],
+                         ["s_avg", s.avg_fitness], ["s_elite", s.elite], ["s_mut", s.mut_rate],
+                         ["s_sps", s.sps], ["s_level", s.level]])
+    if (v !== undefined) document.getElementById(id).textContent = v;
+  if (s.turbo !== undefined && turbo !== s.turbo){
+    turbo = s.turbo;
+    document.getElementById("b_turbo").className = turbo ? "on" : "";
+    document.getElementById("b_turbo").textContent = turbo ? "Turbo ON (click for real-time)" : "Turbo";
+  }
+  drawChart(s.history);
+  (m.envs || []).forEach(e => {
+    if (e.watched) watched = e.id;
+    drawEnv(e, s);
+    const chip = chipEls[e.id];
+    if (chip){
+      chip.classList.toggle("watched", e.id === watched);
+      chip.querySelector(".fit").textContent = "FIT " + ((s.live_fitness || [])[e.id] ?? e.fitness);
+      const st = chip.querySelector(".st");
+      st.textContent = e.status; st.className = "st " + e.status;
+    }
+  });
+}
+
+function connect(){
+  ws = new WebSocket("ws://127.0.0.1:8765");
+  ws.onopen = () => { document.getElementById("conn").textContent = "live";
+                      document.getElementById("conn").style.color = "#4caf50"; };
+  ws.onmessage = ev => onUpdate(JSON.parse(ev.data));
+  ws.onclose = () => { document.getElementById("conn").textContent = "disconnected";
+                       document.getElementById("conn").style.color = "#e05252";
+                       setTimeout(connect, 1500); };
+}
+document.getElementById("b_turbo").onclick = () => { turbo = !turbo; send({cmd:"turbo", on:turbo}); };
+document.getElementById("b_sensors").onclick = function(){
+  sensorsOn = !sensorsOn; this.className = sensorsOn ? "on" : "";
+  this.textContent = sensorsOn ? "Sensors ON (debug)" : "Sensors OFF";
+  send({cmd:"sensors", on:sensorsOn});
+};
+connect();
+</script>
+</body>
+</html>

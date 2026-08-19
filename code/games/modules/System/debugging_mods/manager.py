@@ -1,6 +1,5 @@
 import pygame
 import math
-from .....wrappers.RewardHub import RewardHub
 from .overlays import (
     HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay,
     ArchOverlay, JumpArcOverlay,
@@ -352,7 +351,10 @@ class DebugManager:
         _card(surface, px, py, pw, ph)
         cy = _section_hdr(surface, self.font, "Reward Trace", px, py, pw, accent=(200, 80, 60))
 
-        hub = self.hub if self.hub else RewardHub.get_instance()
+        # Reward hub died with the RL stack; the strip only renders when a hub is injected.
+        hub = self.hub
+        if hub is None:
+            return
         sf  = self.small_font
 
         persona = getattr(core, "persona", "?").replace("_", " ").title()
