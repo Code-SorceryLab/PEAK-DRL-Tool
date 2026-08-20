@@ -182,6 +182,47 @@ def _logo_b64() -> str | None:
         return None
 
 
+# stylized Meat-Boy-ish cube of our own; nothing copyrighted
+_MEATBOY_SVG = (
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+    "<rect x='2' y='4' width='20' height='18' rx='4' fill='%23c81e1e'/>"
+    "<rect x='2' y='4' width='20' height='7' rx='4' fill='%23e13030'/>"
+    "<circle cx='9' cy='12' r='2.2' fill='white'/><circle cx='16' cy='12' r='2.2' fill='white'/>"
+    "<circle cx='9.6' cy='12.4' r='1' fill='black'/><circle cx='16.6' cy='12.4' r='1' fill='black'/>"
+    "<path d='M9 17.5 q3 2.4 6.5 0' stroke='black' stroke-width='1.3' fill='none' stroke-linecap='round'/>"
+    "</svg>")
+
+_icon_cache: dict[str, str | None] = {}
+
+
+def _game_icon(game: str) -> str:
+    """Small inline icon per game: the mario sprite from the engine assets, a
+    stylized meat cube for meatboy, a letter badge otherwise."""
+    if game in _icon_cache:
+        src = _icon_cache[game]
+    elif game == "mario":
+        src = None
+        try:
+            from PIL import Image
+            img = Image.open(os.path.join(GAMES_DIR, "assets", "idle1.png"))
+            img.thumbnail((28, 36))
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            src = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception:
+            pass
+        _icon_cache[game] = src
+    elif game == "meatboy":
+        src = _MEATBOY_SVG
+        _icon_cache[game] = src
+    else:
+        _icon_cache[game] = None
+        src = None
+    if src:
+        return f'<img class="gicon" src="{src}" alt="">'
+    return f'<span class="gicon gletter">{game[:1].upper()}</span>'
+
+
 # ── verdicts (B1/B2/B3 vs threshold bands) ──────────────────────────────────
 
 def _in_band(value, target, warn) -> bool:
@@ -332,6 +373,32 @@ CSS = """
     border-radius:4px;padding:1px 6px}
   .doc-body ul{padding-left:22px;margin:8px 0}
   .doc-body b{color:var(--txt)}
+  /* game icons */
+  .gicon{height:1.35em;width:auto;vertical-align:-0.28em;margin-right:8px;image-rendering:pixelated}
+  nav a .gicon{height:1.15em;margin-right:6px}
+  .gletter{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;
+    border-radius:4px;background:#333;color:#fff;font:700 .8em var(--mono)}
+
+  /* overview split: table + radar side by side, stacking on narrow screens */
+  .ovsplit{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr);gap:14px;align-items:start}
+  .radarbox{margin-top:0}
+  canvas.radar{width:100%;max-width:520px;height:auto;display:block;margin:0 auto}
+  @media (max-width:900px){.ovsplit{grid-template-columns:1fr}}
+
+  /* entrance + micro animations */
+  section.game{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  section.game.seen{opacity:1;transform:none}
+  .mini i{width:0;transition:width .8s cubic-bezier(.2,.7,.3,1)}
+  .gametag{position:relative;overflow:hidden}
+  .gametag::after{content:'';position:absolute;inset:0;
+    background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);
+    transform:translateX(-100%);animation:sheen 4.5s ease-in-out infinite}
+  @keyframes sheen{0%,60%{transform:translateX(-100%)}80%,100%{transform:translateX(100%)}}
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;animation:none !important}
+    section.game{opacity:1;transform:none}
+  }
+
   @media (max-width:560px){
     .lvlgrid{grid-template-columns:1fr 1fr}
     .stats{grid-template-columns:1fr 1fr}
@@ -532,11 +599,33 @@ def _overview(personas: dict[str, dict]) -> str:
                 best_pill = '<span class="pill pill-warn">partial</span>'
         tds.insert(1, f"<td>{best_pill}</td>")
         trs.append("<tr>" + "".join(tds) + "</tr>")
+
+    # balance radar: one axis per level, one polygon per persona (win rate 0..1)
+    pcolors = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#eab308"}
+    series = []
+    for p in pnames:
+        rows_by_lvl = {r["level"]: r for r in personas[p]["levels"]}
+        vals = [round((rows_by_lvl.get(lvl) or {}).get("win_rate_mean", 0.0), 3) for lvl in order]
+        series.append({"name": p, "color": pcolors.get(p, "#a855f7"), "vals": vals})
+    radar_payload = json.dumps({"axes": [str(v) for v in order], "series": series})
+    legend = " ".join(f'<span style="color:{s["color"]}">●</span> {s["name"]}' for s in series)
+    radar = f"""
+    <div class="viz radarbox"><div class="vt">Balance radar — win rate per level, one shape per
+      persona &nbsp;<span style="font-weight:400;color:var(--faint)">{legend}</span></div>
+      <canvas class="radar" width="520" height="440" data-radar='{radar_payload}'></canvas>
+      <div class="caption">Each spoke is a level; distance from center = win rate (rings at 25 /
+      50 / 75 / 100%). A bigger shape = an easier game for that skill tier; dents point at the
+      hard levels. Personas nesting inside each other (yellow ⊃ red ⊃ blue) is healthy tier
+      separation.</div></div>"""
+
     return f"""
-    <div class="ovwrap"><table>
-      <thead><tr><th>Level</th><th>Status</th>{ths}</tr></thead>
-      <tbody>{''.join(trs)}</tbody>
-    </table></div>
+    <div class="ovsplit">
+      <div class="ovwrap"><table>
+        <thead><tr><th>Level</th><th>Status</th>{ths}</tr></thead>
+        <tbody>{''.join(trs)}</tbody>
+      </table></div>
+      {radar}
+    </div>
     <div class="ovnote">Status = best across personas. Select a persona tab for the full
     per-level breakdown — cards expand in place with routes, death maps, causes, and curves.</div>"""
 
@@ -560,7 +649,7 @@ def _game_section(game: str, personas: dict[str, dict], idx: int, th: dict) -> s
     return f"""
   <section class="game" id="g_{game}">
     <div class="gamehead">
-      <span class="gametag">{game}</span>
+      <span class="gametag">{_game_icon(game)}{game}</span>
       <span class="gamemeta">seeds {metas['seeds']} · budget {metas['gens_budget']} gens/probe</span>
       <div class="tabs">{''.join(tabs)}</div>
     </div>
@@ -666,6 +755,82 @@ for (const cv of document.querySelectorAll('canvas.curve')){
   });
 }
 
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// sections fade up as they enter the viewport; win-rate bars fill on reveal
+const io = new IntersectionObserver(entries => {
+  for (const e of entries) if (e.isIntersecting){
+    e.target.classList.add('seen');
+    e.target.querySelectorAll('.mini i').forEach(b => { b.style.width = b.dataset.w || b.style.width; });
+    io.unobserve(e.target);
+  }
+}, {threshold: 0.08});
+for (const s of document.querySelectorAll('section.game')){
+  s.querySelectorAll('.mini i').forEach(b => { b.dataset.w = b.style.width; if (!REDUCED) b.style.width = '0'; });
+  if (REDUCED) s.classList.add('seen'); else io.observe(s);
+}
+
+// balance radar — one axis per level, one animated polygon per persona
+function drawRadar(cv, t){
+  const d = JSON.parse(cv.dataset.radar || 'null');
+  if (!d || !d.axes.length) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2 + 6;
+  const R = Math.min(W, H) / 2 - 52;
+  const n = d.axes.length;
+  const ang = i => -Math.PI / 2 + i * 2 * Math.PI / n;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '400 12px "IBM Plex Mono", monospace';
+  for (const frac of [0.25, 0.5, 0.75, 1]){
+    ctx.strokeStyle = frac === 0.5 ? '#33333a' : '#222226';
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++){
+      const a = ang(i % n), r = R * frac;
+      const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#606066';
+  ctx.fillText('50%', cx + 4, cy - R * 0.5 - 3);
+  for (let i = 0; i < n; i++){
+    const a = ang(i);
+    ctx.strokeStyle = '#222226';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a)); ctx.stroke();
+    const lx = cx + (R + 16) * Math.cos(a), ly = cy + (R + 16) * Math.sin(a);
+    ctx.fillStyle = '#9a9aa0';
+    ctx.textAlign = Math.abs(Math.cos(a)) < 0.3 ? 'center' : (Math.cos(a) > 0 ? 'left' : 'right');
+    ctx.fillText(d.axes[i], lx, ly + 4);
+  }
+  ctx.textAlign = 'left';
+  for (const s of d.series){
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++){
+      const a = ang(i % n), v = Math.min(1, s.vals[i % n] || 0) * t;
+      const x = cx + R * v * Math.cos(a), y = cy + R * v * Math.sin(a);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = s.color + '22'; ctx.fill();
+    for (let i = 0; i < n; i++){
+      const a = ang(i), v = Math.min(1, s.vals[i] || 0) * t;
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(cx + R * v * Math.cos(a), cy + R * v * Math.sin(a), 2.6, 0, 7); ctx.fill();
+    }
+  }
+}
+for (const cv of document.querySelectorAll('canvas.radar')){
+  if (REDUCED){ drawRadar(cv, 1); continue; }
+  const t0 = performance.now();
+  const tick = now => {
+    const t = Math.min(1, (now - t0) / 700);
+    drawRadar(cv, 1 - Math.pow(1 - t, 3));  // ease-out cubic
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 // agent routes over level geometry
 for (const cv of document.querySelectorAll('canvas.routes')){
   const d = JSON.parse(cv.dataset.routes || 'null');
@@ -715,7 +880,7 @@ GLOSSARY = """
 
 def _nav(games: list[str], has_runs: bool, logo: str | None, doc_page: bool = False) -> str:
     img = f'<img src="data:image/png;base64,{logo}" alt="PEAK">' if logo else ""
-    links = "".join(f'<a href="report.html#g_{g}">{g}</a>' for g in games)
+    links = "".join(f'<a href="report.html#g_{g}">{_game_icon(g)}{g}</a>' for g in games)
     if has_runs:
         links += '<a href="report.html#g_runs">runs</a>'
     links += '<a class="doc" href="instructions.html">Instructions</a>' if not doc_page \
