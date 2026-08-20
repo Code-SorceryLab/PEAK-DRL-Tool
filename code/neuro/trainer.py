@@ -191,6 +191,7 @@ class Trainer:
             "win_rate10": round(100 * sum(r.get("wins", 0) for r in last10) / episodes10, 1)
                           if episodes10 else 0.0,
             "elapsed": int(time.time() - self._start_time),
+            "train_time": round(sum(r.get("duration") or 0 for r in hist), 1),  # cumulative, survives --resume
             "total_frames": self._step_accum,
         })
 

@@ -252,6 +252,7 @@
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Won</span><b id="k_wins" class="font-mono text-sm font-medium text-blue-400">0</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Frames</span><b id="k_frames" class="font-mono text-sm font-medium text-zinc-500">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Train Time</span><b id="k_traintime" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
         </div>
       </section>
 
@@ -485,6 +486,10 @@ function onUpdate(m){
     $("s_elapsed").textContent = mins + ":" + String(sec).padStart(2,"0");
   }
   if (s.total_frames !== undefined) $("k_frames").textContent = fmt(s.total_frames);
+  if (s.train_time !== undefined){
+    const t = Math.round(s.train_time), h = Math.floor(t/3600), mm = Math.floor((t%3600)/60), ss = t%60;
+    $("k_traintime").textContent = (h ? h + ":" + String(mm).padStart(2,"0") : mm) + ":" + String(ss).padStart(2,"0");
+  }
   if (s.results) drawResults(s.results);
 
   if (s.levels && s.levels.length){

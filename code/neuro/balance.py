@@ -225,7 +225,7 @@ def main() -> None:
     levels = args.levels or list_levels(args.game)
     if not levels:
         raise SystemExit(f"no levels found for game '{args.game}'")
-    run_root = os.path.join(args.out, "probes", args.game)
+    run_root = os.path.join("runs", "probes", args.game)
     jobs = [(args.game, lvl, seed, args.gens, run_root, persona)
             for lvl in levels for seed in args.seeds]
     workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
