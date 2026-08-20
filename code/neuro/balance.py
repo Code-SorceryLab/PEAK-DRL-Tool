@@ -242,7 +242,8 @@ def main() -> None:
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({"game": args.game, "gens_budget": args.gens, "seeds": args.seeds,
                    "persona": persona.name, "elapsed_s": round(time.time() - t0, 1),
-                   "levels": list(merged_rows.values()), "cells": merged_cells}, f, indent=2)
+                   "levels": list(merged_rows.values()), "cells": merged_cells},
+                  f, indent=2, default=float)  # numpy scalars leak from some cores
     print(f"\nsaved {out_path}  ({time.time() - t0:.0f}s total)", flush=True)
 
 

@@ -60,12 +60,12 @@ note: use `G` for goals, never `D`). Enabled levels register in `code/games/game
 (Mario at root, megaman/sonic nested) and `meatboy_config.yaml` (ordered list). New
 game-faithful levels added:
 
-| Level | Style | First probe verdict |
+| Level | Style | Probe verdict (2 seeds, 20-gen budget) |
 |---|---|---|
-| `Mario1-3` | SMB 1-3 athletic: platform islands over pits, koopas | solved 2/2 seeds, gen 9±0; Koopa 92% of deaths |
-| `MM-Stage2` | Mega Man tower: ladder climbs, spike floor, mets + bats | see `balance/report_megaman.json` |
-| `Green Hill 3` | Sonic act: rolling slopes, ring arcs, springs, badniks | see `balance/report_sonic.json` |
-| `world1_11_salt_factory` | Meat Boy: wall-jump shafts, saws, crumble bridges | see `balance/report_meatboy.json` |
+| `Green Hill 3` | Sonic act: rolling slopes, ring arcs, springs, badniks | solved 2/2, first win gen 3.5 ±6.4, 50% win rate; Enemy 75% — easy/medium |
+| `Mario1-3` | SMB 1-3 athletic: platform islands over pits, koopas | solved 2/2, first win gen 9 ±0, 16% win rate; Koopa 92% — medium |
+| `MM-Stage2` | Mega Man: jumpable pillar corridor, spike troughs, mets + bats (ladders are manual-play flavor) | solved 2/2, first win gen 14 ±12.7, 7% win rate; Spike 94% — hard |
+| `world1_11_salt_factory` | Meat Boy: wall-jump shafts, saws, crumble bridges | unsolved at 20 gens (75% BFS progress, still improving) — hardest; BFS-verified reachable |
 
 **Design constraint the probes exposed:** agents act with left/right/jump only — Mega Man's
 climb action is never pressed, so **ladders are unusable by agents** (manual play only).

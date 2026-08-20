@@ -91,8 +91,8 @@ def _episode_stats(adapter, x: float) -> dict:
         "time_left": round(float(getattr(core, "timer", 0.0) or 0.0), 1),
         "cause": str(getattr(core, "death_cause", "") or getattr(core, "last_cause", "") or ""),
         # balance-metric fields (Amr's table): where the episode ended, level extents, loot pool
-        "end_x": round(adapter._end_xy[0], 1) if adapter._end_xy else None,
-        "end_y": round(adapter._end_xy[1], 1) if adapter._end_xy else None,
+        "end_x": round(float(adapter._end_xy[0]), 1) if adapter._end_xy else None,
+        "end_y": round(float(adapter._end_xy[1]), 1) if adapter._end_xy else None,
         "level_len": round(float(getattr(getattr(core, "level_data", None), "width", 0.0) or 0.0), 1),
         "level_coins": adapter._level_coins,
     }
