@@ -970,6 +970,46 @@ def run_agent_analyzer():
     print(_DIM("    " + "─" * W))
 
 
+def run_balance_report():
+    """Balance Report — multi-seed neuroevolution probes per level (the paper-matrix successor)."""
+    _refresh_screen()
+    _section("BALANCE  ›  Multi-seed Level Report")
+
+    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
+    if not game:
+        return
+
+    levels = get_levels_for_game(game)
+    if not levels:
+        print(_RED("  ✖  No levels found for this game."))
+        return
+    chosen = toggle_select(f"LEVELS  ·  {game}", levels, default_indices=list(range(len(levels))))
+    if not chosen:
+        return
+
+    gens_raw = input(_DIM("\n    Generation budget per probe [25]: ")).strip()
+    gens = gens_raw if gens_raw.isdigit() else "25"
+    seeds_raw = input(_DIM("    Seeds [1234 2025 31337]: ")).strip()
+    seeds = seeds_raw.split() if seeds_raw else ["1234", "2025", "31337"]
+
+    n_jobs = len(chosen) * len(seeds)
+    print(f"\n    {_WHT(str(n_jobs))} probes ({len(chosen)} levels × {len(seeds)} seeds), "
+          f"{_DIM('roughly ' + str(n_jobs * 2) + '-' + str(n_jobs * 4) + ' minutes')}")
+    proceed = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
+    if proceed in ("n", "no"):
+        return
+
+    cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game,
+           "--gens", gens, "--seeds", *seeds, "--levels", *chosen]
+    print(_DIM("  >>> " + " ".join(cmd) + "\n"))
+    try:
+        ok = subprocess.run(cmd).returncode == 0
+    except KeyboardInterrupt:
+        return
+    if ok:
+        play_chime()
+
+
 def delete_logs_and_models():
     """Permanently delete all training runs (populations, checkpoints, results)."""
     _section("DANGER  ›  Delete Logs & Models")
@@ -1066,6 +1106,7 @@ def main():
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("dashboard",            run_dashboard),
         "12": ("analyzer",             run_agent_analyzer),
+        "14": ("balance",              run_balance_report),
         "13": ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -1095,6 +1136,7 @@ def main():
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
         print(_menu_item("12", "Analyze Performance",  "results table + run aggregates"))
+        print(_menu_item("14", "Balance Report",       "multi-seed level difficulty ± CI"))
         print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 

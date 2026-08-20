@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import threading
 import time
@@ -276,7 +277,7 @@ class Trainer:
 
         return [s.adapter.fitness() for s in self.slots]
 
-    def run(self, max_gens: int | None = None) -> None:
+    def run(self, max_gens: int | None = None, verbose: bool = True) -> None:
         while max_gens is None or self.pop.generation < max_gens:
             t0 = time.time()
             fitnesses = self.run_generation()
@@ -287,7 +288,10 @@ class Trainer:
                 rec.update({"env": i, "fit": round(fitnesses[i], 1),
                             "status": statuses[i], "frames": slot.frames})
                 env_rows.append(rec)
+            prev_best = self.pop.best_fitness
             self.pop.evolve(fitnesses)
+            if self.pop.best_fitness > prev_best:
+                self.pop.best_level = self.level  # replay defaults to the level the record was set on
             fits = np.asarray(fitnesses)
             self.pop.history[-1].update({
                 "gen": self.pop.generation,
@@ -306,10 +310,11 @@ class Trainer:
             })
             self.pop.save(self.run_dir)
             h = self.pop.history[-1]
-            print(f"gen {self.pop.generation:4d}  [{self.level or 'auto'}]  "
-                  f"best {h['best']:8.1f}  avg {h['avg']:8.1f}  "
-                  f"all-time {self.pop.best_fitness:8.1f}  wins {h['wins']}  ({h['duration']}s)",
-                  flush=True)
+            if verbose:
+                print(f"gen {self.pop.generation:4d}  [{self.level or 'auto'}]  "
+                      f"best {h['best']:8.1f}  avg {h['avg']:8.1f}  "
+                      f"all-time {self.pop.best_fitness:8.1f}  wins {h['wins']}  ({h['duration']}s)",
+                      flush=True)
             if self.state is not None:
                 self._publish_stats(statuses, fitnesses, 0.0)
 
@@ -320,9 +325,11 @@ class Trainer:
                 self.level = self.levels[self.levels.index(self.level) + 1]
                 for slot in self.slots:
                     slot.adapter.set_level(self.level)
-                print(f"curriculum: {h['wins']} wins -> advancing to level "
-                      f"[{self.level}] at gen {self.pop.generation}", flush=True)
-        print(format_results(self.pop.history), flush=True)
+                if verbose:
+                    print(f"curriculum: {h['wins']} wins -> advancing to level "
+                          f"[{self.level}] at gen {self.pop.generation}", flush=True)
+        if verbose:
+            print(format_results(self.pop.history), flush=True)
 
 
 def format_results(history: list[dict], tail: int | None = None) -> str:
@@ -342,6 +349,16 @@ def format_results(history: list[dict], tail: int | None = None) -> str:
 
 
 def replay(path: str, game: str, level: str | None, state: SharedState | None) -> None:
+    if not os.path.exists(path):
+        print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
+        return
+    if level is None:  # default to the level the record was set on
+        state_path = os.path.join(os.path.dirname(path), "state.json")
+        if os.path.exists(state_path):
+            with open(state_path, encoding="utf-8") as f:
+                level = json.load(f).get("best_level")
+            if level:
+                print(f"replaying on level [{level}] (where the record was set)", flush=True)
     weights = np.load(path)["weights"]
     cfg = GAConfig(pop_size=1)
     net = NeuralNet()

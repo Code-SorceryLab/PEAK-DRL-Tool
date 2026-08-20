@@ -35,6 +35,7 @@ class Population:
         self.generation = 0
         self.best_fitness = -np.inf
         self.best_weights = self.weights[0].copy()
+        self.best_level: str | None = None  # level the all-time best was earned on (set by the trainer)
         # Per-gen result rows. evolve() writes best/avg; the trainer appends the
         # rest (median, wins, statuses, per-env episode stats, duration, ...).
         self.history: list[dict] = []
@@ -82,6 +83,7 @@ class Population:
         state = {
             "generation": self.generation,
             "best_fitness": self.best_fitness,
+            "best_level": self.best_level,
             "config": asdict(self.cfg),
             "rng_state": self.rng.bit_generator.state,
             "history": self.history,
@@ -101,6 +103,7 @@ class Population:
         pop.best_weights = data["best_weights"].astype(np.float32)
         pop.generation = int(state["generation"])
         pop.best_fitness = float(state["best_fitness"])
+        pop.best_level = state.get("best_level")
         pop.history = state.get("history", [])
         pop.rng.bit_generator.state = state["rng_state"]
         return pop
