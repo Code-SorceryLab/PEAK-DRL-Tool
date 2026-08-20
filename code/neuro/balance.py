@@ -7,7 +7,7 @@ paper read it — win rate, generations-to-first-win, and the death-cause mix th
 WHY a level is hard (Enemy pressure vs Pit gaps vs Spike density vs Stall dead-ends).
 
 Run:  python -m code.neuro.balance --game mario [--levels L1 L2 ...]
-      [--seeds 1234 2025 31337] [--gens 25] [--out balance]
+      [--seeds 1234 2025 31337] [--gens 25] [--out runs/balance]
 """
 from __future__ import annotations
 
@@ -212,7 +212,7 @@ def main() -> None:
     ap.add_argument("--gens", type=int, default=25, help="generation budget per probe")
     ap.add_argument("--persona", default="experienced", choices=sorted(PERSONAS),
                     help="player type the probe agents imitate")
-    ap.add_argument("--out", default="balance")
+    ap.add_argument("--out", default=os.path.join("runs", "balance"))
     ap.add_argument("--workers", type=int, default=None,
                     help="probe processes; default = min(jobs, cores-1), 1 = sequential")
     args = ap.parse_args()
@@ -225,6 +225,10 @@ def main() -> None:
     levels = args.levels or list_levels(args.game)
     if not levels:
         raise SystemExit(f"no levels found for game '{args.game}'")
+    if args.levels:
+        from .adapters import validate_level
+        for lvl in args.levels:
+            validate_level(args.game, lvl)
     run_root = os.path.join("runs", "probes", args.game)
     jobs = [(args.game, lvl, seed, args.gens, run_root, persona)
             for lvl in levels for seed in args.seeds]

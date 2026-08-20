@@ -11,9 +11,9 @@ probes.*
    (or the generation budget). Default seeds `1234 2025 31337` — the same set the paper
    matrix used, keep them for comparability.
 2. **Aggregate** — per level, means ± 95% t-CIs across seeds, merged into
-   `balance/report_<game>.json` (new probes extend the file; they don't clobber it).
+   `runs/balance/report_<game>_<persona>.json` (new probes extend the file; they don't clobber it).
 3. **Report** — `python -m code.neuro.report --open` renders every game's JSON into one
-   self-contained page, `balance/report.html`: ranked difficulty table, death-location
+   self-contained page, `runs/balance/report.html`: ranked difficulty table, death-location
    heatmaps, failure-mode bars, per-seed fitness curves. Menu [12] and [14] offer to open it.
 
 ## The metric table
@@ -175,7 +175,7 @@ Every training run and balance probe now appends one row per finished episode to
 cause_of_death, jump_count, coins_collected, avg_vx, progress_ratio, route,
 enemies_killed, elapsed_time` — `route` is a sampled `(x, y)` trace, ~7.5 points/s).
 Amr's Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer line)
-reads those CSVs recursively from `runs/` and `balance/probes/` (configured in
+reads those CSVs recursively from `runs/` (configured in
 `code/stats/MarioThresholds.yaml`) and computes B1 challenge calibration, B2 punishment
 severity, and B3 strategy diversity (route clustering) with per-level target bands and a
 route-overlay view on the level grid. Launch: menu → Analyze / Balance → "stats
@@ -185,7 +185,7 @@ Speed: `balance.py --workers N` runs probes in parallel processes (default cores
 each (level x seed) cell is independent, so wall clock divides by the worker count).
 The trainer also skips all frame JPEG encoding while no dashboard tab is connected.
 
-**Per-persona reports:** balance probes write `balance/report_<game>_<persona>.json` — one file
+**Per-persona reports:** balance probes write `runs/balance/report_<game>_<persona>.json` — one file
 per (game, persona) so tiers never overwrite each other's rows. The web report renders every
 file it finds, grouped by game with the persona shown in the section header. Probe checkpoints
 live under `runs/probes/<game>/<level>_<seed>/`.

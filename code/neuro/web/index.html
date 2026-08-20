@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Evolution Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2309090b'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -494,7 +495,9 @@ function onUpdate(m){
 
   if (s.levels && s.levels.length){
     const sel = $("k_levelsel");
-    if (sel.options.length !== s.levels.length){
+    const want = s.levels.join("\\u0001");
+    if (sel.dataset.levels !== want){
+      sel.dataset.levels = want;
       sel.innerHTML = s.levels.map(l => `<option value="${l}">${l}</option>`).join("");
       sel.onchange = () => send({cmd:"level", level: sel.value});
     }

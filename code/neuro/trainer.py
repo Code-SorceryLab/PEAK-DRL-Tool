@@ -527,6 +527,9 @@ def main() -> None:
         pop = None
         cfg = GAConfig(seed=args.seed)
 
+    if args.level is not None:
+        from .adapters import validate_level
+        validate_level(args.game, args.level)
     trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
                       persona=get_persona(args.persona))
     trainer.run(args.gens)

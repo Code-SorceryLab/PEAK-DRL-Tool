@@ -1,10 +1,10 @@
-"""Balance web report: one self-contained HTML page from balance/report_*.json.
+"""Balance web report: one self-contained HTML page from runs/balance/report_*.json.
 
 Design follows the PEAK stats dashboard (dark, IBM Plex, card-based) and the
 overview-first / details-on-demand pattern: a clean per-level card grid up top,
 click a card to open its full detail panel (metrics, death map, causes, curves).
 
-Run:  python -m code.neuro.report [--dir balance] [--open]
+Run:  python -m code.neuro.report [--dir runs/balance] [--open]
 """
 from __future__ import annotations
 
@@ -113,6 +113,11 @@ def _cause_name(name: str) -> str:
     return "unknown" if name in ("?", "", "-") else name
 
 
+def _ci(row: dict) -> float:
+    """Two-seed t-intervals explode past 100% — cap the display, the JSON keeps the raw value."""
+    return min(row.get("win_rate_ci") or 0.0, 1.0)
+
+
 def _overview_card(row: dict, did: str) -> str:
     wr = row["win_rate_mean"]
     fw = (f"first win gen {row['first_win_mean']}" if row["first_win_mean"] is not None
@@ -163,7 +168,7 @@ def _detail(row: dict, cells: list[dict], did: str) -> str:
     gap = row.get("novice_expert_gap_mean", 0.0)
     dom = _cause_name(row["dominant_cause"])
     stats = "".join([
-        _stat("Win rate", f"{row['win_rate_mean']:.0%} ± {row['win_rate_ci']:.0%}",
+        _stat("Win rate", f"{row['win_rate_mean']:.0%} ± {_ci(row):.0%}",
               "measured 10 gens after first win"),
         _stat("First win", fw, f"{row['solved_by']}/{row['seeds']} seeds solved"),
         _stat("Completion", f"{row.get('completion_rate_mean', 0):.0%}", "wins / all episodes"),
@@ -206,7 +211,7 @@ def _game_section(data: dict) -> str:
 
     trs = []
     for r in rows:
-        wr = f"{r['win_rate_mean']:.0%} ±{r['win_rate_ci']:.0%}"
+        wr = f"{r['win_rate_mean']:.0%} ±{_ci(r):.0%}"
         fw = (f"{r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None else "—")
         solved_cls = "good" if r["solved_by"] == r["seeds"] else ("warn" if r["solved_by"] else "bad")
         mct = f"{r['mean_completion_time']}s" if r.get("mean_completion_time") is not None else "—"
@@ -345,13 +350,13 @@ def build(balance_dir: str) -> str:
   </div>
   {body}
   {GLOSSARY}
-  <footer>PEAK ENGINE · code/neuro/report.py · data: balance/report_*.json</footer>
+  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance/report_*.json</footer>
 </main><script>{JS}</script></body></html>"""
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate the balance web report")
-    ap.add_argument("--dir", default="balance")
+    ap.add_argument("--dir", default=os.path.join("runs", "balance"))
     ap.add_argument("--open", action="store_true", help="open in the default browser")
     args = ap.parse_args()
 

@@ -49,7 +49,7 @@ def _set_locked_level(core, level: str) -> None:
     core.world = str(level)
 
 
-def list_levels(game: str) -> list[str]:
+def list_levels(game: str, include_disabled: bool = False) -> list[str]:
     """Enabled level ids for a game, in config order. Meatboy levels are indices."""
     import yaml
     games_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
@@ -60,8 +60,23 @@ def list_levels(game: str) -> list[str]:
     with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     section = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}[game]
-    levels = section.get("levels") or {}
-    return list(levels.keys())
+    names = list((section.get("levels") or {}).keys())
+    if include_disabled:
+        names += list((section.get("disabled_levels") or {}).keys())
+    return names
+
+
+def validate_level(game: str, level: str) -> None:
+    """Fail fast on a level the cores can't load — a disabled or unknown level
+    otherwise falls back to an empty world and produces garbage fitness."""
+    enabled = list_levels(game)
+    if level in enabled:
+        return
+    if level in list_levels(game, include_disabled=True):
+        raise SystemExit(f"level '{level}' exists but is DISABLED in the config — "
+                         f"enable it first (menu 10: Toggle Levels)")
+    raise SystemExit(f"unknown level '{level}' for game '{game}' "
+                     f"(enabled: {', '.join(enabled) or 'none'})")
 
 
 def _move_md(move_x: int, sprint: bool) -> int:
