@@ -609,7 +609,7 @@ def _overview(personas: dict[str, dict]) -> str:
         series.append({"name": p, "color": pcolors.get(p, "#a855f7"), "vals": vals})
     radar_payload = json.dumps({"axes": [str(v) for v in order], "series": series})
     legend = " ".join(f'<span style="color:{s["color"]}">●</span> {s["name"]}' for s in series)
-    radar = f"""
+    radar = "" if len(order) < 3 else f"""
     <div class="viz radarbox"><div class="vt">Balance radar — win rate per level, one shape per
       persona &nbsp;<span style="font-weight:400;color:var(--faint)">{legend}</span></div>
       <canvas class="radar" width="520" height="440" data-radar='{radar_payload}'></canvas>
