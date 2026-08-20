@@ -1,216 +1,474 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PEAK Neuroevolution</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEAK Evolution Lab</title>
 <style>
-  :root { --bg:#111318; --panel:#1a1d24; --line:#2a2f3a; --txt:#d6dae2; --dim:#8a90a0;
-          --green:#4caf50; --yellow:#e6c229; --red:#e05252; --cyan:#3ecfd6; --accent:#ff9d3b; }
-  * { box-sizing:border-box; margin:0; }
-  body { background:var(--bg); color:var(--txt); font:13px/1.4 Consolas,monospace; padding:8px; }
-  #topbar { display:flex; gap:16px; align-items:center; background:var(--panel); border:1px solid var(--line);
-            padding:6px 12px; border-radius:6px; flex-wrap:wrap; }
-  #topbar b { color:var(--accent); }
-  button { background:#242936; color:var(--txt); border:1px solid var(--line); border-radius:4px;
-           padding:4px 10px; font:inherit; cursor:pointer; }
-  button.on { background:var(--accent); color:#111; font-weight:bold; }
-  #chips { display:flex; gap:6px; margin:8px 0; flex-wrap:wrap; }
-  .chip { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:4px 8px;
-          cursor:pointer; min-width:86px; }
-  .chip.watched { border-color:var(--accent); }
-  .chip .st { font-weight:bold; }
-  #main { display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; }
-  #watchwrap { position:relative; }
-  #watch { border:1px solid var(--line); border-radius:4px; background:#000; }
-  #hud { position:absolute; top:8px; left:8px; background:rgba(10,12,16,.78); padding:8px 10px;
-         border-radius:4px; white-space:pre; font-size:12px; }
-  #side { display:flex; flex-direction:column; gap:8px; }
-  #chart { background:var(--panel); border:1px solid var(--line); border-radius:4px; }
-  #thumbs { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
-  .thumb { position:relative; border:1px solid var(--line); border-radius:4px; overflow:hidden; cursor:pointer; }
-  .thumb canvas { display:block; width:100%; }
-  .thumb .mini { position:absolute; top:2px; left:4px; font-size:11px; background:rgba(10,12,16,.7);
-                 padding:1px 5px; border-radius:3px; white-space:pre; }
-  .RUNNING { color:var(--green); } .STUCK { color:var(--yellow); }
-  .DEAD { color:var(--red); } .WON { color:var(--cyan); }
+  :root{
+    --bg:#0b0e1a; --panel:#131728; --panel2:#0f1322; --line:#242b47; --line2:#1a2038;
+    --txt:#e8ecf8; --dim:#7d86a8; --faint:#4a5273;
+    --gold:#ffb02e; --gold-soft:rgba(255,176,46,.14);
+    --sky:#6ec6ff;
+    --run:#43d17c; --stuck:#ff9d3b; --dead:#ff5470; --won:#ffd23e;
+    --mono:"Cascadia Mono",Consolas,"JetBrains Mono",monospace;
+    --ui:"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--txt);font:14px/1.45 var(--ui);padding:14px}
+  canvas{image-rendering:pixelated}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  #app{max-width:1440px;margin:0 auto;display:grid;gap:12px;
+       grid-template-columns:minmax(0,1fr) 372px;
+       grid-template-areas:"header header" "feed side" "wall wall"}
+  @media (max-width:1120px){
+    #app{grid-template-columns:1fr;grid-template-areas:"header" "feed" "side" "wall"}
+  }
+
+  .panel{background:var(--panel);border:1px solid var(--line)}
+
+  /* ── header ─────────────────────────────────────────── */
+  header{grid-area:header;display:flex;align-items:stretch;gap:0;
+         background:var(--panel);border:1px solid var(--line)}
+  .ident{padding:12px 18px;border-right:1px solid var(--line2);min-width:190px}
+  .eyebrow{font:600 10px/1 var(--ui);letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+  .ident h1{font:700 21px/1.15 var(--ui);letter-spacing:.01em;margin-top:5px}
+  .ident h1 em{font-style:normal;color:var(--gold)}
+  .gen{padding:8px 20px;border-right:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center}
+  .gen b{font:700 34px/1 var(--mono);color:var(--gold);font-variant-numeric:tabular-nums}
+  .metrics{display:flex;flex:1;align-items:center;gap:26px;padding:0 20px;flex-wrap:wrap}
+  .metric{display:flex;flex-direction:column;gap:3px}
+  .metric span{font:600 10px/1 var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+  .metric b{font:600 17px/1 var(--mono);font-variant-numeric:tabular-nums}
+  .metric b.record{color:var(--won)}
+  .ctrls{display:flex;align-items:center;gap:8px;padding:0 16px;border-left:1px solid var(--line2)}
+  .toggle{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+          padding:7px 13px;font:600 12px var(--ui);letter-spacing:.04em;transition:all .15s}
+  .toggle.on{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
+  .toggle:hover{border-color:var(--dim)}
+  #b_manual.on{background:var(--gold);color:#14100a;border-color:var(--gold)}
+  .conn{display:flex;align-items:center;gap:7px;font:600 11px var(--ui);color:var(--dim);
+        letter-spacing:.08em;text-transform:uppercase;padding-right:4px}
+  .conn i{width:8px;height:8px;border-radius:50%;background:var(--dead);display:inline-block}
+  .conn.live i{background:var(--run);animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+
+  /* ── main feed ──────────────────────────────────────── */
+  #feedwrap{grid-area:feed;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line)}
+  .feedhead{display:flex;align-items:baseline;gap:14px;padding:9px 14px;border-bottom:1px solid var(--line2)}
+  .feedhead .eyebrow{color:var(--faint)}
+  #f_env{font:700 15px var(--mono);color:var(--txt)}
+  #f_meta{font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:auto}
+  #f_status{font:700 12px var(--mono);letter-spacing:.1em}
+  #bezel{position:relative;background:#000;line-height:0}
+  #watch{width:100%;height:auto;display:block}
+  #bezel::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.05) 3px 4px)}
+  #ribbon{display:none;padding:8px 14px;font:600 12.5px var(--ui);letter-spacing:.03em;
+          background:var(--gold);color:#14100a}
+  #feedwrap.manual #ribbon{display:block}
+  #feedwrap.manual{border-color:var(--gold)}
+  #boot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+        color:var(--faint);font:600 13px var(--mono);letter-spacing:.1em}
+
+  /* ── side column ────────────────────────────────────── */
+  #side{grid-area:side;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);padding:12px 14px 14px}
+  .card h2{font:600 10px/1 var(--ui);letter-spacing:.22em;color:var(--dim);
+           text-transform:uppercase;margin-bottom:11px;display:flex;justify-content:space-between}
+  .card h2 small{color:var(--faint);letter-spacing:.06em}
+
+  /* sensor telemetry strip — the signature */
+  .sgroup{font:600 9px/1 var(--ui);letter-spacing:.18em;color:var(--faint);
+          text-transform:uppercase;margin:9px 0 5px;border-top:1px solid var(--line2);padding-top:7px}
+  .sgroup:first-of-type{margin-top:0;border-top:0;padding-top:0}
+  .srow{display:grid;grid-template-columns:52px 1fr 38px;align-items:center;gap:8px;margin:3px 0}
+  .srow label{font:600 10.5px var(--mono);color:var(--dim);letter-spacing:.05em}
+  .srow output{font:500 10.5px var(--mono);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+  .sbar{height:7px;background:var(--panel2);border:1px solid var(--line2);position:relative;overflow:hidden}
+  .sbar i{position:absolute;top:0;bottom:0;left:0;background:var(--gold);transition:width .12s,left .12s}
+  .sbar.threat i{background:var(--dead)}
+  .sbar.body i{background:var(--sky)}
+  .sbar.loot i{background:var(--won)}
+  .sbar.center::before{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:var(--line)}
+  #sensors.stale .sbar i{background:var(--faint)}
+  #sensors.stale output{color:var(--faint)}
+
+  /* fitness chart */
+  #chart{width:100%;height:172px;display:block}
+
+  /* run config */
+  .kv{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 14px}
+  .kv div span{display:block;font:600 9.5px/1 var(--ui);letter-spacing:.14em;color:var(--faint);
+               text-transform:uppercase;margin-bottom:3px}
+  .kv div b{font:600 13.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
+
+  /* ── specimen wall ──────────────────────────────────── */
+  #wallwrap{grid-area:wall}
+  .wallhead{display:flex;align-items:center;gap:16px;padding:9px 14px;border-bottom:1px solid var(--line2)}
+  #census{margin-left:auto;font:600 11.5px var(--mono);color:var(--dim);letter-spacing:.04em}
+  #census b{font-weight:700}
+  #wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:1px;background:var(--line2)}
+  .spec{background:var(--panel2);border:0;padding:0;text-align:left;color:var(--txt);
+        position:relative;transition:background .15s}
+  .spec:hover{background:#161b30}
+  .spec.watched::before{content:"";position:absolute;inset:0;border:2px solid var(--gold);pointer-events:none;z-index:2}
+  .spec canvas{width:100%;height:auto;display:block;background:#000;opacity:.92}
+  .spec.watched canvas{opacity:1}
+  .spec .tag{display:flex;align-items:center;gap:8px;padding:6px 9px 4px}
+  .spec .tag b{font:700 12px var(--mono);letter-spacing:.05em}
+  .spec .tag i{width:7px;height:7px;border-radius:50%;flex:none}
+  .spec .tag em{font:600 10px var(--mono);font-style:normal;letter-spacing:.08em;margin-left:auto}
+  .spec .nums{display:flex;justify-content:space-between;padding:0 9px 6px;
+              font:500 10.5px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+  .fitrail{height:4px;background:var(--line2)}
+  .fitrail i{display:block;height:100%;background:var(--gold);width:0;transition:width .3s}
+  .spec.s-WON .fitrail i{background:var(--won);box-shadow:0 0 8px var(--won)}
+  .spec.s-DEAD canvas{filter:grayscale(.7) brightness(.55)}
+  .spec.s-STUCK canvas{filter:saturate(.4) brightness(.7)}
+
+  .c-RUNNING{color:var(--run)} .c-STUCK{color:var(--stuck)}
+  .c-DEAD{color:var(--dead)} .c-WON{color:var(--won)}
+  .d-RUNNING{background:var(--run)} .d-STUCK{background:var(--stuck)}
+  .d-DEAD{background:var(--dead)} .d-WON{background:var(--won);box-shadow:0 0 6px var(--won)}
+
+  #turbonote{display:none;padding:7px 14px;font:500 11.5px var(--ui);color:var(--dim);
+             border-top:1px solid var(--line2)}
+  #wallwrap.turbo #turbonote{display:block}
+
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;animation:none !important}
+  }
 </style>
 </head>
 <body>
-<div id="topbar">
-  <span>GEN <b id="s_gen">0</b></span>
-  <span>ALL-TIME BEST <b id="s_atb">0</b></span>
-  <span>LAST GEN BEST <b id="s_lgb">0</b></span>
-  <span>AVG FIT <b id="s_avg">0</b></span>
-  <span>ELITE <b id="s_elite">0</b></span>
-  <span>MUT <b id="s_mut">0</b></span>
-  <span>STEPS/s <b id="s_sps">0</b></span>
-  <span>LEVEL <b id="s_level">-</b></span>
-  <button id="b_turbo">Turbo</button>
-  <button id="b_sensors" class="on">Sensors ON (debug)</button>
-  <button id="b_manual">AI training (click to play)</button>
-  <span id="conn" style="color:var(--red)">disconnected</span>
-</div>
-<div id="chips"></div>
-<div id="main">
-  <div id="watchwrap">
-    <canvas id="watch" width="800" height="600"></canvas>
-    <div id="hud"></div>
+<div id="app">
+
+  <header>
+    <div class="ident">
+      <div class="eyebrow">Neuroevolution lab</div>
+      <h1>PEAK <em id="h_game">mario</em></h1>
+    </div>
+    <div class="gen">
+      <span class="eyebrow">Generation</span>
+      <b id="s_gen">0</b>
+    </div>
+    <div class="metrics">
+      <div class="metric"><span>All-time best</span><b class="record" id="s_atb">–</b></div>
+      <div class="metric"><span>Last gen best</span><b id="s_lgb">–</b></div>
+      <div class="metric"><span>Avg fitness</span><b id="s_avg">–</b></div>
+      <div class="metric"><span>Steps / s</span><b id="s_sps">–</b></div>
+    </div>
+    <div class="ctrls">
+      <button id="b_turbo" class="toggle">Turbo</button>
+      <button id="b_sensors" class="toggle on">Sensors</button>
+      <button id="b_manual" class="toggle">Take control</button>
+      <span class="conn" id="conn"><i></i><u id="connlabel" style="text-decoration:none">Connecting</u></span>
+    </div>
+  </header>
+
+  <div id="feedwrap">
+    <div class="feedhead">
+      <span class="eyebrow">Watched specimen</span>
+      <b id="f_env">ENV 1</b>
+      <b id="f_status" class="c-RUNNING">RUNNING</b>
+      <span id="f_meta">x 0 · fit 0</span>
+    </div>
+    <div id="bezel">
+      <canvas id="watch" width="800" height="600"></canvas>
+      <div id="boot">WAITING FOR TRAINER…</div>
+    </div>
+    <div id="ribbon">Manual control — arrow keys or WASD move, space jumps. Click “Release control” to hand back to the net.</div>
   </div>
-  <div id="side"><canvas id="chart" width="420" height="220"></canvas></div>
+
+  <div id="side">
+    <div class="card" id="sensorcard">
+      <h2>Sensor telemetry <small id="sensewho">env 1</small></h2>
+      <div id="sensors"></div>
+    </div>
+    <div class="card">
+      <h2>Fitness record <small><span style="color:var(--gold)">■</span> best&nbsp;&nbsp;<span style="color:var(--sky)">■</span> avg</small></h2>
+      <canvas id="chart" width="680" height="344"></canvas>
+    </div>
+    <div class="card">
+      <h2>Run</h2>
+      <div class="kv">
+        <div><span>Level</span><b id="k_level">–</b></div>
+        <div><span>Population</span><b id="k_pop">–</b></div>
+        <div><span>Elite</span><b id="k_elite">–</b></div>
+        <div><span>Mutation</span><b id="k_mut">–</b></div>
+        <div><span>Mode</span><b id="k_mode">real-time</b></div>
+        <div><span>Won</span><b id="k_wins">0</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="wallwrap" class="panel">
+    <div class="wallhead">
+      <span class="eyebrow">Population — generation <span id="wallgen">0</span></span>
+      <span id="census"></span>
+    </div>
+    <div id="wall"></div>
+    <div id="turbonote">Turbo is on — feeds refresh once a second; the watched specimen stays live.</div>
+  </div>
+
 </div>
-<div id="thumbs"></div>
 
 <script>
-const RAY_COLORS = {0:"rgba(255,157,59,.55)", 1:"#ff9d3b", 2:"#e05252"};
-const SENSOR_LABELS = ["obstacle","up30","up60","down30","down60","back","enemy","pit","grounded",
-                       "vx","vy","jump ok","qblock","bias"];
-let sensorsOn = true, turbo = false, watched = 0, nEnvs = 0;
-const thumbCanvases = [], thumbMinis = [], chipEls = [], lastImg = {};
-let ws;
+"use strict";
+const RAY_COLORS = {0:"rgba(255,176,46,.4)", 1:"#ffb02e", 2:"#ff5470"};
+const STATUS = ["RUNNING","STUCK","DEAD","WON"];
+const SENSORS = [
+  {g:"Rays — obstacle proximity", rows:[
+    {i:0,l:"FWD"},{i:1,l:"UP 30"},{i:2,l:"UP 60"},{i:3,l:"DN 30"},{i:4,l:"DN 60"},{i:5,l:"BACK"}]},
+  {g:"Threat", cls:"threat", rows:[{i:6,l:"ENEMY"},{i:7,l:"PIT"}]},
+  {g:"Body", cls:"body", rows:[{i:9,l:"VX",center:true},{i:10,l:"VY",center:true},{i:8,l:"GND"},{i:11,l:"JUMP"}]},
+  {g:"Loot", cls:"loot", rows:[{i:12,l:"QBLK"}]},
+];
+// rays + enemy arrive as "1 = clear"; show proximity so bars grow when danger nears
+const INVERT = new Set([0,1,2,3,4,5,6]);
 
-function send(o){ if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0;
+const lastImg={}, specEls=[], senseEls=[];
+const keys={left:false,right:false,jump:false};
+const $ = id => document.getElementById(id);
+const send = o => { if (ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
 
-function buildEnvUI(n){
+/* ── build static DOM ── */
+(function buildSensors(){
+  const root = $("sensors");
+  for (const grp of SENSORS){
+    const h = document.createElement("div");
+    h.className = "sgroup"; h.textContent = grp.g;
+    root.appendChild(h);
+    for (const r of grp.rows){
+      const row = document.createElement("div");
+      row.className = "srow";
+      row.innerHTML = `<label>${r.l}</label>
+        <div class="sbar ${grp.cls||""} ${r.center?"center":""}"><i></i></div><output>–</output>`;
+      root.appendChild(row);
+      senseEls[r.i] = {bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center, idx:r.i};
+    }
+  }
+})();
+
+function buildWall(n){
   nEnvs = n;
-  const chips = document.getElementById("chips"), thumbs = document.getElementById("thumbs");
-  chips.innerHTML = ""; thumbs.innerHTML = "";
-  thumbCanvases.length = thumbMinis.length = chipEls.length = 0;
-  for (let i = 0; i < n; i++){
-    const c = document.createElement("div");
-    c.className = "chip";
-    c.innerHTML = `ENV ${i+1}<br><span class="fit">FIT 0</span><br><span class="st">-</span>`;
-    c.onclick = () => { watched = i; send({cmd:"watch", env:i}); };
-    chips.appendChild(c); chipEls.push(c);
-    const t = document.createElement("div");
-    t.className = "thumb";
-    const cv = document.createElement("canvas"); cv.width = 280; cv.height = 210;
-    const mini = document.createElement("div"); mini.className = "mini";
-    t.appendChild(cv); t.appendChild(mini);
-    t.onclick = c.onclick;
-    thumbs.appendChild(t); thumbCanvases.push(cv); thumbMinis.push(mini);
+  const wall = $("wall");
+  wall.innerHTML = ""; specEls.length = 0;
+  for (let i=0;i<n;i++){
+    const b = document.createElement("button");
+    b.className = "spec";
+    b.setAttribute("aria-label", `Watch env ${i+1}`);
+    b.innerHTML = `<canvas width="280" height="210"></canvas>
+      <div class="tag"><i></i><b>ENV ${String(i+1).padStart(2,"0")}</b><em>–</em></div>
+      <div class="nums"><span class="nx">x –</span><span class="nf">fit –</span></div>
+      <div class="fitrail"><i></i></div>`;
+    b.onclick = () => { watched = i; send({cmd:"watch", env:i}); };
+    wall.appendChild(b);
+    const pctx = b.querySelector("canvas").getContext("2d");
+    pctx.fillStyle = "#0f1322"; pctx.fillRect(0, 0, 280, 210);
+    pctx.fillStyle = "#4a5273"; pctx.font = "600 18px Consolas,monospace";
+    pctx.textAlign = "center"; pctx.fillText("AWAITING FEED", 140, 110);
+    specEls.push({el:b, cv:b.querySelector("canvas"), dot:b.querySelector(".tag i"),
+                  st:b.querySelector(".tag em"), nx:b.querySelector(".nx"),
+                  nf:b.querySelector(".nf"), rail:b.querySelector(".fitrail i")});
   }
 }
 
+/* ── drawing ── */
 function drawRays(ctx, rays, k){
   if (!sensorsOn || !rays) return;
   for (const [x1,y1,x2,y2,hit] of rays){
     ctx.strokeStyle = RAY_COLORS[hit] || RAY_COLORS[0];
     ctx.lineWidth = hit ? 2 : 1;
-    ctx.beginPath(); ctx.moveTo(x1*k, y1*k); ctx.lineTo(x2*k, y2*k); ctx.stroke();
-    if (hit){ ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x2*k, y2*k, 3, 0, 7); ctx.fill(); }
+    ctx.beginPath(); ctx.moveTo(x1*k,y1*k); ctx.lineTo(x2*k,y2*k); ctx.stroke();
+    if (hit){ ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x2*k,y2*k,3,0,7); ctx.fill(); }
   }
 }
 
-function drawEnv(e, stats){
-  if (e.img){
-    const img = new Image();
-    img.onload = () => { lastImg[e.id] = {img, rays:e.rays, scale:e.scale}; paint(e, stats); };
-    img.src = "data:image/jpeg;base64," + e.img;
-  } else paint(e, stats);
-}
-
-function paint(e, stats){
+function paintEnv(e){
   const cache = lastImg[e.id];
-  if (e.watched){
-    const cv = document.getElementById("watch"), ctx = cv.getContext("2d");
-    if (cache){
-      ctx.drawImage(cache.img, 0, 0, cv.width, cv.height);
-      drawRays(ctx, cache.rays, cv.width / cache.img.width * (cache.scale || 1) === 1 ? 1 : cv.width / cache.img.width);
-    }
-    const hud = document.getElementById("hud");
-    let txt = `ENV ${e.id+1}  GEN ${stats.gen ?? 0}\nX ${e.x}  FIT ${e.fitness}  ` +
-              `<span class="${e.status}">${e.status}</span>\n`;
-    if (e.sensors){
-      txt += "\n";
-      for (let i = 0; i < 13; i++) txt += `${SENSOR_LABELS[i].padEnd(9)} ${e.sensors[i].toFixed(2)}\n`;
-    }
-    hud.innerHTML = txt;
-  }
-  const cv = thumbCanvases[e.id];
-  if (cv && cache){
-    const ctx = cv.getContext("2d");
+  if (e.id === watched && cache){
+    $("boot").style.display = "none";
+    const cv = $("watch"), ctx = cv.getContext("2d");
+    const native = cache.img.width / (cache.scale || 1);
+    if (cv.width !== native){ cv.width = native; cv.height = cache.img.height / (cache.scale||1); }
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(cache.img, 0, 0, cv.width, cv.height);
-    drawRays(ctx, cache.rays, cv.width / (cache.img.width / (cache.scale || 1)));
+    drawRays(ctx, cache.rays, cv.width / native);
   }
-  if (thumbMinis[e.id])
-    thumbMinis[e.id].innerHTML =
-      `ENV ${e.id+1}  X ${e.x}\nFIT ${e.fitness}  <span class="${e.status}">${e.status}</span>`;
+  const s = specEls[e.id];
+  if (s && cache){
+    const ctx = s.cv.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cache.img, 0, 0, s.cv.width, s.cv.height);
+    drawRays(ctx, cache.rays, s.cv.width / (cache.img.width / (cache.scale||1)));
+  }
+}
+
+function updateSensors(e){
+  if (!e.sensors) return;
+  $("sensors").classList.remove("stale");
+  $("sensewho").textContent = "env " + (e.id+1);
+  for (const s of senseEls){
+    if (!s) continue;
+    let v = e.sensors[s.idx];
+    const shown = v;
+    if (INVERT.has(s.idx)) v = 1 - v;
+    if (s.center){
+      const half = Math.min(Math.abs(v),1) * 50;
+      s.bar.style.left  = v < 0 ? (50-half)+"%" : "50%";
+      s.bar.style.width = half + "%";
+    } else {
+      s.bar.style.left = 0;
+      s.bar.style.width = Math.max(0,Math.min(v,1))*100 + "%";
+    }
+    s.out.value = (+shown).toFixed(2);
+  }
 }
 
 function drawChart(history){
-  const cv = document.getElementById("chart"), ctx = cv.getContext("2d");
-  ctx.fillStyle = "#1a1d24"; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = "#8a90a0"; ctx.fillText("fitness / generation  (orange=best, gray=avg)", 10, 14);
-  if (!history || history.length < 2) return;
-  const max = Math.max(...history.map(h => h[0]), 1);
-  const px = i => 8 + i * (cv.width - 16) / (history.length - 1);
-  const py = v => cv.height - 8 - v / max * (cv.height - 32);
-  for (const [j, color] of [[1, "#8a90a0"], [0, "#ff9d3b"]]){
-    ctx.strokeStyle = color; ctx.lineWidth = j ? 1 : 2; ctx.beginPath();
-    history.forEach((h, i) => i ? ctx.lineTo(px(i), py(h[j])) : ctx.moveTo(px(i), py(h[j])));
-    ctx.stroke();
+  const cv = $("chart"), ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height, L = 46, R = 12, T = 14, B = 34;
+  ctx.clearRect(0,0,W,H);
+  if (!history || history.length < 2){
+    ctx.fillStyle = "#4a5273"; ctx.font = "600 22px Consolas,monospace";
+    ctx.fillText("waiting for two generations…", L, H/2);
+    return;
   }
+  const max = Math.max(...history.map(h=>h[0])) * 1.06 || 1;
+  const px = i => L + i*(W-L-R)/(history.length-1);
+  const py = v => H-B - (v/max)*(H-T-B);
+  ctx.strokeStyle = "#1a2038"; ctx.fillStyle = "#5d6584";
+  ctx.font = "500 19px Consolas,monospace"; ctx.lineWidth = 1;
+  for (let q=0;q<=4;q++){
+    const y = py(max*q/4);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(W-R,y); ctx.stroke();
+    ctx.fillText(Math.round(max*q/4), 4, y+6);
+  }
+  ctx.fillText("gen 1", L, H-8);
+  const endLbl = "gen " + history.length;
+  ctx.fillText(endLbl, W-R-ctx.measureText(endLbl).width, H-8);
+  // best area + line
+  ctx.beginPath();
+  history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[0])) : ctx.moveTo(px(0),py(h[0])));
+  ctx.strokeStyle = "#ffb02e"; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.lineTo(px(history.length-1),H-B); ctx.lineTo(L,H-B); ctx.closePath();
+  const grad = ctx.createLinearGradient(0,T,0,H-B);
+  grad.addColorStop(0,"rgba(255,176,46,.22)"); grad.addColorStop(1,"rgba(255,176,46,0)");
+  ctx.fillStyle = grad; ctx.fill();
+  // avg line
+  ctx.beginPath();
+  history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[1])) : ctx.moveTo(px(0),py(h[1])));
+  ctx.strokeStyle = "#6ec6ff"; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
+/* ── state intake ── */
 function onUpdate(m){
   const s = m.stats || {};
-  if (s.pop_size && s.pop_size !== nEnvs) buildEnvUI(s.pop_size);
-  for (const [id, v] of [["s_gen", s.gen], ["s_atb", s.all_time_best], ["s_lgb", s.last_gen_best],
-                         ["s_avg", s.avg_fitness], ["s_elite", s.elite], ["s_mut", s.mut_rate],
-                         ["s_sps", s.sps], ["s_level", s.level]])
-    if (v !== undefined) document.getElementById(id).textContent = v;
-  if (s.turbo !== undefined && turbo !== s.turbo){
+  if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
+  if (s.game) $("h_game").textContent = s.game;
+
+  const fmt = v => v===undefined||v===null ? "–" : (+v).toLocaleString("en-US",{maximumFractionDigits:0});
+  if (s.gen !== undefined){ $("s_gen").textContent = s.gen; $("wallgen").textContent = s.gen; }
+  $("s_atb").textContent = fmt(s.all_time_best);
+  $("s_lgb").textContent = fmt(s.last_gen_best);
+  $("s_avg").textContent = fmt(s.avg_fitness);
+  $("s_sps").textContent = fmt(s.sps);
+  if (s.level) $("k_level").textContent = s.level;
+  if (s.pop_size) $("k_pop").textContent = s.pop_size;
+  if (s.elite !== undefined) $("k_elite").textContent = s.elite;
+  if (s.mut_rate !== undefined) $("k_mut").textContent = Math.round(s.mut_rate*100)+"%";
+  $("k_mode").textContent = s.turbo ? "turbo" : "real-time";
+
+  if (s.turbo !== undefined && s.turbo !== turbo){
     turbo = s.turbo;
-    document.getElementById("b_turbo").className = turbo ? "on" : "";
-    document.getElementById("b_turbo").textContent = turbo ? "Turbo ON (click for real-time)" : "Turbo";
+    $("b_turbo").classList.toggle("on", turbo);
+    $("wallwrap").classList.toggle("turbo", turbo);
+  }
+  if (s.manual !== undefined && s.manual !== manual) setManual(s.manual, false);
+
+  if (s.statuses){
+    const c = {}; STATUS.forEach(k=>c[k]=0);
+    s.statuses.forEach(k=>c[k]=(c[k]||0)+1);
+    $("census").innerHTML = STATUS
+      .map(k=>`<b class="c-${k}">${c[k]}</b> <span style="color:var(--faint)">${k.toLowerCase()}</span>`)
+      .join(" &nbsp;·&nbsp; ");
+    $("k_wins").textContent = c.WON;
+    const genBest = Math.max(...(s.live_fitness||[1]), 1);
+    (s.statuses).forEach((st,i)=>{
+      const sp = specEls[i]; if (!sp) return;
+      sp.el.className = "spec s-" + st + (i===watched?" watched":"");
+      sp.dot.className = "d-" + st;
+      sp.st.textContent = st; sp.st.className = "c-" + st;
+      const f = (s.live_fitness||[])[i];
+      if (f !== undefined){
+        sp.nf.textContent = "fit " + fmt(f);
+        sp.rail.style.width = Math.max(2, f/genBest*100) + "%";
+      }
+    });
   }
   drawChart(s.history);
-  (m.envs || []).forEach(e => {
-    if (e.watched) watched = e.id;
-    drawEnv(e, s);
-    const chip = chipEls[e.id];
-    if (chip){
-      chip.classList.toggle("watched", e.id === watched);
-      chip.querySelector(".fit").textContent = "FIT " + ((s.live_fitness || [])[e.id] ?? e.fitness);
-      const st = chip.querySelector(".st");
-      st.textContent = e.status; st.className = "st " + e.status;
+
+  for (const e of (m.envs||[])){
+    if (e.watched !== undefined && e.watched) watched = e.id;
+    if (e.img){
+      const img = new Image();
+      img.onload = () => { lastImg[e.id] = {img, rays:e.rays, scale:e.scale}; paintEnv(e); };
+      img.src = "data:image/jpeg;base64," + e.img;
+    } else paintEnv(e);
+    const sp = specEls[e.id];
+    if (sp) sp.nx.textContent = "x " + Math.round(e.x);
+    if (e.id === watched){
+      $("f_env").textContent = "ENV " + String(e.id+1).padStart(2,"0");
+      $("f_status").textContent = e.status;
+      $("f_status").className = "c-" + e.status;
+      $("f_meta").textContent = `x ${Math.round(e.x)} · fit ${fmt(e.fitness)}`;
+      updateSensors(e);
     }
-  });
+  }
 }
 
-function connect(){
-  ws = new WebSocket("ws://127.0.0.1:8765");
-  ws.onopen = () => { document.getElementById("conn").textContent = "live";
-                      document.getElementById("conn").style.color = "#4caf50"; };
-  ws.onmessage = ev => onUpdate(JSON.parse(ev.data));
-  ws.onclose = () => { document.getElementById("conn").textContent = "disconnected";
-                       document.getElementById("conn").style.color = "#e05252";
-                       setTimeout(connect, 1500); };
+/* ── controls ── */
+function setManual(on, notify=true){
+  manual = on;
+  $("b_manual").classList.toggle("on", on);
+  $("b_manual").textContent = on ? "Release control" : "Take control";
+  $("feedwrap").classList.toggle("manual", on);
+  if (!on) keys.left = keys.right = keys.jump = false;
+  if (notify) send({cmd:"manual", on});
 }
-document.getElementById("b_turbo").onclick = () => { turbo = !turbo; send({cmd:"turbo", on:turbo}); };
-let manual = false;
-const keys = {left:false, right:false, jump:false};
-const KEYMAP = {ArrowLeft:"left", a:"left", ArrowRight:"right", d:"right",
-                ArrowUp:"jump", w:"jump", " ":"jump"};
+$("b_manual").onclick = () => setManual(!manual);
+$("b_turbo").onclick = () => { turbo = !turbo; $("b_turbo").classList.toggle("on",turbo);
+                               $("wallwrap").classList.toggle("turbo",turbo); send({cmd:"turbo", on:turbo}); };
+$("b_sensors").onclick = function(){
+  sensorsOn = !sensorsOn; this.classList.toggle("on", sensorsOn);
+  $("sensors").classList.toggle("stale", !sensorsOn);
+  send({cmd:"sensors", on:sensorsOn});
+};
+
+const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};
 function setKey(ev, down){
   const k = KEYMAP[ev.key];
   if (!manual || k === undefined) return;
   ev.preventDefault();
   if (keys[k] !== down){ keys[k] = down; send({cmd:"keys", ...keys}); }
 }
-document.addEventListener("keydown", ev => setKey(ev, true));
-document.addEventListener("keyup", ev => setKey(ev, false));
-document.getElementById("b_manual").onclick = function(){
-  manual = !manual; send({cmd:"manual", on:manual});
-  this.className = manual ? "on" : "";
-  this.textContent = manual ? "MANUAL PLAY - arrows/WASD, space to jump (click for AI)"
-                            : "AI training (click to play)";
-};
-document.getElementById("b_sensors").onclick = function(){
-  sensorsOn = !sensorsOn; this.className = sensorsOn ? "on" : "";
-  this.textContent = sensorsOn ? "Sensors ON (debug)" : "Sensors OFF";
-  send({cmd:"sensors", on:sensorsOn});
-};
+document.addEventListener("keydown", ev => setKey(ev,true));
+document.addEventListener("keyup", ev => setKey(ev,false));
+
+/* ── connection ── */
+function connect(){
+  ws = new WebSocket("ws://127.0.0.1:8765");
+  ws.onopen = () => { $("conn").classList.add("live"); $("connlabel").textContent = "Live"; };
+  ws.onmessage = ev => onUpdate(JSON.parse(ev.data));
+  ws.onclose = () => { $("conn").classList.remove("live"); $("connlabel").textContent = "Reconnecting";
+                       $("boot").style.display = "flex"; setTimeout(connect, 1500); };
+}
 connect();
 </script>
 </body>
