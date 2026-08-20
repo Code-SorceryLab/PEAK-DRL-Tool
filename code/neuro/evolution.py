@@ -20,6 +20,7 @@ class GAConfig:
     max_frames: int = 3600       # per-episode frame budget (60s at 60fps)
     stuck_frames: int = 300      # frames without max_x gain before an env is marked STUCK
     advance_wins: int = 3        # wins in one generation before the curriculum advances a level
+    anneal_factor: float = 0.5   # multiply mutation rate+sigma by this once a level is first solved (1.0 = off)
     win_bonus: float = 5000.0
     seed: int = 42
 
@@ -36,6 +37,7 @@ class Population:
         self.best_fitness = -np.inf
         self.best_weights = self.weights[0].copy()
         self.best_level: str | None = None  # level the all-time best was earned on (set by the trainer)
+        self.annealed = False  # mutation halved after the current level's first win (trainer-managed)
         # Per-gen result rows. evolve() writes best/avg; the trainer appends the
         # rest (median, wins, statuses, per-env episode stats, duration, ...).
         self.history: list[dict] = []
@@ -84,6 +86,7 @@ class Population:
             "generation": self.generation,
             "best_fitness": self.best_fitness,
             "best_level": self.best_level,
+            "annealed": self.annealed,
             "persona": getattr(self, "persona", None),
             "config": asdict(self.cfg),
             "rng_state": self.rng.bit_generator.state,
@@ -116,6 +119,7 @@ class Population:
         pop.generation = int(state["generation"])
         pop.best_fitness = float(state["best_fitness"])
         pop.best_level = state.get("best_level")
+        pop.annealed = state.get("annealed", False)
         pop.history = state.get("history", [])
         pop.rng.bit_generator.state = state["rng_state"]
         return pop

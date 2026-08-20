@@ -147,6 +147,13 @@ class Trainer:
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
+        # Base mutation settings, restored when the curriculum moves to an unsolved level.
+        # If resuming an already-annealed run, recover the originals by inverting the factor.
+        if self.pop.annealed and cfg.anneal_factor not in (0.0, 1.0):
+            self._base_mutation = (cfg.mutation_rate / cfg.anneal_factor,
+                                   cfg.mutation_sigma / cfg.anneal_factor)
+        else:
+            self._base_mutation = (cfg.mutation_rate, cfg.mutation_sigma)
         self._step_accum = 0  # cumulative env-steps, sampled by _steps_per_sec
         self._steps_window: list[tuple[float, int]] = []  # (timestamp, cumulative steps)
         self._start_time = time.time()
@@ -360,6 +367,16 @@ class Trainer:
                             "status": statuses[i], "frames": slot.frames})
                 env_rows.append(rec)
             self._append_episode_csv(env_rows)
+            # Post-first-win annealing: once this level is solved, drop mutation so the
+            # population exploits the winning lineage instead of re-exploring forever.
+            if (statuses.count("WON") > 0 and not self.pop.annealed
+                    and self.cfg.anneal_factor not in (0.0, 1.0)):
+                self.cfg.mutation_rate *= self.cfg.anneal_factor
+                self.cfg.mutation_sigma *= self.cfg.anneal_factor
+                self.pop.annealed = True
+                if verbose:
+                    print(f"first win on [{self.level or 'auto'}] — mutation annealed to "
+                          f"{self.cfg.mutation_rate:.3f}/{self.cfg.mutation_sigma:.2f}", flush=True)
             prev_best = self.pop.best_fitness
             self.pop.evolve(fitnesses)
             if self.pop.best_fitness > prev_best:
@@ -409,6 +426,8 @@ class Trainer:
                 self.level = requested
                 for slot in self.slots:
                     slot.adapter.set_level(self.level)
+                self.cfg.mutation_rate, self.cfg.mutation_sigma = self._base_mutation
+                self.pop.annealed = False
                 self.state.controls.level_request = None
                 if verbose:
                     print(f"level switched to [{self.level}] from the dashboard "
@@ -421,6 +440,9 @@ class Trainer:
                 self.level = self.levels[self.levels.index(self.level) + 1]
                 for slot in self.slots:
                     slot.adapter.set_level(self.level)
+                # fresh unsolved level -> back to full exploration
+                self.cfg.mutation_rate, self.cfg.mutation_sigma = self._base_mutation
+                self.pop.annealed = False
                 if verbose:
                     print(f"curriculum: {h['wins']} wins -> advancing to level "
                           f"[{self.level}] at gen {self.pop.generation}", flush=True)
@@ -468,6 +490,8 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state)
     trainer.slots[0].adapter = adapter
     trainer.slots[0].net = net
+    all_levels = list_levels(game)
+    cur_level = level if level is not None else (all_levels[0] if all_levels else None)
     while True:
         adapter.reset()
         while adapter.alive:
@@ -481,6 +505,12 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
                 trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)
             clock.tick(60)
         print(f"replay episode done: {adapter.status}, fitness {adapter.fitness():.1f}", flush=True)
+        # A win advances the replay to the next enabled level (wrapping), like the game would.
+        if getattr(adapter, "won", False) and all_levels and cur_level in all_levels:
+            cur_level = all_levels[(all_levels.index(cur_level) + 1) % len(all_levels)]
+            adapter.set_level(cur_level)
+            trainer.level = cur_level  # dashboard header follows
+            print(f"replay: level cleared — advancing to [{cur_level}]", flush=True)
 
 
 def main() -> None:
