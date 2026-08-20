@@ -981,6 +981,19 @@ def run_agent_analyzer():
 
     if input(_DIM("\n    Open the balance web report? [Y/n]: ")).strip().lower() not in ("n", "no"):
         subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+    if input(_DIM("    Open the stats dashboard (Streamlit)? [y/N]: ")).strip().lower() in ("y", "yes"):
+        launch_stats_dashboard()
+
+
+def launch_stats_dashboard():
+    """Amr's per-episode stats dashboard (B1/B2/B3 + route viz) on the neuro CSVs."""
+    try:
+        import streamlit  # noqa: F401
+    except ImportError:
+        print(_RED("  ✖  Streamlit not installed. Run: pip install streamlit pandas matplotlib"))
+        return
+    subprocess.run([sys.executable, "-m", "streamlit", "run",
+                    os.path.join("code", "stats", "dashboard", "app.py")])
 
 
 def run_balance_report():
@@ -1024,6 +1037,8 @@ def run_balance_report():
     if ok:
         subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
         play_chime()
+        if input(_DIM("    Open the stats dashboard (Streamlit)? [y/N]: ")).strip().lower() in ("y", "yes"):
+            launch_stats_dashboard()
 
 
 def delete_logs_and_models():

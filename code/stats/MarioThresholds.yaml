@@ -1,0 +1,30 @@
+# episode CSVs are written by the trainer (runs/<name>/episodes.csv) and by
+# balance probes (balance/probes/<game>/<level>_<seed>/episodes.csv)
+path:
+  - runs/
+  - balance/probes/
+
+metrics:
+  B1_challenge_calibration:
+    thresholds:
+      target_completion_rate: 0.7
+      warning_completion_rate_difference: 0.2
+      target_mean_completion_time: 20
+      warning_mean_completion_time_difference: 4
+
+  B2_punishment_severity:
+    thresholds:
+      target_deaths_per_run: 2
+      warning_deaths_per_run: 1
+      target_death_cluster_entropy: 0.4
+      warning_death_cluster_entropy: 0.1
+
+  B3_strategy_diversity:
+    thresholds:
+      target_strategy_count: 2
+      warning_strategy_count: 1
+      target_dominant_path_share: 0.5
+      warning_dominant_path_share: 0.1
+      target_safe_vs_fast_ratio: 1.3
+      warning_safe_vs_fast_ratio: 0.3
+      route_cluster_threshold: 96

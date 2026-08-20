@@ -167,3 +167,20 @@ probe is what makes the CI economics work.
 **Use case in one sentence:** a designer edits a saw speed and two minutes later gets a
 diffable report saying which balance dimensions moved out of intent — no scheduled human
 playtest, no GPU.
+
+## Episode CSVs & the stats dashboard
+
+Every training run and balance probe now appends one row per finished episode to
+`<run_dir>/episodes.csv` in the stats-dashboard schema (`persona, game, world,
+cause_of_death, jump_count, coins_collected, avg_vx, progress_ratio, route,
+enemies_killed, elapsed_time` — `route` is a sampled `(x, y)` trace, ~7.5 points/s).
+Amr's Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer line)
+reads those CSVs recursively from `runs/` and `balance/probes/` (configured in
+`code/stats/MarioThresholds.yaml`) and computes B1 challenge calibration, B2 punishment
+severity, and B3 strategy diversity (route clustering) with per-level target bands and a
+route-overlay view on the level grid. Launch: menu → Analyze / Balance → "stats
+dashboard", or `streamlit run code/stats/dashboard/app.py`.
+
+Speed: `balance.py --workers N` runs probes in parallel processes (default cores-1;
+each (level x seed) cell is independent, so wall clock divides by the worker count).
+The trainer also skips all frame JPEG encoding while no dashboard tab is connected.

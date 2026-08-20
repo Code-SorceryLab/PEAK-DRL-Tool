@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import multiprocessing as mp
 import os
 import statistics
 import time
@@ -127,6 +128,18 @@ def probe(game: str, level: str, seed: int, gens: int, run_root: str,
     }
 
 
+def _pool_init() -> None:
+    """Each worker process gets its own headless pygame."""
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    import pygame
+    pygame.init()
+
+
+def _probe_job(job: tuple) -> tuple[str, int, dict]:
+    game, lvl, seed, gens, run_root, persona = job
+    return lvl, seed, probe(game, lvl, seed, gens, run_root, persona)
+
+
 def aggregate(cells: list[dict]) -> dict:
     """Fold one level's per-seed cells into a paper-style row (mean +- 95% CI)."""
     n = len(cells)
@@ -200,6 +213,8 @@ def main() -> None:
     ap.add_argument("--persona", default="experienced", choices=sorted(PERSONAS),
                     help="player type the probe agents imitate")
     ap.add_argument("--out", default="balance")
+    ap.add_argument("--workers", type=int, default=None,
+                    help="probe processes; default = min(jobs, cores-1), 1 = sequential")
     args = ap.parse_args()
     persona = get_persona(args.persona)
 
@@ -211,18 +226,32 @@ def main() -> None:
     if not levels:
         raise SystemExit(f"no levels found for game '{args.game}'")
     run_root = os.path.join(args.out, "probes", args.game)
-    jobs = [(lvl, seed) for lvl in levels for seed in args.seeds]
+    jobs = [(args.game, lvl, seed, args.gens, run_root, persona)
+            for lvl in levels for seed in args.seeds]
+    workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
     print(f"balance probe: {len(levels)} levels x {len(args.seeds)} seeds = {len(jobs)} jobs, "
-          f"budget {args.gens} gens each\n", flush=True)
+          f"budget {args.gens} gens each, {workers} worker(s)\n", flush=True)
 
     cells: dict[str, list[dict]] = {lvl: [] for lvl in levels}
     t0 = time.time()
-    for i, (lvl, seed) in enumerate(jobs, 1):
-        cell = probe(args.game, lvl, seed, args.gens, run_root, persona)
+
+    def _record(i: int, lvl: str, seed: int, cell: dict) -> None:
         cells[lvl].append(cell)
         fw = f"first win gen {cell['first_win_gen']}" if cell["first_win_gen"] else "never won"
         print(f"[{i}/{len(jobs)}] {lvl} seed {seed}: {fw}, "
               f"win rate {cell['win_rate']:.0%}, best_x {cell['best_x']}", flush=True)
+
+    if workers <= 1:
+        for i, job in enumerate(jobs, 1):
+            lvl, seed, cell = _probe_job(job)
+            _record(i, lvl, seed, cell)
+    else:
+        with mp.Pool(workers, initializer=_pool_init) as pool:
+            for i, (lvl, seed, cell) in enumerate(pool.imap_unordered(_probe_job, jobs), 1):
+                _record(i, lvl, seed, cell)
+        seed_order = {s: i for i, s in enumerate(args.seeds)}
+        for lvl in cells:  # deterministic JSON regardless of completion order
+            cells[lvl].sort(key=lambda c: seed_order.get(c["seed"], 99))
 
     rows = [aggregate(c) for c in cells.values()]
     report = format_report(rows, args.game)

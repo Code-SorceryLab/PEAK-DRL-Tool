@@ -86,13 +86,17 @@ async def _ws_handler(ws, state: SharedState) -> None:
         except websockets.exceptions.ConnectionClosed:
             return  # browser tab closed or reloaded — a normal event, not an error
 
-    recv = asyncio.create_task(recv_loop())
-    send = asyncio.create_task(send_loop())
-    done, pending = await asyncio.wait({recv, send}, return_when=asyncio.FIRST_COMPLETED)
-    for t in pending:
-        t.cancel()
-    for t in done:
-        t.exception()  # retrieve so asyncio never logs "exception was never retrieved"
+    state.add_viewer()  # trainer skips frame encoding while nobody is connected
+    try:
+        recv = asyncio.create_task(recv_loop())
+        send = asyncio.create_task(send_loop())
+        done, pending = await asyncio.wait({recv, send}, return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
+        for t in done:
+            t.exception()  # retrieve so asyncio never logs "exception was never retrieved"
+    finally:
+        state.remove_viewer()
 
 
 def _run_ws(state: SharedState, port: int) -> None:

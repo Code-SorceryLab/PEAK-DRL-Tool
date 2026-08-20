@@ -11,6 +11,7 @@ thread only ever sees encoded frame bytes.
 from __future__ import annotations
 
 import argparse
+import csv
 import io
 import json
 import os
@@ -55,6 +56,19 @@ class SharedState:
         self._lock = threading.Lock()
         self._stats: dict = {}
         self._envs: list[dict] = []
+        self._viewers = 0  # connected dashboard clients; frames aren't encoded at 0
+
+    def add_viewer(self) -> None:
+        with self._lock:
+            self._viewers += 1
+
+    def remove_viewer(self) -> None:
+        with self._lock:
+            self._viewers = max(0, self._viewers - 1)
+
+    @property
+    def has_viewers(self) -> bool:
+        return self._viewers > 0
 
     def publish(self, stats: dict | None = None, envs: list[dict] | None = None) -> None:
         with self._lock:
@@ -78,6 +92,11 @@ class EnvSlot:
         self.last_rays: list = []
         self.last_tiles: list = []
         self.last_sensors: np.ndarray = np.zeros(14, dtype=np.float32)
+        # per-episode telemetry for the balance CSV (Amr's stats schema)
+        self.route: list[tuple[float, float]] = []
+        self.jump_count = 0
+        self.prev_jump = False
+        self.vx_sum = 0.0
 
 
 def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
@@ -176,7 +195,7 @@ class Trainer:
         })
 
     def _publish_frames(self, encode_thumbs: bool) -> None:
-        if self.state is None:
+        if self.state is None or not self.state.has_viewers:
             return
         ctrl = self.state.controls
         for slot in self.slots:  # classic PEAK overlays drawn by the cores themselves
@@ -220,6 +239,27 @@ class Trainer:
             envs.append(entry)
         self.state.publish(envs=envs)
 
+    def _append_episode_csv(self, env_rows: list[dict]) -> None:
+        """One row per finished episode, in the stats dashboard's CSV schema."""
+        path = os.path.join(self.run_dir, "episodes.csv")
+        os.makedirs(self.run_dir, exist_ok=True)
+        new = not os.path.exists(path)
+        with open(path, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(["persona", "game", "world", "cause_of_death", "jump_count",
+                            "coins_collected", "avg_vx", "progress_ratio", "route",
+                            "enemies_killed", "elapsed_time"])
+            for slot, rec in zip(self.slots, env_rows):
+                cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
+                level_len = rec.get("level_len") or 1.0
+                progress = min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)
+                w.writerow([self.persona.name, self.game, self.level or "auto", cause,
+                            slot.jump_count, rec.get("coins", 0),
+                            round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
+                            repr(slot.route), rec.get("kills", 0),
+                            round(slot.frames / 60.0, 2)])
+
     def _steps_per_sec(self) -> float:
         now = time.time()
         self._steps_window.append((now, self._step_accum))
@@ -237,6 +277,10 @@ class Trainer:
             slot.frames = 0
             slot.stuck_anchor_x = 0.0
             slot.stuck_frames = 0
+            slot.route = [(round(slot.adapter.x, 1), round(slot.adapter.y, 1))]
+            slot.jump_count = 0
+            slot.prev_jump = False
+            slot.vx_sum = 0.0
 
         clock = pygame.time.Clock()
         last_thumb = last_watch = last_stats = 0.0
@@ -262,6 +306,12 @@ class Trainer:
                 slot.adapter.step(move_x, jump)
                 slot.frames += 1
                 self._step_accum += 1
+                if jump and not slot.prev_jump:
+                    slot.jump_count += 1
+                slot.prev_jump = bool(jump)
+                slot.vx_sum += slot.adapter.vx
+                if slot.frames % 8 == 0:  # ~7.5 route samples/s, matches Amr's density
+                    slot.route.append((round(slot.adapter.x, 1), round(slot.adapter.y, 1)))
                 # trainer-side stuck kill (faster than the core's 20s stall watchdog)
                 fit = slot.adapter.fitness()
                 if fit > slot.stuck_anchor_x + 1.0:
@@ -308,6 +358,7 @@ class Trainer:
                 rec.update({"env": i, "fit": round(fitnesses[i], 1),
                             "status": statuses[i], "frames": slot.frames})
                 env_rows.append(rec)
+            self._append_episode_csv(env_rows)
             prev_best = self.pop.best_fitness
             self.pop.evolve(fitnesses)
             if self.pop.best_fitness > prev_best:
