@@ -26,7 +26,8 @@ Everything is deterministic under a seed — same seed, same evolution, step for
 
 ```bash
 pip install -r requirements.txt
-python -m code.neuro.trainer --game mario
+python menu.py                            # interactive launcher
+python -m code.neuro.trainer --game mario # or the CLI directly
 ```
 
 Then open **http://127.0.0.1:8000/mario/index.html** — you get the live dashboard:
@@ -37,6 +38,8 @@ Then open **http://127.0.0.1:8000/mario/index.html** — you get the live dashbo
 - fitness-over-generations chart
 - **Turbo** toggle (max-speed headless vs real-time) and **Sensors** debug toggle
 - click any thumbnail to watch that env
+- **manual play**: click "AI training (click to play)" and drive the watched env yourself
+  (arrows/WASD, space to jump) while the other nine keep evolving
 
 ### CLI
 

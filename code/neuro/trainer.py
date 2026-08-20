@@ -38,6 +38,8 @@ class Controls:
         self.turbo = turbo
         self.watch_env = 0
         self.sensors_on = True
+        self.manual = False  # human plays the watched env instead of its net
+        self.keys = {"left": False, "right": False, "jump": False}
 
 
 class SharedState:
@@ -126,6 +128,7 @@ class Trainer:
             "game": self.game,
             "sps": round(sps),
             "turbo": self.state.controls.turbo,
+            "manual": self.state.controls.manual,
             "history": [[round(h["best"], 1), round(h["avg"], 1)] for h in hist[-400:]],
             "live_fitness": [round(f, 1) for f in fitnesses],
             "statuses": statuses,
@@ -182,13 +185,20 @@ class Trainer:
         clock = pygame.time.Clock()
         last_thumb = last_watch = last_stats = 0.0
 
+        ctrl = self.state.controls if self.state else None
         while any(s.adapter.alive for s in self.slots):
-            for slot in self.slots:
+            manual_idx = ctrl.watch_env % len(self.slots) if ctrl and ctrl.manual else -1
+            for i, slot in enumerate(self.slots):
                 if not slot.adapter.alive:
                     continue
                 vec, rays = read_sensors(slot.adapter)
                 slot.last_sensors, slot.last_rays = vec, rays
-                move_x, jump = slot.net.act(vec)
+                if i == manual_idx:
+                    k = ctrl.keys
+                    move_x = (1 if k["right"] else 0) - (1 if k["left"] else 0)
+                    jump = k["jump"]
+                else:
+                    move_x, jump = slot.net.act(vec)
                 slot.adapter.step(move_x, jump)
                 slot.frames += 1
                 self._step_accum += 1
@@ -220,7 +230,7 @@ class Trainer:
                         self._steps_per_sec(),
                     )
                     last_stats = now
-                if not turbo:
+                if not turbo or manual_idx >= 0:  # manual play is always real-time
                     clock.tick(60)
             # headless without server: no pacing, run flat out
 

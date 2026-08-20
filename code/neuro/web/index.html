@@ -47,6 +47,7 @@
   <span>LEVEL <b id="s_level">-</b></span>
   <button id="b_turbo">Turbo</button>
   <button id="b_sensors" class="on">Sensors ON (debug)</button>
+  <button id="b_manual">AI training (click to play)</button>
   <span id="conn" style="color:var(--red)">disconnected</span>
 </div>
 <div id="chips"></div>
@@ -187,6 +188,24 @@ function connect(){
                        setTimeout(connect, 1500); };
 }
 document.getElementById("b_turbo").onclick = () => { turbo = !turbo; send({cmd:"turbo", on:turbo}); };
+let manual = false;
+const keys = {left:false, right:false, jump:false};
+const KEYMAP = {ArrowLeft:"left", a:"left", ArrowRight:"right", d:"right",
+                ArrowUp:"jump", w:"jump", " ":"jump"};
+function setKey(ev, down){
+  const k = KEYMAP[ev.key];
+  if (!manual || k === undefined) return;
+  ev.preventDefault();
+  if (keys[k] !== down){ keys[k] = down; send({cmd:"keys", ...keys}); }
+}
+document.addEventListener("keydown", ev => setKey(ev, true));
+document.addEventListener("keyup", ev => setKey(ev, false));
+document.getElementById("b_manual").onclick = function(){
+  manual = !manual; send({cmd:"manual", on:manual});
+  this.className = manual ? "on" : "";
+  this.textContent = manual ? "MANUAL PLAY - arrows/WASD, space to jump (click for AI)"
+                            : "AI training (click to play)";
+};
 document.getElementById("b_sensors").onclick = function(){
   sensorsOn = !sensorsOn; this.className = sensorsOn ? "on" : "";
   this.textContent = sensorsOn ? "Sensors ON (debug)" : "Sensors OFF";

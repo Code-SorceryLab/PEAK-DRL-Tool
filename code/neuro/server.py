@@ -54,6 +54,16 @@ async def _ws_handler(ws, state: SharedState) -> None:
                 state.controls.turbo = bool(msg.get("on", False))
             elif cmd == "sensors":
                 state.controls.sensors_on = bool(msg.get("on", True))
+            elif cmd == "manual":
+                state.controls.manual = bool(msg.get("on", False))
+                if not state.controls.manual:
+                    state.controls.keys = {"left": False, "right": False, "jump": False}
+            elif cmd == "keys":
+                state.controls.keys = {
+                    "left": bool(msg.get("left")),
+                    "right": bool(msg.get("right")),
+                    "jump": bool(msg.get("jump")),
+                }
 
     async def send_loop() -> None:
         while True:
