@@ -1041,6 +1041,51 @@ def run_balance_report():
             launch_stats_dashboard()
 
 
+def run_full_sweep():
+    """Full Sweep — balance probes across games × personas × seeds, all parallel."""
+    _refresh_screen()
+    _section("BALANCE  ›  Full Sweep")
+
+    games = toggle_select("GAMES", get_available_games(),
+                          default_indices=[i for i, g in enumerate(get_available_games())
+                                           if g in ("mario", "meatboy")])
+    if not games:
+        return
+    personas = toggle_select("PERSONAS", ["experienced", "novice", "speedrunner"],
+                             default_indices=[0, 1, 2])
+    if not personas:
+        return
+    gens_raw = input(_DIM("\n    Generation budget per probe [40]: ")).strip()
+    gens = gens_raw if gens_raw.isdigit() else "40"
+    seeds = ["1234", "2025", "31337"]
+
+    n_levels = sum(len(get_levels_for_game(g)) for g in games)
+    n_jobs = n_levels * len(seeds) * len(personas)
+    workers = max(1, (os.cpu_count() or 2) - 1)
+    print(f"\n    {_WHT(str(n_jobs))} probes ({n_levels} levels × {len(seeds)} seeds × "
+          f"{len(personas)} personas), {workers} parallel workers")
+    print(_DIM("    Only ENABLED levels are probed — use Toggle Levels [10] first if needed."))
+    if input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() in ("n", "no"):
+        return
+
+    for game in games:
+        for persona in personas:
+            print(_BOLD(f"\n  ── {game} · {persona} " + "─" * 30))
+            cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game,
+                   "--persona", persona, "--gens", gens, "--seeds", *seeds]
+            try:
+                subprocess.run(cmd)
+            except KeyboardInterrupt:
+                print(_RED("\n  Sweep interrupted — finished probes are already merged into the report."))
+                return
+
+    play_chime()
+    if input(_DIM("\n    Open the balance web report? [Y/n]: ")).strip().lower() not in ("n", "no"):
+        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+    if input(_DIM("    Open the stats dashboard (Streamlit)? [y/N]: ")).strip().lower() in ("y", "yes"):
+        launch_stats_dashboard()
+
+
 def delete_logs_and_models():
     """Permanently delete all training runs (populations, checkpoints, results)."""
     _section("DANGER  ›  Delete Logs & Models")
@@ -1138,6 +1183,7 @@ def main():
         "11": ("dashboard",            run_dashboard),
         "12": ("analyzer",             run_agent_analyzer),
         "14": ("balance",              run_balance_report),
+        "15": ("full_sweep",           run_full_sweep),
         "13": ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -1168,6 +1214,7 @@ def main():
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
         print(_menu_item("12", "Analyze Performance",  "results table + run aggregates"))
         print(_menu_item("14", "Balance Report",       "multi-seed level difficulty ± CI"))
+        print(_menu_item("15", "Full Sweep",           "games × personas × seeds, parallel"))
         print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
