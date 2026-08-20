@@ -1,7 +1,21 @@
 -----
 # PEAK: Platformer Engine by Al & Kevin
 
-![Screenshot](docs/img/PEAK_LOGO.png)
+<p align="center">
+  <img src="docs/img/PEAK_LOGO.png" alt="PEAK" width="640">
+</p>
+
+<p align="center">
+  <img src="docs/img/peak_banner.svg" alt="Neuroevolution — fitness curve with a specimen running it" width="880">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10+-4584b6?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/pygame-2.6-1e1e22?style=flat-square" alt="Pygame 2.6">
+  <img src="https://img.shields.io/badge/agents-291%20params-ef4444?style=flat-square" alt="291 params">
+  <img src="https://img.shields.io/badge/deterministic-seed%2042-22c55e?style=flat-square" alt="Deterministic">
+  <img src="https://img.shields.io/badge/GPU-not%20required-9a9a9a?style=flat-square" alt="No GPU">
+</p>
 
 A deterministic, high-performance **game-balancing engine** that uses evolved neural agents as
 tireless playtesters across 2D platformer environments.
@@ -24,6 +38,17 @@ The engine emphasizes:
 
 > The previous deep-RL (stable-baselines3 PPO) version of this repo is preserved on the
 > `archive/drl-sb3-final` branch.
+
+***
+
+## Watch It Evolve
+
+<p align="center">
+  <img src="docs/img/first_win.gif" alt="The first evolved genome to beat Mario 1-1 — final seconds of the winning run" width="480">
+</p>
+
+<p align="center"><i>The population's first Mario 1-1 win, captured live during evolution —
+a 291-parameter network that learned this from raycasts and a distance score.</i></p>
 
 ***
 

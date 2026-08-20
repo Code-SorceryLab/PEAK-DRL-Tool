@@ -184,3 +184,8 @@ dashboard", or `streamlit run code/stats/dashboard/app.py`.
 Speed: `balance.py --workers N` runs probes in parallel processes (default cores-1;
 each (level x seed) cell is independent, so wall clock divides by the worker count).
 The trainer also skips all frame JPEG encoding while no dashboard tab is connected.
+
+**Per-persona reports:** balance probes write `balance/report_<game>_<persona>.json` — one file
+per (game, persona) so tiers never overwrite each other's rows. The web report renders every
+file it finds, grouped by game with the persona shown in the section header. Probe checkpoints
+live under `runs/probes/<game>/<level>_<seed>/`.
