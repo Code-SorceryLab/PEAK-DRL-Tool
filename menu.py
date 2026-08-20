@@ -545,12 +545,13 @@ def train_all_models_for_game():
     if proceed in ("n", "no"):
         return
 
+    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
     successful = 0
     for i, level in enumerate(chosen, 1):
         print(f"\n  {_YEL(f'[{i}/{len(chosen)}]')}  {_WHT(game)} | {_WHT(level)}")
         run_dir = RUNS_DIR / f"{game}_{level}"
         ok = execute_training_run(
-            _trainer_cmd(game, level, gens, turbo=True, serve=False, run_dir=run_dir))
+            _trainer_cmd(game, level, gens, turbo=True, run_dir=run_dir))
         successful += int(ok)
 
     print_training_summary(len(chosen), successful, len(chosen) - successful)
@@ -584,12 +585,13 @@ def train_complete_grid():
     if proceed in ("n", "no"):
         return
 
+    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
     successful = 0
     for i, (game, level) in enumerate(jobs, 1):
         print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(level or 'auto')}")
         run_dir = RUNS_DIR / (game if not level else f"{game}_{level}")
         ok = execute_training_run(
-            _trainer_cmd(game, level, gens, turbo=True, serve=False, run_dir=run_dir))
+            _trainer_cmd(game, level, gens, turbo=True, run_dir=run_dir))
         successful += int(ok)
 
     print_training_summary(len(jobs), successful, len(jobs) - successful)
