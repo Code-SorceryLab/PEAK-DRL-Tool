@@ -91,7 +91,18 @@ class Population:
         }
         with open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
-        np.savez_compressed(os.path.join(run_dir, "best.npz"), weights=self.best_weights)
+        # The tags travel inside the model file too, so a copied best.npz stays identifiable.
+        meta = {
+            "game": getattr(self, "game", None),
+            "level": self.best_level,
+            "persona": getattr(self, "persona", None),
+            "fitness": round(float(self.best_fitness), 1),
+            "generation": self.generation,
+            "seed": self.cfg.seed,
+            "net": "14-16-3",
+        }
+        np.savez_compressed(os.path.join(run_dir, "best.npz"),
+                            weights=self.best_weights, meta=np.array(json.dumps(meta)))
 
     @classmethod
     def load(cls, run_dir: str) -> "Population":

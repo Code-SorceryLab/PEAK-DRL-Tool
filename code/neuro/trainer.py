@@ -104,6 +104,7 @@ class Trainer:
         self.net_proto = NeuralNet()
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
+        self.pop.game = game  # tags embedded in best.npz
 
         # Level curriculum: an explicit --level locks that one level; otherwise the
         # trainer walks every enabled level in config order, advancing once a
