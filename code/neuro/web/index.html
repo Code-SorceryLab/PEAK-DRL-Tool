@@ -12,14 +12,22 @@
     --sky:#6ec6ff;
     --run:#43d17c; --stuck:#ff9d3b; --dead:#ff5470; --won:#ffd23e;
     --mono:"Cascadia Mono",Consolas,"JetBrains Mono",monospace;
+    --px:"Press Start 2P","Cascadia Mono",Consolas,monospace;  /* pixel face when installed */
     --ui:"Segoe UI",system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0}
   html,body{height:100%}
-  body{background:var(--bg);color:var(--txt);font:14px/1.45 var(--ui);padding:14px}
+  body{background:var(--bg);color:var(--txt);font:15.5px/1.5 var(--ui);padding:14px;
+       background-image:radial-gradient(rgba(110,198,255,.03) 1px, transparent 1px);
+       background-size:24px 24px}
   canvas{image-rendering:pixelated}
   button{font:inherit;cursor:pointer}
-  :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  /* pixel-game chrome: cut corners + hard drop shadows, no soft edges anywhere */
+  .panel,.card,header,#feedwrap{
+    clip-path:polygon(0 8px,8px 0,calc(100% - 8px) 0,100% 8px,
+                      100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px));
+  }
 
   #app{max-width:1440px;margin:0 auto;display:grid;gap:12px;
        grid-template-columns:minmax(0,1fr) 372px;
@@ -35,25 +43,28 @@
   header{grid-area:header;display:flex;align-items:stretch;gap:0;
          background:var(--panel);border:1px solid var(--line)}
   .ident{padding:12px 18px;border-right:1px solid var(--line2);min-width:190px}
-  .eyebrow{font:600 10px/1 var(--ui);letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
-  .ident h1{font:700 21px/1.15 var(--ui);letter-spacing:.01em;margin-top:5px}
-  .ident h1 em{font-style:normal;color:var(--gold)}
+  .eyebrow{font:700 11px/1.4 var(--px);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+  .ident h1{font:700 25px/1.15 var(--ui);letter-spacing:.01em;margin-top:5px}
+  .ident h1 em{font-style:normal;color:var(--gold);text-shadow:2px 2px 0 rgba(0,0,0,.6)}
   .gen{padding:8px 20px;border-right:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center}
-  .gen b{font:700 34px/1 var(--mono);color:var(--gold);font-variant-numeric:tabular-nums}
+  .gen b{font:700 42px/1 var(--px);color:var(--gold);font-variant-numeric:tabular-nums;
+         text-shadow:3px 3px 0 rgba(0,0,0,.55)}
   .metrics{display:flex;flex:1;align-items:center;gap:26px;padding:0 20px;flex-wrap:wrap}
-  .metric{display:flex;flex-direction:column;gap:3px}
-  .metric span{font:600 10px/1 var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
-  .metric b{font:600 17px/1 var(--mono);font-variant-numeric:tabular-nums}
-  .metric b.record{color:var(--won)}
-  .ctrls{display:flex;align-items:center;gap:8px;padding:0 16px;border-left:1px solid var(--line2)}
-  .toggle{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
-          padding:7px 13px;font:600 12px var(--ui);letter-spacing:.04em;transition:all .15s}
+  .metric{display:flex;flex-direction:column;gap:4px}
+  .metric span{font:600 11px/1 var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+  .metric b{font:700 20px/1 var(--mono);font-variant-numeric:tabular-nums}
+  .metric b.record{color:var(--won);text-shadow:2px 2px 0 rgba(0,0,0,.5)}
+  .ctrls{display:flex;align-items:center;gap:9px;padding:0 16px;border-left:1px solid var(--line2);flex-wrap:wrap}
+  .toggle{background:var(--panel2);color:var(--dim);border:2px solid var(--line);
+          padding:9px 15px;font:700 13px var(--ui);letter-spacing:.04em;
+          box-shadow:0 3px 0 rgba(0,0,0,.55);transition:all .1s}
   .toggle.on{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
   .toggle:hover{border-color:var(--dim)}
+  .toggle:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.55)}
   #b_manual.on{background:var(--gold);color:#14100a;border-color:var(--gold)}
-  .conn{display:flex;align-items:center;gap:7px;font:600 11px var(--ui);color:var(--dim);
+  .conn{display:flex;align-items:center;gap:7px;font:600 12.5px var(--ui);color:var(--dim);
         letter-spacing:.08em;text-transform:uppercase;padding-right:4px}
-  .conn i{width:8px;height:8px;border-radius:50%;background:var(--dead);display:inline-block}
+  .conn i{width:9px;height:9px;background:var(--dead);display:inline-block}
   .conn.live i{background:var(--run);animation:pulse 2s infinite}
   @keyframes pulse{50%{opacity:.35}}
 
@@ -61,9 +72,9 @@
   #feedwrap{grid-area:feed;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line)}
   .feedhead{display:flex;align-items:baseline;gap:14px;padding:9px 14px;border-bottom:1px solid var(--line2)}
   .feedhead .eyebrow{color:var(--faint)}
-  #f_env{font:700 15px var(--mono);color:var(--txt)}
-  #f_meta{font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:auto}
-  #f_status{font:700 12px var(--mono);letter-spacing:.1em}
+  #f_env{font:700 17px var(--mono);color:var(--txt)}
+  #f_meta{font:500 14px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:auto}
+  #f_status{font:700 14px var(--mono);letter-spacing:.1em}
   #bezel{position:relative;background:#000;line-height:0}
   #watch{width:100%;height:auto;display:block}
   #bezel::after{content:"";position:absolute;inset:0;pointer-events:none;
@@ -78,18 +89,18 @@
   /* ── side column ────────────────────────────────────── */
   #side{grid-area:side;display:flex;flex-direction:column;gap:12px;min-width:0}
   .card{background:var(--panel);border:1px solid var(--line);padding:12px 14px 14px}
-  .card h2{font:600 10px/1 var(--ui);letter-spacing:.22em;color:var(--dim);
-           text-transform:uppercase;margin-bottom:11px;display:flex;justify-content:space-between}
+  .card h2{font:700 11.5px/1.4 var(--px);letter-spacing:.16em;color:var(--dim);
+           text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between}
   .card h2 small{color:var(--faint);letter-spacing:.06em}
 
   /* sensor telemetry strip — the signature */
-  .sgroup{font:600 9px/1 var(--ui);letter-spacing:.18em;color:var(--faint);
-          text-transform:uppercase;margin:9px 0 5px;border-top:1px solid var(--line2);padding-top:7px}
+  .sgroup{font:600 10.5px/1 var(--ui);letter-spacing:.18em;color:var(--faint);
+          text-transform:uppercase;margin:10px 0 6px;border-top:1px solid var(--line2);padding-top:8px}
   .sgroup:first-of-type{margin-top:0;border-top:0;padding-top:0}
-  .srow{display:grid;grid-template-columns:52px 1fr 38px;align-items:center;gap:8px;margin:3px 0}
-  .srow label{font:600 10.5px var(--mono);color:var(--dim);letter-spacing:.05em}
-  .srow output{font:500 10.5px var(--mono);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
-  .sbar{height:7px;background:var(--panel2);border:1px solid var(--line2);position:relative;overflow:hidden}
+  .srow{display:grid;grid-template-columns:60px 1fr 44px;align-items:center;gap:8px;margin:4px 0}
+  .srow label{font:700 12px var(--mono);color:var(--dim);letter-spacing:.05em}
+  .srow output{font:500 12px var(--mono);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+  .sbar{height:10px;background:var(--panel2);border:1px solid var(--line2);position:relative;overflow:hidden}
   .sbar i{position:absolute;top:0;bottom:0;left:0;background:var(--gold);transition:width .12s,left .12s}
   .sbar.threat i{background:var(--dead)}
   .sbar.body i{background:var(--sky)}
@@ -103,9 +114,9 @@
 
   /* run config */
   .kv{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 14px}
-  .kv div span{display:block;font:600 9.5px/1 var(--ui);letter-spacing:.14em;color:var(--faint);
-               text-transform:uppercase;margin-bottom:3px}
-  .kv div b{font:600 13.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
+  .kv div span{display:block;font:600 10.5px/1 var(--ui);letter-spacing:.14em;color:var(--faint);
+               text-transform:uppercase;margin-bottom:4px}
+  .kv div b{font:700 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
 
   /* ── specimen wall ──────────────────────────────────── */
   #wallwrap{grid-area:wall}
@@ -120,12 +131,12 @@
   .spec canvas{width:100%;height:auto;display:block;background:#000;opacity:.92}
   .spec.watched canvas{opacity:1}
   .spec .tag{display:flex;align-items:center;gap:8px;padding:6px 9px 4px}
-  .spec .tag b{font:700 12px var(--mono);letter-spacing:.05em}
-  .spec .tag i{width:7px;height:7px;border-radius:50%;flex:none}
-  .spec .tag em{font:600 10px var(--mono);font-style:normal;letter-spacing:.08em;margin-left:auto}
-  .spec .nums{display:flex;justify-content:space-between;padding:0 9px 6px;
-              font:500 10.5px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
-  .fitrail{height:4px;background:var(--line2)}
+  .spec .tag b{font:700 13.5px var(--mono);letter-spacing:.05em}
+  .spec .tag i{width:9px;height:9px;flex:none}  /* square status pip — pixel, not a dot */
+  .spec .tag em{font:700 11.5px var(--mono);font-style:normal;letter-spacing:.08em;margin-left:auto}
+  .spec .nums{display:flex;justify-content:space-between;padding:0 9px 7px;
+              font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+  .fitrail{height:6px;background:var(--line2)}
   .fitrail i{display:block;height:100%;background:var(--gold);width:0;transition:width .3s}
   .spec.s-WON .fitrail i{background:var(--won);box-shadow:0 0 8px var(--won)}
   .spec.s-DEAD canvas{filter:grayscale(.7) brightness(.55)}
@@ -136,18 +147,19 @@
   .d-RUNNING{background:var(--run)} .d-STUCK{background:var(--stuck)}
   .d-DEAD{background:var(--dead)} .d-WON{background:var(--won);box-shadow:0 0 6px var(--won)}
 
-  #turbonote{display:none;padding:7px 14px;font:500 11.5px var(--ui);color:var(--dim);
+  #turbonote{display:none;padding:8px 14px;font:500 13px var(--ui);color:var(--dim);
              border-top:1px solid var(--line2)}
   #wallwrap.turbo #turbonote{display:block}
 
   /* ── results table ──────────────────────────────────── */
   #resultswrap{grid-area:results}
   #resultsbox{max-height:340px;overflow-y:auto}
-  #results{width:100%;border-collapse:collapse;font:500 12px var(--mono);font-variant-numeric:tabular-nums}
-  #results th{position:sticky;top:0;background:var(--panel);text-align:right;padding:7px 14px;
-              font:600 10px var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase;
-              border-bottom:1px solid var(--line)}
-  #results td{text-align:right;padding:5px 14px;border-bottom:1px solid var(--line2);color:var(--txt)}
+  #results{width:100%;border-collapse:collapse;font:500 13.5px var(--mono);font-variant-numeric:tabular-nums}
+  #results th{position:sticky;top:0;background:var(--panel);text-align:right;padding:8px 14px;
+              font:600 11px var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase;
+              border-bottom:2px solid var(--line)}
+  #results td{text-align:right;padding:6px 14px;border-bottom:1px solid var(--line2);color:var(--txt)}
+  #results th:nth-child(2),#results td:nth-child(2){text-align:left;color:var(--sky)}
   #results th:first-child,#results td:first-child{text-align:left;color:var(--gold);font-weight:700}
   #results tr:hover td{background:#161b30}
   #results td.win{color:var(--won);font-weight:700}
@@ -241,7 +253,7 @@
       <span id="census2" style="margin-left:auto;font:600 11.5px var(--mono);color:var(--faint)"></span>
     </div>
     <div id="resultsbox"><table id="results">
-      <thead><tr><th>Gen</th><th>Best</th><th>Avg</th><th>Median</th><th>Wins</th>
+      <thead><tr><th>Gen</th><th>Level</th><th>Best</th><th>Avg</th><th>Median</th><th>Wins</th>
         <th>Stuck</th><th>Dead</th><th>Best x</th><th>Avg score</th><th>Coins</th><th>Dur s</th></tr></thead>
       <tbody></tbody>
     </table></div>
@@ -483,13 +495,14 @@ function drawResults(rows){
   tb.innerHTML = "";
   for (const r of [...rows].reverse()){
     const tr = document.createElement("tr");
-    const cells = [r.gen, Math.round(r.best), Math.round(r.avg), Math.round(r.median ?? 0),
-                   r.wins ?? 0, r.stuck ?? 0, r.dead ?? 0, Math.round(r.best_x ?? 0),
-                   Math.round(r.avg_score ?? 0), r.coins ?? 0, r.duration ?? "–"];
+    const cells = [r.gen, r.level ?? "–", Math.round(r.best), Math.round(r.avg),
+                   Math.round(r.median ?? 0), r.wins ?? 0, r.stuck ?? 0, r.dead ?? 0,
+                   Math.round(r.best_x ?? 0), Math.round(r.avg_score ?? 0),
+                   r.coins ?? 0, r.duration ?? "–"];
     tr.innerHTML = cells.map((v,i)=>{
       let cls = "";
-      if (i===4) cls = v > 0 ? "win" : "zero";
-      if ((i===5||i===6) && v===0) cls = "zero";
+      if (i===5) cls = v > 0 ? "win" : "zero";
+      if ((i===6||i===7) && v===0) cls = "zero";
       return `<td class="${cls}">${v}</td>`;
     }).join("");
     tb.appendChild(tr);

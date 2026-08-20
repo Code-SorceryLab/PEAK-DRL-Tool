@@ -40,6 +40,28 @@ class GameAdapter(Protocol):
     def qblock_count_near(self, r_tiles: int) -> int: ...
     def fitness(self) -> float: ...
     def episode_stats(self) -> dict: ...
+    def set_level(self, level: str) -> None: ...
+
+
+def _set_locked_level(core, level: str) -> None:
+    """Repoint a gym-style core at a new level; applied by its next reset()."""
+    core.locked_level = str(level)
+    core.world = str(level)
+
+
+def list_levels(game: str) -> list[str]:
+    """Enabled level ids for a game, in config order. Meatboy levels are indices."""
+    import yaml
+    games_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
+    if game == "meatboy":
+        with open(os.path.join(games_dir, "meatboy_config.yaml"), encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return [str(i) for i in range(len(data.get("levels", [])))]
+    with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    section = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}[game]
+    levels = section.get("levels") or {}
+    return list(levels.keys())
 
 
 def _episode_stats(core, x: float) -> dict:
@@ -186,6 +208,9 @@ class MarioAdapter:
     def episode_stats(self) -> dict:
         return _episode_stats(self.core, self.core.max_x_seen)
 
+    def set_level(self, level: str) -> None:
+        _set_locked_level(self.core, level)
+
 
 class MegamanAdapter:
     """Wraps MegamanCore. Horizontal progress fitness; enemies shoot but the net can't (fire=0)."""
@@ -287,6 +312,9 @@ class MegamanAdapter:
 
     def episode_stats(self) -> dict:
         return _episode_stats(self.core, self.core.max_x_seen)
+
+    def set_level(self, level: str) -> None:
+        _set_locked_level(self.core, level)
 
 
 class SonicAdapter:
@@ -405,6 +433,9 @@ class SonicAdapter:
     def episode_stats(self) -> dict:
         return _episode_stats(self.core, self.core.max_x_seen)
 
+    def set_level(self, level: str) -> None:
+        _set_locked_level(self.core, level)
+
 
 class MeatboyAdapter:
     """Wraps MeatboyCore (plain class, no gym). Levels are 2-D mazes, so fitness is
@@ -509,6 +540,10 @@ class MeatboyAdapter:
 
     def episode_stats(self) -> dict:
         return _episode_stats(self.core, (1.0 - self._best_bfs) * self._FIT_SCALE)
+
+    def set_level(self, level: str) -> None:
+        self.core._level_idx = int(level)
+        self.core.won = False
 
 
 _ADAPTERS = {

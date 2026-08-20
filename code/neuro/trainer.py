@@ -19,7 +19,7 @@ import time
 import numpy as np
 import pygame
 
-from .adapters import GameAdapter, make_adapter
+from .adapters import GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .net import NeuralNet
 from .sensors import read_sensors
@@ -92,14 +92,29 @@ class Trainer:
     def __init__(self, game: str, level: str | None, cfg: GAConfig, run_dir: str,
                  state: SharedState | None = None, population: Population | None = None) -> None:
         self.game = game
-        self.level = level
         self.cfg = cfg
         self.run_dir = run_dir
         self.state = state
         self.net_proto = NeuralNet()
         self.pop = population or Population(cfg, self.net_proto.n_params)
+
+        # Level curriculum: an explicit --level locks that one level; otherwise the
+        # trainer walks every enabled level in config order, advancing once a
+        # generation produces cfg.advance_wins winners.
+        if level is not None:
+            self.levels: list[str] | None = None
+            self.level: str | None = level
+        else:
+            self.levels = list_levels(game) or None
+            idx = 0
+            for row in reversed(self.pop.history):  # resume on the level we left off
+                if self.levels and row.get("level") in self.levels:
+                    idx = self.levels.index(row["level"])
+                    break
+            self.level = self.levels[idx] if self.levels else None
+
         self.slots = [
-            EnvSlot(make_adapter(game, level, cfg.max_frames, cfg.win_bonus), NeuralNet())
+            EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus), NeuralNet())
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
@@ -138,7 +153,7 @@ class Trainer:
             "live_fitness": [round(f, 1) for f in fitnesses],
             "statuses": statuses,
             "results": [
-                {k: r.get(k) for k in ("gen", "best", "avg", "median", "wins", "stuck",
+                {k: r.get(k) for k in ("gen", "level", "best", "avg", "median", "wins", "stuck",
                                        "dead", "best_x", "avg_score", "coins", "duration")}
                 for r in hist[-60:]
             ],
@@ -276,6 +291,7 @@ class Trainer:
             fits = np.asarray(fitnesses)
             self.pop.history[-1].update({
                 "gen": self.pop.generation,
+                "level": self.level or "auto",
                 "median": round(float(np.median(fits)), 1),
                 "min": round(float(fits.min()), 1),
                 "wins": statuses.count("WON"),
@@ -290,21 +306,32 @@ class Trainer:
             })
             self.pop.save(self.run_dir)
             h = self.pop.history[-1]
-            print(f"gen {self.pop.generation:4d}  best {h['best']:8.1f}  avg {h['avg']:8.1f}  "
+            print(f"gen {self.pop.generation:4d}  [{self.level or 'auto'}]  "
+                  f"best {h['best']:8.1f}  avg {h['avg']:8.1f}  "
                   f"all-time {self.pop.best_fitness:8.1f}  wins {h['wins']}  ({h['duration']}s)",
                   flush=True)
             if self.state is not None:
                 self._publish_stats(statuses, fitnesses, 0.0)
+
+            # Curriculum: enough winners this generation -> move the whole
+            # population to the next enabled level (nets carry over).
+            if (self.levels and h["wins"] >= self.cfg.advance_wins
+                    and self.levels.index(self.level) < len(self.levels) - 1):
+                self.level = self.levels[self.levels.index(self.level) + 1]
+                for slot in self.slots:
+                    slot.adapter.set_level(self.level)
+                print(f"curriculum: {h['wins']} wins -> advancing to level "
+                      f"[{self.level}] at gen {self.pop.generation}", flush=True)
         print(format_results(self.pop.history), flush=True)
 
 
 def format_results(history: list[dict], tail: int | None = None) -> str:
     """Aligned per-generation results table (replaces the old CSV logs)."""
     rows = history[-tail:] if tail else history
-    cols = [("GEN", "gen", 4), ("BEST", "best", 9), ("AVG", "avg", 9), ("MEDIAN", "median", 9),
-            ("MIN", "min", 8), ("WINS", "wins", 4), ("STUCK", "stuck", 5), ("DEAD", "dead", 4),
-            ("BEST X", "best_x", 8), ("AVG SCORE", "avg_score", 9), ("COINS", "coins", 5),
-            ("DUR S", "duration", 6)]
+    cols = [("GEN", "gen", 4), ("LEVEL", "level", 12), ("BEST", "best", 9), ("AVG", "avg", 9),
+            ("MEDIAN", "median", 9), ("MIN", "min", 8), ("WINS", "wins", 4), ("STUCK", "stuck", 5),
+            ("DEAD", "dead", 4), ("BEST X", "best_x", 8), ("AVG SCORE", "avg_score", 9),
+            ("COINS", "coins", 5), ("DUR S", "duration", 6)]
     def cell(v) -> str:
         return f"{v:.1f}" if isinstance(v, float) else str(v)
 

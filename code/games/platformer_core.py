@@ -1082,10 +1082,8 @@ class PlatformerCore(gymnasium.Env):
         self.load_level()
 
     def _update_camera(self):
-        # Camera math is only needed in human mode.
-        if self.render_mode != "human":
-            return
-
+        # Runs in every mode — headless consumers (dashboard frame streaming)
+        # need a scrolling camera too. Camera is view-only; physics never reads it.
         if self.debug_manager.free_cam_active:
             movement_x, movement_y = self.debug_manager.current_cam_move
             self.camera_x += movement_x * self.dt

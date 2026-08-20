@@ -19,6 +19,7 @@ class GAConfig:
     init_sigma: float = 0.5
     max_frames: int = 3600       # per-episode frame budget (60s at 60fps)
     stuck_frames: int = 300      # frames without max_x gain before an env is marked STUCK
+    advance_wins: int = 3        # wins in one generation before the curriculum advances a level
     win_bonus: float = 5000.0
     seed: int = 42
 
