@@ -186,7 +186,30 @@ so runs stay deterministic either way.
 
 ---
 
-## 9. Files and tools
+## 9. Balancing games with it — the balance report
+
+PEAK's purpose is balancing levels with agents. The paper pipeline did this with PPO
+matrices (win rate ± CI + failure-mode taxonomy, fed by the stats subsystem); the GA
+successor is `python -m code.neuro.balance --game mario` (menu **[14] Balance Report**).
+For each (level × seed) it evolves a fresh population, stops shortly after the first win,
+and aggregates with 95% t-CIs: **win rate, generations-to-first-win, dominant death cause,
+stuck rate, best x, learning trend** — hardest levels first. JSON lands in
+`balance/report_<game>.json`.
+
+First real run (4 levels × 3 seeds, 12.4 min total, all seeds solved everything):
+
+| Level | First win | Win rate | Dominant cause |
+|---|---|---|---|
+| Mario1-1a | gen 10.0 ±4.3 | 18% ±10% | Enemy (51%) |
+| Mario1-1b | gen 7.0 ±5.0 | 33% ±40% | OOB (54%) |
+| Mario1-1 (full) | gen 4.7 ±5.7 | 36% ±12% | Enemy (65%) |
+| Mario1-1c | gen 1.3 ±1.4 | 83% ±18% | Enemy (67%) |
+
+Immediate balance insight: the 1-1a slice is *harder than the full level* (slice boundaries
+invert difficulty), and full Mario1-2 is a wall — the curriculum population reached x≈4990
+and won zero episodes in 25 generations there.
+
+## 10. Files and tools
 
 ```
 menu.py                     PEAK ENGINE hub (train / play / watch / tools)
