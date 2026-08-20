@@ -119,3 +119,51 @@ white dot at each hit point, a red outline on the exact tile each ray stopped on
 translucent blue boxes on the tile column the pit probe scans. **Hitboxes** and **Grid**
 toggles add the engine's own overlays. In manual play (menu [5]) the F-keys do the same
 in-window: F1 rays, F2 free cam, F3 slow motion, F4 hitboxes, F5 agent vision.
+
+## Related work & positioning
+
+*(Citation years/venues flagged for verification against the originals before submission.)*
+
+**Why a GA probe instead of DRL.** Measured in this repo on the same levels: the GA reproduces
+the PPO matrix's failure-mode taxonomy at roughly 1/100th the compute, bit-exact under a seed,
+with no reward shaping or per-game tuning (fitness = distance, 291 params, 4 engines unchanged).
+The trade: a reactive policy is a *lower bound* on difficulty — it cannot express memory or
+planning, and it is not human-like. For balance CI that trade is correct: the probe must be
+frozen, cheap, and deterministic so metric deltas isolate the level change. DRL is the better
+player; the GA is the better measuring instrument for the inner design loop.
+
+**Agents as difficulty probes.** Isaksen et al., *Exploring Game Space* (2015) — simple agents
+mapping Flappy Bird difficulty; the closest ancestor of "cheap probe, many runs."
+Gudmundsson et al. (King, 2018), *Human-Like Playtesting with Deep Learning* — production
+difficulty prediction for Candy Crush. Roohi et al. (~2020) — difficulty/churn prediction
+combining an RL agent with a player-population model.
+
+**Procedural personas.** Holmgård, Liapis, Togelius & Yannakakis (2014–2018) — the canonical
+line on encoding player archetypes as differently-parameterized agents; Mugrai et al. for
+match-3. Citation anchor for our novice / experienced / speedrunner tiers.
+
+**RL for game testing in industry.** Bergdahl et al. (EA SEED, 2020), *Augmenting Automated
+Game Testing with Deep RL*; Gisslén et al. (2021), adversarial RL for content validation;
+Zheng et al., *Wuji* (2019), evolutionary+RL hybrid that found real bugs at NetEase;
+Ariyurek et al. (2021), synthetic human-like testers; Ubisoft La Forge and modl.ai ship this
+commercially — evidence of industry pull.
+
+**Automated balancing.** Volz et al. (GECCO 2016), *Demonstrating the Feasibility of Automatic
+Game Balancing*; Fontaine et al. (2019), MAP-Elites over Hearthstone decks; Pfau et al. (2020),
+*Dungeons & Replicants*, player-behavior clones for MMO class balance; Tomašev et al. (2020),
+AlphaZero assessing chess-variant balance.
+
+**Neuroevolution in platformers.** Togelius et al.'s Mario AI competition line (2009+);
+SethBling's MarI/O (2015, NEAT); Such et al. (Uber, 2017) and Salimans et al. (OpenAI, 2017)
+showing GA/ES competitive with DRL — legitimizing the probe choice.
+
+**The gap PEAK occupies.** Studio tools are proprietary, single-game, and DRL-heavy — too
+expensive per level edit. Academic difficulty work mostly scores finished levels offline.
+The assembled loop — deterministic sub-minute probes, persona tiers, intent bands,
+report-not-gate, inside the designer's edit loop, across multiple engines, on a laptop —
+is the contribution: "SonarQube for playtesting" as an open, reproducible pipeline. The GA
+probe is what makes the CI economics work.
+
+**Use case in one sentence:** a designer edits a saw speed and two minutes later gets a
+diffable report saying which balance dimensions moved out of intent — no scheduled human
+playtest, no GPU.
