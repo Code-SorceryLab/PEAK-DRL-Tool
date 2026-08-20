@@ -58,7 +58,7 @@ class MeatboyCore:
 
         # Fixed action space: [move_x(idle/left/right), run, jump]
         self.action_space = spaces.MultiDiscrete([3, 2, 2])
-        self.window = 21
+        self.window = 11
         self.n_scalars = _CORE_SCALARS + MeatboyPlayer.N_EXTRA
         self.observation_space = spaces.Dict({
             "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, self.window, self.window),

@@ -25,7 +25,7 @@ from .adapters import GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet
-from .sensors import read_sensors
+from .sensors import N_BODY, SENSOR_MODES, read_sensors, sensor_dim
 
 THUMB_SCALE = 0.35          # thumbnail downscale factor
 THUMB_INTERVAL = 0.20       # s between thumbnail encodes (real-time mode)
@@ -91,7 +91,7 @@ class EnvSlot:
         self.stuck_frames = 0
         self.last_rays: list = []
         self.last_tiles: list = []
-        self.last_sensors: np.ndarray = np.zeros(14, dtype=np.float32)
+        self.last_sensors: np.ndarray = np.zeros(net.n_inputs, dtype=np.float32)
         # per-episode telemetry for the balance CSV (Amr's stats schema)
         self.route: list[tuple[float, float]] = []
         self.jump_count = 0
@@ -120,7 +120,7 @@ class Trainer:
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
-        self.net_proto = NeuralNet()
+        self.net_proto = NeuralNet(sensor_dim(cfg.sensors))
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.game = game  # tags embedded in best.npz
@@ -143,7 +143,7 @@ class Trainer:
         self.slots = [
             EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus,
                                  sprint=self.persona.sprint, time_rate=self.persona.time_rate),
-                    NeuralNet())
+                    NeuralNet(self.net_proto.n_inputs))
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
@@ -240,8 +240,9 @@ class Trainer:
                         [round(tx - cam_x, 1), round(ty - cam_y, 1), ts, kind]
                         for tx, ty, ts, kind in slot.last_tiles
                     ]
-                    if i == watch:
-                        entry["sensors"] = [round(float(v), 2) for v in slot.last_sensors]
+                    if i == watch:  # grid mode: the 363 cells are drawn as tiles, bars show body only
+                        shown = slot.last_sensors if self.cfg.sensors == "rays" else slot.last_sensors[-N_BODY:]
+                        entry["sensors"] = [round(float(v), 2) for v in shown]
                 if i == watch:
                     entry["live"] = slot.adapter.episode_stats()
             envs.append(entry)
@@ -301,7 +302,7 @@ class Trainer:
                     continue
                 # Persona reaction time: the novice only gets fresh senses every Nth frame
                 if slot.frames % self.persona.sensor_period == 0:
-                    vec, rays, tiles = read_sensors(slot.adapter)
+                    vec, rays, tiles = read_sensors(slot.adapter, self.cfg.sensors)
                     slot.last_sensors, slot.last_rays, slot.last_tiles = vec, rays, tiles
                 else:
                     vec = slot.last_sensors
@@ -471,18 +472,20 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
     persona = PERSONAS["experienced"]
+    sensors = "rays"
     state_path = os.path.join(os.path.dirname(path), "state.json")
     if os.path.exists(state_path):
         with open(state_path, encoding="utf-8") as f:
             meta = json.load(f)
         persona = PERSONAS.get(meta.get("persona") or "", persona)
+        sensors = (meta.get("config") or {}).get("sensors", sensors)
         if level is None and meta.get("best_level"):  # default to the record's level
             level = meta["best_level"]
             print(f"replaying on level [{level}] as [{persona.name}] "
                   f"(where the record was set)", flush=True)
     weights = np.load(path)["weights"]
-    cfg = GAConfig(pop_size=1)
-    net = NeuralNet()
+    cfg = GAConfig(pop_size=1, sensors=sensors)
+    net = NeuralNet(sensor_dim(sensors))
     net.set_weights(weights.astype(np.float32))
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
                            sprint=persona.sprint, time_rate=persona.time_rate)
@@ -495,7 +498,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     while True:
         adapter.reset()
         while adapter.alive:
-            vec, rays, tiles = read_sensors(adapter)
+            vec, rays, tiles = read_sensors(adapter, sensors)
             slot0 = trainer.slots[0]
             slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
             move_x, jump = net.act(vec)
@@ -528,6 +531,8 @@ def main() -> None:
     ap.add_argument("--persona", default="experienced", choices=sorted(PERSONAS),
                     help="player type the agents imitate")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--sensors", default="rays", choices=SENSOR_MODES,
+                    help="exteroception: 6 rays + probes (14 inputs) or a 3x11x11 tile grid (368)")
     args = ap.parse_args()
 
     if args.results:
@@ -555,7 +560,7 @@ def main() -> None:
         print(f"resumed {args.resume} at gen {pop.generation}", flush=True)
     else:
         pop = None
-        cfg = GAConfig(seed=args.seed)
+        cfg = GAConfig(seed=args.seed, sensors=args.sensors)
 
     if args.level is not None:
         from .adapters import validate_level

@@ -142,6 +142,7 @@ class MarioAdapter:
             num_rays=0,
             max_steps=max_frames,
             skip_obs=True,
+            dijkstra_enabled=False,  # grid sensors call _obs() directly; the oracle channel is unused
         )
         # Lives are hardcoded to 3; >1 makes _handle_death soft-reset mid-episode,
         # which restarts the level without ending the episode and corrupts fitness.

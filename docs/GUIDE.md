@@ -190,7 +190,7 @@ so runs stay deterministic either way.
 
 PEAK's purpose is balancing levels with agents. The paper pipeline did this with PPO
 matrices (win rate ± CI + failure-mode taxonomy, fed by the stats subsystem); the GA
-successor is `python -m code.neuro.balance --game mario` (menu **[14] Balance Report**).
+successor is `python -m code.neuro.balance --game mario` (menu **[15] Full Sweep**).
 For each (level × seed) it evolves a fresh population, stops shortly after the first win,
 and aggregates with 95% t-CIs: **win rate, generations-to-first-win, dominant death cause,
 stuck rate, best x, learning trend** — hardest levels first. JSON lands in

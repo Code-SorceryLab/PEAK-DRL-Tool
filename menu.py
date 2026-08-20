@@ -9,6 +9,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -198,29 +199,39 @@ def get_enabled_level_count() -> int:
 
 
 def get_run_dirs():
-    """Run dirs under runs/ that hold a trained population (state.json)."""
+    """Every dir under runs/ holding a trained population (state.json + best.npz),
+    including balance probes (runs/probes/<game>/<persona>/<tag>/<level>_<seed>)."""
     if not RUNS_DIR.exists():
         return []
-    return sorted(p for p in RUNS_DIR.iterdir() if (p / "state.json").exists())
+    return sorted(p.parent for p in RUNS_DIR.rglob("state.json")
+                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay")
+
+
+def run_meta(run_dir: Path) -> dict:
+    """Identity tags embedded in best.npz (game/level/persona/fitness/generation)."""
+    try:
+        import numpy as np
+        return json.loads(str(np.load(run_dir / "best.npz")["meta"]))
+    except Exception:
+        return {}
 
 
 def get_trained_games():
-    trained = set()
-    for p in get_run_dirs():
-        for g in GAMES:
-            if p.name.startswith(g):
-                trained.add(g)
-    return trained
+    return {guess_game_for_run(p) for p in get_run_dirs()}
 
 
 def get_trained_models_count() -> int:
-    return len(list(RUNS_DIR.glob("*/best.npz"))) if RUNS_DIR.exists() else 0
+    return len(get_run_dirs())
 
 
 def guess_game_for_run(run_dir: Path) -> str:
-    for g in GAMES:
-        if run_dir.name.startswith(g):
-            return g
+    game = run_meta(run_dir).get("game")
+    if game in GAMES:
+        return game
+    for part in run_dir.relative_to(RUNS_DIR).parts:
+        for g in GAMES:
+            if part.startswith(g):
+                return g
     return GAMES[0]
 
 
@@ -472,6 +483,9 @@ def run_training():
                         ["experienced", "novice", "speedrunner"], default="experienced")
     if not persona:
         return
+    sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
+    if not sensors:
+        return
     gens = _prompt_gens()
     if gens == "invalid":
         return
@@ -480,6 +494,8 @@ def run_training():
     run_dir = RUNS_DIR / (game if not level else f"{game}_{level}")
     if persona != "experienced":
         run_dir = Path(str(run_dir) + f"_{persona}")
+    if sensors != "rays":  # a grid population has a different genome size — never share a run dir
+        run_dir = Path(str(run_dir) + f"_{sensors}")
 
     W = 50
     print()
@@ -488,6 +504,7 @@ def run_training():
     print(f"    Game:        {_WHT(game)}")
     print(f"    Level:       {_WHT(level or 'auto')}")
     print(f"    Persona:     {_WHT(persona)}")
+    print(f"    Sensors:     {_WHT(sensors)}")
     print(f"    Generations: {_WHT(str(gens) if gens else 'until stopped')}")
     print(f"    Mode:        {_WHT('turbo' if turbo else 'real-time')}")
     print(f"    Run dir:     {_WHT(str(run_dir))}")
@@ -501,7 +518,7 @@ def run_training():
     print(f"    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print()
     ok = execute_training_run(_trainer_cmd(game, level, gens, turbo, run_dir=run_dir,
-                                           extra=("--persona", persona)))
+                                           extra=("--persona", persona, "--sensors", sensors)))
     print_training_summary(1, int(ok), int(not ok))
     if ok:
         play_chime()
@@ -738,11 +755,18 @@ def run_manual_play():
 def _pick_run(prompt="\n  Choose a run:"):
     runs = get_run_dirs()
     if not runs:
-        print(_RED("  ✖  No trained runs found in runs/. Train something first."))
+        print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (14/15) first."))
         return None
-    names = [p.name for p in runs]
-    name = ask_index(prompt, names, default=names[0])
-    return RUNS_DIR / name if name else None
+    metas = [run_meta(p) for p in runs]
+    order = sorted(range(len(runs)), key=lambda i: -(metas[i].get("fitness") or 0))  # strongest first
+    labels = []
+    for i in order:
+        m = metas[i]
+        info = " · ".join(str(m[k]) for k in ("level", "persona") if m.get(k))
+        fit = f"fit {m['fitness']:,.0f}" if m.get("fitness") is not None else ""
+        labels.append(f"{runs[i].relative_to(RUNS_DIR)}  {_DIM('[' + ' · '.join(x for x in (info, fit) if x) + ']')}")
+    name = ask_index(prompt, labels, default=labels[0])
+    return runs[order[labels.index(name)]] if name else None
 
 
 def watch_trained_agent():
@@ -761,6 +785,7 @@ def watch_trained_agent():
     game = guess_game_for_run(run_dir)
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print(_DIM("    Ctrl+C to stop the replay.\n"))
+    threading.Timer(2.0, lambda: webbrowser.open(DASHBOARD_URL)).start()  # after the server is up
     execute_training_run(
         [sys.executable, "-m", "code.neuro.trainer", "--game", game,
          "--replay", str(best)])
@@ -930,97 +955,111 @@ def run_dashboard():
 
 
 def open_balance_command():
-    """Balance Command — regenerate the command center from runs/ and open it."""
+    """Balance Command — regenerate the command center from runs/, serve it, open it."""
     _refresh_screen()
     _section("BALANCE COMMAND")
     print(_DIM("    Regenerating from runs/balance, runs/probes, and every training run..."))
-    subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
-
-
-def run_balance_report():
-    """Balance Report — multi-seed neuroevolution probes per level (the paper-matrix successor)."""
-    _refresh_screen()
-    _section("BALANCE  ›  Multi-seed Level Report")
-
-    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
-    if not game:
-        return
-
-    levels = get_levels_for_game(game)
-    if not levels:
-        print(_RED("  ✖  No levels found for this game."))
-        return
-    chosen = toggle_select(f"LEVELS  ·  {game}", levels, default_indices=list(range(len(levels))))
-    if not chosen:
-        return
-
-    persona = ask_index("\n  Probe persona:", ["experienced", "novice", "speedrunner"],
-                        default="experienced") or "experienced"
-    gens_raw = input(_DIM("\n    Generation budget per probe [25]: ")).strip()
-    gens = gens_raw if gens_raw.isdigit() else "25"
-    seeds_raw = input(_DIM("    Seeds [1234 2025 31337]: ")).strip()
-    seeds = seeds_raw.split() if seeds_raw else ["1234", "2025", "31337"]
-
-    n_jobs = len(chosen) * len(seeds)
-    print(f"\n    {_WHT(str(n_jobs))} probes ({len(chosen)} levels × {len(seeds)} seeds), "
-          f"{_DIM('roughly ' + str(n_jobs * 2) + '-' + str(n_jobs * 4) + ' minutes')}")
-    proceed = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
-    if proceed in ("n", "no"):
-        return
-
-    cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
-           "--gens", gens, "--seeds", *seeds, "--levels", *chosen]
-    print(_DIM("  >>> " + " ".join(cmd) + "\n"))
+    print(_DIM("    Served locally so ▶ Watch buttons can launch replays. Ctrl+C closes it.\n"))
     try:
-        ok = subprocess.run(cmd).returncode == 0
+        subprocess.run([sys.executable, "-m", "code.neuro.report", "--serve", "--open"])
     except KeyboardInterrupt:
+        pass
+
+
+SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); grid = 3×11×11 tiles (368)
+
+
+def _sweep_prompts(n_modes: int = 1, default_gens: str = "40"):
+    """Shared sweep selection: games, personas, generation budget, seeds (None = back).
+    Every ENABLED level of each chosen game is probed."""
+    games = toggle_select("GAMES", get_available_games(),
+                          default_indices=[i for i, g in enumerate(get_available_games())
+                                           if g in ("mario", "meatboy")])
+    if not games:
+        return None
+    personas = toggle_select("PERSONAS", ["experienced", "novice", "speedrunner"],
+                             default_indices=[0, 1, 2])
+    if not personas:
+        return None
+    gens_raw = input(_DIM(f"\n    Generation budget per probe [{default_gens}]: ")).strip()
+    gens = gens_raw if gens_raw.isdigit() else default_gens
+    seeds_raw = input(_DIM("    Seeds [1234 2025 31337]: ")).strip()
+    seeds = [s for s in seeds_raw.split() if s.lstrip("-").isdigit()] or ["1234", "2025", "31337"]
+
+    n_levels = sum(len(get_levels_for_game(g)) for g in games)
+    n_jobs = n_levels * len(seeds) * len(personas) * n_modes
+    workers = max(1, (os.cpu_count() or 2) - 1)
+    modes = f" × {n_modes} sensor modes" if n_modes > 1 else ""
+    print(f"\n    {_WHT(str(n_jobs))} probes ({n_levels} levels × {len(seeds)} seeds × "
+          f"{len(personas)} personas{modes}), {workers} parallel workers")
+    print(_DIM("    Only ENABLED levels are probed — use Toggle Levels [10] first if needed."))
+    if input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() in ("n", "no"):
+        return None
+    return games, personas, gens, seeds
+
+
+def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg) -> bool:
+    """games × personas × sensor modes probe runs; False if interrupted."""
+    for game in games:
+        for persona in personas:
+            for sensors in sensors_list:
+                tag = f" · {sensors}" if len(sensors_list) > 1 else ""
+                print(_BOLD(f"\n  ── {game} · {persona}{tag} " + "─" * 30))
+                cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
+                       "--gens", gens, "--seeds", *seeds, "--sensors", sensors]
+                try:
+                    subprocess.run(cmd)
+                except KeyboardInterrupt:
+                    print(_RED(interrupted_msg))
+                    return False
+    return True
+
+
+def _open_command_center(page: str = "report") -> None:
+    if input(_DIM("\n    Open the Balance Command center? [Y/n]: ")).strip().lower() in ("n", "no"):
         return
-    if ok:
-        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
-        play_chime()
+    subprocess.run([sys.executable, "-m", "code.neuro.report"])  # regenerates every page
+    webbrowser.open((RUNS_DIR / "balance" / f"{page}.html").resolve().as_uri())
+
+
+def run_sensor_ablation():
+    """Sensor Ablation — the Full Sweep selection, run once per sensor mode (rays, grid), then compared."""
+    _refresh_screen()
+    _section("BALANCE  ›  Sensor Ablation  (rays vs grid)")
+    print(_DIM("    Same games × personas × seeds as Full Sweep, evolved once with raycasts and once with\n"
+               "    the 3×11×11 tile grid; prints generations-to-first-win ± CI and win rate side by side."))
+    picked = _sweep_prompts(n_modes=len(SENSOR_CHOICES))
+    if not picked:
+        return
+    games, personas, gens, seeds = picked
+    if not _sweep(games, personas, gens, seeds, SENSOR_CHOICES,
+                  "\n  Ablation interrupted — finished probes are kept; rerun to fill the gaps."):
+        return
+    print()
+    for game in games:
+        for persona in personas:
+            subprocess.run([sys.executable, "-m", "code.neuro.balance", "--game", game,
+                            "--persona", persona, "--gens", gens, "--compare"])
+    play_chime()
+    _open_command_center("ablation")
 
 
 def run_full_sweep():
     """Full Sweep — balance probes across games × personas × seeds, all parallel."""
     _refresh_screen()
     _section("BALANCE  ›  Full Sweep")
-
-    games = toggle_select("GAMES", get_available_games(),
-                          default_indices=[i for i, g in enumerate(get_available_games())
-                                           if g in ("mario", "meatboy")])
-    if not games:
+    sensors = ask_index("\n  Sensors (what the probe agents see):", SENSOR_CHOICES, default="rays")
+    if not sensors:
         return
-    personas = toggle_select("PERSONAS", ["experienced", "novice", "speedrunner"],
-                             default_indices=[0, 1, 2])
-    if not personas:
+    picked = _sweep_prompts()
+    if not picked:
         return
-    gens_raw = input(_DIM("\n    Generation budget per probe [40]: ")).strip()
-    gens = gens_raw if gens_raw.isdigit() else "40"
-    seeds = ["1234", "2025", "31337"]
-
-    n_levels = sum(len(get_levels_for_game(g)) for g in games)
-    n_jobs = n_levels * len(seeds) * len(personas)
-    workers = max(1, (os.cpu_count() or 2) - 1)
-    print(f"\n    {_WHT(str(n_jobs))} probes ({n_levels} levels × {len(seeds)} seeds × "
-          f"{len(personas)} personas), {workers} parallel workers")
-    print(_DIM("    Only ENABLED levels are probed — use Toggle Levels [10] first if needed."))
-    if input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() in ("n", "no"):
+    games, personas, gens, seeds = picked
+    if not _sweep(games, personas, gens, seeds, [sensors],
+                  "\n  Sweep interrupted — finished probes are already in the report."):
         return
-
-    for game in games:
-        for persona in personas:
-            print(_BOLD(f"\n  ── {game} · {persona} " + "─" * 30))
-            cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game,
-                   "--persona", persona, "--gens", gens, "--seeds", *seeds]
-            try:
-                subprocess.run(cmd)
-            except KeyboardInterrupt:
-                print(_RED("\n  Sweep interrupted — finished probes are already merged into the report."))
-                return
-
     play_chime()
-    if input(_DIM("\n    Open the Balance Command center? [Y/n]: ")).strip().lower() not in ("n", "no"):
-        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+    _open_command_center()
 
 
 def delete_logs_and_models():
@@ -1088,7 +1127,7 @@ def show_project_status():
             print(f"   {p.name}: {_DIM('(unreadable state.json)')}")
 
     print(f"\nAlgorithm: {_WHT('fixed-topology GA')}  {_DIM('(elitism + tournament + crossover + mutation)')}")
-    print(f"Network:   {_WHT('14 sensors → 16 tanh → 3 (left/right/jump)')}")
+    print(f"Network:   {_WHT('14 sensors (or 368 grid cells) → 16 tanh → 3 (left/right/jump)')}")
     print()
 
 
@@ -1119,9 +1158,9 @@ def main():
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("dashboard",            run_dashboard),
         "12": ("balance_command",      open_balance_command),
-        "14": ("balance",              run_balance_report),
         "15": ("full_sweep",           run_full_sweep),
-        "13": ("delete_all",           delete_logs_and_models),
+        "16": ("sensor_ablation",      run_sensor_ablation),
+        "d":  ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
     }
@@ -1150,9 +1189,9 @@ def main():
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
         print(_menu_item("12", "Balance Command",      "open the command center (all runs + probes)"))
-        print(_menu_item("14", "Balance Report",       "multi-seed level difficulty ± CI"))
         print(_menu_item("15", "Full Sweep",           "games × personas × seeds, parallel"))
-        print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
+        print(_menu_item("16", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
+        print(_menu_item(" D", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
         print()

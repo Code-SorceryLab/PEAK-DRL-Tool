@@ -1,6 +1,12 @@
 """Game-agnostic sensors: ray marching + scalar state, computed via GameAdapter queries.
 
-Sensor vector (14 floats, all roughly [-1, 1]):
+Two exteroception modes, selected by GAConfig.sensors (same body scalars in both):
+  "rays" — 14 floats (below), the default
+  "grid" — the cores' obs window sized to 11x11 around the agent, 3 channels
+           (solid / collectible / hazard; the Dijkstra oracle channel is dropped) + 5 body
+           scalars = 368 floats. The Mario-AI-competition-style input, for the sensor ablation.
+
+Ray sensor vector (14 floats, all roughly [-1, 1]):
   0-5  solid-ray distances (fwd, fwd-up30, fwd-up60, fwd-down30, fwd-down60, back); 1.0 = clear
   6    forward enemy distance (corridor of +-1 tile around the forward ray); 1.0 = none
   7    pit ahead (no ground within 4 tiles below a point 1.5 tiles ahead)
@@ -21,6 +27,11 @@ import numpy as np
 if TYPE_CHECKING:
     from .adapters import GameAdapter
 
+SENSOR_MODES = ("rays", "grid")
+GRID_HALF = 5   # 11x11 window centred on the agent's tile
+GRID_N = 2 * GRID_HALF + 1
+GRID_CH = 3     # solid, collectible, hazard
+N_BODY = 5      # grounded, vx, vy, can_jump, bias
 RAY_MAX_DIST = 250.0
 RAY_STEP = 8.0
 VX_NORM = 300.0
@@ -63,8 +74,55 @@ def _march(adapter: "GameAdapter", ox: float, oy: float, dx: float, dy: float) -
     return RAY_MAX_DIST
 
 
-def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Tile]]:
-    """Returns (14-float sensor vector, rays for the debug overlay, tile highlights)."""
+def sensor_dim(mode: str) -> int:
+    if mode not in SENSOR_MODES:
+        raise ValueError(f"unknown sensor mode {mode!r}, expected one of {SENSOR_MODES}")
+    return 14 if mode == "rays" else GRID_CH * (2 * GRID_HALF + 1) ** 2 + N_BODY
+
+
+def _body(adapter: "GameAdapter") -> list[float]:
+    return [1.0 if adapter.grounded else 0.0,
+            float(np.clip(adapter.vx / VX_NORM, -1.0, 1.0)),
+            float(np.clip(adapter.vy / VY_NORM, -1.0, 1.0)),
+            1.0 if adapter.can_jump else 0.0,
+            1.0]
+
+
+def _fit_window(core) -> None:
+    """Size the core's obs window to GRID_N (default 21). Every core reads these attributes at
+    call time, so _obs() builds 121 cells instead of 441 and the agent stays the centre cell."""
+    if hasattr(core, "window"):  # meatboy
+        core.window = GRID_N
+    else:  # platformer / megaman / sonic
+        core.obs_width = core.obs_height = GRID_N
+        core.obs_pad_x = core.obs_pad_y = GRID_HALF
+        for k in ("_hazard_window_cache", "_dijkstra_window_cache", "_solid_window_cache"):
+            if hasattr(core, k):  # per-step caches were built at the old size
+                setattr(core, k, None)
+        if hasattr(core, "_update_debug_caches"):  # megaman fills hazards from that cache
+            core._update_debug_caches()
+
+
+def _read_grid(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Tile]]:
+    core = adapter.core
+    if getattr(core, "window", getattr(core, "obs_width", None)) != GRID_N:
+        _fit_window(core)
+    win = core._obs()["grids"][:GRID_CH]  # (3, 11, 11); the agent's tile is the centre cell
+    assert win.shape[1:] == (GRID_N, GRID_N), win.shape
+    vec = np.concatenate([win.ravel(), _body(adapter)]).astype(np.float32)
+    # overlay: outline the solid cells the agent sees, so the crop is visibly centred
+    tile = float(adapter.tile_size)
+    ox = adapter.x // tile * tile - GRID_HALF * tile
+    oy = adapter.y // tile * tile - GRID_HALF * tile
+    tiles: list[Tile] = [(ox + lx * tile, oy + ly * tile, tile, TILE_HIT)
+                         for ly, lx in zip(*np.nonzero(win[0] > 0.5))]
+    return vec, [], tiles
+
+
+def read_sensors(adapter: "GameAdapter", mode: str = "rays") -> tuple[np.ndarray, list[Ray], list[Tile]]:
+    """Returns (sensor vector, rays for the debug overlay, tile highlights)."""
+    if mode == "grid":
+        return _read_grid(adapter)
     ox, oy = adapter.x, adapter.y
     facing = -1.0 if adapter.vx < -1.0 else 1.0  # rays flip when moving left
     tile = float(adapter.tile_size)
@@ -103,10 +161,7 @@ def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Ti
             break
     vec[7] = 0.0 if ground else 1.0
 
-    vec[8] = 1.0 if adapter.grounded else 0.0
-    vec[9] = float(np.clip(adapter.vx / VX_NORM, -1.0, 1.0))
-    vec[10] = float(np.clip(adapter.vy / VY_NORM, -1.0, 1.0))
-    vec[11] = 1.0 if adapter.can_jump else 0.0
+    vec[8:12] = _body(adapter)[:4]
     vec[12] = min(adapter.qblock_count_near(5), 5) / 5.0
     vec[13] = 1.0
     return vec, rays, tiles

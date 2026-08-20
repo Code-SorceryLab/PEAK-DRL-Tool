@@ -6,15 +6,19 @@ probes.*
 
 ## The pipeline
 
-1. **Probe** — `python -m code.neuro.balance --game <g>` (menu **[14] Balance Report**).
+1. **Probe** — `python -m code.neuro.balance --game <g>` (menu **[15] Full Sweep**).
    For each (level × seed) a fresh population evolves until shortly after its first win
    (or the generation budget). Default seeds `1234 2025 31337` — the same set the paper
    matrix used, keep them for comparability.
 2. **Aggregate** — per level, means ± 95% t-CIs across seeds, merged into
    `runs/balance/report_<game>_<persona>.json` (new probes extend the file; they don't clobber it).
+   **Sensor ablation:** `--sensors grid` swaps the 6 rays for the 3×11×11 tile window
+   (solid / collectible / hazard, Dijkstra dropped, 368 inputs). Probes land under a
+   `p50g25_grid` tag so they never overwrite the ray probes; `--compare` prints both side by
+   side (generations-to-first-win ± CI, win rate) per level.
 3. **Report** — `python -m code.neuro.report --open` renders every game's JSON into one
    self-contained page, `runs/balance/report.html`: ranked difficulty table, death-location
-   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12] and [14] offer to open it.
+   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12], [15] and [16] offer to open it.
 
 ## The metric table
 
@@ -82,7 +86,7 @@ there). `--level` on the CLI locks a single level; menu Train Single prompts for
 ## Player personas
 
 Probes and training runs imitate a chosen player type (`--persona`, or the persona prompt
-in menu Train Single / Balance Report). A persona is a *capability + objective* profile,
+in menu Train Single / Full Sweep). A persona is a *capability + objective* profile,
 not a reward function:
 
 | Persona | Capabilities | Objective |
@@ -109,7 +113,7 @@ The intended workflow for level designers:
    `python -m code.games.tools.manual_play --game platformer --file <path>.txt`).
 3. **Train agents on it** — menu **[2] Train Single**, pick the level and a persona, watch
    on the dashboard (or pick the level live from the Run panel's dropdown).
-4. **Judge the balance** — menu **[14] Balance Report** on the level (optionally per
+4. **Judge the balance** — menu **[15] Full Sweep** on the game (optionally per
    persona), then the web report shows completion, death heatmap, and failure modes.
 
 ## The debug overlay
@@ -185,7 +189,13 @@ Speed: `balance.py --workers N` runs probes in parallel processes (default cores
 each (level x seed) cell is independent, so wall clock divides by the worker count).
 The trainer also skips all frame JPEG encoding while no dashboard tab is connected.
 
-**Per-persona reports:** balance probes write `runs/balance/report_<game>_<persona>.json` — one file
-per (game, persona) so tiers never overwrite each other's rows. The web report renders every
-file it finds, grouped by game with the persona shown in the section header. Probe checkpoints
-live under `runs/probes/<game>/<level>_<seed>/`.
+**Per-config reports:** probe checkpoints live under
+`runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` where `tag = p<pop_size>g<gens>` (e.g. `p50g40`),
+so different personas, population sizes, and generation budgets never overwrite each other;
+re-probing a level with the same config replaces just that level. The Balance Command
+(`python -m code.neuro.report --open`, menu 12) re-aggregates every probe on disk into
+`runs/balance/report_<game>_<persona>_<tag>.json` each time it opens — no finished sweep
+needed — and renders one section per (game, tag). Each probe cell records `best_gen`
+(generation the record genome appeared), `improvement_rate` (slope of best progress per
+generation until the peak, as a share of the level), win-time std, and wall-clock train time;
+a `STUCK` episode counts as the `Stall` cause alongside Enemy/Pit/Saw/Spike.

@@ -64,3 +64,44 @@ def test_rays_flip_when_moving_left():
     _, rays, _t = read_sensors(LeftAdapter())
     x1, _, x2, _, _ = rays[0]  # forward ray now points left
     assert x2 < x1
+
+
+class FakeCore:
+    """Meatboy-style core: builds a `window`-sized obs with the agent at the centre cell,
+    a solid cell 2 tiles ahead, a hazard directly below, and an oracle channel 3."""
+
+    window = 21  # the cores' default; the grid sensor resizes it
+
+    def _obs(self):
+        n, c = self.window, self.window // 2
+        g = np.zeros((4, n, n), dtype=np.float32)
+        g[0, c, c + 2] = 1.0   # solid, (row, col) = centre + 2 columns
+        g[2, c + 1, c] = -1.0  # hazard directly below
+        g[3, :, :] = 0.7       # dijkstra oracle: must NOT reach the vector
+        return {"grids": g, "scalars": np.zeros(20, dtype=np.float32)}
+
+
+def test_grid_mode_resizes_window_and_drops_dijkstra():
+    from code.neuro.sensors import GRID_HALF, GRID_N, TILE_HIT, sensor_dim
+
+    a = FakeAdapter()
+    a.core = FakeCore()
+    vec, rays, tiles = read_sensors(a, "grid")
+    assert a.core.window == GRID_N == 11  # core now builds 11x11 directly, no crop
+    assert vec.shape == (sensor_dim("grid"),) == (368,)
+    win = vec[:363].reshape(3, 11, 11)
+    assert win[0, GRID_HALF, GRID_HALF + 2] == 1.0 and win[2, GRID_HALF + 1, GRID_HALF] == -1.0
+    assert win.max() <= 1.0 and win.min() >= -1.0  # the 0.7 oracle channel is gone
+    assert vec[-1] == 1.0 and vec[-5] == 1.0  # bias, grounded
+    assert rays == [] and len(tiles) == 1 and tiles[0][3] == TILE_HIT
+    # the one solid cell (2 tiles ahead) outlines the tile at x = agent_tile + 2
+    assert tiles[0][0] == (64.0 // 32) * 32 + 2 * 32
+
+
+def test_sensor_dim_rejects_unknown_mode():
+    import pytest
+    from code.neuro.sensors import sensor_dim
+
+    assert sensor_dim("rays") == 14
+    with pytest.raises(ValueError):
+        sensor_dim("pixels")

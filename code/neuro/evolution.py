@@ -10,19 +10,20 @@ import numpy as np
 
 @dataclass
 class GAConfig:
-    pop_size: int = 10
-    elite: int = 4          # raised from 2 (2026-08-20): population win rate plateaued at 23%
+    pop_size: int = 50
+    elite: int = 5          # raised from 2 (2026-08-20): population win rate plateaued at 23%
     tournament_k: int = 5   # raised from 3: stronger selection pressure toward winners
     crossover_rate: float = 0.7
     mutation_rate: float = 0.15
-    mutation_sigma: float = 0.3
+    mutation_sigma: float = 0.15
     init_sigma: float = 0.5
     max_frames: int = 3600       # per-episode frame budget (60s at 60fps)
     stuck_frames: int = 300      # frames without max_x gain before an env is marked STUCK
     advance_wins: int = 3        # wins in one generation before the curriculum advances a level
-    anneal_factor: float = 0.5   # multiply mutation rate+sigma by this once a level is first solved (1.0 = off)
+    anneal_factor: float = 0.85   # multiply mutation rate+sigma by this once a level is first solved (1.0 = off)
     win_bonus: float = 5000.0
     seed: int = 42
+    sensors: str = "rays"        # exteroception: "rays" (14 inputs) or "grid" (3x11x11 + body)
 
 
 class Population:
@@ -36,6 +37,7 @@ class Population:
         self.generation = 0
         self.best_fitness = -np.inf
         self.best_weights = self.weights[0].copy()
+        self.best_gen = 0  # generation (1-based, matches history rows) the all-time best was found
         self.best_level: str | None = None  # level the all-time best was earned on (set by the trainer)
         self.annealed = False  # mutation halved after the current level's first win (trainer-managed)
         # Per-gen result rows. evolve() writes best/avg; the trainer appends the
@@ -52,6 +54,7 @@ class Population:
         if fit[gen_best] > self.best_fitness:
             self.best_fitness = float(fit[gen_best])
             self.best_weights = self.weights[gen_best].copy()
+            self.best_gen = self.generation + 1
         self.history.append({"best": float(fit.max()), "avg": float(fit.mean())})
 
         order = np.argsort(fit)[::-1]
@@ -85,6 +88,7 @@ class Population:
         state = {
             "generation": self.generation,
             "best_fitness": self.best_fitness,
+            "best_gen": self.best_gen,
             "best_level": self.best_level,
             "annealed": self.annealed,
             "persona": getattr(self, "persona", None),
@@ -102,7 +106,8 @@ class Population:
             "fitness": round(float(self.best_fitness), 1),
             "generation": self.generation,
             "seed": self.cfg.seed,
-            "net": "14-16-3",
+            "sensors": self.cfg.sensors,
+            "n_params": self.n_params,
         }
         np.savez_compressed(os.path.join(run_dir, "best.npz"),
                             weights=self.best_weights, meta=np.array(json.dumps(meta)))
@@ -118,6 +123,7 @@ class Population:
         pop.best_weights = data["best_weights"].astype(np.float32)
         pop.generation = int(state["generation"])
         pop.best_fitness = float(state["best_fitness"])
+        pop.best_gen = int(state.get("best_gen", 0))
         pop.best_level = state.get("best_level")
         pop.annealed = state.get("annealed", False)
         pop.history = state.get("history", [])
