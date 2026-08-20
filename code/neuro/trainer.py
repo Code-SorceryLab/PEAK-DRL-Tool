@@ -338,6 +338,18 @@ class Trainer:
             if self.state is not None:
                 self._publish_stats(statuses, fitnesses, 0.0)
 
+            # Re-read the enabled-level list each generation so levels added or
+            # toggled in game_config.yaml appear live in the dropdown/curriculum.
+            if self.levels is not None:
+                try:
+                    fresh = list_levels(self.game)
+                    if fresh and fresh != self.levels:
+                        self.levels = fresh
+                        if verbose:
+                            print(f"level list refreshed: {', '.join(fresh)}", flush=True)
+                except Exception:
+                    pass  # a half-saved config edit shouldn't kill training
+
             # Dashboard level pick wins over the curriculum, applied at the gen boundary.
             requested = self.state.controls.level_request if self.state else None
             if requested and self.levels and requested in self.levels and requested != self.level:
@@ -351,6 +363,7 @@ class Trainer:
             # Curriculum: enough winners this generation -> move the whole
             # population to the next enabled level (nets carry over).
             elif (self.levels and h["wins"] >= self.cfg.advance_wins
+                    and self.level in self.levels  # current level may have been toggled off
                     and self.levels.index(self.level) < len(self.levels) - 1):
                 self.level = self.levels[self.levels.index(self.level) + 1]
                 for slot in self.slots:
