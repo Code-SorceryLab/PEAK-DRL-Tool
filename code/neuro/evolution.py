@@ -84,6 +84,7 @@ class Population:
             "generation": self.generation,
             "best_fitness": self.best_fitness,
             "best_level": self.best_level,
+            "persona": getattr(self, "persona", None),
             "config": asdict(self.cfg),
             "rng_state": self.rng.bit_generator.state,
             "history": self.history,

@@ -468,12 +468,18 @@ def run_training():
         if level.startswith("auto"):
             level = None
 
+    persona = ask_index("\n  Player persona (who should the agents play like?):",
+                        ["experienced", "novice", "speedrunner"], default="experienced")
+    if not persona:
+        return
     gens = _prompt_gens()
     if gens == "invalid":
         return
     turbo = input(_DIM("    Start in turbo? [y/N]: ")).strip().lower().startswith("y")
 
     run_dir = RUNS_DIR / (game if not level else f"{game}_{level}")
+    if persona != "experienced":
+        run_dir = Path(str(run_dir) + f"_{persona}")
 
     W = 50
     print()
@@ -481,6 +487,7 @@ def run_training():
     print(f"    {_BOLD('Run Summary')}")
     print(f"    Game:        {_WHT(game)}")
     print(f"    Level:       {_WHT(level or 'auto')}")
+    print(f"    Persona:     {_WHT(persona)}")
     print(f"    Generations: {_WHT(str(gens) if gens else 'until stopped')}")
     print(f"    Mode:        {_WHT('turbo' if turbo else 'real-time')}")
     print(f"    Run dir:     {_WHT(str(run_dir))}")
@@ -493,7 +500,8 @@ def run_training():
     print()
     print(f"    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print()
-    ok = execute_training_run(_trainer_cmd(game, level, gens, turbo, run_dir=run_dir))
+    ok = execute_training_run(_trainer_cmd(game, level, gens, turbo, run_dir=run_dir,
+                                           extra=("--persona", persona)))
     print_training_summary(1, int(ok), int(not ok))
     if ok:
         play_chime()
@@ -969,6 +977,9 @@ def run_agent_analyzer():
         print(f"    Death causes:  {_DIM(cause_str)}")
     print(_DIM("    " + "─" * W))
 
+    if input(_DIM("\n    Open the balance web report? [Y/n]: ")).strip().lower() not in ("n", "no"):
+        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+
 
 def run_balance_report():
     """Balance Report — multi-seed neuroevolution probes per level (the paper-matrix successor)."""
@@ -987,6 +998,8 @@ def run_balance_report():
     if not chosen:
         return
 
+    persona = ask_index("\n  Probe persona:", ["experienced", "novice", "speedrunner"],
+                        default="experienced") or "experienced"
     gens_raw = input(_DIM("\n    Generation budget per probe [25]: ")).strip()
     gens = gens_raw if gens_raw.isdigit() else "25"
     seeds_raw = input(_DIM("    Seeds [1234 2025 31337]: ")).strip()
@@ -999,7 +1012,7 @@ def run_balance_report():
     if proceed in ("n", "no"):
         return
 
-    cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game,
+    cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
            "--gens", gens, "--seeds", *seeds, "--levels", *chosen]
     print(_DIM("  >>> " + " ".join(cmd) + "\n"))
     try:
@@ -1007,6 +1020,7 @@ def run_balance_report():
     except KeyboardInterrupt:
         return
     if ok:
+        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
         play_chime()
 
 

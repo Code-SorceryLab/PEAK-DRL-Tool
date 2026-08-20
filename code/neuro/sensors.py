@@ -46,6 +46,13 @@ HIT_ENEMY = 2
 # One ray for the overlay: (x1, y1, x2, y2, hit_type) in world coordinates
 Ray = tuple[float, float, float, float, int]
 
+# Tile highlight kinds for the overlay (the classic PEAK debug look:
+# red outline = tile a ray hit, translucent blue = tile the pit probe scanned)
+TILE_HIT = 1
+TILE_PROBE = 2
+# One tile box: (world_x, world_y, size, kind)
+Tile = tuple[float, float, float, int]
+
 
 def _march(adapter: "GameAdapter", ox: float, oy: float, dx: float, dy: float) -> float:
     d = RAY_STEP
@@ -56,21 +63,25 @@ def _march(adapter: "GameAdapter", ox: float, oy: float, dx: float, dy: float) -
     return RAY_MAX_DIST
 
 
-def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray]]:
-    """Returns (14-float sensor vector, rays for the debug overlay)."""
+def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Tile]]:
+    """Returns (14-float sensor vector, rays for the debug overlay, tile highlights)."""
     ox, oy = adapter.x, adapter.y
     facing = -1.0 if adapter.vx < -1.0 else 1.0  # rays flip when moving left
+    tile = float(adapter.tile_size)
     vec = np.empty(14, dtype=np.float32)
     rays: list[Ray] = []
+    tiles: list[Tile] = []
 
     for i, (dx, dy) in enumerate(RAY_DIRS):
         dx *= facing
         d = _march(adapter, ox, oy, dx, dy)
         vec[i] = d / RAY_MAX_DIST
-        rays.append((ox, oy, ox + dx * d, oy + dy * d, HIT_SOLID if d < RAY_MAX_DIST else HIT_NONE))
+        hit = d < RAY_MAX_DIST
+        rays.append((ox, oy, ox + dx * d, oy + dy * d, HIT_SOLID if hit else HIT_NONE))
+        if hit:  # outline the exact tile the ray stopped on
+            tiles.append(((ox + dx * d) // tile * tile, (oy + dy * d) // tile * tile, tile, TILE_HIT))
 
     # Forward enemy distance: nearest enemy inside a +-1 tile corridor along the forward ray
-    tile = float(adapter.tile_size)
     enemy_d = RAY_MAX_DIST
     for ex, ey in adapter.enemy_positions():
         along = (ex - ox) * facing
@@ -80,9 +91,17 @@ def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray]]:
     if enemy_d < RAY_MAX_DIST:
         rays.append((ox, oy, ox + facing * enemy_d, oy, HIT_ENEMY))
 
-    # Pit ahead: probe 1.5 tiles ahead, look for solid ground within 4 tiles below
+    # Pit ahead: probe 1.5 tiles ahead, look for solid ground within 4 tiles below.
+    # The scanned column is highlighted as translucent probe tiles in the overlay.
     px = ox + facing * tile * 1.5
-    vec[7] = 0.0 if any(adapter.solid_at(px, oy + tile * k) for k in range(1, 5)) else 1.0
+    ground = False
+    for k in range(1, 5):
+        py = oy + tile * k
+        tiles.append((px // tile * tile, py // tile * tile, tile, TILE_PROBE))
+        if adapter.solid_at(px, py):
+            ground = True
+            break
+    vec[7] = 0.0 if ground else 1.0
 
     vec[8] = 1.0 if adapter.grounded else 0.0
     vec[9] = float(np.clip(adapter.vx / VX_NORM, -1.0, 1.0))
@@ -90,4 +109,4 @@ def read_sensors(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray]]:
     vec[11] = 1.0 if adapter.can_jump else 0.0
     vec[12] = min(adapter.qblock_count_near(5), 5) / 5.0
     vec[13] = 1.0
-    return vec, rays
+    return vec, rays, tiles

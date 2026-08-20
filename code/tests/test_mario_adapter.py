@@ -34,7 +34,7 @@ def test_step_and_fitness_progress(adapter):
 
 def test_sensors_on_real_level(adapter):
     adapter.reset()
-    vec, rays = read_sensors(adapter)
+    vec, rays, _tiles = read_sensors(adapter)
     assert vec.shape == (14,)
     assert not np.any(np.isnan(vec))
     assert len(rays) >= 6

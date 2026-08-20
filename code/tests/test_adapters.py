@@ -18,7 +18,7 @@ def test_adapter_smoke(game):
     assert adapter.status == "RUNNING"
     assert adapter.tile_size > 0
 
-    vec, rays = read_sensors(adapter)
+    vec, rays, _tiles = read_sensors(adapter)
     assert vec.shape == (14,)
     assert not np.any(np.isnan(vec))
     assert len(rays) >= 6

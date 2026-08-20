@@ -22,6 +22,7 @@ import pygame
 
 from .adapters import GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
+from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet
 from .sensors import read_sensors
 
@@ -43,6 +44,7 @@ class Controls:
         self.keys = {"left": False, "right": False, "jump": False}
         self.hitboxes = False  # classic PEAK debug overlays, drawn by the game cores
         self.grid = False
+        self.level_request: str | None = None  # dashboard level pick; applied at the next gen boundary
 
 
 class SharedState:
@@ -74,6 +76,7 @@ class EnvSlot:
         self.stuck_anchor_x = 0.0
         self.stuck_frames = 0
         self.last_rays: list = []
+        self.last_tiles: list = []
         self.last_sensors: np.ndarray = np.zeros(14, dtype=np.float32)
 
 
@@ -91,13 +94,16 @@ def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
 
 class Trainer:
     def __init__(self, game: str, level: str | None, cfg: GAConfig, run_dir: str,
-                 state: SharedState | None = None, population: Population | None = None) -> None:
+                 state: SharedState | None = None, population: Population | None = None,
+                 persona: Persona | None = None) -> None:
         self.game = game
         self.cfg = cfg
         self.run_dir = run_dir
         self.state = state
+        self.persona = persona or PERSONAS["experienced"]
         self.net_proto = NeuralNet()
         self.pop = population or Population(cfg, self.net_proto.n_params)
+        self.pop.persona = self.persona.name  # persisted so replay matches capabilities
 
         # Level curriculum: an explicit --level locks that one level; otherwise the
         # trainer walks every enabled level in config order, advancing once a
@@ -115,7 +121,9 @@ class Trainer:
             self.level = self.levels[idx] if self.levels else None
 
         self.slots = [
-            EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus), NeuralNet())
+            EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus,
+                                 sprint=self.persona.sprint, time_rate=self.persona.time_rate),
+                    NeuralNet())
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
@@ -146,6 +154,8 @@ class Trainer:
             "mut_rate": self.cfg.mutation_rate,
             "pop_size": self.cfg.pop_size,
             "level": self.level or "auto",
+            "levels": self.levels or ([self.level] if self.level else []),
+            "persona": self.persona.name,
             "game": self.game,
             "sps": round(sps),
             "turbo": self.state.controls.turbo,
@@ -198,6 +208,10 @@ class Trainer:
                          round(x2 - cam_x, 1), round(y2 - cam_y, 1), hit]
                         for x1, y1, x2, y2, hit in slot.last_rays
                     ]
+                    entry["tiles"] = [
+                        [round(tx - cam_x, 1), round(ty - cam_y, 1), ts, kind]
+                        for tx, ty, ts, kind in slot.last_tiles
+                    ]
                     if i == watch:
                         entry["sensors"] = [round(float(v), 2) for v in slot.last_sensors]
                 if i == watch:
@@ -232,8 +246,12 @@ class Trainer:
             for i, slot in enumerate(self.slots):
                 if not slot.adapter.alive:
                     continue
-                vec, rays = read_sensors(slot.adapter)
-                slot.last_sensors, slot.last_rays = vec, rays
+                # Persona reaction time: the novice only gets fresh senses every Nth frame
+                if slot.frames % self.persona.sensor_period == 0:
+                    vec, rays, tiles = read_sensors(slot.adapter)
+                    slot.last_sensors, slot.last_rays, slot.last_tiles = vec, rays, tiles
+                else:
+                    vec = slot.last_sensors
                 if i == manual_idx:
                     k = ctrl.keys
                     move_x = (1 if k["right"] else 0) - (1 if k["left"] else 0)
@@ -253,6 +271,7 @@ class Trainer:
                     if slot.stuck_frames >= self.cfg.stuck_frames and slot.adapter.alive:
                         slot.adapter.alive = False
                         slot.adapter.status = "STUCK"
+                        slot.adapter._end_xy = (slot.adapter.x, slot.adapter.y)  # type: ignore[attr-defined]
 
             if self.state is not None:
                 now = time.time()
@@ -296,6 +315,7 @@ class Trainer:
             self.pop.history[-1].update({
                 "gen": self.pop.generation,
                 "level": self.level or "auto",
+                "persona": self.persona.name,
                 "median": round(float(np.median(fits)), 1),
                 "min": round(float(fits.min()), 1),
                 "wins": statuses.count("WON"),
@@ -318,9 +338,19 @@ class Trainer:
             if self.state is not None:
                 self._publish_stats(statuses, fitnesses, 0.0)
 
+            # Dashboard level pick wins over the curriculum, applied at the gen boundary.
+            requested = self.state.controls.level_request if self.state else None
+            if requested and self.levels and requested in self.levels and requested != self.level:
+                self.level = requested
+                for slot in self.slots:
+                    slot.adapter.set_level(self.level)
+                self.state.controls.level_request = None
+                if verbose:
+                    print(f"level switched to [{self.level}] from the dashboard "
+                          f"at gen {self.pop.generation}", flush=True)
             # Curriculum: enough winners this generation -> move the whole
             # population to the next enabled level (nets carry over).
-            if (self.levels and h["wins"] >= self.cfg.advance_wins
+            elif (self.levels and h["wins"] >= self.cfg.advance_wins
                     and self.levels.index(self.level) < len(self.levels) - 1):
                 self.level = self.levels[self.levels.index(self.level) + 1]
                 for slot in self.slots:
@@ -352,18 +382,22 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     if not os.path.exists(path):
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
-    if level is None:  # default to the level the record was set on
-        state_path = os.path.join(os.path.dirname(path), "state.json")
-        if os.path.exists(state_path):
-            with open(state_path, encoding="utf-8") as f:
-                level = json.load(f).get("best_level")
-            if level:
-                print(f"replaying on level [{level}] (where the record was set)", flush=True)
+    persona = PERSONAS["experienced"]
+    state_path = os.path.join(os.path.dirname(path), "state.json")
+    if os.path.exists(state_path):
+        with open(state_path, encoding="utf-8") as f:
+            meta = json.load(f)
+        persona = PERSONAS.get(meta.get("persona") or "", persona)
+        if level is None and meta.get("best_level"):  # default to the record's level
+            level = meta["best_level"]
+            print(f"replaying on level [{level}] as [{persona.name}] "
+                  f"(where the record was set)", flush=True)
     weights = np.load(path)["weights"]
     cfg = GAConfig(pop_size=1)
     net = NeuralNet()
     net.set_weights(weights.astype(np.float32))
-    adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus)
+    adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
+                           sprint=persona.sprint, time_rate=persona.time_rate)
     clock = pygame.time.Clock()
     trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state)
     trainer.slots[0].adapter = adapter
@@ -371,8 +405,9 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     while True:
         adapter.reset()
         while adapter.alive:
-            vec, rays = read_sensors(adapter)
-            trainer.slots[0].last_sensors, trainer.slots[0].last_rays = vec, rays
+            vec, rays, tiles = read_sensors(adapter)
+            slot0 = trainer.slots[0]
+            slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
             move_x, jump = net.act(vec)
             adapter.step(move_x, jump)
             if state is not None:
@@ -394,6 +429,8 @@ def main() -> None:
     ap.add_argument("--resume", default=None, help="resume from a run dir")
     ap.add_argument("--replay", default=None, help="path to a best.npz to watch")
     ap.add_argument("--results", default=None, help="print the results table for a run dir and exit")
+    ap.add_argument("--persona", default="experienced", choices=sorted(PERSONAS),
+                    help="player type the agents imitate")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -424,7 +461,8 @@ def main() -> None:
         pop = None
         cfg = GAConfig(seed=args.seed)
 
-    trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop)
+    trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
+                      persona=get_persona(args.persona))
     trainer.run(args.gens)
 
 

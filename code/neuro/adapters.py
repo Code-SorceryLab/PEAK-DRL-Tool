@@ -64,8 +64,25 @@ def list_levels(game: str) -> list[str]:
     return list(levels.keys())
 
 
-def _episode_stats(core, x: float) -> dict:
+def _move_md(move_x: int, sprint: bool) -> int:
+    """move_x -1/0/+1 -> MultiDiscrete move value; sprint picks the run variant (walk + 1)."""
+    base = {-1: 1, 0: 0, 1: 3}[move_x]
+    return base + 1 if sprint and move_x else base
+
+
+def _win_time_bonus(adapter) -> float:
+    """Speedrunner fitness: time left on the clock pays out on a win."""
+    return adapter.time_rate * max(float(getattr(adapter.core, "timer", 0.0) or 0.0), 0.0)
+
+
+def _count_coins(core) -> int:
+    ld = getattr(core, "level_data", None)  # megaman builds level_data on first reset
+    return len(ld.coins) if ld is not None else 0
+
+
+def _episode_stats(adapter, x: float) -> dict:
     """Game metrics shared by every core, read defensively (not every core has every field)."""
+    core = adapter.core
     return {
         "x": round(float(x), 1),
         "score": int(getattr(core, "score", 0) or 0),
@@ -73,6 +90,11 @@ def _episode_stats(core, x: float) -> dict:
         "kills": int(getattr(core, "kills_total", 0) or 0),
         "time_left": round(float(getattr(core, "timer", 0.0) or 0.0), 1),
         "cause": str(getattr(core, "death_cause", "") or getattr(core, "last_cause", "") or ""),
+        # balance-metric fields (Amr's table): where the episode ended, level extents, loot pool
+        "end_x": round(adapter._end_xy[0], 1) if adapter._end_xy else None,
+        "end_y": round(adapter._end_xy[1], 1) if adapter._end_xy else None,
+        "level_len": round(float(getattr(getattr(core, "level_data", None), "width", 0.0) or 0.0), 1),
+        "level_coins": adapter._level_coins,
     }
 
 
@@ -82,7 +104,8 @@ class MarioAdapter:
     # move_x -1/0/+1 -> MultiDiscrete move component (1=left, 0=idle, 3=right; walk speed only)
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
-    def __init__(self, level: str | None, max_frames: int, win_bonus: float) -> None:
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         from code.games.platformer_core import PlatformerCore
         from code.games.modules.Parameters.Map_parameters import (
@@ -91,6 +114,8 @@ class MarioAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.sprint = sprint        # persona capability: run/sprint action variants
+        self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}  # None -> first level in game_config.yaml
         self.core = PlatformerCore(
             render_mode="none",
@@ -110,6 +135,8 @@ class MarioAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     # ── state ────────────────────────────────────────────────────────────
 
@@ -155,13 +182,16 @@ class MarioAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _ = self.core.step([self._MOVE_MD[move_x], int(jump), 0])
+        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
         if terminated or truncated:
             self.alive = False
+            self._end_xy = (self.x, self.y)
             self.won = bool(self.core.reached_goal)
             if self.won:
                 self.status = "WON"
@@ -203,10 +233,10 @@ class MarioAdapter:
         return n
 
     def fitness(self) -> float:
-        return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
+        return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
-        return _episode_stats(self.core, self.core.max_x_seen)
+        return _episode_stats(self,self.core.max_x_seen)
 
     def set_level(self, level: str) -> None:
         _set_locked_level(self.core, level)
@@ -217,7 +247,8 @@ class MegamanAdapter:
 
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
-    def __init__(self, level: str | None, max_frames: int, win_bonus: float) -> None:
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         from code.games.megaman_core import MegamanCore
         from code.games.modules.Parameters.Map_parameters import (
@@ -226,6 +257,8 @@ class MegamanAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.sprint = sprint        # persona capability: run/sprint action variants
+        self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}
         self.core = MegamanCore(
             render_mode="none",
@@ -237,6 +270,8 @@ class MegamanAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     @property
     def x(self) -> float:
@@ -274,13 +309,16 @@ class MegamanAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _ = self.core.step([self._MOVE_MD[move_x], 0, int(jump), 0])
+        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), 0, int(jump), 0])
         if terminated or truncated:
             self.alive = False
+            self._end_xy = (self.x, self.y)
             self.won = bool(self.core.reached_goal)
             self.status = "WON" if self.won else ("STUCK" if truncated else "DEAD")
 
@@ -308,10 +346,10 @@ class MegamanAdapter:
         return 0
 
     def fitness(self) -> float:
-        return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
+        return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
-        return _episode_stats(self.core, self.core.max_x_seen)
+        return _episode_stats(self,self.core.max_x_seen)
 
     def set_level(self, level: str) -> None:
         _set_locked_level(self.core, level)
@@ -322,7 +360,8 @@ class SonicAdapter:
 
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
-    def __init__(self, level: str | None, max_frames: int, win_bonus: float) -> None:
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         from code.games.sonic_core import SonicCore
         from code.games.modules.Parameters.Map_parameters import (
@@ -331,6 +370,8 @@ class SonicAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.sprint = sprint        # persona capability: run/sprint action variants
+        self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}
         self.core = SonicCore(
             render_mode="none",
@@ -345,6 +386,8 @@ class SonicAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     @property
     def x(self) -> float:
@@ -383,14 +426,17 @@ class SonicAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, info = self.core.step([self._MOVE_MD[move_x], int(jump), 0])
+        _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
         won = bool(info.get("won"))  # core.reached_goal is wiped by the mid-step level reload
         if won or terminated or truncated:
             self.alive = False
+            self._end_xy = (self.x, self.y)
             self.won = won
             if won:
                 self.status = "WON"
@@ -428,10 +474,10 @@ class SonicAdapter:
         return 0
 
     def fitness(self) -> float:
-        return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
+        return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
-        return _episode_stats(self.core, self.core.max_x_seen)
+        return _episode_stats(self,self.core.max_x_seen)
 
     def set_level(self, level: str) -> None:
         _set_locked_level(self.core, level)
@@ -444,7 +490,8 @@ class MeatboyAdapter:
     _MOVE_MD = {-1: 1, 0: 0, 1: 2}
     _FIT_SCALE = 1000.0
 
-    def __init__(self, level: str | None, max_frames: int, win_bonus: float) -> None:
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         pygame.init()  # MeatboyCore does not init pygame itself
         from code.games.meatboy_core import MeatboyCore
@@ -453,6 +500,8 @@ class MeatboyAdapter:
         )
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
         self.win_bonus = win_bonus
+        self.sprint = sprint        # persona capability: run/sprint action variants
+        self.time_rate = time_rate  # persona objective: fitness per second left on a win
         self.core = MeatboyCore(render_mode="none", max_steps=max_frames)
         self.tile_size = int(self.core.tile_size)
         if level is not None:
@@ -460,6 +509,8 @@ class MeatboyAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
         self.reset()
 
@@ -501,17 +552,21 @@ class MeatboyAdapter:
         self.alive = True
         self.won = False
         self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
 
     def step(self, move_x: int, jump: bool) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, info = self.core.step([self._MOVE_MD[move_x], 0, int(jump)])
+        _, _, terminated, truncated, info = self.core.step(
+            [self._MOVE_MD[move_x], int(self.sprint), int(jump)])
         bfs = float(info.get("bfs_dist", -1.0))
         if 0.0 <= bfs < self._best_bfs:
             self._best_bfs = bfs
         if terminated or truncated:
             self.alive = False
+            self._end_xy = (self.x, self.y)
             self.won = bool(self.core.won)
             self.status = "WON" if self.won else ("STUCK" if truncated else "DEAD")
 
@@ -535,11 +590,11 @@ class MeatboyAdapter:
 
     def fitness(self) -> float:
         if self.won:
-            return self._FIT_SCALE + self.win_bonus
+            return self._FIT_SCALE + self.win_bonus + _win_time_bonus(self)
         return (1.0 - self._best_bfs) * self._FIT_SCALE
 
     def episode_stats(self) -> dict:
-        return _episode_stats(self.core, (1.0 - self._best_bfs) * self._FIT_SCALE)
+        return _episode_stats(self,(1.0 - self._best_bfs) * self._FIT_SCALE)
 
     def set_level(self, level: str) -> None:
         self.core._level_idx = int(level)
@@ -554,9 +609,10 @@ _ADAPTERS = {
 }
 
 
-def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float) -> GameAdapter:
+def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> GameAdapter:
     try:
         cls = _ADAPTERS[game]
     except KeyError:
         raise ValueError(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})") from None
-    return cls(level, max_frames, win_bonus)
+    return cls(level, max_frames, win_bonus, sprint, time_rate)

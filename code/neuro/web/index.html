@@ -117,6 +117,9 @@
   .kv div span{display:block;font:600 10.5px/1 var(--ui);letter-spacing:.14em;color:var(--faint);
                text-transform:uppercase;margin-bottom:4px}
   .kv div b{font:700 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
+  .kv select{font:700 13.5px var(--mono);background:var(--panel2);color:var(--txt);
+             border:2px solid var(--line);padding:3px 6px;max-width:150px;cursor:pointer}
+  .kv select:hover{border-color:var(--gold)}
 
   /* ── specimen wall ──────────────────────────────────── */
   #wallwrap{grid-area:wall}
@@ -227,10 +230,11 @@
     <div class="card">
       <h2>Run</h2>
       <div class="kv">
-        <div><span>Level</span><b id="k_level">–</b></div>
+        <div><span>Level</span><select id="k_levelsel" title="Switches at the next generation"></select></div>
         <div><span>Population</span><b id="k_pop">–</b></div>
         <div><span>Elite</span><b id="k_elite">–</b></div>
         <div><span>Mutation</span><b id="k_mut">–</b></div>
+        <div><span>Persona</span><b id="k_persona">–</b></div>
         <div><span>Mode</span><b id="k_mode">real-time</b></div>
         <div><span>Won</span><b id="k_wins">0</b></div>
         <div><span>Total frames</span><b id="k_frames">–</b></div>
@@ -263,7 +267,10 @@
 
 <script>
 "use strict";
-const RAY_COLORS = {0:"rgba(255,176,46,.4)", 1:"#ffb02e", 2:"#ff5470"};
+// classic PEAK debug look: red rays with white hit dots, translucent probe tiles
+const RAY_COLORS = {0:"rgba(255,255,255,.28)", 1:"#ff4040", 2:"#ff2d8f"};
+const TILE_STYLES = {1:{fill:"rgba(255,70,70,.22)", line:"#ff4646"},   // ray-hit tile
+                     2:{fill:"rgba(90,160,255,.30)", line:"rgba(120,180,255,.85)"}}; // pit probe
 const STATUS = ["RUNNING","STUCK","DEAD","WON"];
 const SENSORS = [
   {g:"Rays — obstacle proximity", rows:[
@@ -324,8 +331,14 @@ function buildWall(n){
 }
 
 /* ── drawing ── */
-function drawRays(ctx, rays, k){
-  if (!sensorsOn || !rays) return;
+function drawRays(ctx, rays, k, tiles){
+  if (!sensorsOn) return;
+  for (const [tx,ty,ts,kind] of (tiles || [])){
+    const st = TILE_STYLES[kind]; if (!st) continue;
+    ctx.fillStyle = st.fill; ctx.strokeStyle = st.line; ctx.lineWidth = kind === 1 ? 2 : 1;
+    ctx.fillRect(tx*k, ty*k, ts*k, ts*k); ctx.strokeRect(tx*k, ty*k, ts*k, ts*k);
+  }
+  if (!rays) return;
   for (const [x1,y1,x2,y2,hit] of rays){
     ctx.strokeStyle = RAY_COLORS[hit] || RAY_COLORS[0];
     ctx.lineWidth = hit ? 2 : 1;
@@ -343,14 +356,14 @@ function paintEnv(e){
     if (cv.width !== native){ cv.width = native; cv.height = cache.img.height / (cache.scale||1); }
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(cache.img, 0, 0, cv.width, cv.height);
-    drawRays(ctx, cache.rays, cv.width / native);
+    drawRays(ctx, cache.rays, cv.width / native, cache.tiles);
   }
   const s = specEls[e.id];
   if (s && cache){
     const ctx = s.cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(cache.img, 0, 0, s.cv.width, s.cv.height);
-    drawRays(ctx, cache.rays, s.cv.width / (cache.img.width / (cache.scale||1)));
+    drawRays(ctx, cache.rays, s.cv.width / (cache.img.width / (cache.scale||1)), cache.tiles);
   }
 }
 
@@ -430,11 +443,19 @@ function onUpdate(m){
   }
   if (s.total_frames !== undefined) $("k_frames").textContent = fmt(s.total_frames);
   if (s.results) drawResults(s.results);
-  if (s.level) $("k_level").textContent = s.level;
+  if (s.levels && s.levels.length){
+    const sel = $("k_levelsel");
+    if (sel.options.length !== s.levels.length){
+      sel.innerHTML = s.levels.map(l => `<option value="${l}">${l}</option>`).join("");
+      sel.onchange = () => send({cmd:"level", level: sel.value});
+    }
+    if (s.level && document.activeElement !== sel) sel.value = s.level;
+  }
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
   if (s.elite !== undefined) $("k_elite").textContent = s.elite;
   if (s.mut_rate !== undefined) $("k_mut").textContent = Math.round(s.mut_rate*100)+"%";
   $("k_mode").textContent = s.turbo ? "turbo" : "real-time";
+  if (s.persona) $("k_persona").textContent = s.persona;
 
   if (s.turbo !== undefined && s.turbo !== turbo){
     turbo = s.turbo;
@@ -469,7 +490,7 @@ function onUpdate(m){
     if (e.watched !== undefined && e.watched) watched = e.id;
     if (e.img){
       const img = new Image();
-      img.onload = () => { lastImg[e.id] = {img, rays:e.rays, scale:e.scale}; paintEnv(e); };
+      img.onload = () => { lastImg[e.id] = {img, rays:e.rays, tiles:e.tiles, scale:e.scale}; paintEnv(e); };
       img.src = "data:image/jpeg;base64," + e.img;
     } else paintEnv(e);
     const sp = specEls[e.id];
