@@ -116,6 +116,7 @@ class MeatboyCore:
         self.score = 0
         self.alive = True
         self.won = False
+        self.death_cause = ""
         self._crumble_timers = {}
         # Clear the shaping anchor at the episode boundary. The shared
         # _ScoreTracker only resets on `terminated`, NOT on truncation, so
@@ -145,6 +146,7 @@ class MeatboyCore:
         cause = self._lethal_overlap()
         if cause:
             self.alive = False
+            self.death_cause = cause
             terminated = True
         elif self._touching_goal():
             self.won = True
@@ -152,6 +154,7 @@ class MeatboyCore:
             terminated = True
         elif self.player.y > self.level_data.height + 64:
             self.alive = False
+            self.death_cause = "Pit"
             terminated = True
         if self._steps >= self.max_steps:
             truncated = True

@@ -258,7 +258,8 @@ def main() -> None:
     print("\n" + report, flush=True)
 
     os.makedirs(args.out, exist_ok=True)
-    out_path = os.path.join(args.out, f"report_{args.game}.json")
+    # one file per (game, persona) — personas must never overwrite each other's rows
+    out_path = os.path.join(args.out, f"report_{args.game}_{persona.name}.json")
     # Merge into any existing report so partial probes extend rather than clobber it.
     merged_rows, merged_cells = {}, {}
     if os.path.exists(out_path):
