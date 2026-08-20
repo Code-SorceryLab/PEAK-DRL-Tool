@@ -23,9 +23,10 @@
 
   #app{max-width:1440px;margin:0 auto;display:grid;gap:12px;
        grid-template-columns:minmax(0,1fr) 372px;
-       grid-template-areas:"header header" "feed side" "wall wall"}
+       grid-template-areas:"header header" "feed side" "wall wall" "results results"}
   @media (max-width:1120px){
-    #app{grid-template-columns:1fr;grid-template-areas:"header" "feed" "side" "wall"}
+    #app{grid-template-columns:1fr;
+         grid-template-areas:"header" "feed" "side" "wall" "results"}
   }
 
   .panel{background:var(--panel);border:1px solid var(--line)}
@@ -139,6 +140,20 @@
              border-top:1px solid var(--line2)}
   #wallwrap.turbo #turbonote{display:block}
 
+  /* ── results table ──────────────────────────────────── */
+  #resultswrap{grid-area:results}
+  #resultsbox{max-height:340px;overflow-y:auto}
+  #results{width:100%;border-collapse:collapse;font:500 12px var(--mono);font-variant-numeric:tabular-nums}
+  #results th{position:sticky;top:0;background:var(--panel);text-align:right;padding:7px 14px;
+              font:600 10px var(--ui);letter-spacing:.14em;color:var(--dim);text-transform:uppercase;
+              border-bottom:1px solid var(--line)}
+  #results td{text-align:right;padding:5px 14px;border-bottom:1px solid var(--line2);color:var(--txt)}
+  #results th:first-child,#results td:first-child{text-align:left;color:var(--gold);font-weight:700}
+  #results tr:hover td{background:#161b30}
+  #results td.win{color:var(--won);font-weight:700}
+  #results td.zero{color:var(--faint)}
+  #results tbody tr:first-child td{background:var(--gold-soft)}
+
   @media (prefers-reduced-motion:reduce){
     *{transition:none !important;animation:none !important}
   }
@@ -161,10 +176,14 @@
       <div class="metric"><span>Last gen best</span><b id="s_lgb">–</b></div>
       <div class="metric"><span>Avg fitness</span><b id="s_avg">–</b></div>
       <div class="metric"><span>Steps / s</span><b id="s_sps">–</b></div>
+      <div class="metric"><span>Win rate ·10 gen</span><b id="s_wr">–</b></div>
+      <div class="metric"><span>Elapsed</span><b id="s_elapsed">–</b></div>
     </div>
     <div class="ctrls">
       <button id="b_turbo" class="toggle">Turbo</button>
       <button id="b_sensors" class="toggle on">Sensors</button>
+      <button id="b_hitboxes" class="toggle">Hitboxes</button>
+      <button id="b_grid" class="toggle">Grid</button>
       <button id="b_manual" class="toggle">Take control</button>
       <span class="conn" id="conn"><i></i><u id="connlabel" style="text-decoration:none">Connecting</u></span>
     </div>
@@ -202,6 +221,7 @@
         <div><span>Mutation</span><b id="k_mut">–</b></div>
         <div><span>Mode</span><b id="k_mode">real-time</b></div>
         <div><span>Won</span><b id="k_wins">0</b></div>
+        <div><span>Total frames</span><b id="k_frames">–</b></div>
       </div>
     </div>
   </div>
@@ -213,6 +233,18 @@
     </div>
     <div id="wall"></div>
     <div id="turbonote">Turbo is on — feeds refresh once a second; the watched specimen stays live.</div>
+  </div>
+
+  <div class="panel" id="resultswrap">
+    <div class="wallhead">
+      <span class="eyebrow">Results — per generation</span>
+      <span id="census2" style="margin-left:auto;font:600 11.5px var(--mono);color:var(--faint)"></span>
+    </div>
+    <div id="resultsbox"><table id="results">
+      <thead><tr><th>Gen</th><th>Best</th><th>Avg</th><th>Median</th><th>Wins</th>
+        <th>Stuck</th><th>Dead</th><th>Best x</th><th>Avg score</th><th>Coins</th><th>Dur s</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
   </div>
 
 </div>
@@ -379,6 +411,13 @@ function onUpdate(m){
   $("s_lgb").textContent = fmt(s.last_gen_best);
   $("s_avg").textContent = fmt(s.avg_fitness);
   $("s_sps").textContent = fmt(s.sps);
+  if (s.win_rate10 !== undefined) $("s_wr").textContent = s.win_rate10 + "%";
+  if (s.elapsed !== undefined){
+    const m = Math.floor(s.elapsed/60), sec = s.elapsed%60;
+    $("s_elapsed").textContent = m + ":" + String(sec).padStart(2,"0");
+  }
+  if (s.total_frames !== undefined) $("k_frames").textContent = fmt(s.total_frames);
+  if (s.results) drawResults(s.results);
   if (s.level) $("k_level").textContent = s.level;
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
   if (s.elite !== undefined) $("k_elite").textContent = s.elite;
@@ -427,10 +466,35 @@ function onUpdate(m){
       $("f_env").textContent = "ENV " + String(e.id+1).padStart(2,"0");
       $("f_status").textContent = e.status;
       $("f_status").className = "c-" + e.status;
-      $("f_meta").textContent = `x ${Math.round(e.x)} · fit ${fmt(e.fitness)}`;
+      let meta = `x ${Math.round(e.x)} · fit ${fmt(e.fitness)}`;
+      if (e.live) meta += ` · score ${fmt(e.live.score)} · coins ${e.live.coins} · t ${Math.max(0,Math.round(e.live.time_left))}`;
+      if (e.live && e.live.cause && e.status !== "RUNNING") meta += ` · ${e.live.cause.toLowerCase()}`;
+      $("f_meta").textContent = meta;
       updateSensors(e);
     }
   }
+}
+
+let resultCount = 0;
+function drawResults(rows){
+  if (rows.length === resultCount) return;
+  resultCount = rows.length;
+  const tb = document.querySelector("#results tbody");
+  tb.innerHTML = "";
+  for (const r of [...rows].reverse()){
+    const tr = document.createElement("tr");
+    const cells = [r.gen, Math.round(r.best), Math.round(r.avg), Math.round(r.median ?? 0),
+                   r.wins ?? 0, r.stuck ?? 0, r.dead ?? 0, Math.round(r.best_x ?? 0),
+                   Math.round(r.avg_score ?? 0), r.coins ?? 0, r.duration ?? "–"];
+    tr.innerHTML = cells.map((v,i)=>{
+      let cls = "";
+      if (i===4) cls = v > 0 ? "win" : "zero";
+      if ((i===5||i===6) && v===0) cls = "zero";
+      return `<td class="${cls}">${v}</td>`;
+    }).join("");
+    tb.appendChild(tr);
+  }
+  $("census2").textContent = rows.length + " generations recorded";
 }
 
 /* ── controls ── */
@@ -449,6 +513,13 @@ $("b_sensors").onclick = function(){
   sensorsOn = !sensorsOn; this.classList.toggle("on", sensorsOn);
   $("sensors").classList.toggle("stale", !sensorsOn);
   send({cmd:"sensors", on:sensorsOn});
+};
+let hitboxes = false, gridOn = false;
+$("b_hitboxes").onclick = function(){
+  hitboxes = !hitboxes; this.classList.toggle("on", hitboxes); send({cmd:"hitboxes", on:hitboxes});
+};
+$("b_grid").onclick = function(){
+  gridOn = !gridOn; this.classList.toggle("on", gridOn); send({cmd:"grid", on:gridOn});
 };
 
 const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};

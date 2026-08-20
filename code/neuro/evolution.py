@@ -34,7 +34,9 @@ class Population:
         self.generation = 0
         self.best_fitness = -np.inf
         self.best_weights = self.weights[0].copy()
-        self.history: list[dict[str, float]] = []  # per-gen {best, avg}
+        # Per-gen result rows. evolve() writes best/avg; the trainer appends the
+        # rest (median, wins, statuses, per-env episode stats, duration, ...).
+        self.history: list[dict] = []
 
     def _tournament(self, fitnesses: np.ndarray) -> int:
         idx = self.rng.integers(0, self.cfg.pop_size, self.cfg.tournament_k)
@@ -75,14 +77,13 @@ class Population:
             os.path.join(run_dir, "gen_state.npz"),
             weights=self.weights,
             best_weights=self.best_weights,
-            history_best=np.array([h["best"] for h in self.history]),
-            history_avg=np.array([h["avg"] for h in self.history]),
         )
         state = {
             "generation": self.generation,
             "best_fitness": self.best_fitness,
             "config": asdict(self.cfg),
             "rng_state": self.rng.bit_generator.state,
+            "history": self.history,
         }
         with open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
@@ -99,9 +100,6 @@ class Population:
         pop.best_weights = data["best_weights"].astype(np.float32)
         pop.generation = int(state["generation"])
         pop.best_fitness = float(state["best_fitness"])
-        pop.history = [
-            {"best": float(b), "avg": float(a)}
-            for b, a in zip(data["history_best"], data["history_avg"])
-        ]
+        pop.history = state.get("history", [])
         pop.rng.bit_generator.state = state["rng_state"]
         return pop

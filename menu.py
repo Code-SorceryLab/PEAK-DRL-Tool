@@ -45,8 +45,10 @@ def main() -> None:
         print("  1. train (with dashboard)")
         print("  2. resume a run")
         print("  3. replay all-time best")
-        print("  4. run tests")
-        print("  5. quit")
+        print("  4. level editor")
+        print("  5. show results table")
+        print("  6. run tests")
+        print("  7. quit")
         choice = ask("choice", "1")
         if choice == "1":
             game = pick_game()
@@ -65,6 +67,11 @@ def main() -> None:
             game = pick_game()
             run_trainer("--game", game, "--replay", ask("best.npz path", f"runs/{game}/best.npz"))
         elif choice == "4":
+            game = ask("editor game (platformer/megaman/sonic)", "platformer")
+            subprocess.run([sys.executable, "code/games/tools/level_editor.py", "--game", game])
+        elif choice == "5":
+            run_trainer("--results", ask("run dir", "runs/mario"))
+        elif choice == "6":
             subprocess.run([sys.executable, "-m", "pytest", "code/tests/", "-q"])
         else:
             return

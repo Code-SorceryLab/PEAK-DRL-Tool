@@ -58,6 +58,10 @@ async def _ws_handler(ws, state: SharedState) -> None:
                 state.controls.manual = bool(msg.get("on", False))
                 if not state.controls.manual:
                     state.controls.keys = {"left": False, "right": False, "jump": False}
+            elif cmd == "hitboxes":
+                state.controls.hitboxes = bool(msg.get("on", False))
+            elif cmd == "grid":
+                state.controls.grid = bool(msg.get("on", False))
             elif cmd == "keys":
                 state.controls.keys = {
                     "left": bool(msg.get("left")),

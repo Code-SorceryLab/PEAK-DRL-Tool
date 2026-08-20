@@ -40,6 +40,8 @@ class Controls:
         self.sensors_on = True
         self.manual = False  # human plays the watched env instead of its net
         self.keys = {"left": False, "right": False, "jump": False}
+        self.hitboxes = False  # classic PEAK debug overlays, drawn by the game cores
+        self.grid = False
 
 
 class SharedState:
@@ -103,6 +105,7 @@ class Trainer:
         self._surfaces: list[pygame.Surface] | None = None
         self._step_accum = 0  # cumulative env-steps, sampled by _steps_per_sec
         self._steps_window: list[tuple[float, int]] = []  # (timestamp, cumulative steps)
+        self._start_time = time.time()
 
     # ── serving helpers ──────────────────────────────────────────────────
 
@@ -116,6 +119,8 @@ class Trainer:
         if self.state is None:
             return
         hist = self.pop.history
+        last10 = hist[-10:]
+        episodes10 = len(last10) * self.cfg.pop_size
         self.state.publish(stats={
             "gen": self.pop.generation,
             "all_time_best": round(self.pop.best_fitness if hist else 0.0, 1),
@@ -132,12 +137,30 @@ class Trainer:
             "history": [[round(h["best"], 1), round(h["avg"], 1)] for h in hist[-400:]],
             "live_fitness": [round(f, 1) for f in fitnesses],
             "statuses": statuses,
+            "results": [
+                {k: r.get(k) for k in ("gen", "best", "avg", "median", "wins", "stuck",
+                                       "dead", "best_x", "avg_score", "coins", "duration")}
+                for r in hist[-60:]
+            ],
+            "win_rate10": round(100 * sum(r.get("wins", 0) for r in last10) / episodes10, 1)
+                          if episodes10 else 0.0,
+            "elapsed": int(time.time() - self._start_time),
+            "total_frames": self._step_accum,
         })
 
     def _publish_frames(self, encode_thumbs: bool) -> None:
         if self.state is None:
             return
-        watch = self.state.controls.watch_env % len(self.slots)
+        ctrl = self.state.controls
+        for slot in self.slots:  # classic PEAK overlays drawn by the cores themselves
+            dm = getattr(slot.adapter.core, "debug_manager", None)  # type: ignore[attr-defined]
+            if dm is not None:
+                dm.show_hitboxes = ctrl.hitboxes
+                dm.show_grid = ctrl.grid
+                # NOTE: dm.show_sensors stays off — the core's jump-arc overlay
+                # perturbs game state when rendered (breaks determinism); the
+                # dashboard draws its own rays from sensors.py instead.
+        watch = ctrl.watch_env % len(self.slots)
         envs = []
         for i, slot in enumerate(self.slots):
             entry: dict = {
@@ -161,6 +184,8 @@ class Trainer:
                     ]
                     if i == watch:
                         entry["sensors"] = [round(float(v), 2) for v in slot.last_sensors]
+                if i == watch:
+                    entry["live"] = slot.adapter.episode_stats()
             envs.append(entry)
         self.state.publish(envs=envs)
 
@@ -240,13 +265,53 @@ class Trainer:
         while max_gens is None or self.pop.generation < max_gens:
             t0 = time.time()
             fitnesses = self.run_generation()
+            statuses = [s.adapter.status for s in self.slots]
+            env_rows = []
+            for i, slot in enumerate(self.slots):
+                rec = slot.adapter.episode_stats()
+                rec.update({"env": i, "fit": round(fitnesses[i], 1),
+                            "status": statuses[i], "frames": slot.frames})
+                env_rows.append(rec)
             self.pop.evolve(fitnesses)
+            fits = np.asarray(fitnesses)
+            self.pop.history[-1].update({
+                "gen": self.pop.generation,
+                "median": round(float(np.median(fits)), 1),
+                "min": round(float(fits.min()), 1),
+                "wins": statuses.count("WON"),
+                "stuck": statuses.count("STUCK"),
+                "dead": statuses.count("DEAD"),
+                "best_x": max(r["x"] for r in env_rows),
+                "avg_score": round(sum(r["score"] for r in env_rows) / len(env_rows), 1),
+                "coins": sum(r["coins"] for r in env_rows),
+                "frames": sum(r["frames"] for r in env_rows),
+                "duration": round(time.time() - t0, 1),
+                "envs": env_rows,
+            })
             self.pop.save(self.run_dir)
             h = self.pop.history[-1]
             print(f"gen {self.pop.generation:4d}  best {h['best']:8.1f}  avg {h['avg']:8.1f}  "
-                  f"all-time {self.pop.best_fitness:8.1f}  ({time.time() - t0:.1f}s)", flush=True)
+                  f"all-time {self.pop.best_fitness:8.1f}  wins {h['wins']}  ({h['duration']}s)",
+                  flush=True)
             if self.state is not None:
-                self._publish_stats([s.adapter.status for s in self.slots], fitnesses, 0.0)
+                self._publish_stats(statuses, fitnesses, 0.0)
+        print(format_results(self.pop.history), flush=True)
+
+
+def format_results(history: list[dict], tail: int | None = None) -> str:
+    """Aligned per-generation results table (replaces the old CSV logs)."""
+    rows = history[-tail:] if tail else history
+    cols = [("GEN", "gen", 4), ("BEST", "best", 9), ("AVG", "avg", 9), ("MEDIAN", "median", 9),
+            ("MIN", "min", 8), ("WINS", "wins", 4), ("STUCK", "stuck", 5), ("DEAD", "dead", 4),
+            ("BEST X", "best_x", 8), ("AVG SCORE", "avg_score", 9), ("COINS", "coins", 5),
+            ("DUR S", "duration", 6)]
+    def cell(v) -> str:
+        return f"{v:.1f}" if isinstance(v, float) else str(v)
+
+    out = ["  ".join(h.rjust(w) for h, _, w in cols)]
+    for r in rows:
+        out.append("  ".join(cell(r.get(k, "-")).rjust(w) for _, k, w in cols))
+    return "\n".join(out)
 
 
 def replay(path: str, game: str, level: str | None, state: SharedState | None) -> None:
@@ -284,8 +349,13 @@ def main() -> None:
     ap.add_argument("--run-dir", default=None, help="checkpoint dir (default: runs/<game>)")
     ap.add_argument("--resume", default=None, help="resume from a run dir")
     ap.add_argument("--replay", default=None, help="path to a best.npz to watch")
+    ap.add_argument("--results", default=None, help="print the results table for a run dir and exit")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
+
+    if args.results:
+        print(format_results(Population.load(args.results).history))
+        return
 
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()

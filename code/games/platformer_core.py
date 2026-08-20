@@ -387,6 +387,10 @@ class PlatformerCore(gymnasium.Env):
             # Headless / Training mode
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
             pygame.init()
+            # AnimationHandler refuses to load sprite sheets without a display
+            # surface; a 1x1 dummy-driver window is free and unlocks the art.
+            if pygame.display.get_surface() is None:
+                pygame.display.set_mode((1, 1))
             self._surf = pygame.Surface((self.WIDTH, self.HEIGHT))
 
         # 1. Initialize Managers

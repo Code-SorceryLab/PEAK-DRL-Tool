@@ -39,6 +39,19 @@ class GameAdapter(Protocol):
     def enemy_positions(self) -> list[tuple[float, float]]: ...
     def qblock_count_near(self, r_tiles: int) -> int: ...
     def fitness(self) -> float: ...
+    def episode_stats(self) -> dict: ...
+
+
+def _episode_stats(core, x: float) -> dict:
+    """Game metrics shared by every core, read defensively (not every core has every field)."""
+    return {
+        "x": round(float(x), 1),
+        "score": int(getattr(core, "score", 0) or 0),
+        "coins": int(getattr(core, "coins_total", 0) or 0),
+        "kills": int(getattr(core, "kills_total", 0) or 0),
+        "time_left": round(float(getattr(core, "timer", 0.0) or 0.0), 1),
+        "cause": str(getattr(core, "death_cause", "") or getattr(core, "last_cause", "") or ""),
+    }
 
 
 class MarioAdapter:
@@ -170,6 +183,9 @@ class MarioAdapter:
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
 
+    def episode_stats(self) -> dict:
+        return _episode_stats(self.core, self.core.max_x_seen)
+
 
 class MegamanAdapter:
     """Wraps MegamanCore. Horizontal progress fitness; enemies shoot but the net can't (fire=0)."""
@@ -268,6 +284,9 @@ class MegamanAdapter:
 
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
+
+    def episode_stats(self) -> dict:
+        return _episode_stats(self.core, self.core.max_x_seen)
 
 
 class SonicAdapter:
@@ -383,6 +402,9 @@ class SonicAdapter:
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + (self.win_bonus if self.won else 0.0)
 
+    def episode_stats(self) -> dict:
+        return _episode_stats(self.core, self.core.max_x_seen)
+
 
 class MeatboyAdapter:
     """Wraps MeatboyCore (plain class, no gym). Levels are 2-D mazes, so fitness is
@@ -484,6 +506,9 @@ class MeatboyAdapter:
         if self.won:
             return self._FIT_SCALE + self.win_bonus
         return (1.0 - self._best_bfs) * self._FIT_SCALE
+
+    def episode_stats(self) -> dict:
+        return _episode_stats(self.core, (1.0 - self._best_bfs) * self._FIT_SCALE)
 
 
 _ADAPTERS = {

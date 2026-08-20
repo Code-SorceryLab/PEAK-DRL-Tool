@@ -173,6 +173,14 @@ class DebugManager:
     # ─────────────────────────────────────────────────────────
     def render_overlays(self, surface: pygame.Surface, core):
         if core.render_mode != "human":
+            # Headless: only the game-area overlays are safe (panel overlays would
+            # draw at DEBUG_PANEL_X == 0, straight over the game frame).
+            if self.show_grid:
+                self._safe_overlay("grid", self.grid_overlay.render, surface, core)
+            if self.show_hitboxes:
+                self._safe_overlay("hitboxes", self.hitbox_overlay.render, surface, core)
+            if self.show_sensors:
+                self._safe_overlay("jump_arc", self.jump_arc_overlay.render, surface, core)
             return
 
         debug_x = core.DEBUG_PANEL_X
