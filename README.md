@@ -38,8 +38,12 @@ Then open **http://127.0.0.1:8000/mario/index.html** — you get the live dashbo
 - fitness-over-generations chart
 - **Turbo** toggle (max-speed headless vs real-time) and **Sensors** debug toggle
 - click any thumbnail to watch that env
-- **manual play**: click "AI training (click to play)" and drive the watched env yourself
+- **manual play**: click "Take control" and drive the watched env yourself
   (arrows/WASD, space to jump) while the other nine keep evolving
+- **debug overlays** from classic PEAK: hitboxes and tile grid, toggleable live
+- **results table**: every generation's full metrics (best/avg/median fitness, wins,
+  stuck/dead counts, best x, score, coins, duration) — also printed at end of run,
+  via `--results runs/<name>`, and persisted as JSON in the run dir (no more CSVs)
 
 ### CLI
 
@@ -48,7 +52,9 @@ python -m code.neuro.trainer --game sonic          # also: megaman, meatboy
 python -m code.neuro.trainer --game mario --level Mario1-2 --turbo   # start in turbo
 python -m code.neuro.trainer --resume runs/mario                     # continue a run
 python -m code.neuro.trainer --replay runs/mario/best.npz            # watch the all-time best
+python -m code.neuro.trainer --results runs/mario                    # print the results table
 python -m code.neuro.trainer --no-serve --gens 50                    # headless, no dashboard
+python code/games/tools/level_editor.py --game platformer            # PEAK level editor
 ```
 
 Checkpoints (population weights, RNG state, fitness history, best genome) land in `runs/<game>/`
