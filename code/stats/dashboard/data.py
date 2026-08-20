@@ -111,7 +111,13 @@ def load_all_csvs(data_path):
             continue
     if not dfs:
         return pd.DataFrame()
-    return pd.concat(dfs, ignore_index=True)
+    df = pd.concat(dfs, ignore_index=True)
+    # meatboy worlds are numeric strings ("0".."10") — pandas infers int per-file,
+    # mario infers str, and sorted() on the mix crashes. Normalize once here.
+    for col in ("world", "persona", "game"):
+        if col in df.columns:
+            df[col] = df[col].astype(str)
+    return df
 
 
 # Helpers
