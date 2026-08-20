@@ -76,8 +76,21 @@ code/
   tests/            pytest suite (GA determinism, sensors, adapter smoke tests)
 ```
 
-GA hyperparameters live in `GAConfig` (`code/neuro/evolution.py`): population 10, elite 2,
-mutation 0.15/weight (σ=0.3), crossover 0.7, 3600-frame episode budget, 300-frame stuck kill.
+## What a dev can tweak
+
+| Knob | Where | What it changes |
+|---|---|---|
+| GA hyperparameters | `GAConfig` in `code/neuro/evolution.py` | population size (10), elite (2), tournament k, crossover rate (0.7), mutation rate/σ (0.15/0.3), episode frame budget (3600), stuck kill (300 frames), curriculum `advance_wins` (3), win bonus (5000), seed |
+| Player personas | `code/neuro/personas.py` | who the agents play like: sprint capability, sensor reaction period, time-left fitness bonus — add your own profile in one dataclass |
+| Network shape | `code/neuro/net.py` | hidden size (16), outputs (add e.g. a climb action for Megaman ladders) |
+| Sensors | `code/neuro/sensors.py` | ray angles/count, max distance (250px), march step, velocity normalization, pit-probe depth (4 tiles) |
+| Levels | `code/games/levels/*/*.txt` + registration in `code/games/game_config.yaml` / `meatboy_config.yaml` | ASCII tilemaps — legend in `levels/common/ASCII_TILEMAP.md` (goal char is `G`, never `D`); or paint them in the level editor (menu 9) |
+| Game feel / physics | per-game blocks in `game_config.yaml`, `meatboy_config.yaml` | gravity, jump velocity, run speed, coyote frames, wall-jump forces, per-level `time_limit` |
+| Balance probes | `code/neuro/balance.py` | seed set (default 1234/2025/31337 — keep for paper comparability), gens budget, post-win measurement window |
+| Dashboard | `--port` (HTTP, default 8000), ws 8765, frame cadences in `code/neuro/trainer.py` | streaming rates: thumbnails 5 fps (1 in turbo), watched env 20 fps |
+
+Deep dives: `docs/GUIDE.md` (how the whole system works) and `docs/BALANCE.md` (every balance
+metric + the author → play → train → balance loop).
 
 Known wart: the top-level package is named `code`, which shadows a stdlib module. Renaming it
 touches every import in `code/games/` and hasn't been worth the churn.
