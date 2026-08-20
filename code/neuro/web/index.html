@@ -4,295 +4,277 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Evolution Lab</title>
-<style>
-  /* dark neumorphism: one soft material, shapes carved by dual light — red accent */
-  :root{
-    --bg:#1d1d21;
-    --srf:linear-gradient(145deg,#212126,#1a1a1e);       /* raised surface */
-    --srf-flat:#1e1e22;
-    --well:#17171a;                                       /* inset well floor */
-    --sh-d:rgba(0,0,0,.55); --sh-l:rgba(255,255,255,.055);
-    --raise:7px 7px 14px var(--sh-d), -7px -7px 14px var(--sh-l);
-    --raise-sm:4px 4px 9px var(--sh-d), -4px -4px 9px var(--sh-l);
-    --inset:inset 4px 4px 9px rgba(0,0,0,.6), inset -3px -3px 7px var(--sh-l);
-    --inset-sm:inset 2px 2px 5px rgba(0,0,0,.6), inset -2px -2px 4px var(--sh-l);
-    --edge:rgba(255,255,255,.045);
-    --txt:#e8e8ec; --dim:#94949d; --faint:#5d5d66;
-    --red:#ff3b30; --red-dim:#d92b23; --red-soft:rgba(255,59,48,.14);
-    --run:#3ddc84; --stuck:#ffb340; --dead:#ff453a; --won:#ffd60a;
-    --mono:"Cascadia Mono",Consolas,"JetBrains Mono",monospace;
-    --ui:"Segoe UI",system-ui,sans-serif;
-  }
-  *{box-sizing:border-box;margin:0}
-  html,body{height:100%}
-  body{background:var(--bg);color:var(--txt);font:15.5px/1.5 var(--ui);padding:18px}
-  canvas{image-rendering:pixelated}
-  button{font:inherit;cursor:pointer}
-  :focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:8px}
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style type="text/tailwindcss">
+  @layer base {
+    body {
+      @apply bg-[#09090b] text-zinc-300 font-sans antialiased selection:bg-red-500/30 selection:text-red-200 overflow-y-scroll;
+    }
+    canvas {
+      image-rendering: pixelated;
+    }
+    /* Minimal Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { @apply bg-transparent; }
+    ::-webkit-scrollbar-thumb { @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors; }
 
-  #app{max-width:1440px;margin:0 auto;display:grid;gap:18px;
-       grid-template-columns:minmax(0,1fr) 372px;
-       grid-template-areas:"header header" "feed side" "wall wall" "results results"}
-  @media (max-width:1120px){
-    #app{grid-template-columns:1fr;
-         grid-template-areas:"header" "feed" "side" "wall" "results"}
+    select {
+      @apply bg-zinc-900/50 border border-white/5 rounded-md text-zinc-300 px-2 py-1 font-mono text-xs focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all appearance-none cursor-pointer hover:bg-zinc-800/50;
+    }
   }
 
-  .panel{background:var(--srf);border:1px solid var(--edge);border-radius:20px;box-shadow:var(--raise)}
+  @layer components {
+    .eyebrow {
+      @apply text-[9px] font-bold tracking-[0.2em] uppercase text-zinc-500;
+    }
+    .metric-group {
+      @apply flex flex-col gap-1;
+    }
+    .metric-val {
+      @apply font-mono text-lg font-medium text-zinc-100;
+    }
+    .btn-sleek {
+      @apply px-3 py-1.5 rounded bg-zinc-900 border border-white/5 text-[10px] font-bold tracking-widest uppercase text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 hover:border-white/10 transition-all focus:outline-none;
+    }
+    .btn-sleek.on {
+      @apply bg-zinc-800 text-zinc-100 border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.03)];
+    }
+    #b_manual.on {
+      @apply bg-red-500/10 text-red-500 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.15)] hover:bg-red-500/20;
+    }
 
-  /* ── header ─────────────────────────────────────────── */
-  header{grid-area:header;display:flex;align-items:stretch;gap:0;
-         background:var(--srf);border:1px solid var(--edge);border-radius:20px;box-shadow:var(--raise)}
-  .ident{padding:14px 20px;border-right:1px solid var(--edge);min-width:190px}
-  .eyebrow{font:700 10.5px/1.4 var(--ui);letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
-  .ident h1{font:700 25px/1.15 var(--ui);letter-spacing:.01em;margin-top:5px}
-  .ident h1 em{font-style:normal;color:var(--red)}
-  .gen{padding:10px 20px;border-right:1px solid var(--edge);display:flex;flex-direction:column;
-       align-items:center;justify-content:center;gap:6px}
-  .gen b{width:62px;height:62px;display:flex;align-items:center;justify-content:center;
-         border-radius:50%;box-shadow:var(--inset);background:var(--well);
-         font:700 24px/1 var(--mono);color:var(--red);font-variant-numeric:tabular-nums}
-  .metrics{display:flex;flex:1;align-items:center;gap:26px;padding:0 22px;flex-wrap:wrap}
-  .metric{display:flex;flex-direction:column;gap:4px}
-  .metric span{font:600 10.5px/1 var(--ui);letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
-  .metric b{font:700 20px/1 var(--mono);font-variant-numeric:tabular-nums}
-  .metric b.record{color:var(--red)}
-  .ctrls{display:flex;align-items:center;gap:12px;padding:14px 18px;border-left:1px solid var(--edge);flex-wrap:wrap}
-  .toggle{background:var(--srf);color:var(--dim);border:1px solid var(--edge);
-          padding:10px 18px;font:600 13px var(--ui);letter-spacing:.04em;
-          border-radius:999px;box-shadow:var(--raise-sm);transition:box-shadow .15s,color .15s}
-  .toggle:hover{color:var(--txt)}
-  .toggle:active,.toggle.on{box-shadow:var(--inset-sm);background:var(--well)}
-  .toggle.on{color:var(--red)}
-  #b_manual.on{background:linear-gradient(145deg,var(--red),var(--red-dim));color:#fff;
-               border-color:transparent;box-shadow:var(--raise-sm), 0 0 16px rgba(255,59,48,.35)}
-  .conn{display:flex;align-items:center;gap:8px;font:600 12px var(--ui);color:var(--dim);
-        letter-spacing:.08em;text-transform:uppercase;padding-right:4px}
-  .conn i{width:10px;height:10px;border-radius:50%;background:var(--dead);display:inline-block;
-          box-shadow:0 0 8px rgba(255,69,58,.6)}
-  .conn.live i{background:var(--run);box-shadow:0 0 8px rgba(61,220,132,.6);animation:pulse 2s infinite}
-  @keyframes pulse{50%{opacity:.35}}
+    /* Sleek table */
+    .table-header { @apply sticky top-0 bg-[#09090b] backdrop-blur-md z-10 text-left p-3 eyebrow border-b border-white/10; }
+    .table-cell { @apply p-3 border-b border-white/5 font-mono text-xs text-zinc-400 text-right group-hover:text-zinc-300 transition-colors; }
+  }
 
-  /* ── main feed ──────────────────────────────────────── */
-  #feedwrap{grid-area:feed;display:flex;flex-direction:column;background:var(--srf);
-            border:1px solid var(--edge);border-radius:20px;box-shadow:var(--raise);padding:0 14px 14px}
-  .feedhead{display:flex;align-items:baseline;gap:14px;padding:12px 4px}
-  .feedhead .eyebrow{color:var(--faint)}
-  #f_env{font:700 17px var(--mono);color:var(--txt)}
-  #f_meta{font:500 14px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:auto}
-  #f_status{font:700 14px var(--mono);letter-spacing:.1em}
-  #bezel{position:relative;background:#000;line-height:0;border-radius:14px;overflow:hidden;
-         box-shadow:var(--inset)}
-  #watch{width:100%;height:auto;display:block}
-  #ribbon{display:none;margin-top:12px;padding:9px 16px;font:600 12.5px var(--ui);letter-spacing:.03em;
-          background:linear-gradient(145deg,var(--red),var(--red-dim));color:#fff;border-radius:999px}
-  #feedwrap.manual #ribbon{display:block}
-  #feedwrap.manual{box-shadow:var(--raise), 0 0 0 2px var(--red)}
-  #boot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-        color:var(--faint);font:600 13px var(--mono);letter-spacing:.1em}
+  @layer utilities {
+    /* JS mapped dynamic colors */
+    .c-RUNNING { @apply text-emerald-400; }
+    .c-STUCK { @apply text-amber-500; }
+    .c-DEAD { @apply text-red-500; }
+    .c-WON { @apply text-blue-400; }
 
-  /* ── side column ────────────────────────────────────── */
-  #side{grid-area:side;display:flex;flex-direction:column;gap:18px;min-width:0}
-  .card{background:var(--srf);border:1px solid var(--edge);border-radius:20px;
-        box-shadow:var(--raise);padding:16px 18px 18px}
-  .card h2{font:700 11px/1.4 var(--ui);letter-spacing:.2em;color:var(--dim);
-           text-transform:uppercase;margin-bottom:14px;display:flex;justify-content:space-between}
-  .card h2 small{color:var(--faint);letter-spacing:.06em}
+    .d-RUNNING { @apply bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]; }
+    .d-STUCK { @apply bg-amber-500; }
+    .d-DEAD { @apply bg-red-500; }
+    .d-WON { @apply bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]; }
 
-  /* sensor telemetry strip — inset grooves, red fill */
-  .sgroup{font:600 10px/1 var(--ui);letter-spacing:.2em;color:var(--faint);
-          text-transform:uppercase;margin:12px 0 7px;border-top:1px solid var(--edge);padding-top:10px}
-  .sgroup:first-of-type{margin-top:0;border-top:0;padding-top:0}
-  .srow{display:grid;grid-template-columns:60px 1fr 44px;align-items:center;gap:10px;margin:5px 0}
-  .srow label{font:700 12px var(--mono);color:var(--dim);letter-spacing:.05em}
-  .srow output{font:500 12px var(--mono);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
-  .sbar{height:9px;background:var(--well);border-radius:999px;box-shadow:var(--inset-sm);
-        position:relative;overflow:hidden}
-  .sbar i{position:absolute;top:0;bottom:0;left:0;border-radius:999px;
-          background:linear-gradient(180deg,var(--red),var(--red-dim));transition:width .12s,left .12s}
-  .sbar.threat i{background:linear-gradient(180deg,#ff6b63,var(--red-dim))}
-  .sbar.body i{background:linear-gradient(180deg,#f2f2f5,#c9c9d0)}
-  .sbar.loot i{background:linear-gradient(180deg,var(--won),#d9b000)}
-  .sbar.center::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.12)}
-  #sensors.stale .sbar i{background:var(--faint)}
-  #sensors.stale output{color:var(--faint)}
+    /* Specimen Wall dynamic states */
+    .s-DEAD canvas { filter: grayscale(1) brightness(0.3); }
+    .s-STUCK canvas { filter: saturate(0.2) brightness(0.5); }
+    .spec.watched .canvas-wrap { @apply ring-1 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]; }
+    .spec.watched .canvas-wrap canvas { @apply opacity-100; }
 
-  /* fitness chart in an inset well */
-  #chart{width:100%;height:172px;display:block;background:var(--well);border-radius:14px;
-         box-shadow:var(--inset-sm);padding:4px}
-
-  /* run config */
-  .kv{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 14px}
-  .kv div span{display:block;font:600 10px/1 var(--ui);letter-spacing:.16em;color:var(--faint);
-               text-transform:uppercase;margin-bottom:4px}
-  .kv div b{font:700 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
-  .kv select{font:700 13px var(--mono);background:var(--well);color:var(--txt);
-             border:1px solid var(--edge);border-radius:10px;box-shadow:var(--inset-sm);
-             padding:5px 8px;max-width:150px;cursor:pointer}
-  .kv select:hover{color:var(--red)}
-
-  /* ── specimen wall — floating soft cards ────────────── */
-  #wallwrap{grid-area:wall}
-  .wallhead{display:flex;align-items:center;gap:16px;padding:14px 20px 4px}
-  #census{margin-left:auto;font:600 11.5px var(--mono);color:var(--dim);letter-spacing:.04em}
-  #census b{font-weight:700}
-  #wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:14px 20px 20px}
-  .spec{background:var(--srf);border:1px solid var(--edge);border-radius:14px;overflow:hidden;
-        padding:0;text-align:left;color:var(--txt);position:relative;
-        box-shadow:var(--raise-sm);transition:transform .15s,box-shadow .15s}
-  .spec:hover{transform:translateY(-2px)}
-  .spec.watched{box-shadow:var(--raise-sm), 0 0 0 2px var(--red), 0 0 18px rgba(255,59,48,.25)}
-  .spec canvas{width:100%;height:auto;display:block;background:#000;opacity:.92}
-  .spec.watched canvas{opacity:1}
-  .spec .tag{display:flex;align-items:center;gap:8px;padding:7px 11px 4px}
-  .spec .tag b{font:700 13.5px var(--mono);letter-spacing:.05em}
-  .spec .tag i{width:9px;height:9px;border-radius:50%;flex:none}
-  .spec .tag em{font:700 11.5px var(--mono);font-style:normal;letter-spacing:.08em;margin-left:auto}
-  .spec .nums{display:flex;justify-content:space-between;padding:0 11px 8px;
-              font:500 12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
-  .fitrail{height:5px;background:var(--well);box-shadow:var(--inset-sm)}
-  .fitrail i{display:block;height:100%;background:linear-gradient(90deg,var(--red-dim),var(--red));
-             border-radius:0 999px 999px 0;width:0;transition:width .3s}
-  .spec.s-WON .fitrail i{background:var(--won);box-shadow:0 0 8px var(--won)}
-  .spec.s-DEAD canvas{filter:grayscale(.7) brightness(.55)}
-  .spec.s-STUCK canvas{filter:saturate(.4) brightness(.7)}
-
-  .c-RUNNING{color:var(--run)} .c-STUCK{color:var(--stuck)}
-  .c-DEAD{color:var(--dead)} .c-WON{color:var(--won)}
-  .d-RUNNING{background:var(--run);box-shadow:0 0 6px rgba(61,220,132,.5)}
-  .d-STUCK{background:var(--stuck)}
-  .d-DEAD{background:var(--dead)}
-  .d-WON{background:var(--won);box-shadow:0 0 6px var(--won)}
-
-  #turbonote{display:none;padding:0 20px 14px;font:500 13px var(--ui);color:var(--dim)}
-  #wallwrap.turbo #turbonote{display:block}
-
-  /* ── results table ──────────────────────────────────── */
-  #resultswrap{grid-area:results;overflow:hidden}
-  #resultsbox{max-height:340px;overflow-y:auto;margin:0 8px 8px;border-radius:14px}
-  #results{width:100%;border-collapse:collapse;font:500 13.5px var(--mono);font-variant-numeric:tabular-nums}
-  #results th{position:sticky;top:0;background:var(--srf-flat);text-align:right;padding:9px 14px;
-              font:600 10.5px var(--ui);letter-spacing:.16em;color:var(--dim);text-transform:uppercase;
-              border-bottom:1px solid var(--edge)}
-  #results td{text-align:right;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt)}
-  #results th:nth-child(2),#results td:nth-child(2){text-align:left;color:var(--dim)}
-  #results th:first-child,#results td:first-child{text-align:left;color:var(--red);font-weight:700}
-  #results tr:hover td{background:rgba(255,255,255,.025)}
-  #results td.win{color:var(--won);font-weight:700}
-  #results td.zero{color:var(--faint)}
-  #results tbody tr:first-child td{background:var(--red-soft)}
-
-  @media (prefers-reduced-motion:reduce){
-    *{transition:none !important;animation:none !important}
+    /* Sensor bar styling for JS toggling */
+    .stale .sbar-fill { @apply bg-zinc-800 !important; }
+    .stale .sbar-out { @apply text-zinc-600 !important; }
   }
 </style>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        }
+      }
+    }
+  }
+</script>
 </head>
-<body>
-<div id="app">
+<body class="p-4 md:p-8 max-w-[1600px] mx-auto flex flex-col gap-8">
 
-  <header>
-    <div class="ident">
-      <div class="eyebrow">Neuroevolution lab</div>
-      <h1>PEAK <em id="h_game">mario</em></h1>
+  <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/5">
+
+    <!-- Branding & Live Stats -->
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div class="pr-8 border-r border-white/10">
+        <div class="eyebrow mb-1.5">Neuroevolution Lab</div>
+        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          PEAK <span id="h_game" class="text-red-500 uppercase text-[10px] tracking-widest px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20">mario</span>
+        </h1>
+      </div>
+
+      <div class="metric-group items-center pr-8 border-r border-white/10">
+        <span class="eyebrow">Generation</span>
+        <b id="s_gen" class="font-mono text-3xl font-medium text-red-500 leading-none">0</b>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <div class="metric-group"><span class="eyebrow">All-time best</span><b class="metric-val text-red-400" id="s_atb">–</b></div>
+        <div class="metric-group"><span class="eyebrow">Last gen best</span><b class="metric-val" id="s_lgb">–</b></div>
+        <div class="metric-group"><span class="eyebrow">Avg fitness</span><b class="metric-val text-zinc-400" id="s_avg">–</b></div>
+        <div class="metric-group hidden sm:flex"><span class="eyebrow">Steps / s</span><b class="metric-val text-zinc-400" id="s_sps">–</b></div>
+        <div class="metric-group hidden md:flex"><span class="eyebrow">Win rate (10g)</span><b class="metric-val text-zinc-400" id="s_wr">–</b></div>
+        <div class="metric-group hidden lg:flex"><span class="eyebrow">Elapsed</span><b class="metric-val text-zinc-500" id="s_elapsed">–</b></div>
+      </div>
     </div>
-    <div class="gen">
-      <span class="eyebrow">Generation</span>
-      <b id="s_gen">0</b>
-    </div>
-    <div class="metrics">
-      <div class="metric"><span>All-time best</span><b class="record" id="s_atb">–</b></div>
-      <div class="metric"><span>Last gen best</span><b id="s_lgb">–</b></div>
-      <div class="metric"><span>Avg fitness</span><b id="s_avg">–</b></div>
-      <div class="metric"><span>Steps / s</span><b id="s_sps">–</b></div>
-      <div class="metric"><span>Win rate ·10 gen</span><b id="s_wr">–</b></div>
-      <div class="metric"><span>Elapsed</span><b id="s_elapsed">–</b></div>
-    </div>
-    <div class="ctrls">
-      <button id="b_turbo" class="toggle">Turbo</button>
-      <button id="b_sensors" class="toggle on">Sensors</button>
-      <button id="b_hitboxes" class="toggle">Hitboxes</button>
-      <button id="b_grid" class="toggle">Grid</button>
-      <button id="b_manual" class="toggle">Take control</button>
-      <span class="conn" id="conn"><i></i><u id="connlabel" style="text-decoration:none">Connecting</u></span>
+
+    <!-- Toggles -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="b_turbo" class="btn-sleek">Turbo</button>
+      <button id="b_sensors" class="btn-sleek on">Sensors</button>
+      <button id="b_hitboxes" class="btn-sleek">Hitboxes</button>
+      <button id="b_grid" class="btn-sleek">Grid</button>
+      <div class="w-px h-6 bg-white/10 mx-2"></div>
+      <button id="b_manual" class="btn-sleek text-red-400 border-red-500/20">Take control</button>
+
+      <!-- Connection Ping -->
+      <div class="flex items-center gap-2 ml-2 pl-4 border-l border-white/5" id="conn">
+        <i class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block transition-colors duration-300"></i>
+        <span id="connlabel" class="eyebrow !text-[9px] !text-zinc-600">Connecting</span>
+      </div>
     </div>
   </header>
 
-  <div id="feedwrap">
-    <div class="feedhead">
-      <span class="eyebrow">Watched specimen</span>
-      <b id="f_env">ENV 1</b>
-      <b id="f_status" class="c-RUNNING">RUNNING</b>
-      <span id="f_meta">x 0 · fit 0</span>
-    </div>
-    <div id="bezel">
-      <canvas id="watch" width="800" height="600"></canvas>
-      <div id="boot">WAITING FOR TRAINER…</div>
-    </div>
-    <div id="ribbon">Manual control — arrow keys or WASD move, space jumps. Click “Release control” to hand back to the net.</div>
-  </div>
+  <main class="grid grid-cols-1 xl:grid-cols-12 gap-8 lg:gap-12">
 
-  <div id="side">
-    <div class="card" id="sensorcard">
-      <h2>Sensor telemetry <small id="sensewho">env 1</small></h2>
-      <div id="sensors"></div>
-    </div>
-    <div class="card">
-      <h2>Fitness record <small><span style="color:var(--red)">●</span> best&nbsp;&nbsp;<span style="color:#c9c9d0">●</span> avg</small></h2>
-      <canvas id="chart" width="680" height="344"></canvas>
-    </div>
-    <div class="card">
-      <h2>Run</h2>
-      <div class="kv">
-        <div><span>Level</span><select id="k_levelsel" title="Switches at the next generation"></select></div>
-        <div><span>Population</span><b id="k_pop">–</b></div>
-        <div><span>Elite</span><b id="k_elite">–</b></div>
-        <div><span>Mutation</span><b id="k_mut">–</b></div>
-        <div><span>Persona</span><b id="k_persona">–</b></div>
-        <div><span>Mode</span><b id="k_mode">real-time</b></div>
-        <div><span>Won</span><b id="k_wins">0</b></div>
-        <div><span>Total frames</span><b id="k_frames">–</b></div>
-      </div>
-    </div>
-  </div>
+    <!-- Left Column: Video Feed & Stats -->
+    <div class="xl:col-span-8 flex flex-col gap-8">
 
-  <div id="wallwrap" class="panel">
-    <div class="wallhead">
-      <span class="eyebrow">Population — generation <span id="wallgen">0</span></span>
-      <span id="census"></span>
-    </div>
-    <div id="wall"></div>
-    <div id="turbonote">Turbo is on — feeds refresh once a second; the watched specimen stays live.</div>
-  </div>
+      <!-- Live Feed -->
+      <section id="feedwrap" class="flex flex-col relative group transition-all duration-300">
+        <div class="flex items-end justify-between mb-3">
+          <div class="flex items-baseline gap-4">
+            <h2 class="eyebrow">Watched Specimen</h2>
+            <b id="f_env" class="font-mono text-lg font-medium text-white">ENV 1</b>
+            <b id="f_status" class="font-mono text-[10px] font-bold tracking-widest c-RUNNING">RUNNING</b>
+          </div>
+          <span id="f_meta" class="font-mono text-xs text-zinc-500 hidden sm:block">x 0 · fit 0</span>
+        </div>
 
-  <div class="panel" id="resultswrap">
-    <div class="wallhead">
-      <span class="eyebrow">Results — per generation</span>
-      <span id="census2" style="margin-left:auto;font:600 11.5px var(--mono);color:var(--faint)"></span>
-    </div>
-    <div id="resultsbox"><table id="results">
-      <thead><tr><th>Gen</th><th>Level</th><th>Best</th><th>Avg</th><th>Median</th><th>Wins</th>
-        <th>Stuck</th><th>Dead</th><th>Best x</th><th>Avg score</th><th>Coins</th><th>Dur s</th></tr></thead>
-      <tbody></tbody>
-    </table></div>
-  </div>
+        <div id="bezel" class="relative bg-black rounded-lg overflow-hidden ring-1 ring-white/5 shadow-2xl">
+          <canvas id="watch" width="800" height="600" class="w-full h-auto block"></canvas>
+          <div id="boot" class="absolute inset-0 flex items-center justify-center font-mono text-xs font-bold tracking-widest text-zinc-600 bg-black/90 backdrop-blur z-10">
+            WAITING FOR TRAINER...
+          </div>
+        </div>
 
-</div>
+        <div id="ribbon" class="hidden absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase bg-red-500/10 text-red-500 border border-red-500/20 rounded backdrop-blur-md whitespace-nowrap shadow-lg">
+          Manual control active — Use Arrows/WASD
+        </div>
+      </section>
+
+      <!-- Specimen Wall -->
+      <section id="wallwrap" class="flex flex-col pt-4 border-t border-white/5">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-baseline gap-3">
+            <h2 class="eyebrow">Population</h2>
+            <span class="font-mono text-xs text-zinc-500">Gen <span id="wallgen" class="text-zinc-300">0</span></span>
+          </div>
+          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4"></div>
+        </div>
+
+        <!-- Wall Grid -->
+        <div id="wall" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <!-- Injected via JS -->
+        </div>
+
+        <div id="turbonote" class="hidden mt-6 text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center">
+          [ Turbo Mode Active — Feeds Throttled ]
+        </div>
+      </section>
+
+      <!-- Results Table -->
+      <section id="resultswrap" class="flex flex-col pt-4 border-t border-white/5">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="eyebrow">Results Ledger</h2>
+          <span id="census2" class="font-mono text-[10px] text-zinc-600"></span>
+        </div>
+
+        <div id="resultsbox" class="max-h-[300px] overflow-y-auto pr-2 rounded-lg border border-white/5 bg-[#0a0a0c]">
+          <table id="results" class="w-full border-collapse">
+            <thead>
+              <tr>
+                <th class="table-header !pl-4">Gen</th>
+                <th class="table-header">Level</th>
+                <th class="table-header text-right">Best</th>
+                <th class="table-header text-right">Avg</th>
+                <th class="table-header text-right">Med</th>
+                <th class="table-header text-right">Wins</th>
+                <th class="table-header text-right">Stuck</th>
+                <th class="table-header text-right">Dead</th>
+                <th class="table-header text-right !pr-4">Coins</th>
+              </tr>
+            </thead>
+            <tbody class="text-zinc-300 divide-y divide-white/5">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <div id="side" class="xl:col-span-4 flex flex-col gap-8 min-w-0">
+
+      <!-- Sensors -->
+      <section id="sensorcard">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+          <h2 class="eyebrow">Telemetry</h2>
+          <small id="sensewho" class="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">env 1</small>
+        </div>
+        <div id="sensors" class="flex flex-col gap-1.5">
+          <!-- Sensors injected here -->
+        </div>
+      </section>
+
+      <!-- Fitness Chart -->
+      <section>
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+          <h2 class="eyebrow">Fitness Trajectory</h2>
+          <div class="flex items-center gap-3 font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-red-500"></i> best</span>
+            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-zinc-600"></i> avg</span>
+          </div>
+        </div>
+        <div class="bg-[#0a0a0c] rounded-lg border border-white/5 p-3">
+          <canvas id="chart" width="680" height="300" class="w-full h-auto block opacity-90"></canvas>
+        </div>
+      </section>
+
+      <!-- Config -->
+      <section>
+        <div class="mb-4 pb-2 border-b border-white/5">
+          <h2 class="eyebrow">Run Configuration</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-y-4 gap-x-4">
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Level</span><select id="k_levelsel"></select></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-300">real-time</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Population</span><b id="k_pop" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Elite</span><b id="k_elite" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Mutation</span><b id="k_mut" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Won</span><b id="k_wins" class="font-mono text-sm font-medium text-blue-400">0</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Frames</span><b id="k_frames" class="font-mono text-sm font-medium text-zinc-500">–</b></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
 
 <script>
 "use strict";
-// classic PEAK debug look: red rays with white hit dots, translucent probe tiles
-const RAY_COLORS = {0:"rgba(255,255,255,.28)", 1:"#ff4040", 2:"#ff2d8f"};
-const TILE_STYLES = {1:{fill:"rgba(255,70,70,.22)", line:"#ff4646"},   // ray-hit tile
-                     2:{fill:"rgba(90,160,255,.30)", line:"rgba(120,180,255,.85)"}}; // pit probe
+
+const RAY_COLORS = {0:"rgba(255,255,255,.10)", 1:"#ef4444", 2:"#ec4899"};
+const TILE_STYLES = {
+  1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"},
+  2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}
+};
 const STATUS = ["RUNNING","STUCK","DEAD","WON"];
+
 const SENSORS = [
-  {g:"Rays — obstacle proximity", rows:[
-    {i:0,l:"FWD"},{i:1,l:"UP 30"},{i:2,l:"UP 60"},{i:3,l:"DN 30"},{i:4,l:"DN 60"},{i:5,l:"BACK"}]},
-  {g:"Threat", cls:"threat", rows:[{i:6,l:"ENEMY"},{i:7,l:"PIT"}]},
-  {g:"Body", cls:"body", rows:[{i:9,l:"VX",center:true},{i:10,l:"VY",center:true},{i:8,l:"GND"},{i:11,l:"JUMP"}]},
-  {g:"Loot", cls:"loot", rows:[{i:12,l:"QBLK"}]},
+  {g:"Proximity rays", color:"bg-zinc-300", rows:[
+    {i:0,l:"FWD"},{i:1,l:"U30"},{i:2,l:"U60"},{i:3,l:"D30"},{i:4,l:"D60"},{i:5,l:"BCK"}]},
+  {g:"Threats", color:"bg-red-500", rows:[{i:6,l:"NMY"},{i:7,l:"PIT"}]},
+  {g:"Kinematics", color:"bg-blue-400", rows:[{i:9,l:"VX",center:true},{i:10,l:"VY",center:true},{i:8,l:"GND"},{i:11,l:"JMP"}]},
+  {g:"Objectives", color:"bg-amber-400", rows:[{i:12,l:"BLK"}]},
 ];
-// rays + enemy arrive as "1 = clear"; show proximity so bars grow when danger nears
 const INVERT = new Set([0,1,2,3,4,5,6]);
 
 let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0;
@@ -301,18 +283,29 @@ const keys={left:false,right:false,jump:false};
 const $ = id => document.getElementById(id);
 const send = o => { if (ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
 
-/* ── build static DOM ── */
 (function buildSensors(){
   const root = $("sensors");
   for (const grp of SENSORS){
     const h = document.createElement("div");
-    h.className = "sgroup"; h.textContent = grp.g;
+    h.className = "text-[8px] font-bold tracking-widest uppercase text-zinc-700 mt-3 first:mt-0";
+    h.textContent = grp.g;
     root.appendChild(h);
+
     for (const r of grp.rows){
       const row = document.createElement("div");
-      row.className = "srow";
-      row.innerHTML = `<label>${r.l}</label>
-        <div class="sbar ${grp.cls||""} ${r.center?"center":""}"><i></i></div><output>–</output>`;
+      row.className = "flex items-center gap-3 group";
+
+      let barInner = `<div class="relative h-1 flex-1 bg-zinc-900 rounded-full overflow-hidden border border-white/5">`;
+      if(r.center) {
+          barInner += `<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/20 z-10"></div>`;
+      }
+      barInner += `<i class="absolute top-0 bottom-0 left-0 rounded-full ${grp.color} sbar-fill transition-all duration-150 ease-out opacity-80 group-hover:opacity-100"></i></div>`;
+
+      row.innerHTML = `
+        <label class="w-7 text-right font-mono text-[9px] font-bold text-zinc-500">${r.l}</label>
+        ${barInner}
+        <output class="w-8 font-mono text-[9px] text-zinc-500 sbar-out tabular-nums text-left">–</output>
+      `;
       root.appendChild(row);
       senseEls[r.i] = {bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center, idx:r.i};
     }
@@ -325,25 +318,50 @@ function buildWall(n){
   wall.innerHTML = ""; specEls.length = 0;
   for (let i=0;i<n;i++){
     const b = document.createElement("button");
-    b.className = "spec";
+    b.className = "spec group text-left relative focus:outline-none flex flex-col gap-2";
     b.setAttribute("aria-label", `Watch env ${i+1}`);
-    b.innerHTML = `<canvas width="280" height="210"></canvas>
-      <div class="tag"><i></i><b>ENV ${String(i+1).padStart(2,"0")}</b><em>–</em></div>
-      <div class="nums"><span class="nx">x –</span><span class="nf">fit –</span></div>
-      <div class="fitrail"><i></i></div>`;
+
+    // Minimal sleek grid item
+    b.innerHTML = `
+      <div class="canvas-wrap relative rounded overflow-hidden bg-[#050505] transition-all duration-300 ring-1 ring-white/5 group-hover:ring-white/20">
+        <canvas width="280" height="210" class="w-full h-auto block opacity-60 group-hover:opacity-100 transition-opacity"></canvas>
+      </div>
+      <div class="flex flex-col gap-1 w-full">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <i class="dot w-1.5 h-1.5 rounded-full flex-none bg-zinc-700"></i>
+            <b class="font-mono text-[10px] font-bold text-zinc-400 group-hover:text-zinc-200 transition-colors">ENV ${String(i+1).padStart(2,"0")}</b>
+          </div>
+          <em class="status-text font-mono text-[9px] font-bold tracking-widest not-italic uppercase text-zinc-600">–</em>
+        </div>
+        <div class="flex justify-between font-mono text-[9px] text-zinc-600 tabular-nums">
+          <span class="nx">x –</span><span class="nf">fit –</span>
+        </div>
+        <div class="h-[2px] w-full bg-zinc-900 rounded-full overflow-hidden mt-0.5">
+          <i class="rail block h-full bg-zinc-700 w-0 transition-all duration-300"></i>
+        </div>
+      </div>`;
+
     b.onclick = () => { watched = i; send({cmd:"watch", env:i}); };
     wall.appendChild(b);
+
     const pctx = b.querySelector("canvas").getContext("2d");
-    pctx.fillStyle = "#141416"; pctx.fillRect(0, 0, 280, 210);
-    pctx.fillStyle = "#57575e"; pctx.font = "600 18px Consolas,monospace";
-    pctx.textAlign = "center"; pctx.fillText("AWAITING FEED", 140, 110);
-    specEls.push({el:b, cv:b.querySelector("canvas"), dot:b.querySelector(".tag i"),
-                  st:b.querySelector(".tag em"), nx:b.querySelector(".nx"),
-                  nf:b.querySelector(".nf"), rail:b.querySelector(".fitrail i")});
+    pctx.fillStyle = "#09090b"; pctx.fillRect(0, 0, 280, 210);
+    pctx.fillStyle = "#3f3f46"; pctx.font = "500 12px 'JetBrains Mono', monospace";
+    pctx.textAlign = "center"; pctx.fillText("WAITING", 140, 110);
+
+    specEls.push({
+      el:b,
+      cv:b.querySelector("canvas"),
+      dot:b.querySelector(".dot"),
+      st:b.querySelector(".status-text"),
+      nx:b.querySelector(".nx"),
+      nf:b.querySelector(".nf"),
+      rail:b.querySelector(".rail")
+    });
   }
 }
 
-/* ── drawing ── */
 function drawRays(ctx, rays, k, tiles){
   if (!sensorsOn) return;
   for (const [tx,ty,ts,kind] of (tiles || [])){
@@ -356,7 +374,7 @@ function drawRays(ctx, rays, k, tiles){
     ctx.strokeStyle = RAY_COLORS[hit] || RAY_COLORS[0];
     ctx.lineWidth = hit ? 2 : 1;
     ctx.beginPath(); ctx.moveTo(x1*k,y1*k); ctx.lineTo(x2*k,y2*k); ctx.stroke();
-    if (hit){ ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x2*k,y2*k,3,0,7); ctx.fill(); }
+    if (hit){ ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x2*k,y2*k,2,0,7); ctx.fill(); }
   }
 }
 
@@ -389,12 +407,13 @@ function updateSensors(e){
     let v = e.sensors[s.idx];
     const shown = v;
     if (INVERT.has(s.idx)) v = 1 - v;
+
     if (s.center){
       const half = Math.min(Math.abs(v),1) * 50;
       s.bar.style.left  = v < 0 ? (50-half)+"%" : "50%";
       s.bar.style.width = half + "%";
     } else {
-      s.bar.style.left = 0;
+      s.bar.style.left = "0%";
       s.bar.style.width = Math.max(0,Math.min(v,1))*100 + "%";
     }
     s.out.value = (+shown).toFixed(2);
@@ -403,41 +422,52 @@ function updateSensors(e){
 
 function drawChart(history){
   const cv = $("chart"), ctx = cv.getContext("2d");
-  const W = cv.width, H = cv.height, L = 46, R = 12, T = 14, B = 34;
+  const W = cv.width, H = cv.height, L = 30, R = 10, T = 15, B = 20;
   ctx.clearRect(0,0,W,H);
   if (!history || history.length < 2){
-    ctx.fillStyle = "#6a6a72"; ctx.font = "600 22px Consolas,monospace";
-    ctx.fillText("waiting for two generations…", L, H/2);
+    ctx.fillStyle = "#3f3f46"; ctx.font = "500 12px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("waiting for data...", W/2, H/2);
+    ctx.textAlign = "left";
     return;
   }
-  const max = Math.max(...history.map(h=>h[0])) * 1.06 || 1;
+  const max = Math.max(...history.map(h=>h[0])) * 1.05 || 1;
   const px = i => L + i*(W-L-R)/(history.length-1);
   const py = v => H-B - (v/max)*(H-T-B);
-  ctx.strokeStyle = "#28282d"; ctx.fillStyle = "#7c7c85";
-  ctx.font = "500 19px Consolas,monospace"; ctx.lineWidth = 1;
+
+  // Grid
+  ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.fillStyle = "#52525b";
+  ctx.font = "400 9px 'JetBrains Mono', monospace"; ctx.lineWidth = 1;
   for (let q=0;q<=4;q++){
     const y = py(max*q/4);
     ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(W-R,y); ctx.stroke();
-    ctx.fillText(Math.round(max*q/4), 4, y+6);
+    ctx.fillText(Math.round(max*q/4), 0, y+3);
   }
-  ctx.fillText("gen 1", L, H-8);
-  const endLbl = "gen " + history.length;
-  ctx.fillText(endLbl, W-R-ctx.measureText(endLbl).width, H-8);
-  // best area + line
+
+  ctx.fillText("g1", L, H-2);
+  const endLbl = "g" + history.length;
+  ctx.fillText(endLbl, W-R-ctx.measureText(endLbl).width, H-2);
+
+  // Area fill under best
   ctx.beginPath();
   history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[0])) : ctx.moveTo(px(0),py(h[0])));
-  ctx.strokeStyle = "#ff3b30"; ctx.lineWidth = 2.5; ctx.stroke();
   ctx.lineTo(px(history.length-1),H-B); ctx.lineTo(L,H-B); ctx.closePath();
   const grad = ctx.createLinearGradient(0,T,0,H-B);
-  grad.addColorStop(0,"rgba(255,59,48,.22)"); grad.addColorStop(1,"rgba(255,59,48,0)");
+  grad.addColorStop(0,"rgba(239,68,68,0.15)"); grad.addColorStop(1,"rgba(239,68,68,0)");
   ctx.fillStyle = grad; ctx.fill();
-  // avg line
+
+  // Avg Line
   ctx.beginPath();
   history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[1])) : ctx.moveTo(px(0),py(h[1])));
-  ctx.strokeStyle = "#c9c9d0"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = "#52525b"; ctx.lineWidth = 1; ctx.stroke();
+
+  // Best Line
+  ctx.beginPath();
+  history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[0])) : ctx.moveTo(px(0),py(h[0])));
+  ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 1.5;
+  ctx.lineJoin = "round"; ctx.stroke();
 }
 
-/* ── state intake ── */
 function onUpdate(m){
   const s = m.stats || {};
   if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
@@ -451,11 +481,12 @@ function onUpdate(m){
   $("s_sps").textContent = fmt(s.sps);
   if (s.win_rate10 !== undefined) $("s_wr").textContent = s.win_rate10 + "%";
   if (s.elapsed !== undefined){
-    const m = Math.floor(s.elapsed/60), sec = s.elapsed%60;
-    $("s_elapsed").textContent = m + ":" + String(sec).padStart(2,"0");
+    const mins = Math.floor(s.elapsed/60), sec = s.elapsed%60;
+    $("s_elapsed").textContent = mins + ":" + String(sec).padStart(2,"0");
   }
   if (s.total_frames !== undefined) $("k_frames").textContent = fmt(s.total_frames);
   if (s.results) drawResults(s.results);
+
   if (s.levels && s.levels.length){
     const sel = $("k_levelsel");
     if (sel.options.length !== s.levels.length){
@@ -464,6 +495,7 @@ function onUpdate(m){
     }
     if (s.level && document.activeElement !== sel) sel.value = s.level;
   }
+
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
   if (s.elite !== undefined) $("k_elite").textContent = s.elite;
   if (s.mut_rate !== undefined) $("k_mut").textContent = Math.round(s.mut_rate*100)+"%";
@@ -473,27 +505,38 @@ function onUpdate(m){
   if (s.turbo !== undefined && s.turbo !== turbo){
     turbo = s.turbo;
     $("b_turbo").classList.toggle("on", turbo);
-    $("wallwrap").classList.toggle("turbo", turbo);
+    $("turbonote").style.display = turbo ? "block" : "none";
   }
+
   if (s.manual !== undefined && s.manual !== manual) setManual(s.manual, false);
 
   if (s.statuses){
     const c = {}; STATUS.forEach(k=>c[k]=0);
     s.statuses.forEach(k=>c[k]=(c[k]||0)+1);
+
     $("census").innerHTML = STATUS
-      .map(k=>`<b class="c-${k}">${c[k]}</b> <span style="color:var(--faint)">${k.toLowerCase()}</span>`)
-      .join(" &nbsp;·&nbsp; ");
+      .map(k=>`<div class="flex items-baseline gap-1"><b class="c-${k} text-xs">${c[k]}</b> <span class="text-[9px] uppercase text-zinc-600">${k}</span></div>`)
+      .join("<span class='text-white/10'>/</span>");
+
     $("k_wins").textContent = c.WON;
+
     const genBest = Math.max(...(s.live_fitness||[1]), 1);
+
     (s.statuses).forEach((st,i)=>{
       const sp = specEls[i]; if (!sp) return;
-      sp.el.className = "spec s-" + st + (i===watched?" watched":"");
-      sp.dot.className = "d-" + st;
-      sp.st.textContent = st; sp.st.className = "c-" + st;
+
+      // Update wall item classes
+      sp.el.className = `spec group text-left relative focus:outline-none flex flex-col gap-2 s-${st} ${i===watched ? 'watched' : ''}`;
+      sp.dot.className = `dot w-1.5 h-1.5 rounded-full flex-none d-${st}`;
+      sp.st.textContent = st;
+      sp.st.className = `status-text font-mono text-[9px] font-bold tracking-widest not-italic uppercase c-${st}`;
+
       const f = (s.live_fitness||[])[i];
       if (f !== undefined){
         sp.nf.textContent = "fit " + fmt(f);
         sp.rail.style.width = Math.max(2, f/genBest*100) + "%";
+        if(st === 'WON') sp.rail.className = "rail block h-full w-0 transition-all duration-300 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
+        else sp.rail.className = "rail block h-full w-0 transition-all duration-300 bg-red-500";
       }
     });
   }
@@ -506,14 +549,17 @@ function onUpdate(m){
       img.onload = () => { lastImg[e.id] = {img, rays:e.rays, tiles:e.tiles, scale:e.scale}; paintEnv(e); };
       img.src = "data:image/jpeg;base64," + e.img;
     } else paintEnv(e);
+
     const sp = specEls[e.id];
     if (sp) sp.nx.textContent = "x " + Math.round(e.x);
+
     if (e.id === watched){
       $("f_env").textContent = "ENV " + String(e.id+1).padStart(2,"0");
       $("f_status").textContent = e.status;
-      $("f_status").className = "c-" + e.status;
+      $("f_status").className = `font-mono text-[10px] font-bold tracking-widest uppercase c-${e.status}`;
+
       let meta = `x ${Math.round(e.x)} · fit ${fmt(e.fitness)}`;
-      if (e.live) meta += ` · score ${fmt(e.live.score)} · coins ${e.live.coins} · t ${Math.max(0,Math.round(e.live.time_left))}`;
+      if (e.live) meta += ` · scr ${fmt(e.live.score)} · cns ${e.live.coins} · t ${Math.max(0,Math.round(e.live.time_left))}`;
       if (e.live && e.live.cause && e.status !== "RUNNING") meta += ` · ${e.live.cause.toLowerCase()}`;
       $("f_meta").textContent = meta;
       updateSensors(e);
@@ -529,45 +575,63 @@ function drawResults(rows){
   tb.innerHTML = "";
   for (const r of [...rows].reverse()){
     const tr = document.createElement("tr");
-    const cells = [r.gen, r.level ?? "–", Math.round(r.best), Math.round(r.avg),
-                   Math.round(r.median ?? 0), r.wins ?? 0, r.stuck ?? 0, r.dead ?? 0,
-                   Math.round(r.best_x ?? 0), Math.round(r.avg_score ?? 0),
-                   r.coins ?? 0, r.duration ?? "–"];
-    tr.innerHTML = cells.map((v,i)=>{
-      let cls = "";
-      if (i===5) cls = v > 0 ? "win" : "zero";
-      if ((i===6||i===7) && v===0) cls = "zero";
-      return `<td class="${cls}">${v}</td>`;
-    }).join("");
+    tr.className = "hover:bg-zinc-800/20 transition-colors group";
+
+    const cells = [
+      {v: r.gen, c: "table-cell !text-left !pl-4 font-bold text-zinc-300 group-first:text-red-400"},
+      {v: r.level ?? "–", c: "table-cell !text-left"},
+      {v: Math.round(r.best), c: "table-cell"},
+      {v: Math.round(r.avg), c: "table-cell"},
+      {v: Math.round(r.median ?? 0), c: "table-cell"},
+      {v: r.wins ?? 0, c: `table-cell ${(r.wins>0)?'text-blue-400 font-medium':'text-zinc-600'}`},
+      {v: r.stuck ?? 0, c: `table-cell ${(r.stuck===0)?'text-zinc-600':'text-amber-400/80'}`},
+      {v: r.dead ?? 0, c: `table-cell ${(r.dead===0)?'text-zinc-600':'text-red-400/80'}`},
+      {v: r.coins ?? 0, c: "table-cell !pr-4 text-amber-500/80"}
+    ];
+
+    tr.innerHTML = cells.map(cell => `<td class="${cell.c}">${cell.v}</td>`).join("");
     tb.appendChild(tr);
   }
-  $("census2").textContent = rows.length + " generations recorded";
+  $("census2").textContent = rows.length + " gens";
 }
 
-/* ── controls ── */
 function setManual(on, notify=true){
   manual = on;
   $("b_manual").classList.toggle("on", on);
   $("b_manual").textContent = on ? "Release control" : "Take control";
-  $("feedwrap").classList.toggle("manual", on);
+
+  const fwrap = $("bezel");
+  if(on) {
+      fwrap.classList.add("ring-red-500/50", "shadow-[0_0_30px_rgba(239,68,68,0.2)]");
+      fwrap.classList.remove("ring-white/5", "shadow-2xl");
+      $("ribbon").classList.remove("hidden");
+  } else {
+      fwrap.classList.remove("ring-red-500/50", "shadow-[0_0_30px_rgba(239,68,68,0.2)]");
+      fwrap.classList.add("ring-white/5", "shadow-2xl");
+      $("ribbon").classList.add("hidden");
+  }
+
   if (!on) keys.left = keys.right = keys.jump = false;
   if (notify) send({cmd:"manual", on});
 }
+
 $("b_manual").onclick = () => setManual(!manual);
-$("b_turbo").onclick = () => { turbo = !turbo; $("b_turbo").classList.toggle("on",turbo);
-                               $("wallwrap").classList.toggle("turbo",turbo); send({cmd:"turbo", on:turbo}); };
+$("b_turbo").onclick = () => {
+  turbo = !turbo;
+  $("b_turbo").classList.toggle("on", turbo);
+  $("turbonote").style.display = turbo ? "block" : "none";
+  send({cmd:"turbo", on:turbo});
+};
 $("b_sensors").onclick = function(){
-  sensorsOn = !sensorsOn; this.classList.toggle("on", sensorsOn);
-  $("sensors").classList.toggle("stale", !sensorsOn);
+  sensorsOn = !sensorsOn;
+  this.classList.toggle("on", sensorsOn);
+  if(!sensorsOn) $("sensors").classList.add("stale");
+  else $("sensors").classList.remove("stale");
   send({cmd:"sensors", on:sensorsOn});
 };
 let hitboxes = false, gridOn = false;
-$("b_hitboxes").onclick = function(){
-  hitboxes = !hitboxes; this.classList.toggle("on", hitboxes); send({cmd:"hitboxes", on:hitboxes});
-};
-$("b_grid").onclick = function(){
-  gridOn = !gridOn; this.classList.toggle("on", gridOn); send({cmd:"grid", on:gridOn});
-};
+$("b_hitboxes").onclick = function(){ hitboxes = !hitboxes; this.classList.toggle("on", hitboxes); send({cmd:"hitboxes", on:hitboxes}); };
+$("b_grid").onclick = function(){ gridOn = !gridOn; this.classList.toggle("on", gridOn); send({cmd:"grid", on:gridOn}); };
 
 const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};
 function setKey(ev, down){
@@ -579,13 +643,23 @@ function setKey(ev, down){
 document.addEventListener("keydown", ev => setKey(ev,true));
 document.addEventListener("keyup", ev => setKey(ev,false));
 
-/* ── connection ── */
 function connect(){
   ws = new WebSocket("ws://127.0.0.1:8765");
-  ws.onopen = () => { $("conn").classList.add("live"); $("connlabel").textContent = "Live"; };
+  ws.onopen = () => {
+    const c = $("conn");
+    c.querySelector("i").className = "w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shadow-[0_0_8px_rgba(16,185,129,0.8)]";
+    $("connlabel").textContent = "Live";
+    $("connlabel").classList.replace("text-zinc-600", "text-emerald-500");
+  };
   ws.onmessage = ev => onUpdate(JSON.parse(ev.data));
-  ws.onclose = () => { $("conn").classList.remove("live"); $("connlabel").textContent = "Reconnecting";
-                       $("boot").style.display = "flex"; setTimeout(connect, 1500); };
+  ws.onclose = () => {
+    const c = $("conn");
+    c.querySelector("i").className = "w-1.5 h-1.5 rounded-full bg-red-500 inline-block shadow-[0_0_8px_rgba(239,68,68,0.8)]";
+    $("connlabel").textContent = "Offline";
+    $("connlabel").classList.replace("text-emerald-500", "text-zinc-600");
+    $("boot").style.display = "flex";
+    setTimeout(connect, 1500);
+  };
 }
 connect();
 </script>

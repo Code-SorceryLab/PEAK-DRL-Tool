@@ -11,8 +11,8 @@ import numpy as np
 @dataclass
 class GAConfig:
     pop_size: int = 10
-    elite: int = 2
-    tournament_k: int = 3
+    elite: int = 4          # raised from 2 (2026-08-20): population win rate plateaued at 23%
+    tournament_k: int = 5   # raised from 3: stronger selection pressure toward winners
     crossover_rate: float = 0.7
     mutation_rate: float = 0.15
     mutation_sigma: float = 0.3
