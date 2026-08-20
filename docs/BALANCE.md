@@ -67,6 +67,14 @@ game-faithful levels added:
 | `Green Hill 3` | Sonic act: rolling slopes, ring arcs, springs, badniks | see `balance/report_sonic.json` |
 | `world1_11_salt_factory` | Meat Boy: wall-jump shafts, saws, crumble bridges | see `balance/report_meatboy.json` |
 
+**Design constraint the probes exposed:** agents act with left/right/jump only — Mega Man's
+climb action is never pressed, so **ladders are unusable by agents** (manual play only).
+Agent-facing megaman levels must have a jumpable critical path. The first MM-Stage2 draft
+violated this (0/2 seeds, Spike 71%) and was redesigned; the first Green Hill 3 draft had
+its goal floating above the running surface (agents sprinted underneath it — OOB 78%) and
+got a full-height goal column instead. This is the tool working as intended: **probe every
+new level before shipping it.**
+
 **Selecting levels live:** the dashboard's Run panel has a level dropdown — picking one
 switches the whole population at the next generation boundary (the curriculum resumes from
 there). `--level` on the CLI locks a single level; menu Train Single prompts for one.
