@@ -929,58 +929,12 @@ def run_dashboard():
         print(_RED(f"  ✖  Could not open browser: {e}"))
 
 
-def run_agent_analyzer():
-    """Analyze Performance — per-generation results table + run aggregates."""
+def open_balance_command():
+    """Balance Command — regenerate the command center from runs/ and open it."""
     _refresh_screen()
-    _section("ANALYZE  ›  Run Performance")
-
-    run_dir = _pick_run()
-    if not run_dir:
-        return
-
-    from code.neuro.evolution import Population
-    from code.neuro.trainer import format_results
-
-    pop = Population.load(str(run_dir))
-    hist = pop.history
-    if not hist:
-        print(_RED("  ✖  No generations recorded yet."))
-        return
-
-    print()
-    print(format_results(hist))
-
-    episodes = sum(len(r.get("envs", [])) or pop.cfg.pop_size for r in hist)
-    wins = sum(r.get("wins", 0) for r in hist)
-    frames = sum(r.get("frames", 0) for r in hist)
-    dur = sum(r.get("duration", 0) for r in hist)
-    first_win = next((r["gen"] for r in hist if r.get("wins")), None)
-    causes = {}
-    for r in hist:
-        for e in r.get("envs", []):
-            if e.get("status") == "DEAD":
-                c = e.get("cause") or "?"
-                causes[c] = causes.get(c, 0) + 1
-
-    W = 50
-    print()
-    print(_DIM("    " + "─" * W))
-    print(f"    {_BOLD('Aggregates')}")
-    print(f"    Generations:   {_WHT(str(len(hist)))}")
-    print(f"    Episodes:      {_WHT(str(episodes))}")
-    win_str = f"{wins} ({100 * wins / max(episodes, 1):.0f}%)"
-    print(f"    Wins:          {(_GRN(win_str) if wins else _DIM(win_str))}")
-    print(f"    First win:     {_WHT(f'gen {first_win}') if first_win else _DIM('never')}")
-    print(f"    Best fitness:  {_WHT(f'{pop.best_fitness:.1f}')}")
-    print(f"    Total frames:  {_WHT(f'{frames:,}')}")
-    print(f"    Wall clock:    {_WHT(f'{dur:.0f}s')}")
-    if causes:
-        cause_str = "  ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1]))
-        print(f"    Death causes:  {_DIM(cause_str)}")
-    print(_DIM("    " + "─" * W))
-
-    if input(_DIM("\n    Open the Balance Command center? [Y/n]: ")).strip().lower() not in ("n", "no"):
-        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+    _section("BALANCE COMMAND")
+    print(_DIM("    Regenerating from runs/balance, runs/probes, and every training run..."))
+    subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
 
 
 def run_balance_report():
@@ -1164,7 +1118,7 @@ def main():
         "9":  ("level_editor",         run_level_editor),
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("dashboard",            run_dashboard),
-        "12": ("analyzer",             run_agent_analyzer),
+        "12": ("balance_command",      open_balance_command),
         "14": ("balance",              run_balance_report),
         "15": ("full_sweep",           run_full_sweep),
         "13": ("delete_all",           delete_logs_and_models),
@@ -1195,7 +1149,7 @@ def main():
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
-        print(_menu_item("12", "Analyze Performance",  "results table + run aggregates"))
+        print(_menu_item("12", "Balance Command",      "open the command center (all runs + probes)"))
         print(_menu_item("14", "Balance Report",       "multi-seed level difficulty ± CI"))
         print(_menu_item("15", "Full Sweep",           "games × personas × seeds, parallel"))
         print(_menu_item("13", "Delete Logs & Models", "nuclear option"))
