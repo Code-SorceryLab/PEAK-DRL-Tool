@@ -12,7 +12,8 @@ from data import (
     GAME_CONFIG_PATH, LEVELS_ROOT, TILE_SIZE,
     load_game_config, load_level_grid, parse_route,
 )
-from metrics import B1_ANALYSIS, B2_ANALYSIS, B3_ANALYSIS
+from metrics import (B1_ANALYSIS, B2_ANALYSIS, B3_ANALYSIS,
+                      M4_ANALYSIS, M5_ANALYSIS, M6_ANALYSIS)
 
 BAR_W, BAR_H = 800, 36
 
@@ -298,6 +299,237 @@ def render_b3_detail(m):
         ), unsafe_allow_html=True)
 
     _analysis_box(m["b3_key"], B3_ANALYSIS)
+
+
+def render_m4_detail(m):
+    tc = m["time_cost"]
+    dp = m["death_premium"]
+    m4_color = m["m4_color"]
+    t = m["thresholds"]
+    tgt_tc  = t.get("target_time_cost", 1.3)
+    warn_tc = t.get("warning_time_cost", 0.2)
+    tgt_dp  = t.get("target_death_premium", 1.5)
+    warn_dp = t.get("warning_death_premium", 0.3)
+
+    # Time cost bar
+    if tc is not None:
+        tc_lo = max(tgt_tc - warn_tc, 0)
+        tc_hi = tgt_tc + warn_tc
+        tc_bar_max = max(tc * 1.3, tc_hi * 1.3, 1)
+        segments = [
+            (0,     tc_lo,      "#14532d", "free"),
+            (tc_lo, tc_hi,      "#78350f", "target"),
+            (tc_hi, tc_bar_max, "#7f1d1d", "costly"),
+        ]
+        ticks = [(v, "%.1fx" % v) for v in [0, tc_lo, tgt_tc, tc_hi]]
+        bar_svg = _zone_bar_svg(tc, "%.2fx" % tc, segments, ticks, m4_color, tc_bar_max)
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;">'
+            'Time cost -- %s_* avg time / %s_* avg time</div>'
+            % (m["collector_prefix"], m["baseline_prefix"]),
+            unsafe_allow_html=True,
+        )
+        st.markdown(bar_svg, unsafe_allow_html=True)
+
+    # Death premium bar
+    dp_lo = max(tgt_dp - warn_dp, 0)
+    dp_hi = tgt_dp + warn_dp
+    dp_bar_max = max(dp * 1.3, dp_hi * 1.3, 1)
+    dp_segments = [
+        (0,     dp_lo,      "#14532d", "safe"),
+        (dp_lo, dp_hi,      "#78350f", "target"),
+        (dp_hi, dp_bar_max, "#7f1d1d", "deadly"),
+    ]
+    dp_ticks = [(v, "%.1fx" % v) for v in [0, dp_lo, tgt_dp, dp_hi]]
+    dp_bar = _zone_bar_svg(dp, "%.2fx" % dp, dp_segments, dp_ticks, m4_color, dp_bar_max)
+    st.markdown(
+        '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;margin-top:16px;">'
+        'Death premium -- %s_* deaths/run / %s_* deaths/run</div>'
+        % (m["collector_prefix"], m["baseline_prefix"]),
+        unsafe_allow_html=True,
+    )
+    st.markdown(dp_bar, unsafe_allow_html=True)
+    st.markdown('<div class="sep"></div>', unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        tc_str = "%.2fx" % tc if tc is not None else "N/A"
+        st.markdown(_stat_card(
+            "Time cost",
+            '<span style="color:%s;">%s</span>' % (m4_color, tc_str),
+            "%s_* / %s_*" % (m["collector_prefix"], m["baseline_prefix"]),
+        ), unsafe_allow_html=True)
+    with c2:
+        st.markdown(_stat_card(
+            "Death premium",
+            '<span style="color:#3b82f6;">%.2fx</span>' % dp,
+            "%.2f / %.2f dpr" % (m["collector_dpr"], m["baseline_dpr"]),
+        ), unsafe_allow_html=True)
+    with c3:
+        ct = m["collector_avg_time"]
+        ct_str = "%.1fs" % ct if ct is not None else "N/A"
+        st.markdown(_stat_card(
+            "%s_* avg time" % m["collector_prefix"],
+            '<span style="color:#f59e0b;">%s</span>' % ct_str,
+            "successful runs",
+        ), unsafe_allow_html=True)
+    with c4:
+        bt = m["baseline_avg_time"]
+        bt_str = "%.1fs" % bt if bt is not None else "N/A"
+        st.markdown(_stat_card(
+            "%s_* avg time" % m["baseline_prefix"],
+            '<span style="color:#a855f7;">%s</span>' % bt_str,
+            "successful runs",
+        ), unsafe_allow_html=True)
+
+    _analysis_box(m["m4_key"], M4_ANALYSIS)
+
+
+def render_m5_detail(m):
+    ne_gap = m["novice_expert_gap"]
+    me_gap = m["mid_expert_gap"]
+    m5_color = m["m5_color"]
+    t = m["thresholds"]
+    tgt_ne  = t.get("target_novice_expert_gap", 0.4)
+    warn_ne = t.get("warning_novice_expert_gap", 0.15)
+    tgt_me  = t.get("target_mid_expert_gap", 0.15)
+    warn_me = t.get("warning_mid_expert_gap", 0.1)
+
+    # Novice-expert gap bar (0-1 range since it is a CR difference)
+    ne_lo = max(tgt_ne - warn_ne, 0)
+    ne_hi = min(tgt_ne + warn_ne, 1.0)
+    ne_bar_max = min(max(abs(ne_gap) * 1.3, ne_hi * 1.3, 0.1), 1.0)
+    segments = [
+        (0,     ne_lo,      "#7f1d1d", "flat"),
+        (ne_lo, ne_hi,      "#14532d", "target"),
+        (ne_hi, ne_bar_max, "#78350f", "steep"),
+    ]
+    ticks = [(v, "%d%%" % round(v * 100)) for v in [0, ne_lo, tgt_ne, ne_hi]]
+    bar_svg = _zone_bar_svg(
+        abs(ne_gap), "%d%%" % round(abs(ne_gap) * 100),
+        segments, ticks, m5_color, ne_bar_max,
+    )
+    st.markdown(
+        '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;">'
+        'Novice-expert gap -- *_%s CR - *_%s CR</div>'
+        % (m["expert_suffix"], m["novice_suffix"]),
+        unsafe_allow_html=True,
+    )
+    st.markdown(bar_svg, unsafe_allow_html=True)
+
+    # Mid-expert gap bar
+    if me_gap is not None:
+        me_lo = max(tgt_me - warn_me, 0)
+        me_hi = min(tgt_me + warn_me, 1.0)
+        me_bar_max = min(max(abs(me_gap) * 1.3, me_hi * 1.3, 0.1), 1.0)
+        me_segments = [
+            (0,     me_lo,      "#7f1d1d", "flat"),
+            (me_lo, me_hi,      "#14532d", "target"),
+            (me_hi, me_bar_max, "#78350f", "steep"),
+        ]
+        me_ticks = [(v, "%d%%" % round(v * 100)) for v in [0, me_lo, tgt_me, me_hi]]
+        me_bar = _zone_bar_svg(
+            abs(me_gap), "%d%%" % round(abs(me_gap) * 100),
+            me_segments, me_ticks, m5_color, me_bar_max,
+        )
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;margin-top:16px;">'
+            'Mid-expert gap -- *_%s CR - *_%s CR</div>'
+            % (m["expert_suffix"], m["mid_suffix"]),
+            unsafe_allow_html=True,
+        )
+        st.markdown(me_bar, unsafe_allow_html=True)
+
+    st.markdown('<div class="sep"></div>', unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(_stat_card(
+            "*_%s completion" % m["expert_suffix"],
+            '<span style="color:#22c55e;">%.1f%%</span>' % (m["expert_cr"] * 100),
+            "expert baseline",
+        ), unsafe_allow_html=True)
+    with c2:
+        if m["mid_cr"] is not None:
+            mid_str = "%.1f%%" % (m["mid_cr"] * 100)
+        else:
+            mid_str = "N/A"
+        st.markdown(_stat_card(
+            "*_%s completion" % m["mid_suffix"],
+            '<span style="color:#3b82f6;">%s</span>' % mid_str,
+            "mid tier",
+        ), unsafe_allow_html=True)
+    with c3:
+        st.markdown(_stat_card(
+            "*_%s completion" % m["novice_suffix"],
+            '<span style="color:#f59e0b;">%.1f%%</span>' % (m["novice_cr"] * 100),
+            "novice tier",
+        ), unsafe_allow_html=True)
+
+    _analysis_box(m["m5_key"], M5_ANALYSIS)
+
+
+def render_m6_detail(m):
+    rates = m["rates"]
+    missing = m["missing_skills"]
+    skill_suffixes = m["skill_suffixes"]
+    m6_color = m["m6_color"]
+    t = m["thresholds"]
+
+    # One bar per skill tier
+    for role in ("novice", "mid", "expert"):
+        tgt = t.get("target_%s_completion" % role)
+        warn = t.get("warning_%s_completion" % role)
+        if tgt is None or warn is None:
+            continue
+        rate = rates.get(role)
+        suffix = skill_suffixes.get(role, role)
+        if rate is None:
+            st.markdown(
+                '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;margin-top:16px;">'
+                '%s (*_%s) -- no data</div>' % (role.title(), suffix),
+                unsafe_allow_html=True,
+            )
+            continue
+        lo = max(tgt - warn, 0)
+        hi = min(tgt + warn, 1.0)
+        segments = [
+            (0,  lo, "#7f1d1d", "too hard"),
+            (lo, hi, "#14532d", "target"),
+            (hi, 1.0, "#78350f", "too easy"),
+        ]
+        ticks = [(v, "%d%%" % round(v * 100)) for v in [0, lo, tgt, hi, 1.0]]
+        bar = _zone_bar_svg(rate, "%d%%" % round(rate * 100), segments, ticks, m6_color, 1.0)
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#777;margin-bottom:2px;margin-top:16px;">'
+            '%s (*_%s) completion rate</div>' % (role.title(), suffix),
+            unsafe_allow_html=True,
+        )
+        st.markdown(bar, unsafe_allow_html=True)
+
+    st.markdown('<div class="sep"></div>', unsafe_allow_html=True)
+
+    # Stat cards for each tier
+    cols = st.columns(max(len(rates), 1))
+    colors = {"novice": "#f59e0b", "mid": "#3b82f6", "expert": "#22c55e"}
+    for i, (role, rate) in enumerate(sorted(rates.items(), key=lambda x: ["novice","mid","expert"].index(x[0]) if x[0] in ["novice","mid","expert"] else 99)):
+        with cols[i % len(cols)]:
+            suffix = skill_suffixes.get(role, role)
+            c = colors.get(role, "#a855f7")
+            st.markdown(_stat_card(
+                "%s (*_%s)" % (role.title(), suffix),
+                '<span style="color:%s;">%.1f%%</span>' % (c, rate * 100),
+                "completion rate",
+            ), unsafe_allow_html=True)
+
+    if missing:
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#777;margin-top:8px;">Missing skill tiers: %s</div>'
+            % ", ".join(missing),
+            unsafe_allow_html=True,
+        )
+
+    _analysis_box(m["m6_key"], M6_ANALYSIS)
 
 
 def render_route_viz(world, df_all):

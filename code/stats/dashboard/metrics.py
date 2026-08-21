@@ -186,6 +186,127 @@ B3_ANALYSIS = {
 }
 
 
+def classify_m4_risk_reward(time_cost, death_premium, thresholds):
+    t = thresholds
+    tgt_tc  = t.get("target_time_cost", 1.3)
+    warn_tc = t.get("warning_time_cost", 0.2)
+    tgt_dp  = t.get("target_death_premium", 1.5)
+    warn_dp = t.get("warning_death_premium", 0.3)
+    tc_ok = abs(time_cost - tgt_tc) <= warn_tc
+    dp_ok = abs(death_premium - tgt_dp) <= warn_dp
+    if tc_ok and dp_ok:
+        return "balanced", "#22c55e", "pill-balanced", 1
+    if tc_ok or dp_ok:
+        return "warning", "#eab308", "pill-warning", 0
+    return "imbalanced", "#ef4444", "pill-imbalance", 0
+
+
+def classify_m5_skill_expression(novice_expert_gap, mid_expert_gap, thresholds):
+    t = thresholds
+    tgt_ne  = t.get("target_novice_expert_gap", 0.4)
+    warn_ne = t.get("warning_novice_expert_gap", 0.15)
+    tgt_me  = t.get("target_mid_expert_gap", 0.15)
+    warn_me = t.get("warning_mid_expert_gap", 0.1)
+    ne_ok = abs(novice_expert_gap - tgt_ne) <= warn_ne
+    me_ok = abs(mid_expert_gap - tgt_me) <= warn_me
+    if ne_ok and me_ok:
+        return "expressive", "#22c55e", "pill-balanced", 1
+    if ne_ok or me_ok:
+        return "warning", "#eab308", "pill-warning", 0
+    return "flat", "#ef4444", "pill-imbalance", 0
+
+
+def classify_m6_progression_fit(rates, thresholds):
+    """Classify progression fit based on per-skill completion rates.
+    rates: dict mapping role name to completion rate, e.g. {"novice": 0.3, ...}
+    """
+    t = thresholds
+    checks = []
+    for role in ("novice", "mid", "expert"):
+        tgt = t.get("target_%s_completion" % role)
+        warn = t.get("warning_%s_completion" % role)
+        if tgt is None or warn is None:
+            continue
+        rate = rates.get(role)
+        if rate is not None:
+            checks.append(abs(rate - tgt) <= warn)
+    if not checks:
+        return "warning", "#eab308", "pill-warning", 0
+    good = sum(checks)
+    if good == len(checks):
+        return "aligned", "#22c55e", "pill-balanced", 1
+    if good >= 1:
+        return "warning", "#eab308", "pill-warning", 0
+    return "misaligned", "#ef4444", "pill-imbalance", 0
+
+
+M4_ANALYSIS = {
+    "balanced": (
+        "Risk-reward -- well balanced",
+        "The coin-collecting playstyle costs a reasonable amount of extra time and deaths "
+        "compared to the baseline. The optional challenge feels worth pursuing.",
+        "Good balance. Monitor after adding or moving collectibles.",
+    ),
+    "warning": (
+        "Risk-reward -- partially off-target",
+        "Either the time cost or the death premium of the coin-collecting path is outside "
+        "the target range. The optional challenge may feel too cheap or too punishing.",
+        "Check whether collectible placement encourages excessive backtracking or dangerous detours.",
+    ),
+    "imbalanced": (
+        "Risk-reward -- imbalanced",
+        "Both time cost and death premium are outside target. The coin-collecting path is either "
+        "trivially free or prohibitively expensive.",
+        "Revisit collectible placement. Good risk-reward means the reward path is noticeably "
+        "harder but not dramatically so.",
+    ),
+}
+
+M5_ANALYSIS = {
+    "expressive": (
+        "Skill expression -- clear differentiation",
+        "Expert players outperform novices by the expected margin, and mid-level players sit "
+        "in between. The level rewards skill without being all-or-nothing.",
+        "Good differentiation. Check that the gap does not collapse on layout changes.",
+    ),
+    "warning": (
+        "Skill expression -- partially flat",
+        "One of the two skill gaps (novice-expert or mid-expert) is outside target. "
+        "The level may not differentiate skill levels well in one segment.",
+        "Look at which gap is off. A small novice-expert gap suggests the level is too "
+        "forgiving; a small mid-expert gap suggests a skill ceiling.",
+    ),
+    "flat": (
+        "Skill expression -- low",
+        "Both skill gaps are outside target. The level does not meaningfully differentiate "
+        "between skill levels -- everyone succeeds or fails at similar rates.",
+        "Add optional challenges, time-pressure sections, or execution-heavy shortcuts "
+        "that reward better play.",
+    ),
+}
+
+M6_ANALYSIS = {
+    "aligned": (
+        "Progression fit -- well aligned",
+        "Each skill tier completes the level at roughly the intended rate. The level is "
+        "appropriately challenging for its place in the progression.",
+        "Continue monitoring. Progression balance is sensitive to difficulty curve changes.",
+    ),
+    "warning": (
+        "Progression fit -- partially off-target",
+        "At least one skill tier's completion rate is outside its target range. "
+        "The level may be too easy for some players or too hard for others.",
+        "Check which tier is off and adjust difficulty accordingly.",
+    ),
+    "misaligned": (
+        "Progression fit -- misaligned",
+        "Multiple skill tiers have completion rates far from their targets. "
+        "The level's difficulty does not match its intended position in the progression.",
+        "A full difficulty review is recommended with per-tier testing.",
+    ),
+}
+
+
 def compute_world_metrics(world, cfg, df_all):
     results = {}
     for metric_key, metric_cfg in cfg.items():
@@ -316,6 +437,148 @@ def compute_world_metrics(world, cfg, df_all):
                 "b3_key": b3_key,
                 "b3_color": b3_color,
                 "b3_pill": b3_pill,
+                "score_pt": score_pt,
+                "thresholds": thresholds,
+            }
+
+        elif "M4" in metric_key.upper() or "risk_reward" in metric_key.lower():
+            personas_cfg = metric_cfg.get("personas", {})
+            collector_prefix = personas_cfg.get("collector", "coin_collector")
+            baseline_prefix = personas_cfg.get("baseline", "regular")
+            sub = df_all[df_all["world"] == world]
+            # Match by persona prefix: coin_collector matches coin_collector_expert, etc.
+            col_runs = sub[sub["persona"].str.rsplit("_", n=1).str[0] == collector_prefix]
+            base_runs = sub[sub["persona"].str.rsplit("_", n=1).str[0] == baseline_prefix]
+            if len(col_runs) == 0 or len(base_runs) == 0:
+                missing = []
+                if len(col_runs) == 0:
+                    missing.append(collector_prefix + "_*")
+                if len(base_runs) == 0:
+                    missing.append(baseline_prefix + "_*")
+                results[metric_key] = {
+                    "error": "No runs with persona prefix: %s" % ", ".join(missing)
+                }
+                continue
+            col_success = col_runs[col_runs["cause_of_death"].str.lower() == "success"]
+            base_success = base_runs[base_runs["cause_of_death"].str.lower() == "success"]
+            col_avg_time = col_success["elapsed_time"].mean() if len(col_success) > 0 else None
+            base_avg_time = base_success["elapsed_time"].mean() if len(base_success) > 0 else None
+            if col_avg_time is not None and base_avg_time is not None and base_avg_time > 0:
+                time_cost = col_avg_time / base_avg_time
+            else:
+                time_cost = None
+            col_deaths_total = (col_runs["cause_of_death"].str.lower() != "success").sum()
+            col_successes = (col_runs["cause_of_death"].str.lower() == "success").sum()
+            base_deaths_total = (base_runs["cause_of_death"].str.lower() != "success").sum()
+            base_successes = (base_runs["cause_of_death"].str.lower() == "success").sum()
+            col_dpr = col_deaths_total / max(col_successes, 1)
+            base_dpr = base_deaths_total / max(base_successes, 1)
+            death_premium = col_dpr / max(base_dpr, 0.01)
+            if time_cost is not None:
+                m4_key, m4_color, m4_pill, score_pt = classify_m4_risk_reward(
+                    time_cost, death_premium, thresholds
+                )
+            else:
+                m4_key, m4_color, m4_pill, score_pt = "warning", "#eab308", "pill-warning", 0
+            results[metric_key] = {
+                "type": "M4",
+                "time_cost": round(time_cost, 3) if time_cost is not None else None,
+                "death_premium": round(death_premium, 3),
+                "collector_avg_time": round(col_avg_time, 2) if col_avg_time else None,
+                "baseline_avg_time": round(base_avg_time, 2) if base_avg_time else None,
+                "collector_dpr": round(col_dpr, 2),
+                "baseline_dpr": round(base_dpr, 2),
+                "collector_prefix": collector_prefix,
+                "baseline_prefix": baseline_prefix,
+                "m4_key": m4_key,
+                "m4_color": m4_color,
+                "m4_pill": m4_pill,
+                "score_pt": score_pt,
+                "thresholds": thresholds,
+            }
+
+        elif "M5" in metric_key.upper() or "skill_expression" in metric_key.lower():
+            skills_cfg = metric_cfg.get("skills", {})
+            expert_suffix = skills_cfg.get("expert", "expert")
+            mid_suffix = skills_cfg.get("mid", "mid")
+            novice_suffix = skills_cfg.get("novice", "novice")
+            sub = df_all[df_all["world"] == world]
+            # Match by skill suffix: expert matches coin_collector_expert, adept_expert, etc.
+            def cr_for_skill(suffix):
+                p = sub[sub["persona"].str.rsplit("_", n=1).str[-1] == suffix]
+                if len(p) == 0:
+                    return None
+                return (p["cause_of_death"].str.lower() == "success").sum() / len(p)
+            expert_cr = cr_for_skill(expert_suffix)
+            mid_cr = cr_for_skill(mid_suffix)
+            novice_cr = cr_for_skill(novice_suffix)
+            missing = []
+            if expert_cr is None:
+                missing.append("*_" + expert_suffix)
+            if novice_cr is None:
+                missing.append("*_" + novice_suffix)
+            if missing:
+                results[metric_key] = {
+                    "error": "No runs with skill suffix: %s" % ", ".join(missing)
+                }
+                continue
+            ne_gap = expert_cr - novice_cr
+            me_gap = expert_cr - mid_cr if mid_cr is not None else None
+            if me_gap is not None:
+                m5_key, m5_color, m5_pill, score_pt = classify_m5_skill_expression(
+                    ne_gap, me_gap, thresholds
+                )
+            else:
+                m5_key, m5_color, m5_pill, score_pt = "warning", "#eab308", "pill-warning", 0
+            results[metric_key] = {
+                "type": "M5",
+                "novice_expert_gap": round(ne_gap, 3),
+                "mid_expert_gap": round(me_gap, 3) if me_gap is not None else None,
+                "expert_cr": round(expert_cr, 3),
+                "mid_cr": round(mid_cr, 3) if mid_cr is not None else None,
+                "novice_cr": round(novice_cr, 3),
+                "expert_suffix": expert_suffix,
+                "mid_suffix": mid_suffix,
+                "novice_suffix": novice_suffix,
+                "m5_key": m5_key,
+                "m5_color": m5_color,
+                "m5_pill": m5_pill,
+                "score_pt": score_pt,
+                "thresholds": thresholds,
+            }
+
+        elif "M6" in metric_key.upper() or "progression" in metric_key.lower():
+            skills_cfg = metric_cfg.get("skills", {})
+            skill_suffixes = {
+                "novice": skills_cfg.get("novice", "novice"),
+                "mid": skills_cfg.get("mid", "mid"),
+                "expert": skills_cfg.get("expert", "expert"),
+            }
+            sub = df_all[df_all["world"] == world]
+            rates = {}
+            missing = []
+            for role, suffix in skill_suffixes.items():
+                p = sub[sub["persona"].str.rsplit("_", n=1).str[-1] == suffix]
+                if len(p) == 0:
+                    missing.append("*_" + suffix)
+                else:
+                    rates[role] = (p["cause_of_death"].str.lower() == "success").sum() / len(p)
+            if len(missing) == len(skill_suffixes):
+                results[metric_key] = {
+                    "error": "No runs with skill suffix: %s" % ", ".join(missing)
+                }
+                continue
+            m6_key, m6_color, m6_pill, score_pt = classify_m6_progression_fit(
+                rates, thresholds
+            )
+            results[metric_key] = {
+                "type": "M6",
+                "rates": {k: round(v, 3) for k, v in rates.items()},
+                "missing_skills": missing,
+                "skill_suffixes": skill_suffixes,
+                "m6_key": m6_key,
+                "m6_color": m6_color,
+                "m6_pill": m6_pill,
                 "score_pt": score_pt,
                 "thresholds": thresholds,
             }
