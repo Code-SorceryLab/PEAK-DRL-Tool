@@ -26,7 +26,7 @@ GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "game
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
-from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, sweep_point, tag_base_sig
+from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
@@ -1795,7 +1795,7 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
     (<code>python -m code.neuro.report --serve --open</code>); as a plain file, copy the command shown.</li>
     <li>Regenerate this page any time: <code>python -m code.neuro.report --open</code> — it
     re-reads every probe under <code>runs/probes/</code>, so it works without a finished sweep.</li>
-    <li>Each distinct config (persona · population · generation budget) gets its own section
+    <li>Each distinct config (persona · population · generation budget · sensors) gets its own section
     and its own probe folders; re-running the same config on a level replaces that level only.</li>
   </ul>
 

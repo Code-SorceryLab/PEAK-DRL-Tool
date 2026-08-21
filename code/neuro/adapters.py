@@ -59,7 +59,10 @@ def list_levels(game: str, include_disabled: bool = False) -> list[str]:
         return [str(i) for i in range(len(data.get("levels", [])))]
     with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    section = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}[game]
+    sections = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}
+    if game not in sections:
+        raise SystemExit(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})")
+    section = sections[game]
     names = list((section.get("levels") or {}).keys())
     if include_disabled:
         names += list((section.get("disabled_levels") or {}).keys())

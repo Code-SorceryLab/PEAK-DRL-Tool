@@ -102,7 +102,8 @@ No per-step rewards — that's the deepest change from DRL. There is a **fitness
 evaluated once per episode:
 
 ```
-fitness = furthest x reached (max_x_seen)  [+ 5000 win bonus if the level was completed]
+fitness = furthest x reached (max_x_seen)  [+ 5000 win bonus if the level was completed
+                                            + time left × persona time_rate (speedrunner: 25/s)]
 ```
 
 (Meat Boy's levels are 2-D mazes, so it uses BFS-distance-to-goal progress scaled to ~0–1000
@@ -199,7 +200,7 @@ successor is `python -m code.neuro.balance --game mario` (menu **[13] Full Sweep
 For each (level × seed) it evolves a fresh population, stops shortly after the first win,
 and aggregates with 95% t-CIs: **win rate, generations-to-first-win, dominant death cause,
 stuck rate, best x, learning trend** — hardest levels first. JSON lands in
-`runs/balance/report_<game>_<persona>.json`.
+`runs/balance/report_<game>_<persona>_<tag>.json` (tag = `p<pop>g<gens>[_grid]`).
 
 First real run (4 levels × 3 seeds, 12.4 min total, all seeds solved everything):
 
@@ -227,5 +228,6 @@ runs/<name>/                gen_state.npz (weights) + state.json (config, RNG,
 ```
 
 Replay the best genome: `python -m code.neuro.trainer --game mario --replay runs/mario/best.npz`.
-Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (20 tests:
-GA determinism, sensor geometry, adapter smoke tests for all four games).
+Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (35 tests:
+GA determinism, net shapes, sensor geometry, adapter/trainer smoke tests for all four games,
+balance aggregation, GA-sweep tags and verdicts).

@@ -85,12 +85,18 @@ def clear_cli():
 
 
 def play_chime():
-    """Victory chime after a fully successful training batch."""
-    if HAS_WINSOUND and CHIME_PATH.exists():
-        try:
+    """Victory chime after a fully successful training batch (winsound / afplay / aplay)."""
+    if not CHIME_PATH.exists():
+        return
+    try:
+        if HAS_WINSOUND:
             winsound.PlaySound(str(CHIME_PATH), winsound.SND_FILENAME)
-        except Exception:
-            pass
+            return
+        player = shutil.which("afplay") or shutil.which("aplay")
+        if player:
+            subprocess.Popen([player, str(CHIME_PATH)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 
 # ============================================================================
@@ -482,7 +488,7 @@ def run_training():
             level = None
 
     persona = ask_index("\n  Player persona (who should the agents play like?):",
-                        ["experienced", "novice", "speedrunner"], default="experienced")
+                        PERSONA_CHOICES, default="experienced")
     if not persona:
         return
     sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
@@ -682,7 +688,7 @@ def run_manual_play():
 def _pick_run(prompt="\n  Choose a run:"):
     runs = get_run_dirs()
     if not runs:
-        print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (14/15) first."))
+        print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (13/14) first."))
         return None
     metas = [run_meta(p) for p in runs]
     order = sorted(range(len(runs)), key=lambda i: -(metas[i].get("fitness") or 0))  # strongest first
@@ -765,7 +771,6 @@ def run_level_editor():
     # Locate the script — check both code/games/tools and project root
     candidates = [
         Path("code/games/tools/level_editor.py"),
-        Path("code/scripts/level_editor.py"),
         Path("level_editor.py"),
     ]
 
@@ -895,6 +900,19 @@ def open_balance_command():
 SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); grid = 3×11×11 tiles (368)
 
 
+def _persona_names() -> list[str]:
+    """Persona registry (code/neuro/personas.py) — read without importing numpy/pygame."""
+    try:
+        from code.neuro.personas import PERSONAS
+        names = list(PERSONAS)
+    except Exception:
+        names = ["experienced", "novice", "speedrunner"]
+    return ["experienced"] + sorted(n for n in names if n != "experienced")
+
+
+PERSONA_CHOICES = _persona_names()
+
+
 def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str = "sensor modes",
                    cost_note: str = ""):
     """Shared sweep selection: games, personas, generation budget, seeds (None = back).
@@ -904,8 +922,7 @@ def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str 
                                            if g in ("mario", "meatboy")])
     if not games:
         return None
-    personas = toggle_select("PERSONAS", ["experienced", "novice", "speedrunner"],
-                             default_indices=[0, 1, 2])
+    personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))
     if not personas:
         return None
     gens_raw = input(_DIM(f"\n    Generation budget per probe [{default_gens}]: ")).strip()
@@ -980,7 +997,7 @@ def run_ga_sweep():
     _section("BALANCE  ›  GA Sweep  (hyperparameter ablation)")
     print(_DIM("    Baseline GAConfig + one knob moved to its literature low / high bound per config\n"
                "    (hidden size, population, elite, tournament, crossover, mutation, anneal, init,\n"
-               "    action feedback, memory units). Same coverage as Full Sweep; ≈33× the probes."))
+               "    action feedback, memory units). Same coverage as Full Sweep; 23× the probes, ≈33× the episodes."))
     from code.neuro.gasweep import AXES, AXIS_DOC, cost_multiplier, sweep_configs  # lazy: numpy import
     sensors = ask_index("\n  Sensors for every config:", SENSOR_CHOICES, default="rays")
     if not sensors:
@@ -1090,7 +1107,7 @@ def show_project_status():
             print(f"   {p.name}: {_DIM('(unreadable state.json)')}")
 
     print(f"\nAlgorithm: {_WHT('fixed-topology GA')}  {_DIM('(elitism + tournament + crossover + mutation)')}")
-    print(f"Network:   {_WHT('14 sensors (or 368 grid cells) → 16 tanh → 3 (left/right/jump)')}")
+    print(f"Network:   {_WHT('14 sensors (or 368 grid cells) → H tanh (default 16) → 3 (left/right/jump)')}")
     print()
 
 
@@ -1145,7 +1162,7 @@ def main():
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
         print(_menu_item("6",  "Watch Agent",         "visualize a trained model"))
-        print(_menu_item("7",  "Watch All Models",    "side-by-side grid"))
+        print(_menu_item("7",  "Watch All Models",    "resume a run with the dashboard grid"))
         print(_menu_item("8",  "Watch Random Agent",  "random actions"))
 
         _section("TOOLS")
@@ -1168,7 +1185,10 @@ def main():
         print(_menu_item("0",  _RED("Exit")))
         print()
 
-        choice = input(_BOLD("    ⟫ ")).strip().lower()
+        try:
+            choice = input(_BOLD("    ⟫ ")).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            choice = "0"
 
         if choice == "0":
             print()

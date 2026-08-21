@@ -1,6 +1,6 @@
 """Generational neuroevolution trainer + CLI.
 
-Run:  python -m code.neuro.trainer --game mario [--level Mario1-1a] [--turbo] [--serve]
+Run:  python -m code.neuro.trainer --game mario [--level Mario1-1a] [--turbo] [--no-serve]
       python -m code.neuro.trainer --resume runs/mario
       python -m code.neuro.trainer --replay runs/mario/best.npz
 
@@ -583,4 +583,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:  # Ctrl+C is the documented way to stop a run / replay
+        print("\nstopped", flush=True)
+        raise SystemExit(130)

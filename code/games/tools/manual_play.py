@@ -18,7 +18,7 @@ for _stream in (sys.stdout, sys.stderr):
 parser = argparse.ArgumentParser()
 parser.add_argument("--game", default="platformer", help="game key")
 parser.add_argument("--fps", type=int, default=30, help="target FPS")
-parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. 1-3)")
+parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. Mario1-2; meatboy: level index)")
 parser.add_argument("--file", default=None, help="Absolute path to a .txt level file (unlisted)")
 parser.add_argument("--random", action="store_true", help="random actions instead of keyboard")
 args = parser.parse_args()
@@ -30,6 +30,11 @@ level_file = args.file  or os.environ.get('PEAK_PLAY_FILE',  None)
 # Normalize game name (mario -> platformer) if needed
 if args.game == "mario":
     args.game = "platformer"
+
+# Fail fast on a level the core can't load (otherwise it falls back to a blank world).
+if level_id and not level_file and args.game != "meatboy":
+    from code.neuro.adapters import validate_level
+    validate_level("mario" if args.game == "platformer" else args.game, level_id)
 
 # Enable manual play mode for platformer-like games
 if args.game in {"platformer", "megaman"}:

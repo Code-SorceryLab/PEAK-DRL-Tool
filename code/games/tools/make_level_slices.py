@@ -7,7 +7,7 @@ spawn/goal markers are placed on real ground at the slice edges.
 
 Why: short levels = short episodes = frequent terminals. The win bonus is
 reachable within a few hundred decisions on a slice, so credit assignment
-works from the first PPO updates, and the curriculum walks the agent from
+works from the first generations, and the curriculum walks the agent from
 slice mastery to the full level. (Same idea as ML-Agents' curriculum +
 episode-design guidance: keep episodes short, escalate difficulty.)
 
@@ -26,7 +26,7 @@ import yaml
 TILE = 32
 OVERLAP = 4          # columns of overlap between adjacent slices
 SOLID = {"#", "="}
-LEVELS_DIR = Path(__file__).resolve().parents[1] / "games" / "levels" / "platformer"
+LEVELS_DIR = Path(__file__).resolve().parents[1] / "levels" / "platformer"
 SOURCES = ["world1_1", "world1_2"]
 
 

@@ -295,6 +295,10 @@ def fmt_hms(sec: float) -> str:
 
 # ── rebuild from probes ──────────────────────────────────────────────────────
 
+def _natural(name: str):  # "2" < "10", "MM-Stage2" < "MM-Stage10"
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
+
+
 def _parse_tag(tag: str) -> tuple[int, int] | None:
     try:
         p, g = tag.split("_")[0][1:].split("g")
@@ -310,7 +314,7 @@ def format_compare(by_mode: dict[str, list[dict]], game: str) -> str:
            f"win rate over the {WIN_WINDOW} gens after it)"]
     hdr = f"{'LEVEL':<14}" + "".join(f"{m.upper() + ' FIRST WIN':>20}{m.upper() + ' WIN RATE':>18}" for m in modes)
     out += [hdr, "-" * len(hdr)]
-    levels = sorted({r["level"] for rows in by_mode.values() for r in rows})
+    levels = sorted({r["level"] for rows in by_mode.values() for r in rows}, key=_natural)
     for lvl in levels:
         line = f"{lvl:<14}"
         for m in modes:
@@ -368,10 +372,7 @@ def load_probe_cells(game: str, persona: str, tag: str,
         cells.setdefault(cell["level"], []).append(cell)
     for lst in cells.values():
         lst.sort(key=lambda c: c["seed"])
-
-    def natural(name: str):  # "2" < "10", "MM-Stage2" < "MM-Stage10"
-        return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
-    return dict(sorted(cells.items(), key=lambda kv: natural(kv[0])))
+    return dict(sorted(cells.items(), key=lambda kv: _natural(kv[0])))
 
 
 def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,

@@ -11,7 +11,8 @@ probes.*
    (or the generation budget). Default seeds `1234 2025 31337` — the same set the paper
    matrix used, keep them for comparability.
 2. **Aggregate** — per level, means ± 95% t-CIs across seeds, merged into
-   `runs/balance/report_<game>_<persona>.json` (new probes extend the file; they don't clobber it).
+   `runs/balance/report_<game>_<persona>_<tag>.json` (tag = `p<pop>g<gens>[_grid]`; new probes
+   extend the file; they don't clobber it).
    **Sensor ablation:** `--sensors grid` swaps the 6 rays for the 3×11×11 tile window
    (solid / collectible / hazard, Dijkstra dropped, 368 inputs). Probes land under a
    `p10g25_grid` tag so they never overwrite the ray probes; `--compare` prints both side by
@@ -24,7 +25,7 @@ probes.*
    0.005 (≈ 1/L) · 0.15 · 0.5, mutation σ 0.02 · 0.15 · 0.5, anneal 0.3 · 0.5 · off, init σ
    0.25 (Xavier) · 0.5 · 1.0, hidden 8 · 16 · 32 · 64, last-action feedback, 2–3 memory units:
    23 configs, each probed on every enabled level × 3 seeds. Probes land under
-   `runs/gasweep/<game>/<persona>/p<pop>g<gens>[_grid]_<axis>-<value>/` and aggregate into
+   `runs/gasweep/<game>/<persona>/p<pop>g<gens>[_grid]_b<sig>_<axis>-<value>/<level>_<seed>/` and aggregate into
    `runs/balance/gasweep_*.json`; the **GA sweep** page shows a generations-to-first-win vs
    parameter-count capacity curve with a flat / improves / degrades verdict, a bound track per
    axis, Δ tables and learning-curve overlays, and the per-axis-winner **recommended config**
@@ -38,7 +39,7 @@ probes.*
    crossover 0 hurt Meat Boy, memory units and action feedback help only the sprinting persona.
 3. **Report** — `python -m code.neuro.report --open` renders every game's JSON into one
    self-contained page, `runs/balance/report.html`: ranked difficulty table, death-location
-   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12], [13] and [14] offer to open it.
+   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12] opens it; [13], [14] and [15] offer to.
 
 ## The metric table
 
@@ -203,15 +204,15 @@ Amr's Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer
 reads those CSVs recursively from `runs/` (configured in
 `code/stats/MarioThresholds.yaml`) and computes B1 challenge calibration, B2 punishment
 severity, and B3 strategy diversity (route clustering) with per-level target bands and a
-route-overlay view on the level grid. Launch: menu → Analyze / Balance → "stats
-dashboard", or `streamlit run code/stats/dashboard/app.py`.
+route-overlay view on the level grid. Launch: `streamlit run code/stats/dashboard/app.py`
+(not in the menu).
 
 Speed: `balance.py --workers N` runs probes in parallel processes (default cores-1;
 each (level x seed) cell is independent, so wall clock divides by the worker count).
 The trainer also skips all frame JPEG encoding while no dashboard tab is connected.
 
 **Per-config reports:** probe checkpoints live under
-`runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` where `tag = p<pop_size>g<gens>` (e.g. `p50g40`),
+`runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` where `tag = p<pop_size>g<gens>[_grid]` (e.g. `p10g40`),
 so different personas, population sizes, and generation budgets never overwrite each other;
 re-probing a level with the same config replaces just that level. The Balance Command
 (`python -m code.neuro.report --open`, menu 12) re-aggregates every probe on disk into

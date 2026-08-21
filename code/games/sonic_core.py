@@ -19,11 +19,9 @@ This file is a STANDALONE copy — the original platformer_core.py is untouched.
 from __future__ import annotations
 import os
 import math
-import importlib
 import heapq
 from collections import deque
-from dataclasses import dataclass
-from typing import List, Tuple, Dict, Any, Optional, Set
+from typing import List, Tuple, Dict, Set
 import numpy as np
 import pygame
 import time

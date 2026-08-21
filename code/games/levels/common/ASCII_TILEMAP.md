@@ -6,7 +6,7 @@ Use these characters in `.txt` level files and in the level editor.
 
 | Char | Meaning |
 | --- | --- |
-| `.` | Air / empty space |
+| `.` | Air / empty space (a space character also reads as air) |
 | `P` | Player start |
 | `#` | Solid ground |
 | `=` | One-way platform |
@@ -36,7 +36,7 @@ Use these characters in `.txt` level files and in the level editor.
 | `H` | Ladder |
 | `M` | Met enemy |
 | `B` | Bat enemy |
-| `D` | Boss door / exit door |
+| `D` | Boss door / exit door (goal-coloured tile only — does **not** complete the level; use `G`) |
 | `X` | Boss spawn |
 
 ## Meat Boy
