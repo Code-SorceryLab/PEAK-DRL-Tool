@@ -56,10 +56,14 @@ a 291-parameter network that learned this from raycasts and a distance score.</i
 
 ### Neuroevolution Core
 
-- **Fixed-Topology GA**: numpy MLP (14 → 16 tanh → 3 sigmoid, ~290 weights) evolved by
-  elitism, tournament selection, uniform crossover, and gaussian mutation
+- **Fixed-Topology GA**: numpy MLP (14 → 16 tanh → 3 sigmoid, 291 weights at the default size) evolved by
+  elitism, tournament selection, uniform crossover, and gaussian mutation; hidden size, last-action
+  feedback, and Jordan memory units are `GAConfig` knobs (`--hidden`, `--action-feedback`, `--memory`)
 - **14-Sensor Perception**: six raycasts (forward, back, ±30°, ±60°), forward enemy distance,
   pit probe, velocity, grounded/jump state, nearby question blocks
+- **Two Sensor Modes**: `rays` (14 inputs, default) or `grid` — a 3×11×11 tile window plus
+  body senses (368 inputs) — switchable with `--sensors`, compared head-to-head by the
+  Sensor Ablation sweep (menu 14)
 - **10 Parallel Simulations**: the whole population plays the same level simultaneously,
   each genome in its own game instance
 - **Distance Fitness + Win Bonus**: fitness = furthest x reached (+5000 on a win);
@@ -75,8 +79,17 @@ a 291-parameter network that learned this from raycasts and a distance score.</i
   progress at death, and a sampled (x, y) route trace
 - **Stats Dashboard (Streamlit)**: B1 challenge calibration, B2 punishment severity, B3 strategy
   diversity (route clustering), win rate by persona, and route overlays drawn on the level grid
-- **Web Balance Report**: self-contained HTML with ranked metric tables, death heatmaps,
-  cause bars, and per-seed learning curves
+- **Balance Command Center** (menu 12): one self-contained HTML report over every run and
+  probe on disk — per-game sections, balance radar, level cards that open into dialogs with
+  death heatmaps, cause bars, per-seed learning curves, the exact GA hyperparameters used, and
+  ▶ Watch buttons that launch replays
+- **Rays vs Grid Ablation**: the same sweep run under both sensor modes, with per-level
+  learning overlays and a comparison page
+- **GA Hyperparameter Sweep** (menu 15): one `GAConfig` knob at a time moved to its literature
+  low and high bound (De Jong, Grefenstette, Schaffer, Miller & Goldberg, Such et al.) plus
+  hidden 8/16/32/64, action feedback and memory units — 23 configs — reported on a dedicated
+  page with a generations-to-first-win vs parameter-count capacity curve and verdict, per-axis
+  bound tracks, Δ tables, and a recommended config per game (`--confirm` probes the composite)
 
 ### Player Personas
 
@@ -137,12 +150,24 @@ python menu.py
 ```
 Follow interactive prompts — train, watch, play, edit levels, and run balance reports.
 
+| | Train | | Play | | Tools |
+|---|---|---|---|---|---|
+| 1 | Project status | 5 | Play manually (any game/level) | 9 | Level editor |
+| 2 | Train single (game · level · persona · sensors) | 6 | Watch a trained agent | 10 | Toggle levels |
+| 3 | Train all levels of one game | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
+| 4 | Train the full game × level grid | 8 | Watch a random agent | 12 | Balance Command center |
+| | | | | 13 | Full sweep (games × personas × seeds) |
+| | | | | 14 | Sensor ablation (rays vs grid) |
+| | | | | 15 | GA sweep (one knob at a time vs literature bounds; best config per game) |
+
 **Via Command Line**:
 ```bash
 python -m code.neuro.trainer --game mario                            # dashboard at :8000
-python -m code.neuro.trainer --game mario --level Mario1-1a --turbo  # one level, max speed
-python -m code.neuro.trainer --resume runs/mario                     # continue a run
-python -m code.neuro.trainer --replay runs/mario/best.npz            # watch the all-time best
+python -m code.neuro.trainer --game mario --level Mario1-2 --turbo   # one level, max speed
+python -m code.neuro.trainer --game sonic --persona speedrunner        # persona: novice / experienced / speedrunner
+python -m code.neuro.trainer --game megaman --sensors grid --seed 7    # tile-grid sensors, custom seed
+python -m code.neuro.trainer --resume runs/mario                      # continue a run
+python -m code.neuro.trainer --replay runs/mario/best.npz             # watch the all-time best
 ```
 
 Then open **http://127.0.0.1:8000/mario/index.html** for the live dashboard.
@@ -150,19 +175,31 @@ Then open **http://127.0.0.1:8000/mario/index.html** for the live dashboard.
 ### Running a Balance Sweep
 
 ```bash
-python -m code.neuro.balance --game mario --gens 40 --persona experienced
-python -m code.neuro.report --open                     # ranked difficulty report
+python -m code.neuro.balance --game mario --gens 40 --persona experienced   # probe every enabled level × 3 seeds
+python -m code.neuro.balance --game mario --gens 40 --sensors grid          # same, tile-grid sensors
+python -m code.neuro.balance --game mario --gens 40 --compare               # rays-vs-grid table (no training)
+python -m code.neuro.gasweep --game mario --gens 40 --axes hidden memory --confirm   # GA hyperparameter ablation
+python -m code.neuro.report --serve --open             # Balance Command center (▶ Watch needs --serve)
 streamlit run code/stats/dashboard/app.py              # B1/B2/B3 stats dashboard
 ```
 
-Or menu option **15 (Full Sweep)**: games × personas × seeds in one pass, parallel.
+Or from the menu: **12 Balance Command** (open the center), **13 Full Sweep** (games × personas
+× seeds, parallel), **14 Sensor Ablation** (the same sweep under rays and grid, compared),
+**15 GA Sweep** (one GA knob at a time against literature bounds → `gasweep.html`).
 
 ### Manual Gameplay
 
+Menu option **5** picks a game and level, prints the controls, and opens the window. Or directly:
+
 ```bash
-python code/games/tools/manual_play.py
+python -m code.games.tools.manual_play --game platformer --level Mario1-2   # mario
+python -m code.games.tools.manual_play --game meatboy --level 3             # meatboy levels are indices
+python -m code.games.tools.manual_play --game sonic --random                # random actions
 ```
-Arrow keys to move, space to jump. F-keys toggle debug overlays.
+
+`A`/`D` move, `Shift` run, `Space` jump, `Z` fire (Mario / Megaman), `W`/`S` climb (Megaman),
+`S` spin dash (Sonic), `Esc` quits. Meat Boy also takes the arrow keys. F-keys toggle debug
+overlays (see [Debugging](#debugging)).
 
 ***
 
@@ -178,7 +215,8 @@ reset, step, solid/hazard queries, fitness, and episode stats.
 
 ### Layer 3: Sensors
 Game-agnostic raycast marching and scalar senses (`code/neuro/sensors.py`) turn any adapter
-into the 14-float observation vector.
+into the 14-float observation vector — or, in `grid` mode, a 3×11×11 tile window plus body
+senses (368 floats). The network input size follows the mode automatically.
 
 ### Layer 4: Evolution
 `GAConfig` + `Population` (`code/neuro/evolution.py`) hold the flat weight vectors and evolve
@@ -200,10 +238,10 @@ Everything a dev can tweak, in one table:
 
 | Knob | Where | What it changes |
 |---|---|---|
-| GA hyperparameters | `GAConfig` in `code/neuro/evolution.py` | population size (10), elite (4), tournament k (5), crossover rate (0.7), mutation rate/σ (0.15/0.3), episode frame budget (3600), stuck kill (300 frames), curriculum `advance_wins` (3), win bonus (5000), seed |
+| GA hyperparameters | `GAConfig` in `code/neuro/evolution.py` | population size (10), elite (4), tournament k (5), crossover rate (0.7), mutation rate/σ (0.15/0.15), post-first-win anneal factor (0.5 — the 2026-08-20 GA sweep's one universal winner), episode frame budget (3600), stuck kill (300 frames), curriculum `advance_wins` (3), win bonus (5000), seed (42), hidden (16), action_feedback (off), memory (0) — these defaults are the GA-sweep baseline |
 | Player personas | `code/neuro/personas.py` | sprint capability, sensor reaction period, time-left fitness bonus |
-| Network shape | `code/neuro/net.py` | hidden size (16), outputs (add e.g. a climb action for Megaman ladders) |
-| Sensors | `code/neuro/sensors.py` | ray angles/count, max distance (250px), march step, pit-probe depth (4 tiles) |
+| Network shape | `--hidden / --action-feedback / --memory` (GAConfig), `code/neuro/net.py` | hidden size (16), previous-action inputs, Jordan memory units; outputs (add e.g. a climb action for Megaman ladders) |
+| Sensors | `--sensors rays\|grid`, `code/neuro/sensors.py` | sensor mode per run, ray angles/count, max distance (250px), march step, pit-probe depth (4 tiles), grid half-width (5 → 11×11) |
 | Levels | `code/games/levels/*/*.txt` + `game_config.yaml` / `meatboy_config.yaml` | ASCII tilemaps (goal char is `G`, never `D`) — or paint them in the level editor |
 | Game feel / physics | per-game blocks in `game_config.yaml`, `meatboy_config.yaml` | gravity, jump velocity, run speed, coyote frames, wall-jump forces, per-level `time_limit` |
 | Balance probes | `code/neuro/balance.py` | seed set (default 1234/2025/31337 — keep for paper comparability), gens budget, `--workers` |
@@ -303,17 +341,13 @@ To create a new level:
 
 ## Debugging
 
-Run manual play to see real-time visualizations:
-```bash
-python code/games/tools/manual_play.py
-```
-
-Toggle debug features with keyboard:
+Run manual play (menu 5, or `python -m code.games.tools.manual_play --game platformer`) to see
+real-time visualizations. Toggle debug features with the keyboard (Mario, Megaman, Sonic):
 - `F1`: Sensor rays
-- `F2`: Free camera
+- `F2`: Free camera (pan with `I` `J` `K` `L`)
 - `F3`: Slow motion
 - `F4`: Hitboxes
-- `F5`: Agent vision
+- `F5`: Agent max view
 
 The browser dashboard exposes the same debug family live during training: raycasts with hit
 dots, tile outlines, pit-probe boxes, hitboxes, and the tile grid.
@@ -329,8 +363,9 @@ touches every import in `code/games/` and hasn't been worth the churn.
 python -m pytest code/tests/ -q
 ```
 
-Covers GA determinism (seeded mutation/crossover/elitism), sensor raycasts on synthetic grids,
-and headless adapter smoke tests for all four games.
+35 tests: GA determinism (seeded mutation/crossover/elitism), net parameter counts and the
+feedback/memory carry, sensor raycasts and the tile grid on synthetic levels, headless adapter
+and trainer smoke tests, balance-probe aggregation, and the GA-sweep config/tag/verdict logic.
 
 ***
 

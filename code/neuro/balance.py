@@ -56,18 +56,20 @@ def config_tag(pop_size: int, gens: int, sensors: str = "rays") -> str:
     return f"p{pop_size}g{gens}" + ("" if sensors == "rays" else f"_{sensors}")
 
 
-def probe_dir(game: str, persona: str, tag: str, level: str, seed: int) -> str:
-    return os.path.join(PROBES_ROOT, game, persona, tag, f"{level}_{seed}".replace(" ", "_"))
+def probe_dir(game: str, persona: str, tag: str, level: str, seed: int,
+              root: str = PROBES_ROOT) -> str:
+    return os.path.join(root, game, persona, tag, f"{level}_{seed}".replace(" ", "_"))
 
 
 def probe(game: str, level: str, seed: int, gens: int, persona: Persona | None = None,
-          sensors: str = "rays") -> dict:
+          sensors: str = "rays", overrides: dict | None = None, run_dir: str | None = None) -> dict:
     """One (level, seed) cell: evolve a fresh population, stop WIN_WINDOW gens after
-    the first win (or at the gen budget), and summarize what happened."""
+    the first win (or at the gen budget), and summarize what happened.
+    `overrides` are extra GAConfig fields (the GA sweep varies one at a time)."""
     from .trainer import Trainer  # lazy: pulls in pygame
     persona = persona or PERSONAS["experienced"]
-    cfg = GAConfig(seed=seed, sensors=sensors)
-    run_dir = probe_dir(game, persona.name, config_tag(cfg.pop_size, gens, sensors), level, seed)
+    cfg = GAConfig(seed=seed, sensors=sensors, **(overrides or {}))
+    run_dir = run_dir or probe_dir(game, persona.name, config_tag(cfg.pop_size, gens, sensors), level, seed)
     trainer = Trainer(game, level, cfg, run_dir=run_dir, persona=persona)
     pop = trainer.pop
 
@@ -184,9 +186,28 @@ def _pool_init() -> None:
     pygame.init()
 
 
-def _probe_job(job: tuple) -> tuple[str, int, dict]:
-    game, lvl, seed, gens, persona, sensors = job
-    return lvl, seed, probe(game, lvl, seed, gens, persona, sensors)
+def _probe_job(job: tuple) -> tuple[tuple, dict]:
+    """job = the positional args of probe(); returns (job, cell) so callers can label output."""
+    return job, probe(*job)
+
+
+def run_jobs(jobs: list[tuple], workers: int, label=None) -> None:
+    """Run probe jobs sequentially (workers <= 1) or in a headless process pool, printing one
+    line per finished cell. `label(job)` names the cell (default: "<level> seed <seed>")."""
+    label = label or (lambda j: f"{j[1]} seed {j[2]}")
+
+    def _record(i: int, job: tuple, cell: dict) -> None:
+        bg = f"best gen {cell['best_gen']}" if cell["best_gen"] else "no progress"
+        print(f"[{i}/{len(jobs)}] {label(job)}: {bg}, win rate {cell['win_rate']:.0%}, "
+              f"best_x {cell['best_x']}, {fmt_hms(cell['train_time_s'])}", flush=True)
+
+    if workers <= 1:
+        for i, job in enumerate(jobs, 1):
+            _record(i, *_probe_job(job))
+    else:
+        with mp.Pool(workers, initializer=_pool_init) as pool:
+            for i, (job, cell) in enumerate(pool.imap_unordered(_probe_job, jobs), 1):
+                _record(i, job, cell)
 
 
 def aggregate(cells: list[dict]) -> dict:
@@ -318,10 +339,11 @@ def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR) -> s
     return format_compare(by_mode, game)
 
 
-def load_probe_cells(game: str, persona: str, tag: str) -> dict[str, list[dict]]:
+def load_probe_cells(game: str, persona: str, tag: str,
+                     root: str = PROBES_ROOT) -> dict[str, list[dict]]:
     """Re-summarize every probe dir under one (game, persona, tag) from its state.json."""
     cells: dict[str, list[dict]] = {}
-    for sp in sorted(glob.glob(os.path.join(PROBES_ROOT, game, persona, tag, "*", "state.json"))):
+    for sp in sorted(glob.glob(os.path.join(root, game, persona, tag, "*", "state.json"))):
         try:
             with open(sp, encoding="utf-8") as f:
                 st = json.load(f)
@@ -352,9 +374,10 @@ def load_probe_cells(game: str, persona: str, tag: str) -> dict[str, list[dict]]
     return dict(sorted(cells.items(), key=lambda kv: natural(kv[0])))
 
 
-def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR) -> str | None:
-    """Aggregate one (game, persona, tag) probe set into runs/balance/report_*.json."""
-    cells = load_probe_cells(game, persona, tag)
+def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
+                 root: str = PROBES_ROOT, prefix: str = "report") -> str | None:
+    """Aggregate one (game, persona, tag) probe set into <out_dir>/<prefix>_*.json."""
+    cells = load_probe_cells(game, persona, tag, root)
     if not cells:
         return None
     parsed = _parse_tag(tag) or (next(iter(cells.values()))[0]["pop_size"], 0)
@@ -365,7 +388,7 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR) 
             c.pop("_config", None)
     rows = [aggregate(c) for c in cells.values()]
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"report_{game}_{persona}_{tag}.json")
+    out_path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{tag}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({"game": game, "persona": persona, "tag": tag, "pop_size": parsed[0],
                    "gens_budget": parsed[1], "seeds": seeds,
@@ -438,20 +461,7 @@ def main() -> None:
           f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag}]\n", flush=True)
 
     t0 = time.time()
-
-    def _record(i: int, lvl: str, seed: int, cell: dict) -> None:
-        bg = f"best gen {cell['best_gen']}" if cell["best_gen"] else "no progress"
-        print(f"[{i}/{len(jobs)}] {lvl} seed {seed}: {bg}, win rate {cell['win_rate']:.0%}, "
-              f"best_x {cell['best_x']}, {fmt_hms(cell['train_time_s'])}", flush=True)
-
-    if workers <= 1:
-        for i, job in enumerate(jobs, 1):
-            lvl, seed, cell = _probe_job(job)
-            _record(i, lvl, seed, cell)
-    else:
-        with mp.Pool(workers, initializer=_pool_init) as pool:
-            for i, (lvl, seed, cell) in enumerate(pool.imap_unordered(_probe_job, jobs), 1):
-                _record(i, lvl, seed, cell)
+    run_jobs(jobs, workers)
 
     # The probe dirs are the source of truth: re-aggregate everything under this config,
     # so earlier levels probed with the same config stay and re-probed levels are replaced.

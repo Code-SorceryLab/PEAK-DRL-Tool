@@ -24,8 +24,8 @@ import pygame
 from .adapters import GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
-from .net import NeuralNet
-from .sensors import N_BODY, SENSOR_MODES, read_sensors, sensor_dim
+from .net import NeuralNet, make_net
+from .sensors import N_BODY, SENSOR_MODES, read_sensors
 
 THUMB_SCALE = 0.35          # thumbnail downscale factor
 THUMB_INTERVAL = 0.20       # s between thumbnail encodes (real-time mode)
@@ -120,7 +120,7 @@ class Trainer:
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
-        self.net_proto = NeuralNet(sensor_dim(cfg.sensors))
+        self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.game = game  # tags embedded in best.npz
@@ -143,7 +143,7 @@ class Trainer:
         self.slots = [
             EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus,
                                  sprint=self.persona.sprint, time_rate=self.persona.time_rate),
-                    NeuralNet(self.net_proto.n_inputs))
+                    make_net(cfg))
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
@@ -180,6 +180,8 @@ class Trainer:
             "elite": self.cfg.elite,
             "mut_rate": self.cfg.mutation_rate,
             "pop_size": self.cfg.pop_size,
+            "hidden": self.cfg.hidden,
+            "sensors": self.cfg.sensors,
             "level": self.level or "auto",
             "levels": self.levels or ([self.level] if self.level else []),
             "persona": self.persona.name,
@@ -282,6 +284,7 @@ class Trainer:
     def run_generation(self) -> list[float]:
         for i, slot in enumerate(self.slots):
             slot.net.set_weights(self.pop.weights[i])
+            slot.net.reset()   # clear action-feedback / memory carry at the episode boundary
             slot.adapter.reset()
             slot.frames = 0
             slot.stuck_anchor_x = 0.0
@@ -472,20 +475,22 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
     persona = PERSONAS["experienced"]
-    sensors = "rays"
+    net_cfg: dict = {}  # sensors / hidden / action_feedback / memory the run was trained with
     state_path = os.path.join(os.path.dirname(path), "state.json")
     if os.path.exists(state_path):
         with open(state_path, encoding="utf-8") as f:
             meta = json.load(f)
         persona = PERSONAS.get(meta.get("persona") or "", persona)
-        sensors = (meta.get("config") or {}).get("sensors", sensors)
+        saved = meta.get("config") or {}
+        net_cfg = {k: saved[k] for k in ("sensors", "hidden", "action_feedback", "memory") if k in saved}
         if level is None and meta.get("best_level"):  # default to the record's level
             level = meta["best_level"]
             print(f"replaying on level [{level}] as [{persona.name}] "
                   f"(where the record was set)", flush=True)
     weights = np.load(path)["weights"]
-    cfg = GAConfig(pop_size=1, sensors=sensors)
-    net = NeuralNet(sensor_dim(sensors))
+    cfg = GAConfig(pop_size=1, **net_cfg)
+    sensors = cfg.sensors
+    net = make_net(cfg)
     net.set_weights(weights.astype(np.float32))
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
                            sprint=persona.sprint, time_rate=persona.time_rate)
@@ -497,6 +502,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     cur_level = level if level is not None else (all_levels[0] if all_levels else None)
     while True:
         adapter.reset()
+        net.reset()
         while adapter.alive:
             vec, rays, tiles = read_sensors(adapter, sensors)
             slot0 = trainer.slots[0]
@@ -533,6 +539,11 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--sensors", default="rays", choices=SENSOR_MODES,
                     help="exteroception: 6 rays + probes (14 inputs) or a 3x11x11 tile grid (368)")
+    ap.add_argument("--hidden", type=int, default=16, help="hidden tanh units")
+    ap.add_argument("--action-feedback", action="store_true",
+                    help="feed the previous action (move, jump) back in as 2 extra inputs")
+    ap.add_argument("--memory", type=int, default=0,
+                    help="Jordan memory units: extra outputs looped back as inputs next frame")
     args = ap.parse_args()
 
     if args.results:
@@ -560,7 +571,8 @@ def main() -> None:
         print(f"resumed {args.resume} at gen {pop.generation}", flush=True)
     else:
         pop = None
-        cfg = GAConfig(seed=args.seed, sensors=args.sensors)
+        cfg = GAConfig(seed=args.seed, sensors=args.sensors, hidden=args.hidden,
+                       action_feedback=args.action_feedback, memory=args.memory)
 
     if args.level is not None:
         from .adapters import validate_level

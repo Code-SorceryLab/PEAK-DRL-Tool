@@ -203,8 +203,10 @@ def get_run_dirs():
     including balance probes (runs/probes/<game>/<persona>/<tag>/<level>_<seed>)."""
     if not RUNS_DIR.exists():
         return []
+    gasweep = RUNS_DIR / "gasweep"  # hundreds of ablation cells — watch those from the command center
     return sorted(p.parent for p in RUNS_DIR.rglob("state.json")
-                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay")
+                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay"
+                  and gasweep not in p.parents)
 
 
 def run_meta(run_dir: Path) -> dict:
@@ -620,136 +622,61 @@ def train_complete_grid():
 # PLAY / WATCH
 # ============================================================================
 
+# Keys exactly as code/games/tools/manual_play.py (and MeatboyPlayer) read them.
+_PLAY_CONTROLS = {
+    "mario":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+                ("Z", "Fire (with fire flower)")],
+    "megaman": [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE", "Jump"),
+                ("W / S", "Climb ladder"), ("Z", "Fire")],
+    "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+                ("S", "Crouch / spin dash")],
+    "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
+}
+_DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
+               ("F4", "Hitboxes"), ("F5", "Agent max view")]
+
+
 def run_manual_play():
-    """Manual gameplay interface — lets the user play any configured game with keyboard controls."""
-
-    # ── Panel width matches the main header (58 chars) ────────────────────────
-    W = 58
-
-    def _box_top():
-        print(_DIM("    ╔" + "═" * W + "╗"))
-
-    def _box_mid():
-        print(_DIM("    ╠" + "═" * W + "╣"))
-
-    def _box_bot():
-        print(_DIM("    ╚" + "═" * W + "╝"))
-
-    def _box_row(text="", color_fn=None):
-        """Print a single ║-bordered row, centered if no color_fn, left-padded otherwise."""
-        if color_fn:
-            inner = f"  {text}"
-            pad   = W - len(inner)
-            print(_DIM("    ║") + color_fn(inner) + _DIM(" " * max(pad, 0) + "║"))
-        else:
-            centered = text.center(W)
-            print(_DIM("    ║" + centered + "║"))
-
-    def _box_kv(key: str, val: str, key_w: int = 16):
-        """Print a key-value row inside the box."""
-        k_part  = _YEL(f"  {key:<{key_w}}")
-        v_part  = _WHT(val)
-        pad     = W - 2 - key_w - len(val)
-        print(_DIM("    ║") + k_part + v_part + _DIM(" " * max(pad, 0) + "║"))
-
-    # ── Resolve available games (meatboy has no manual key mapping) ───────────
+    """Play Manually — pick a game and level, drive it with the keyboard."""
     _refresh_screen()
-    _section("MANUAL PLAY  ›  Select Game")
+    _section("PLAY  ›  Manual")
 
-    available_games = [g for g in get_available_games() if g != "meatboy"]
-    if not available_games:
-        print(_RED("  ✖  No game configurations found"))
+    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
+    if not game:
         return
+    levels = get_levels_for_game(game)
+    level = None
+    if levels:
+        level = ask_index("\n  Choose a level:", ["auto (first level)"] + levels,
+                          default="auto (first level)")
+        if level is None:
+            return
+        if level.startswith("auto"):
+            level = None
 
-    # ── Themed game list ──────────────────────────────────────────────────────
+    W = 50
     print()
-    for i, game in enumerate(available_games, 1):
-        print(f"    {_YEL(f'[{i}]')}  {_WHT(game)}")
-    back_idx = len(available_games) + 1
-    print(f"    {_YEL(f'[{back_idx}]')}  {_DIM('Back')}")
+    print(_DIM("    " + "─" * W))
+    print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
+    for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
+        print(f"    {_YEL(f'{key:<16}')}{what}")
+    if game != "meatboy":  # meatboy has no debug manager
+        print()
+        print(f"    {_BOLD('Debug overlays')}")
+        for key, what in _DEBUG_KEYS:
+            print(f"    {_YEL(f'{key:<16}')}{what}")
+    print(_DIM("    " + "─" * W))
     print()
 
-    raw = input(_BOLD("    ⟫ ")).strip()
-    try:
-        idx = int(raw)
-    except ValueError:
-        print(_RED("  ✖  Invalid selection."))
-        return
-
-    if idx == back_idx:
-        return
-    if not (1 <= idx <= len(available_games)):
-        print(_RED("  ✖  Invalid selection."))
-        return
-
-    selected_game = available_games[idx - 1]
-    config_game = CONFIG_KEY.get(selected_game, selected_game)
-
-    # ── Strip dummy SDL driver so the real window opens ───────────────────────
+    # Strip the dummy SDL driver so a real window opens.
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
-
-    script_path = Path("code/games/tools/manual_play.py")
-    if not script_path.exists():
-        print(_RED("  ✖  Manual play script not found at code/games/tools/manual_play.py"))
-        return
-
-    # ── Pre-launch banner ─────────────────────────────────────────────────────
-    print()
-    _box_top()
-    _box_row()
-    _box_row("PEAK ENGINE  ·  MANUAL PLAY", color_fn=lambda t: _BOLD(_RED("    " + t.center(W - 4))))
-    _box_row(_WHT(f"  {selected_game.upper()}").center(W), color_fn=lambda t: _BOLD(_WHT("    " + selected_game.upper().center(W - 4))))
-    _box_row()
-    _box_mid()
-    # Controls section
-    _box_row("  CONTROLS", color_fn=_BOLD)
-    _box_row()
-    _box_kv("A / D",         "Move left / right")
-    _box_kv("SPACE",         "Jump")
-    if selected_game.lower() == "megaman":
-        _box_kv("W / S",     "Climb ladder")
-        _box_kv("Z",         "Fire")
-    elif selected_game.lower() == "sonic":
-        _box_kv("SHIFT",     "Run")
-        _box_kv("S / DOWN",  "Crouch / spin dash")
-    else:
-        _box_kv("SHIFT",     "Run")
-    _box_kv("ESC",           "Quit session")
-    _box_row()
-    _box_mid()
-    # Debug keys section
-    _box_row("  DEBUG OVERLAY  (F-keys)", color_fn=_BOLD)
-    _box_row()
-    _box_kv("F1",  "Sensor rays   (toggle)",    key_w=5)
-    _box_kv("F2",  "Free camera   (IJKL)",       key_w=5)
-    _box_kv("F3",  "Slow motion   (0.5×)",       key_w=5)
-    _box_kv("F4",  "Hitboxes      (toggle)",     key_w=5)
-    _box_kv("F5",  "Agent vision  (max view)",   key_w=5)
-    _box_row()
-    _box_bot()
-    print()
-
-    # ── Launch ────────────────────────────────────────────────────────────────
-    print(_DIM(f"    Launching {selected_game}..."))
-    print()
-
-    subprocess.run(
-        [sys.executable, "-m", "code.games.tools.manual_play",
-         "--game", config_game, "--fps", "30"],
-        env=proc_env
-    )
-
-    # ── Session-end banner ────────────────────────────────────────────────────
-    print()
-    _box_top()
-    _box_row()
-    _box_row("SESSION ENDED", color_fn=lambda t: _BOLD(_GRN("    " + t.center(W - 4))))
-    _box_row()
-    _box_row(_DIM("  Thanks for playing  ·  PEAK ENGINE"), color_fn=lambda t: _DIM("    " + "Thanks for playing  ·  PEAK ENGINE".center(W - 4)))
-    _box_row()
-    _box_bot()
-    print()
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play",
+           "--game", CONFIG_KEY.get(game, game), "--fps", "30"]
+    if level:
+        cmd += ["--level", level]
+    print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
+    subprocess.run(cmd, env=proc_env)
 
 
 def _pick_run(prompt="\n  Choose a run:"):
@@ -813,8 +740,7 @@ def watch_random_agent():
     _refresh_screen()
     _section("WATCH  ›  Random Agent")
 
-    available = [g for g in get_available_games() if g != "meatboy"]
-    game = ask_index("\n  Choose a game:", available, default=available[0])
+    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
     if not game:
         return
 
@@ -969,7 +895,8 @@ def open_balance_command():
 SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); grid = 3×11×11 tiles (368)
 
 
-def _sweep_prompts(n_modes: int = 1, default_gens: str = "40"):
+def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str = "sensor modes",
+                   cost_note: str = ""):
     """Shared sweep selection: games, personas, generation budget, seeds (None = back).
     Every ENABLED level of each chosen game is probed."""
     games = toggle_select("GAMES", get_available_games(),
@@ -989,24 +916,27 @@ def _sweep_prompts(n_modes: int = 1, default_gens: str = "40"):
     n_levels = sum(len(get_levels_for_game(g)) for g in games)
     n_jobs = n_levels * len(seeds) * len(personas) * n_modes
     workers = max(1, (os.cpu_count() or 2) - 1)
-    modes = f" × {n_modes} sensor modes" if n_modes > 1 else ""
+    modes = f" × {n_modes} {modes_label}" if n_modes > 1 else ""
     print(f"\n    {_WHT(str(n_jobs))} probes ({n_levels} levels × {len(seeds)} seeds × "
           f"{len(personas)} personas{modes}), {workers} parallel workers")
+    if cost_note:
+        print(_DIM(f"    {cost_note}"))
     print(_DIM("    Only ENABLED levels are probed — use Toggle Levels [10] first if needed."))
     if input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() in ("n", "no"):
         return None
     return games, personas, gens, seeds
 
 
-def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg) -> bool:
+def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg,
+           module: str = "code.neuro.balance", extra: tuple = ()) -> bool:
     """games × personas × sensor modes probe runs; False if interrupted."""
     for game in games:
         for persona in personas:
             for sensors in sensors_list:
                 tag = f" · {sensors}" if len(sensors_list) > 1 else ""
                 print(_BOLD(f"\n  ── {game} · {persona}{tag} " + "─" * 30))
-                cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
-                       "--gens", gens, "--seeds", *seeds, "--sensors", sensors]
+                cmd = [sys.executable, "-m", module, "--game", game, "--persona", persona,
+                       "--gens", gens, "--seeds", *seeds, "--sensors", sensors, *extra]
                 try:
                     subprocess.run(cmd)
                 except KeyboardInterrupt:
@@ -1042,6 +972,39 @@ def run_sensor_ablation():
                             "--persona", persona, "--gens", gens, "--compare"])
     play_chime()
     _open_command_center("ablation")
+
+
+def run_ga_sweep():
+    """GA Sweep — one GAConfig knob at a time against literature bounds; best config per game."""
+    _refresh_screen()
+    _section("BALANCE  ›  GA Sweep  (hyperparameter ablation)")
+    print(_DIM("    Baseline GAConfig + one knob moved to its literature low / high bound per config\n"
+               "    (hidden size, population, elite, tournament, crossover, mutation, anneal, init,\n"
+               "    action feedback, memory units). Same coverage as Full Sweep; ≈33× the probes."))
+    from code.neuro.gasweep import AXES, AXIS_DOC, cost_multiplier, sweep_configs  # lazy: numpy import
+    sensors = ask_index("\n  Sensors for every config:", SENSOR_CHOICES, default="rays")
+    if not sensors:
+        return
+    axes = toggle_select("GA AXES", list(AXES), default_indices=list(range(len(AXES))),
+                         show_desc={a: f"{' · '.join(map(str, vs))}  —  {AXIS_DOC[a]}" for a, vs in AXES.items()})
+    if not axes:
+        return
+    confirm = input(_DIM("\n    Also probe the per-axis-winner composite afterwards (--confirm)? [Y/n]: ")
+                    ).strip().lower() not in ("n", "no")
+    configs = sweep_configs(axes)
+    picked = _sweep_prompts(n_modes=len(configs), modes_label="GA configs",
+                            cost_note=f"≈{cost_multiplier(configs):.0f}× the episodes of one Full Sweep "
+                                      f"(population axis dominates) — run overnight for all four games.")
+    if not picked:
+        return
+    games, personas, gens, seeds = picked
+    extra = ("--axes", *axes) + (("--confirm",) if confirm else ())
+    if not _sweep(games, personas, gens, seeds, [sensors],
+                  "\n  GA sweep interrupted — finished probes are kept; rerun to fill the gaps.",
+                  module="code.neuro.gasweep", extra=extra):
+        return
+    play_chime()
+    _open_command_center("gasweep")
 
 
 def run_full_sweep():
@@ -1158,8 +1121,9 @@ def main():
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("dashboard",            run_dashboard),
         "12": ("balance_command",      open_balance_command),
-        "15": ("full_sweep",           run_full_sweep),
-        "16": ("sensor_ablation",      run_sensor_ablation),
+        "13": ("full_sweep",           run_full_sweep),
+        "14": ("sensor_ablation",      run_sensor_ablation),
+        "15": ("ga_sweep",             run_ga_sweep),
         "d":  ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -1189,8 +1153,13 @@ def main():
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
         print(_menu_item("12", "Balance Command",      "open the command center (all runs + probes)"))
-        print(_menu_item("15", "Full Sweep",           "games × personas × seeds, parallel"))
-        print(_menu_item("16", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
+
+        _section("BALANCE")
+        print(_menu_item("13", "Full Sweep",           "games × personas × seeds, parallel"))
+        print(_menu_item("14", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
+        print(_menu_item("15", "GA Sweep",             "one GA knob at a time vs literature bounds; best config per game"))
+
+        _section("SYSTEM")
         print(_menu_item(" D", "Delete Logs & Models", "nuclear option"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 

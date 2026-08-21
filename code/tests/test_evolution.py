@@ -55,3 +55,43 @@ def test_save_load_roundtrip(tmp_path):
     pop.evolve([1.0] * pop.cfg.pop_size)
     loaded.evolve([1.0] * loaded.cfg.pop_size)
     assert np.array_equal(loaded.weights, pop.weights)
+
+
+# ── GA-sweep architecture knobs: hidden size, action feedback, memory units ──
+
+def test_n_params_formula():
+    from code.neuro.net import make_net
+    for h, af, mem in [(16, False, 0), (8, False, 0), (32, False, 0), (64, False, 0),
+                       (16, True, 0), (16, False, 2), (16, False, 3), (8, True, 3)]:
+        net = make_net(GAConfig(hidden=h, action_feedback=af, memory=mem))
+        assert net.n_params == (14 + 2 * af + mem + 1) * h + (h + 1) * (3 + mem)
+    assert make_net(GAConfig()).n_params == 291
+    assert [make_net(GAConfig(hidden=h)).n_params for h in (8, 32, 64)] == [147, 579, 1155]
+    assert make_net(GAConfig(action_feedback=True)).n_params == 323
+    assert [make_net(GAConfig(memory=m)).n_params for m in (2, 3)] == [357, 390]
+
+
+def test_act_carries_feedback_and_memory():
+    net = NeuralNet(n_inputs=2, n_hidden=2, n_outputs=3, feedback=True, memory=2)
+    assert net.carry.shape == (4,) and not net.carry.any()
+    net.set_weights(np.zeros(net.n_params, dtype=np.float32))
+    net._b2[1] = 5.0    # right
+    net._b2[2] = 5.0    # jump
+    net._b2[4] = 5.0    # memory unit 1 fires
+    move_x, jump = net.act(np.zeros(2, dtype=np.float32))
+    assert (move_x, jump) == (1, True)
+    out = net.forward(np.zeros(6, dtype=np.float32))   # 2 sensors + 2 feedback + 2 memory
+    assert np.allclose(net.carry[:2], [1.0, 1.0])          # decoded action fed back
+    assert np.allclose(net.carry[2:], out[3:])             # memory outputs fed back
+    net.reset()
+    assert not net.carry.any()
+
+
+def test_save_load_keeps_net_fields(tmp_path):
+    import json
+    pop = Population(GAConfig(seed=3, hidden=8, memory=2), n_params=50)
+    pop.save(str(tmp_path))
+    loaded = Population.load(str(tmp_path))
+    assert loaded.cfg.hidden == 8 and loaded.cfg.memory == 2 and loaded.cfg.action_feedback is False
+    meta = json.loads(str(np.load(tmp_path / "best.npz")["meta"]))
+    assert meta["hidden"] == 8 and meta["memory"] == 2 and meta["action_feedback"] is False

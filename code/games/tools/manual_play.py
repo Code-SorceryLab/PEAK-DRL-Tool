@@ -132,6 +132,7 @@ ACTION_MAPPING = {
     "mario": _platformer_action,
     "megaman": _megaman_action,
     "sonic": _sonic_action,
+    "meatboy": lambda k: [0, 0, 0],   # MeatboyPlayer reads the keyboard itself in human mode
 }
 
 _IDLE = {"megaman": [0, 0, 0, 0]}
@@ -141,6 +142,8 @@ def _random_action() -> list:
     """Uniform random action in the game's MultiDiscrete space."""
     if args.game == "megaman":
         return [random.randrange(5), random.randrange(3), random.randrange(2), random.randrange(2)]
+    if args.game == "meatboy":
+        return [random.randrange(3), random.randrange(2), random.randrange(2)]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
 
@@ -168,6 +171,11 @@ if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
 
 core_game = GameCls(render_mode="human", **env_kwargs)
+if args.game == "meatboy" and level_id:
+    core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
+# Meatboy draws onto whatever surface it is given; the other cores own a window.
+screen = core_game._surf if hasattr(core_game, "_surf") else \
+    pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
 
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
@@ -191,9 +199,11 @@ if level_file:
 core_game.reset()
 running = True
 random_action = _random_action()
+frame = 0
 
 while running:
     clock.tick(args.fps)
+    frame += 1
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -204,7 +214,7 @@ while running:
     keys = pygame.key.get_pressed()
 
     if args.random:
-        if core_game.frame % 8 == 0:   # re-roll every 8 frames so movement is visible
+        if frame % 8 == 0:   # re-roll every 8 frames so movement is visible
             random_action = _random_action()
         action = random_action
     else:
@@ -218,10 +228,13 @@ while running:
     _, _, terminated, truncated, info = core_game.step(action)
     done = terminated or truncated
 
-    core_game.render(core_game._surf, blit_only=True)
+    core_game.render(screen, blit_only=True)
     pygame.display.flip()
 
     if info.get("episode_end", False) or done:
+        if args.game == "meatboy" and level_id:
+            core_game.won = False          # reset() would otherwise advance to the next level
+            core_game._level_idx = int(level_id)
         core_game.reset()
         # Keep locked level after reset
         active_id = level_id or (TEMP_ID if level_file else None)

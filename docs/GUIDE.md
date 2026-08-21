@@ -74,7 +74,10 @@ Every frame, each agent reads **14 sensors** (all normalized to roughly [-1, 1])
 
 Rays flip direction when the agent moves left. The whole vector feeds a
 14 → 16 (tanh) → 3 (sigmoid) network; outputs are **left, right, jump** (left/right conflict
-resolves by whichever is stronger, jump fires above 0.5).
+resolves by whichever is stronger, jump fires above 0.5). The hidden size is a `GAConfig` knob
+(`--hidden`), and two optional carries exist for timing problems such as wall-jumps:
+`--action-feedback` appends the previous (move, jump) as two extra inputs, `--memory N` adds N
+Jordan memory units (extra outputs looped back as inputs next frame). Both are swept by menu 15.
 
 ### Is the THREAT panel accurate?
 
@@ -120,12 +123,14 @@ that's the anti-stall, replacing the old core watchdog.
    (that's why the population wall is live).
 2. An episode ends on death (enemy/pit/spike), win, STUCK, or the 3,600-frame (60s) budget.
 3. When all 10 are done: fitness is computed, and the next generation is bred —
-   the **2 best survive unchanged** (elitism); the other 8 come from tournament selection
-   (best of 3 random picks), uniform crossover (70% chance, genes mixed 50/50), and gaussian
-   mutation (each weight has a 15% chance of a ±0.3σ nudge).
+   the **4 best survive unchanged** (elitism); the other 6 come from tournament selection
+   (best of 5 random picks), uniform crossover (70% chance, genes mixed 50/50), and gaussian
+   mutation (each weight has a 15% chance of a ±0.15σ nudge; mutation is ×0.5 after a level's
+   first win — the GA sweep's most robust finding).
 4. Checkpoint written to `runs/<name>/` every generation.
 
-All knobs live in `GAConfig` (`code/neuro/evolution.py`). Everything is seeded — same seed,
+All knobs live in `GAConfig` (`code/neuro/evolution.py`); its defaults are the baseline the GA
+sweep (menu 15, `docs/BALANCE.md`) measures every knob against. Everything is seeded — same seed,
 same run, bit for bit. That's also why manual play takes a real-time lock and why the core's
 jump-arc overlay stays off during training (rendering it perturbs game state).
 
@@ -190,7 +195,7 @@ so runs stay deterministic either way.
 
 PEAK's purpose is balancing levels with agents. The paper pipeline did this with PPO
 matrices (win rate ± CI + failure-mode taxonomy, fed by the stats subsystem); the GA
-successor is `python -m code.neuro.balance --game mario` (menu **[15] Full Sweep**).
+successor is `python -m code.neuro.balance --game mario` (menu **[13] Full Sweep**).
 For each (level × seed) it evolves a fresh population, stops shortly after the first win,
 and aggregates with 95% t-CIs: **win rate, generations-to-first-win, dominant death cause,
 stuck rate, best x, learning trend** — hardest levels first. JSON lands in

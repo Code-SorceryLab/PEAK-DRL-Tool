@@ -6,7 +6,7 @@ probes.*
 
 ## The pipeline
 
-1. **Probe** — `python -m code.neuro.balance --game <g>` (menu **[15] Full Sweep**).
+1. **Probe** — `python -m code.neuro.balance --game <g>` (menu **[13] Full Sweep**).
    For each (level × seed) a fresh population evolves until shortly after its first win
    (or the generation budget). Default seeds `1234 2025 31337` — the same set the paper
    matrix used, keep them for comparability.
@@ -14,11 +14,31 @@ probes.*
    `runs/balance/report_<game>_<persona>.json` (new probes extend the file; they don't clobber it).
    **Sensor ablation:** `--sensors grid` swaps the 6 rays for the 3×11×11 tile window
    (solid / collectible / hazard, Dijkstra dropped, 368 inputs). Probes land under a
-   `p50g25_grid` tag so they never overwrite the ray probes; `--compare` prints both side by
+   `p10g25_grid` tag so they never overwrite the ray probes; `--compare` prints both side by
    side (generations-to-first-win ± CI, win rate) per level.
+   **GA hyperparameter ablation (menu 15, `python -m code.neuro.gasweep`):** one `GAConfig`
+   knob at a time is moved to a literature-grounded low and high bound while everything else
+   stays at the baseline (the `GAConfig` defaults) — population 10 · 30 · 100 (Grefenstette 1986,
+   De Jong 1975), elite 1 · 4 · 6 (Such et al. 2017 keep one elite), tournament 2 · 5 · 8
+   (Miller & Goldberg 1995; Harik et al.), crossover 0 · 0.7 · 0.95, mutation rate
+   0.005 (≈ 1/L) · 0.15 · 0.5, mutation σ 0.02 · 0.15 · 0.5, anneal 0.3 · 0.5 · off, init σ
+   0.25 (Xavier) · 0.5 · 1.0, hidden 8 · 16 · 32 · 64, last-action feedback, 2–3 memory units:
+   23 configs, each probed on every enabled level × 3 seeds. Probes land under
+   `runs/gasweep/<game>/<persona>/p<pop>g<gens>[_grid]_<axis>-<value>/` and aggregate into
+   `runs/balance/gasweep_*.json`; the **GA sweep** page shows a generations-to-first-win vs
+   parameter-count capacity curve with a flat / improves / degrades verdict, a bound track per
+   axis, Δ tables and learning-curve overlays, and the per-axis-winner **recommended config**
+   per game (`--confirm` probes that composite once — one-factor-at-a-time ignores
+   interactions). Caveat: trajectories are bit-identical until the first win, so the anneal
+   axis can only move win rate, never generations-to-first-win. The tag carries a 6-char
+   fingerprint of the baseline (`_b1a2c3_`), so re-sweeping after changing `GAConfig` defaults
+   lands beside the previous sweep instead of overwriting it; the page shows each baseline as its
+   own group. First sweep (2026-08-20, 2 games × 3 personas × 23 configs, 32.6 h): capacity flat
+   in 6/6, anneal 0.5 > 0.8 in 6/6 (now the default), pop 100 worse in 6/6, elite 6 / σ 0.02 /
+   crossover 0 hurt Meat Boy, memory units and action feedback help only the sprinting persona.
 3. **Report** — `python -m code.neuro.report --open` renders every game's JSON into one
    self-contained page, `runs/balance/report.html`: ranked difficulty table, death-location
-   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12], [15] and [16] offer to open it.
+   heatmaps, failure-mode bars, per-seed fitness curves. Menu [12], [13] and [14] offer to open it.
 
 ## The metric table
 
@@ -113,7 +133,7 @@ The intended workflow for level designers:
    `python -m code.games.tools.manual_play --game platformer --file <path>.txt`).
 3. **Train agents on it** — menu **[2] Train Single**, pick the level and a persona, watch
    on the dashboard (or pick the level live from the Run panel's dropdown).
-4. **Judge the balance** — menu **[15] Full Sweep** on the game (optionally per
+4. **Judge the balance** — menu **[13] Full Sweep** on the game (optionally per
    persona), then the web report shows completion, death heatmap, and failure modes.
 
 ## The debug overlay
@@ -130,7 +150,8 @@ in-window: F1 rays, F2 free cam, F3 slow motion, F4 hitboxes, F5 agent vision.
 
 **Why a GA probe instead of DRL.** Measured in this repo on the same levels: the GA reproduces
 the PPO matrix's failure-mode taxonomy at roughly 1/100th the compute, bit-exact under a seed,
-with no reward shaping or per-game tuning (fitness = distance, 291 params, 4 engines unchanged).
+with no reward shaping or per-game tuning (fitness = distance, 291 params at the default 16
+hidden units — the GA sweep page reports 147–1,155-param variants, 4 engines unchanged).
 The trade: a reactive policy is a *lower bound* on difficulty — it cannot express memory or
 planning, and it is not human-like. For balance CI that trade is correct: the probe must be
 frozen, cheap, and deterministic so metric deltas isolate the level change. DRL is the better

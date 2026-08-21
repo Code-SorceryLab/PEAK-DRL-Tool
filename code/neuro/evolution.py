@@ -10,8 +10,10 @@ import numpy as np
 
 @dataclass
 class GAConfig:
-    pop_size: int = 50
-    elite: int = 5          # raised from 2 (2026-08-20): population win rate plateaued at 23%
+    # These defaults are the GA-sweep baseline (menu 15 / code/neuro/gasweep.py): every sweep
+    # axis varies exactly one of them against a literature-grounded low/high bound.
+    pop_size: int = 10
+    elite: int = 4          # raised from 2: population win rate plateaued at 23%
     tournament_k: int = 5   # raised from 3: stronger selection pressure toward winners
     crossover_rate: float = 0.7
     mutation_rate: float = 0.15
@@ -20,10 +22,15 @@ class GAConfig:
     max_frames: int = 3600       # per-episode frame budget (60s at 60fps)
     stuck_frames: int = 300      # frames without max_x gain before an env is marked STUCK
     advance_wins: int = 3        # wins in one generation before the curriculum advances a level
-    anneal_factor: float = 0.85   # multiply mutation rate+sigma by this once a level is first solved (1.0 = off)
+    anneal_factor: float = 0.5   # × mutation after a level's first win (1.0 = off). 2026-08-20 GA sweep: 0.5 beat 0.8 in 6/6 game×persona groups
     win_bonus: float = 5000.0
     seed: int = 42
     sensors: str = "rays"        # exteroception: "rays" (14 inputs) or "grid" (3x11x11 + body)
+    # Network shape (see net.NeuralNet): hidden tanh units, previous action fed back as 2 inputs,
+    # and N Jordan memory units (extra outputs looped back as inputs next frame).
+    hidden: int = 16
+    action_feedback: bool = False
+    memory: int = 0
 
 
 class Population:
@@ -107,6 +114,9 @@ class Population:
             "generation": self.generation,
             "seed": self.cfg.seed,
             "sensors": self.cfg.sensors,
+            "hidden": self.cfg.hidden,
+            "action_feedback": self.cfg.action_feedback,
+            "memory": self.cfg.memory,
             "n_params": self.n_params,
         }
         np.savez_compressed(os.path.join(run_dir, "best.npz"),

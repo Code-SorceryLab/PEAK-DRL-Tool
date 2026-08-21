@@ -251,6 +251,7 @@
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Elite</span><b id="k_elite" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Mutation</span><b id="k_mut" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Net</span><b id="k_hidden" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Won</span><b id="k_wins" class="font-mono text-sm font-medium text-blue-400">0</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Frames</span><b id="k_frames" class="font-mono text-sm font-medium text-zinc-500">–</b></div>
           <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Train Time</span><b id="k_traintime" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
@@ -507,6 +508,7 @@ function onUpdate(m){
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
   if (s.elite !== undefined) $("k_elite").textContent = s.elite;
   if (s.mut_rate !== undefined) $("k_mut").textContent = Math.round(s.mut_rate*100)+"%";
+  if (s.hidden) $("k_hidden").textContent = s.hidden + " hidden · " + (s.sensors || "rays");
   $("k_mode").textContent = s.turbo ? "turbo" : "real-time";
   if (s.persona) $("k_persona").textContent = s.persona;
 

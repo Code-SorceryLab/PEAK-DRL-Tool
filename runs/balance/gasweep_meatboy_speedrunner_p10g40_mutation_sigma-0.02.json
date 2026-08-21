@@ -1,0 +1,6059 @@
+{
+  "game": "meatboy",
+  "persona": "speedrunner",
+  "tag": "p10g40_mutation_sigma-0.02",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 554.8,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.02,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.8,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 3.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 2.0,
+      "best_gen_ci": 2.5,
+      "win_rate_mean": 0.203,
+      "win_rate_ci": 0.875,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.59,
+      "causes": {
+        "Stall": 513,
+        "Pit": 355
+      },
+      "best_x_mean": 842.1,
+      "stuck_frac_mean": 0.545,
+      "trends": [
+        "FLAT",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1265,
+      "train_time_s": 46.0,
+      "completion_rate_mean": 0.159,
+      "mean_completion_time": 5.6,
+      "completion_time_stddev": 1.9,
+      "progress_at_death_mean": 0.705,
+      "deaths_per_run_mean": 8.41,
+      "death_hist": [
+        37,
+        3,
+        0,
+        4,
+        9,
+        9,
+        7,
+        438,
+        1,
+        360
+      ],
+      "death_cluster_entropy_mean": 0.315,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.208
+    },
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 19.5,
+      "first_win_ci": 184.2,
+      "best_gen_mean": 13.3,
+      "best_gen_ci": 44.7,
+      "win_rate_mean": 0.39,
+      "win_rate_ci": 0.923,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.98,
+      "causes": {
+        "Stall": 813,
+        "Pit": 19
+      },
+      "best_x_mean": 785.7,
+      "stuck_frac_mean": 0.758,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0714,
+      "train_time_s": 57.0,
+      "completion_rate_mean": 0.202,
+      "mean_completion_time": 2.6,
+      "completion_time_stddev": 0.3,
+      "progress_at_death_mean": 0.787,
+      "deaths_per_run_mean": 7.98,
+      "death_hist": [
+        0,
+        18,
+        11,
+        1,
+        4,
+        11,
+        211,
+        20,
+        537,
+        19
+      ],
+      "death_cluster_entropy_mean": 0.383,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.41
+    },
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 2.0,
+      "first_win_ci": 12.7,
+      "best_gen_mean": 1.7,
+      "best_gen_ci": 2.9,
+      "win_rate_mean": 0.59,
+      "win_rate_ci": 1.274,
+      "dominant_cause": "Pit",
+      "dominant_cause_frac": 0.97,
+      "causes": {
+        "Stall": 12,
+        "Pit": 449
+      },
+      "best_x_mean": 855.1,
+      "stuck_frac_mean": 0.025,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "FLAT"
+      ],
+      "improvement_rate_mean": 0.0488,
+      "train_time_s": 15.2,
+      "completion_rate_mean": 0.503,
+      "mean_completion_time": 1.9,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.532,
+      "deaths_per_run_mean": 4.97,
+      "death_hist": [
+        24,
+        2,
+        1,
+        1,
+        3,
+        2,
+        425,
+        3,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.355,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.478
+    },
+    {
+      "level": "3",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 7.0,
+      "first_win_ci": 25.4,
+      "best_gen_mean": 5.0,
+      "best_gen_ci": 9.9,
+      "win_rate_mean": 0.56,
+      "win_rate_ci": 1.207,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.99,
+      "causes": {
+        "Stall": 562,
+        "Pit": 8
+      },
+      "best_x_mean": 767.7,
+      "stuck_frac_mean": 0.645,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1858,
+      "train_time_s": 42.3,
+      "completion_rate_mean": 0.34,
+      "mean_completion_time": 2.8,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.321,
+      "deaths_per_run_mean": 6.6,
+      "death_hist": [
+        37,
+        109,
+        376,
+        8,
+        0,
+        8,
+        0,
+        6,
+        0,
+        26
+      ],
+      "death_cluster_entropy_mean": 0.383,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.631
+    },
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 6.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 15.3,
+      "best_gen_ci": 51.3,
+      "win_rate_mean": 0.233,
+      "win_rate_ci": 1.004,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.88,
+      "causes": {
+        "Stall": 785,
+        "Pit": 104
+      },
+      "best_x_mean": 639.6,
+      "stuck_frac_mean": 0.703,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0615,
+      "train_time_s": 51.2,
+      "completion_rate_mean": 0.148,
+      "mean_completion_time": 2.9,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.428,
+      "deaths_per_run_mean": 8.52,
+      "death_hist": [
+        131,
+        6,
+        2,
+        705,
+        0,
+        0,
+        0,
+        0,
+        0,
+        45
+      ],
+      "death_cluster_entropy_mean": 0.257,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.287
+    },
+    {
+      "level": "5",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 14.0,
+      "best_gen_ci": 26.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.65,
+      "causes": {
+        "Stall": 398,
+        "Pit": 25,
+        "Saw": 777
+      },
+      "best_x_mean": 568.2,
+      "stuck_frac_mean": 0.332,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1096,
+      "train_time_s": 66.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.467,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        39,
+        1,
+        73,
+        291,
+        380,
+        0,
+        416,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.219,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 10.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 4.0,
+      "best_gen_ci": 12.9,
+      "win_rate_mean": 0.15,
+      "win_rate_ci": 0.645,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.87,
+      "causes": {
+        "Stall": 34,
+        "Pit": 94,
+        "Saw": 826
+      },
+      "best_x_mean": 768.7,
+      "stuck_frac_mean": 0.035,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "FLAT"
+      ],
+      "improvement_rate_mean": 0.0117,
+      "train_time_s": 17.8,
+      "completion_rate_mean": 0.077,
+      "mean_completion_time": 1.8,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.525,
+      "deaths_per_run_mean": 9.23,
+      "death_hist": [
+        45,
+        6,
+        2,
+        3,
+        827,
+        0,
+        0,
+        0,
+        0,
+        71
+      ],
+      "death_cluster_entropy_mean": 0.213,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.161
+    },
+    {
+      "level": "7",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 2.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 1.3,
+      "best_gen_ci": 1.4,
+      "win_rate_mean": 0.303,
+      "win_rate_ci": 1.305,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.97,
+      "causes": {
+        "Stall": 11,
+        "Pit": 16,
+        "Saw": 801
+      },
+      "best_x_mean": 606.9,
+      "stuck_frac_mean": 0.019,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "FLAT"
+      ],
+      "improvement_rate_mean": 0.1781,
+      "train_time_s": 25.0,
+      "completion_rate_mean": 0.256,
+      "mean_completion_time": 2.0,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.405,
+      "deaths_per_run_mean": 7.44,
+      "death_hist": [
+        24,
+        3,
+        2,
+        2,
+        797,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.162,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.208
+    },
+    {
+      "level": "8",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 5.7,
+      "best_gen_ci": 7.6,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Pit",
+      "dominant_cause_frac": 0.52,
+      "causes": {
+        "Stall": 547,
+        "Pit": 629,
+        "Saw": 24
+      },
+      "best_x_mean": 666.6,
+      "stuck_frac_mean": 0.456,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1457,
+      "train_time_s": 94.2,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.133,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        629,
+        357,
+        33,
+        14,
+        71,
+        27,
+        5,
+        1,
+        63,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.372,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "9",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 7.5,
+      "first_win_ci": 19.1,
+      "best_gen_mean": 7.7,
+      "best_gen_ci": 3.8,
+      "win_rate_mean": 0.32,
+      "win_rate_ci": 0.689,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.91,
+      "causes": {
+        "Stall": 57,
+        "Saw": 595
+      },
+      "best_x_mean": 900.7,
+      "stuck_frac_mean": 0.102,
+      "trends": [
+        "FLAT",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0335,
+      "train_time_s": 43.3,
+      "completion_rate_mean": 0.188,
+      "mean_completion_time": 5.1,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.533,
+      "deaths_per_run_mean": 8.12,
+      "death_hist": [
+        29,
+        4,
+        1,
+        89,
+        29,
+        342,
+        96,
+        42,
+        0,
+        20
+      ],
+      "death_cluster_entropy_mean": 0.548,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.409
+    },
+    {
+      "level": "10",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 3.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 13.3,
+      "best_gen_ci": 30.7,
+      "win_rate_mean": 0.29,
+      "win_rate_ci": 1.248,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.93,
+      "causes": {
+        "Stall": 781,
+        "Saw": 61
+      },
+      "best_x_mean": 833.3,
+      "stuck_frac_mean": 0.722,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0665,
+      "train_time_s": 96.4,
+      "completion_rate_mean": 0.226,
+      "mean_completion_time": 4.7,
+      "completion_time_stddev": 0.4,
+      "progress_at_death_mean": 0.749,
+      "deaths_per_run_mean": 7.74,
+      "death_hist": [
+        34,
+        5,
+        17,
+        55,
+        75,
+        81,
+        24,
+        15,
+        52,
+        484
+      ],
+      "death_cluster_entropy_mean": 0.53,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.308
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 789.5,
+        "best_x": 789.5,
+        "stuck_frac": 0.1125,
+        "causes": {
+          "Stall": 45,
+          "Pit": 355
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.1898,
+        "train_time_s": 16.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.954,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          8,
+          3,
+          0,
+          0,
+          2,
+          0,
+          0,
+          29,
+          0,
+          358
+        ],
+        "death_cluster_entropy": 0.187,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            631.6,
+            373.7
+          ],
+          [
+            789.5,
+            568.4
+          ],
+          [
+            789.5,
+            710.5
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            757.9
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            763.2
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            778.9
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            747.4
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            768.4
+          ],
+          [
+            789.5,
+            789.5
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 789.5,
+        "best_x": 789.5,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 20.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.755,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          397,
+          0,
+          1
+        ],
+        "death_cluster_entropy": 0.021,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            789.5,
+            610.5
+          ],
+          [
+            789.5,
+            626.3
+          ],
+          [
+            789.5,
+            726.3
+          ],
+          [
+            789.5,
+            773.7
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ],
+          [
+            789.5,
+            789.5
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.61,
+        "best": 6000.0,
+        "best_x": 947.4,
+        "stuck_frac": 0.5230769230769231,
+        "causes": {
+          "Stall": 68
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1898,
+        "train_time_s": 9.0,
+        "completion_rate": 0.477,
+        "mean_completion_time": 5.6,
+        "completion_time_stddev": 1.9,
+        "progress_at_death": 0.406,
+        "deaths_per_run": 5.23,
+        "death_hist": [
+          27,
+          0,
+          0,
+          4,
+          7,
+          9,
+          7,
+          12,
+          1,
+          1
+        ],
+        "death_cluster_entropy": 0.738,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.625,
+        "curve": [
+          [
+            631.6,
+            389.5
+          ],
+          [
+            631.6,
+            552.6
+          ],
+          [
+            6000.0,
+            1089.5
+          ],
+          [
+            6000.0,
+            1636.8
+          ],
+          [
+            6000.0,
+            2826.3
+          ],
+          [
+            6000.0,
+            4447.4
+          ],
+          [
+            6000.0,
+            4394.7
+          ],
+          [
+            6000.0,
+            4463.2
+          ],
+          [
+            6000.0,
+            3952.6
+          ],
+          [
+            6000.0,
+            3978.9
+          ],
+          [
+            6000.0,
+            4989.5
+          ],
+          [
+            6000.0,
+            3957.9
+          ],
+          [
+            6000.0,
+            4947.4
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/0_31337"
+      }
+    ],
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.74,
+        "best": 6000.0,
+        "best_x": 964.3,
+        "stuck_frac": 0.38666666666666666,
+        "causes": {
+          "Stall": 58,
+          "Pit": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2009,
+        "train_time_s": 6.6,
+        "completion_rate": 0.5,
+        "mean_completion_time": 1.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.792,
+        "deaths_per_run": 5.0,
+        "death_hist": [
+          0,
+          4,
+          6,
+          0,
+          0,
+          0,
+          2,
+          11,
+          35,
+          17
+        ],
+        "death_cluster_entropy": 0.62,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.9,
+        "curve": [
+          [
+            321.4,
+            125.0
+          ],
+          [
+            928.6,
+            335.7
+          ],
+          [
+            928.6,
+            564.3
+          ],
+          [
+            928.6,
+            928.6
+          ],
+          [
+            6000.0,
+            1439.3
+          ],
+          [
+            6000.0,
+            1439.3
+          ],
+          [
+            6000.0,
+            2453.6
+          ],
+          [
+            6000.0,
+            4482.1
+          ],
+          [
+            6000.0,
+            5492.9
+          ],
+          [
+            6000.0,
+            4864.3
+          ],
+          [
+            6000.0,
+            5432.1
+          ],
+          [
+            6000.0,
+            5492.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5492.9
+          ],
+          [
+            6000.0,
+            5432.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 428.6,
+        "best_x": 428.6,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 23.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.88,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          2,
+          1,
+          395,
+          0
+        ],
+        "death_cluster_entropy": 0.035,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            428.6,
+            310.7
+          ],
+          [
+            428.6,
+            321.4
+          ],
+          [
+            428.6,
+            389.3
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            417.9
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ],
+          [
+            428.6,
+            428.6
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 34,
+        "best_gen": 34,
+        "win_rate": 0.43,
+        "best": 6000.0,
+        "best_x": 964.3,
+        "stuck_frac": 0.8875,
+        "causes": {
+          "Stall": 355,
+          "Pit": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0133,
+        "train_time_s": 26.5,
+        "completion_rate": 0.107,
+        "mean_completion_time": 3.4,
+        "completion_time_stddev": 0.6,
+        "progress_at_death": 0.688,
+        "deaths_per_run": 8.93,
+        "death_hist": [
+          0,
+          12,
+          5,
+          1,
+          4,
+          11,
+          207,
+          8,
+          107,
+          2
+        ],
+        "death_cluster_entropy": 0.495,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.331,
+        "curve": [
+          [
+            357.1,
+            125.0
+          ],
+          [
+            357.1,
+            228.6
+          ],
+          [
+            357.1,
+            292.9
+          ],
+          [
+            357.1,
+            328.6
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            357.1,
+            357.1
+          ],
+          [
+            392.9,
+            360.7
+          ],
+          [
+            392.9,
+            367.9
+          ],
+          [
+            500.0,
+            396.4
+          ],
+          [
+            500.0,
+            400.0
+          ],
+          [
+            500.0,
+            414.3
+          ],
+          [
+            500.0,
+            432.1
+          ],
+          [
+            500.0,
+            453.6
+          ],
+          [
+            500.0,
+            446.4
+          ],
+          [
+            500.0,
+            478.6
+          ],
+          [
+            500.0,
+            489.3
+          ],
+          [
+            500.0,
+            475.0
+          ],
+          [
+            500.0,
+            453.6
+          ],
+          [
+            500.0,
+            489.3
+          ],
+          [
+            500.0,
+            471.4
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            478.6
+          ],
+          [
+            500.0,
+            485.7
+          ],
+          [
+            500.0,
+            467.9
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            467.9
+          ],
+          [
+            6000.0,
+            1035.7
+          ],
+          [
+            6000.0,
+            2700.0
+          ],
+          [
+            6000.0,
+            4314.3
+          ],
+          [
+            6000.0,
+            5435.7
+          ],
+          [
+            6000.0,
+            3332.1
+          ],
+          [
+            6000.0,
+            4953.6
+          ],
+          [
+            6000.0,
+            5450.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/1_31337"
+      }
+    ],
+    "2": [
+      {
+        "level": "2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.84,
+        "best": 6000.0,
+        "best_x": 978.3,
+        "stuck_frac": 0.046153846153846156,
+        "causes": {
+          "Stall": 6,
+          "Pit": 39
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1456,
+        "train_time_s": 3.7,
+        "completion_rate": 0.654,
+        "mean_completion_time": 1.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.504,
+        "deaths_per_run": 3.46,
+        "death_hist": [
+          9,
+          2,
+          0,
+          0,
+          1,
+          0,
+          31,
+          2,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.408,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.9,
+        "curve": [
+          [
+            587.0,
+            310.9
+          ],
+          [
+            630.4,
+            493.5
+          ],
+          [
+            6000.0,
+            1150.0
+          ],
+          [
+            6000.0,
+            1684.8
+          ],
+          [
+            6000.0,
+            2773.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5465.2
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5463.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/2_1234"
+      },
+      {
+        "level": "2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.93,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.01818181818181818,
+        "causes": {
+          "Pit": 14,
+          "Stall": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0007,
+        "train_time_s": 3.3,
+        "completion_rate": 0.855,
+        "mean_completion_time": 1.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.477,
+        "deaths_per_run": 1.45,
+        "death_hist": [
+          3,
+          0,
+          1,
+          1,
+          1,
+          0,
+          9,
+          1,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.578,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.533,
+        "curve": [
+          [
+            6000.0,
+            1067.4
+          ],
+          [
+            6000.0,
+            2730.4
+          ],
+          [
+            6000.0,
+            5426.1
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/2_2025"
+      },
+      {
+        "level": "2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 587.0,
+        "best_x": 587.0,
+        "stuck_frac": 0.01,
+        "causes": {
+          "Pit": 396,
+          "Stall": 4
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 8.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.615,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          12,
+          0,
+          0,
+          0,
+          1,
+          2,
+          385,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.08,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            587.0,
+            304.3
+          ],
+          [
+            587.0,
+            432.6
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ],
+          [
+            587.0,
+            587.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/2_31337"
+      }
+    ],
+    "3": [
+      {
+        "level": "3",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 19,
+        "first_win_gen": 9,
+        "best_gen": 9,
+        "win_rate": 0.81,
+        "best": 6000.0,
+        "best_x": 969.7,
+        "stuck_frac": 0.5421052631578948,
+        "causes": {
+          "Stall": 103,
+          "Pit": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.102,
+        "train_time_s": 7.8,
+        "completion_rate": 0.432,
+        "mean_completion_time": 2.8,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.254,
+        "deaths_per_run": 5.68,
+        "death_hist": [
+          11,
+          82,
+          0,
+          1,
+          0,
+          3,
+          0,
+          6,
+          0,
+          5
+        ],
+        "death_cluster_entropy": 0.385,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.933,
+        "curve": [
+          [
+            60.6,
+            24.2
+          ],
+          [
+            60.6,
+            60.6
+          ],
+          [
+            60.6,
+            60.6
+          ],
+          [
+            60.6,
+            54.5
+          ],
+          [
+            60.6,
+            54.5
+          ],
+          [
+            60.6,
+            60.6
+          ],
+          [
+            60.6,
+            60.6
+          ],
+          [
+            545.5,
+            109.1
+          ],
+          [
+            6000.0,
+            775.8
+          ],
+          [
+            6000.0,
+            1997.0
+          ],
+          [
+            6000.0,
+            3951.5
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            3787.9
+          ],
+          [
+            6000.0,
+            4903.0
+          ],
+          [
+            6000.0,
+            5478.8
+          ],
+          [
+            6000.0,
+            5497.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/3_1234"
+      },
+      {
+        "level": "3",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 363.6,
+        "best_x": 363.6,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 27.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.256,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          5,
+          17,
+          375,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.124,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            363.6,
+            84.8
+          ],
+          [
+            363.6,
+            142.4
+          ],
+          [
+            363.6,
+            197.0
+          ],
+          [
+            363.6,
+            333.3
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            360.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ],
+          [
+            363.6,
+            363.6
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/3_2025"
+      },
+      {
+        "level": "3",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.87,
+        "best": 6000.0,
+        "best_x": 969.7,
+        "stuck_frac": 0.3933333333333333,
+        "causes": {
+          "Stall": 59,
+          "Pit": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4553,
+        "train_time_s": 6.8,
+        "completion_rate": 0.587,
+        "mean_completion_time": 2.8,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.452,
+        "deaths_per_run": 4.13,
+        "death_hist": [
+          21,
+          10,
+          1,
+          4,
+          0,
+          5,
+          0,
+          0,
+          0,
+          21
+        ],
+        "death_cluster_entropy": 0.64,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.96,
+        "curve": [
+          [
+            212.1,
+            39.4
+          ],
+          [
+            212.1,
+            78.8
+          ],
+          [
+            969.7,
+            309.1
+          ],
+          [
+            969.7,
+            563.6
+          ],
+          [
+            6000.0,
+            1339.4
+          ],
+          [
+            6000.0,
+            2478.8
+          ],
+          [
+            6000.0,
+            4393.9
+          ],
+          [
+            6000.0,
+            4893.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5493.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/3_31337"
+      }
+    ],
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.7,
+        "best": 6000.0,
+        "best_x": 973.0,
+        "stuck_frac": 0.24375,
+        "causes": {
+          "Stall": 39,
+          "Pit": 50
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1745,
+        "train_time_s": 6.7,
+        "completion_rate": 0.444,
+        "mean_completion_time": 2.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.651,
+        "deaths_per_run": 5.56,
+        "death_hist": [
+          9,
+          2,
+          0,
+          33,
+          0,
+          0,
+          0,
+          0,
+          0,
+          45
+        ],
+        "death_cluster_entropy": 0.447,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.86,
+        "curve": [
+          [
+            243.2,
+            94.6
+          ],
+          [
+            459.5,
+            210.8
+          ],
+          [
+            864.9,
+            391.9
+          ],
+          [
+            918.9,
+            502.7
+          ],
+          [
+            918.9,
+            637.8
+          ],
+          [
+            6000.0,
+            1416.2
+          ],
+          [
+            6000.0,
+            1421.6
+          ],
+          [
+            6000.0,
+            2421.6
+          ],
+          [
+            6000.0,
+            3897.3
+          ],
+          [
+            6000.0,
+            4978.4
+          ],
+          [
+            6000.0,
+            5486.5
+          ],
+          [
+            6000.0,
+            4978.4
+          ],
+          [
+            6000.0,
+            5486.5
+          ],
+          [
+            6000.0,
+            4405.4
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5491.9
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 324.3,
+        "best_x": 324.3,
+        "stuck_frac": 0.9975,
+        "causes": {
+          "Stall": 399,
+          "Pit": 1
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 20.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.371,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          4,
+          0,
+          0,
+          396,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.024,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            324.3,
+            243.2
+          ],
+          [
+            324.3,
+            256.8
+          ],
+          [
+            324.3,
+            308.1
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            270.3
+          ],
+          [
+            324.3,
+            308.1
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            316.2
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            324.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 39,
+        "win_rate": 0.0,
+        "best": 621.6,
+        "best_x": 621.6,
+        "stuck_frac": 0.8675,
+        "causes": {
+          "Pit": 53,
+          "Stall": 347
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0099,
+        "train_time_s": 23.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.263,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          118,
+          4,
+          2,
+          276,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.299,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            270.3,
+            94.6
+          ],
+          [
+            270.3,
+            173.0
+          ],
+          [
+            324.3,
+            224.3
+          ],
+          [
+            324.3,
+            259.5
+          ],
+          [
+            324.3,
+            308.1
+          ],
+          [
+            324.3,
+            313.5
+          ],
+          [
+            324.3,
+            324.3
+          ],
+          [
+            324.3,
+            302.7
+          ],
+          [
+            432.4,
+            324.3
+          ],
+          [
+            432.4,
+            324.3
+          ],
+          [
+            432.4,
+            324.3
+          ],
+          [
+            432.4,
+            329.7
+          ],
+          [
+            432.4,
+            340.5
+          ],
+          [
+            432.4,
+            329.7
+          ],
+          [
+            432.4,
+            345.9
+          ],
+          [
+            432.4,
+            340.5
+          ],
+          [
+            432.4,
+            351.4
+          ],
+          [
+            432.4,
+            340.5
+          ],
+          [
+            432.4,
+            364.9
+          ],
+          [
+            432.4,
+            335.1
+          ],
+          [
+            432.4,
+            362.2
+          ],
+          [
+            432.4,
+            367.6
+          ],
+          [
+            432.4,
+            345.9
+          ],
+          [
+            432.4,
+            351.4
+          ],
+          [
+            432.4,
+            389.2
+          ],
+          [
+            432.4,
+            335.1
+          ],
+          [
+            432.4,
+            378.4
+          ],
+          [
+            432.4,
+            356.8
+          ],
+          [
+            594.6,
+            367.6
+          ],
+          [
+            594.6,
+            405.4
+          ],
+          [
+            594.6,
+            421.6
+          ],
+          [
+            594.6,
+            421.6
+          ],
+          [
+            594.6,
+            391.9
+          ],
+          [
+            594.6,
+            437.8
+          ],
+          [
+            594.6,
+            448.6
+          ],
+          [
+            594.6,
+            524.3
+          ],
+          [
+            594.6,
+            491.9
+          ],
+          [
+            594.6,
+            478.4
+          ],
+          [
+            621.6,
+            494.6
+          ],
+          [
+            621.6,
+            486.5
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/4_31337"
+      }
+    ],
+    "5": [
+      {
+        "level": "5",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 636.4,
+        "best_x": 636.4,
+        "stuck_frac": 0.015,
+        "causes": {
+          "Stall": 6,
+          "Pit": 5,
+          "Saw": 389
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3178,
+        "train_time_s": 11.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.588,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          11,
+          0,
+          26,
+          0,
+          0,
+          0,
+          363,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.158,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            250.0,
+            88.6
+          ],
+          [
+            636.4,
+            229.5
+          ],
+          [
+            636.4,
+            404.5
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            559.1
+          ],
+          [
+            636.4,
+            559.1
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            636.4
+          ],
+          [
+            636.4,
+            597.7
+          ],
+          [
+            636.4,
+            636.4
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/5_1234"
+      },
+      {
+        "level": "5",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 431.8,
+        "best_x": 431.8,
+        "stuck_frac": 0.9475,
+        "causes": {
+          "Stall": 379,
+          "Saw": 20,
+          "Pit": 1
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0003,
+        "train_time_s": 30.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.456,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          2,
+          0,
+          19,
+          1,
+          378,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.104,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            409.1,
+            247.7
+          ],
+          [
+            409.1,
+            261.4
+          ],
+          [
+            409.1,
+            345.5
+          ],
+          [
+            409.1,
+            393.2
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            409.1,
+            409.1
+          ],
+          [
+            431.8,
+            411.4
+          ],
+          [
+            431.8,
+            411.4
+          ],
+          [
+            431.8,
+            413.6
+          ],
+          [
+            431.8,
+            422.7
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            429.5
+          ],
+          [
+            431.8,
+            422.7
+          ],
+          [
+            431.8,
+            422.7
+          ],
+          [
+            431.8,
+            429.5
+          ],
+          [
+            431.8,
+            429.5
+          ],
+          [
+            431.8,
+            429.5
+          ],
+          [
+            431.8,
+            427.3
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            422.7
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            429.5
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            427.3
+          ],
+          [
+            431.8,
+            431.8
+          ],
+          [
+            431.8,
+            431.8
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/5_2025"
+      },
+      {
+        "level": "5",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 636.4,
+        "best_x": 636.4,
+        "stuck_frac": 0.0325,
+        "causes": {
+          "Pit": 19,
+          "Saw": 368,
+          "Stall": 13
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0108,
+        "train_time_s": 24.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.357,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          26,
+          1,
+          28,
+          290,
+          2,
+          0,
+          53,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.394,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            318.2,
+            93.2
+          ],
+          [
+            340.9,
+            179.5
+          ],
+          [
+            340.9,
+            218.2
+          ],
+          [
+            340.9,
+            306.8
+          ],
+          [
+            340.9,
+            322.7
+          ],
+          [
+            363.6,
+            327.3
+          ],
+          [
+            363.6,
+            343.2
+          ],
+          [
+            363.6,
+            340.9
+          ],
+          [
+            386.4,
+            343.2
+          ],
+          [
+            522.7,
+            365.9
+          ],
+          [
+            522.7,
+            393.2
+          ],
+          [
+            522.7,
+            395.5
+          ],
+          [
+            522.7,
+            404.5
+          ],
+          [
+            522.7,
+            415.9
+          ],
+          [
+            522.7,
+            431.8
+          ],
+          [
+            522.7,
+            409.1
+          ],
+          [
+            522.7,
+            415.9
+          ],
+          [
+            522.7,
+            400.0
+          ],
+          [
+            522.7,
+            420.5
+          ],
+          [
+            522.7,
+            440.9
+          ],
+          [
+            522.7,
+            472.7
+          ],
+          [
+            636.4,
+            479.5
+          ],
+          [
+            636.4,
+            472.7
+          ],
+          [
+            636.4,
+            454.5
+          ],
+          [
+            636.4,
+            493.2
+          ],
+          [
+            636.4,
+            440.9
+          ],
+          [
+            636.4,
+            488.6
+          ],
+          [
+            636.4,
+            472.7
+          ],
+          [
+            636.4,
+            513.6
+          ],
+          [
+            636.4,
+            445.5
+          ],
+          [
+            636.4,
+            465.9
+          ],
+          [
+            636.4,
+            465.9
+          ],
+          [
+            636.4,
+            484.1
+          ],
+          [
+            636.4,
+            450.0
+          ],
+          [
+            636.4,
+            479.5
+          ],
+          [
+            636.4,
+            463.6
+          ],
+          [
+            636.4,
+            445.5
+          ],
+          [
+            636.4,
+            452.3
+          ],
+          [
+            636.4,
+            440.9
+          ],
+          [
+            636.4,
+            477.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/5_31337"
+      }
+    ],
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 20,
+        "first_win_gen": 10,
+        "best_gen": 10,
+        "win_rate": 0.45,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.04,
+        "causes": {
+          "Stall": 8,
+          "Pit": 74,
+          "Saw": 72
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0351,
+        "train_time_s": 5.3,
+        "completion_rate": 0.23,
+        "mean_completion_time": 1.8,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.684,
+        "deaths_per_run": 7.7,
+        "death_hist": [
+          8,
+          2,
+          1,
+          1,
+          71,
+          0,
+          0,
+          0,
+          0,
+          71
+        ],
+        "death_cluster_entropy": 0.43,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.483,
+        "curve": [
+          [
+            653.1,
+            395.9
+          ],
+          [
+            653.1,
+            544.9
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            938.8,
+            681.6
+          ],
+          [
+            938.8,
+            738.8
+          ],
+          [
+            938.8,
+            881.6
+          ],
+          [
+            938.8,
+            938.8
+          ],
+          [
+            938.8,
+            910.2
+          ],
+          [
+            6000.0,
+            1444.9
+          ],
+          [
+            6000.0,
+            1893.9
+          ],
+          [
+            6000.0,
+            3946.9
+          ],
+          [
+            6000.0,
+            2906.1
+          ],
+          [
+            6000.0,
+            2849.0
+          ],
+          [
+            6000.0,
+            3355.1
+          ],
+          [
+            6000.0,
+            3383.7
+          ],
+          [
+            6000.0,
+            3946.9
+          ],
+          [
+            6000.0,
+            2877.6
+          ],
+          [
+            6000.0,
+            2934.7
+          ],
+          [
+            6000.0,
+            3383.7
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 653.1,
+        "best_x": 653.1,
+        "stuck_frac": 0.0425,
+        "causes": {
+          "Saw": 373,
+          "Pit": 10,
+          "Stall": 17
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 7.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.442,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          20,
+          4,
+          1,
+          0,
+          375,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.118,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            653.1,
+            622.4
+          ],
+          [
+            653.1,
+            595.9
+          ],
+          [
+            653.1,
+            589.8
+          ],
+          [
+            653.1,
+            557.1
+          ],
+          [
+            653.1,
+            555.1
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            559.2
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            571.4
+          ],
+          [
+            653.1,
+            624.5
+          ],
+          [
+            653.1,
+            591.8
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            628.6
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            628.6
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 653.1,
+        "best_x": 653.1,
+        "stuck_frac": 0.0225,
+        "causes": {
+          "Pit": 10,
+          "Saw": 381,
+          "Stall": 9
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 5.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.449,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          17,
+          0,
+          0,
+          2,
+          381,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.09,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            653.1,
+            385.7
+          ],
+          [
+            653.1,
+            516.3
+          ],
+          [
+            653.1,
+            622.4
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            622.4
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            620.4
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ],
+          [
+            653.1,
+            653.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/6_31337"
+      }
+    ],
+    "7": [
+      {
+        "level": "7",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.91,
+        "best": 6000.0,
+        "best_x": 974.4,
+        "stuck_frac": 0.041666666666666664,
+        "causes": {
+          "Stall": 5,
+          "Pit": 6,
+          "Saw": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.5342,
+        "train_time_s": 4.3,
+        "completion_rate": 0.767,
+        "mean_completion_time": 2.0,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.305,
+        "deaths_per_run": 2.33,
+        "death_hist": [
+          9,
+          2,
+          0,
+          0,
+          17,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.372,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.625,
+        "curve": [
+          [
+            359.0,
+            138.5
+          ],
+          [
+            6000.0,
+            856.4
+          ],
+          [
+            6000.0,
+            3192.3
+          ],
+          [
+            6000.0,
+            4869.2
+          ],
+          [
+            6000.0,
+            5435.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5451.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/7_1234"
+      },
+      {
+        "level": "7",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 487.2,
+        "best_x": 487.2,
+        "stuck_frac": 0.005,
+        "causes": {
+          "Saw": 396,
+          "Pit": 2,
+          "Stall": 2
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 12.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.459,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          3,
+          1,
+          2,
+          1,
+          393,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.048,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            487.2,
+            328.2
+          ],
+          [
+            487.2,
+            394.9
+          ],
+          [
+            487.2,
+            448.7
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            446.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ],
+          [
+            487.2,
+            487.2
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/7_2025"
+      },
+      {
+        "level": "7",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 359.0,
+        "best_x": 359.0,
+        "stuck_frac": 0.01,
+        "causes": {
+          "Pit": 8,
+          "Saw": 388,
+          "Stall": 4
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 8.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.451,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          12,
+          0,
+          0,
+          1,
+          387,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.066,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            359.0,
+            128.2
+          ],
+          [
+            359.0,
+            230.8
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ],
+          [
+            359.0,
+            359.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/7_31337"
+      }
+    ],
+    "8": [
+      {
+        "level": "8",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 9,
+        "win_rate": 0.0,
+        "best": 833.3,
+        "best_x": 833.3,
+        "stuck_frac": 0.265,
+        "causes": {
+          "Stall": 106,
+          "Pit": 283,
+          "Saw": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0537,
+        "train_time_s": 24.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.089,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          283,
+          49,
+          11,
+          5,
+          38,
+          10,
+          0,
+          1,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.444,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            266.7,
+            213.3
+          ],
+          [
+            266.7,
+            230.0
+          ],
+          [
+            266.7,
+            246.7
+          ],
+          [
+            266.7,
+            250.0
+          ],
+          [
+            266.7,
+            250.0
+          ],
+          [
+            266.7,
+            260.0
+          ],
+          [
+            266.7,
+            253.3
+          ],
+          [
+            266.7,
+            250.0
+          ],
+          [
+            833.3,
+            310.0
+          ],
+          [
+            833.3,
+            413.3
+          ],
+          [
+            833.3,
+            723.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            720.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            776.7
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            663.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            776.7
+          ],
+          [
+            833.3,
+            713.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            766.7
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            716.7
+          ],
+          [
+            833.3,
+            826.7
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            710.0
+          ],
+          [
+            833.3,
+            706.7
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            830.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/8_1234"
+      },
+      {
+        "level": "8",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 5,
+        "win_rate": 0.0,
+        "best": 333.3,
+        "best_x": 333.3,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0284,
+        "train_time_s": 32.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.265,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          0,
+          290,
+          19,
+          2,
+          11,
+          16,
+          5,
+          0,
+          57,
+          0
+        ],
+        "death_cluster_entropy": 0.419,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            233.3,
+            206.7
+          ],
+          [
+            233.3,
+            216.7
+          ],
+          [
+            233.3,
+            233.3
+          ],
+          [
+            233.3,
+            233.3
+          ],
+          [
+            333.3,
+            243.3
+          ],
+          [
+            333.3,
+            256.7
+          ],
+          [
+            333.3,
+            276.7
+          ],
+          [
+            333.3,
+            326.7
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            316.7
+          ],
+          [
+            333.3,
+            316.7
+          ],
+          [
+            333.3,
+            326.7
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            316.7
+          ],
+          [
+            333.3,
+            306.7
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            326.7
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            320.0
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            306.7
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            326.7
+          ],
+          [
+            333.3,
+            323.3
+          ],
+          [
+            333.3,
+            310.0
+          ],
+          [
+            333.3,
+            320.0
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            296.7
+          ],
+          [
+            333.3,
+            323.3
+          ],
+          [
+            333.3,
+            333.3
+          ],
+          [
+            333.3,
+            326.7
+          ],
+          [
+            333.3,
+            330.0
+          ],
+          [
+            333.3,
+            326.7
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/8_2025"
+      },
+      {
+        "level": "8",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 3,
+        "win_rate": 0.0,
+        "best": 833.3,
+        "best_x": 833.3,
+        "stuck_frac": 0.1025,
+        "causes": {
+          "Stall": 41,
+          "Saw": 13,
+          "Pit": 346
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3551,
+        "train_time_s": 37.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.045,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          346,
+          18,
+          3,
+          7,
+          22,
+          1,
+          0,
+          0,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.253,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            333.3,
+            230.0
+          ],
+          [
+            333.3,
+            250.0
+          ],
+          [
+            833.3,
+            353.3
+          ],
+          [
+            833.3,
+            396.7
+          ],
+          [
+            833.3,
+            523.3
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            773.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            823.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            770.0
+          ],
+          [
+            833.3,
+            826.7
+          ],
+          [
+            833.3,
+            826.7
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            830.0
+          ],
+          [
+            833.3,
+            833.3
+          ],
+          [
+            833.3,
+            830.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/8_31337"
+      }
+    ],
+    "9": [
+      {
+        "level": "9",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 8,
+        "win_rate": 0.0,
+        "best": 744.7,
+        "best_x": 744.7,
+        "stuck_frac": 0.0275,
+        "causes": {
+          "Stall": 11,
+          "Saw": 389
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0126,
+        "train_time_s": 21.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.565,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          8,
+          2,
+          0,
+          17,
+          0,
+          282,
+          91,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.357,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            531.9,
+            312.8
+          ],
+          [
+            702.1,
+            487.2
+          ],
+          [
+            702.1,
+            597.9
+          ],
+          [
+            702.1,
+            693.6
+          ],
+          [
+            702.1,
+            697.9
+          ],
+          [
+            702.1,
+            695.7
+          ],
+          [
+            702.1,
+            697.9
+          ],
+          [
+            744.7,
+            687.2
+          ],
+          [
+            744.7,
+            712.8
+          ],
+          [
+            744.7,
+            727.7
+          ],
+          [
+            744.7,
+            721.3
+          ],
+          [
+            744.7,
+            736.2
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            729.8
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            723.4
+          ],
+          [
+            744.7,
+            744.7
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            744.7
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            731.9
+          ],
+          [
+            744.7,
+            742.6
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            744.7
+          ],
+          [
+            744.7,
+            744.7
+          ],
+          [
+            744.7,
+            714.9
+          ],
+          [
+            744.7,
+            734.0
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            731.9
+          ],
+          [
+            744.7,
+            719.1
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            734.0
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            731.9
+          ],
+          [
+            744.7,
+            734.0
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            738.3
+          ],
+          [
+            744.7,
+            740.4
+          ],
+          [
+            744.7,
+            723.4
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/9_1234"
+      },
+      {
+        "level": "9",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 19,
+        "first_win_gen": 9,
+        "best_gen": 9,
+        "win_rate": 0.49,
+        "best": 6000.0,
+        "best_x": 978.7,
+        "stuck_frac": 0.04736842105263158,
+        "causes": {
+          "Saw": 131,
+          "Stall": 9
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0317,
+        "train_time_s": 8.5,
+        "completion_rate": 0.263,
+        "mean_completion_time": 3.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.507,
+        "deaths_per_run": 7.37,
+        "death_hist": [
+          7,
+          1,
+          1,
+          63,
+          0,
+          27,
+          0,
+          41,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.546,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.567,
+        "curve": [
+          [
+            531.9,
+            497.9
+          ],
+          [
+            531.9,
+            531.9
+          ],
+          [
+            829.8,
+            508.5
+          ],
+          [
+            829.8,
+            487.2
+          ],
+          [
+            829.8,
+            536.2
+          ],
+          [
+            829.8,
+            638.3
+          ],
+          [
+            829.8,
+            740.4
+          ],
+          [
+            829.8,
+            738.3
+          ],
+          [
+            6000.0,
+            1285.1
+          ],
+          [
+            6000.0,
+            1823.4
+          ],
+          [
+            6000.0,
+            2338.3
+          ],
+          [
+            6000.0,
+            2806.4
+          ],
+          [
+            6000.0,
+            3880.9
+          ],
+          [
+            6000.0,
+            3831.9
+          ],
+          [
+            6000.0,
+            3891.5
+          ],
+          [
+            6000.0,
+            3321.3
+          ],
+          [
+            6000.0,
+            2825.5
+          ],
+          [
+            6000.0,
+            3323.4
+          ],
+          [
+            6000.0,
+            4955.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/9_2025"
+      },
+      {
+        "level": "9",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.47,
+        "best": 6000.0,
+        "best_x": 978.7,
+        "stuck_frac": 0.23125,
+        "causes": {
+          "Stall": 37,
+          "Saw": 75
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0561,
+        "train_time_s": 13.6,
+        "completion_rate": 0.3,
+        "mean_completion_time": 6.3,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.528,
+        "deaths_per_run": 7.0,
+        "death_hist": [
+          14,
+          1,
+          0,
+          9,
+          29,
+          33,
+          5,
+          1,
+          0,
+          20
+        ],
+        "death_cluster_entropy": 0.74,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.66,
+        "curve": [
+          [
+            553.2,
+            312.8
+          ],
+          [
+            744.7,
+            440.4
+          ],
+          [
+            957.4,
+            540.4
+          ],
+          [
+            957.4,
+            697.9
+          ],
+          [
+            957.4,
+            744.7
+          ],
+          [
+            6000.0,
+            1312.8
+          ],
+          [
+            6000.0,
+            1293.6
+          ],
+          [
+            6000.0,
+            1814.9
+          ],
+          [
+            6000.0,
+            1859.6
+          ],
+          [
+            6000.0,
+            2412.8
+          ],
+          [
+            6000.0,
+            3891.5
+          ],
+          [
+            6000.0,
+            3302.1
+          ],
+          [
+            6000.0,
+            4421.3
+          ],
+          [
+            6000.0,
+            3285.1
+          ],
+          [
+            6000.0,
+            4914.9
+          ],
+          [
+            6000.0,
+            4929.8
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/9_31337"
+      }
+    ],
+    "10": [
+      {
+        "level": "10",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.87,
+        "best": 6000.0,
+        "best_x": 977.3,
+        "stuck_frac": 0.3153846153846154,
+        "causes": {
+          "Stall": 41,
+          "Saw": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1937,
+        "train_time_s": 9.3,
+        "completion_rate": 0.677,
+        "mean_completion_time": 4.7,
+        "completion_time_stddev": 0.4,
+        "progress_at_death": 0.736,
+        "deaths_per_run": 3.23,
+        "death_hist": [
+          8,
+          0,
+          1,
+          1,
+          0,
+          2,
+          0,
+          0,
+          0,
+          30
+        ],
+        "death_cluster_entropy": 0.382,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.925,
+        "curve": [
+          [
+            568.2,
+            163.6
+          ],
+          [
+            568.2,
+            420.5
+          ],
+          [
+            6000.0,
+            1111.4
+          ],
+          [
+            6000.0,
+            1654.5
+          ],
+          [
+            6000.0,
+            3284.1
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            6000.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/10_1234"
+      },
+      {
+        "level": "10",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 10,
+        "win_rate": 0.0,
+        "best": 590.9,
+        "best_x": 590.9,
+        "stuck_frac": 0.99,
+        "causes": {
+          "Stall": 396,
+          "Saw": 4
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0012,
+        "train_time_s": 36.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.731,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          12,
+          4,
+          2,
+          4,
+          75,
+          66,
+          14,
+          13,
+          23,
+          187
+        ],
+        "death_cluster_entropy": 0.688,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            568.2,
+            515.9
+          ],
+          [
+            568.2,
+            475.0
+          ],
+          [
+            568.2,
+            465.9
+          ],
+          [
+            568.2,
+            363.6
+          ],
+          [
+            568.2,
+            404.5
+          ],
+          [
+            568.2,
+            540.9
+          ],
+          [
+            568.2,
+            422.7
+          ],
+          [
+            568.2,
+            515.9
+          ],
+          [
+            568.2,
+            529.5
+          ],
+          [
+            590.9,
+            570.5
+          ],
+          [
+            590.9,
+            520.5
+          ],
+          [
+            590.9,
+            584.1
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            584.1
+          ],
+          [
+            590.9,
+            581.8
+          ],
+          [
+            590.9,
+            586.4
+          ],
+          [
+            590.9,
+            581.8
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            581.8
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            588.6
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ],
+          [
+            590.9,
+            590.9
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/10_2025"
+      },
+      {
+        "level": "10",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 27,
+        "win_rate": 0.0,
+        "best": 931.8,
+        "best_x": 931.8,
+        "stuck_frac": 0.86,
+        "causes": {
+          "Stall": 344,
+          "Saw": 56
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0045,
+        "train_time_s": 50.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.779,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          14,
+          1,
+          14,
+          50,
+          0,
+          13,
+          10,
+          2,
+          29,
+          267
+        ],
+        "death_cluster_entropy": 0.521,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            659.1,
+            140.9
+          ],
+          [
+            659.1,
+            340.9
+          ],
+          [
+            659.1,
+            531.8
+          ],
+          [
+            659.1,
+            447.7
+          ],
+          [
+            659.1,
+            536.4
+          ],
+          [
+            659.1,
+            561.4
+          ],
+          [
+            659.1,
+            575.0
+          ],
+          [
+            659.1,
+            604.5
+          ],
+          [
+            659.1,
+            475.0
+          ],
+          [
+            659.1,
+            545.5
+          ],
+          [
+            659.1,
+            588.6
+          ],
+          [
+            659.1,
+            425.0
+          ],
+          [
+            659.1,
+            475.0
+          ],
+          [
+            659.1,
+            495.5
+          ],
+          [
+            659.1,
+            568.2
+          ],
+          [
+            659.1,
+            502.3
+          ],
+          [
+            659.1,
+            615.9
+          ],
+          [
+            659.1,
+            515.9
+          ],
+          [
+            659.1,
+            531.8
+          ],
+          [
+            659.1,
+            488.6
+          ],
+          [
+            659.1,
+            575.0
+          ],
+          [
+            659.1,
+            604.5
+          ],
+          [
+            659.1,
+            477.3
+          ],
+          [
+            659.1,
+            606.8
+          ],
+          [
+            818.2,
+            665.9
+          ],
+          [
+            863.6,
+            645.5
+          ],
+          [
+            931.8,
+            727.3
+          ],
+          [
+            931.8,
+            763.6
+          ],
+          [
+            931.8,
+            600.0
+          ],
+          [
+            931.8,
+            775.0
+          ],
+          [
+            931.8,
+            827.3
+          ],
+          [
+            931.8,
+            756.8
+          ],
+          [
+            931.8,
+            875.0
+          ],
+          [
+            931.8,
+            793.2
+          ],
+          [
+            931.8,
+            843.2
+          ],
+          [
+            931.8,
+            895.5
+          ],
+          [
+            931.8,
+            697.7
+          ],
+          [
+            931.8,
+            843.2
+          ],
+          [
+            931.8,
+            809.1
+          ],
+          [
+            931.8,
+            725.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/speedrunner/p10g40_mutation_sigma-0.02/10_31337"
+      }
+    ]
+  }
+}

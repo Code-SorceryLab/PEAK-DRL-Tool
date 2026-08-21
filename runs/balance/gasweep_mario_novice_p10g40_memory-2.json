@@ -1,0 +1,1028 @@
+{
+  "game": "mario",
+  "persona": "novice",
+  "tag": "p10g40_memory-2",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 714.3,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.8,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 2
+  },
+  "levels": [
+    {
+      "level": "Mario1-1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 2.3,
+      "first_win_ci": 5.7,
+      "best_gen_mean": 6.3,
+      "best_gen_ci": 16.9,
+      "win_rate_mean": 0.397,
+      "win_rate_ci": 0.531,
+      "dominant_cause": "Enemy",
+      "dominant_cause_frac": 0.46,
+      "causes": {
+        "Enemy": 115,
+        "Stall": 36,
+        "OOB": 19,
+        "Pit": 76,
+        "?": 2
+      },
+      "best_x_mean": 6225.9,
+      "stuck_frac_mean": 0.103,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0134,
+      "train_time_s": 158.2,
+      "completion_rate_mean": 0.341,
+      "mean_completion_time": 28.9,
+      "completion_time_stddev": 3.5,
+      "progress_at_death_mean": 0.205,
+      "deaths_per_run_mean": 6.59,
+      "death_hist": [
+        131,
+        9,
+        51,
+        18,
+        0,
+        15,
+        17,
+        7,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.573,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.389
+    },
+    {
+      "level": "Mario1-2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 22.3,
+      "best_gen_ci": 46.6,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.75,
+      "causes": {
+        "Stall": 895,
+        "Enemy": 158,
+        "Pit": 147
+      },
+      "best_x_mean": 5355.6,
+      "stuck_frac_mean": 0.746,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0111,
+      "train_time_s": 556.1,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.723,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        43,
+        1,
+        113,
+        242,
+        14,
+        0,
+        7,
+        9,
+        37,
+        734
+      ],
+      "death_cluster_entropy_mean": 0.427,
+      "coin_collection_rate_mean": 0.043,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "Mario1-1": [
+      {
+        "level": "Mario1-1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 4,
+        "win_rate": 0.63,
+        "best": 11213.5,
+        "best_x": 6213.5,
+        "stuck_frac": 0.045454545454545456,
+        "causes": {
+          "Enemy": 22,
+          "Stall": 5,
+          "OOB": 2,
+          "Pit": 15,
+          "?": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0001,
+        "train_time_s": 59.1,
+        "completion_rate": 0.582,
+        "mean_completion_time": 27.0,
+        "completion_time_stddev": 5.2,
+        "progress_at_death": 0.219,
+        "deaths_per_run": 4.18,
+        "death_hist": [
+          24,
+          0,
+          6,
+          8,
+          0,
+          5,
+          3,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.577,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.633,
+        "curve": [
+          [
+            11210.3,
+            1341.2
+          ],
+          [
+            11210.9,
+            2810.7
+          ],
+          [
+            11211.5,
+            4782.9
+          ],
+          [
+            11213.5,
+            5896.2
+          ],
+          [
+            11213.5,
+            8142.3
+          ],
+          [
+            11213.5,
+            9133.3
+          ],
+          [
+            11213.5,
+            9456.0
+          ],
+          [
+            11213.5,
+            9068.1
+          ],
+          [
+            11213.5,
+            9449.2
+          ],
+          [
+            11213.5,
+            9322.2
+          ],
+          [
+            11213.5,
+            10304.6
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-1_1234"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 14,
+        "win_rate": 0.35,
+        "best": 11228.1,
+        "best_x": 6228.1,
+        "stuck_frac": 0.04666666666666667,
+        "causes": {
+          "OOB": 10,
+          "Enemy": 50,
+          "Pit": 47,
+          "Stall": 7
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.04,
+        "train_time_s": 58.0,
+        "completion_rate": 0.24,
+        "mean_completion_time": 30.7,
+        "completion_time_stddev": 2.7,
+        "progress_at_death": 0.208,
+        "deaths_per_run": 7.6,
+        "death_hist": [
+          52,
+          3,
+          38,
+          6,
+          0,
+          2,
+          12,
+          1,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.575,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.4,
+        "curve": [
+          [
+            2144.8,
+            428.1
+          ],
+          [
+            2144.8,
+            466.7
+          ],
+          [
+            2144.8,
+            477.5
+          ],
+          [
+            4832.8,
+            928.8
+          ],
+          [
+            11210.6,
+            2669.4
+          ],
+          [
+            11210.6,
+            3960.9
+          ],
+          [
+            11210.9,
+            5058.0
+          ],
+          [
+            11210.9,
+            4819.3
+          ],
+          [
+            11222.4,
+            4996.1
+          ],
+          [
+            11222.4,
+            4787.9
+          ],
+          [
+            11222.4,
+            4733.2
+          ],
+          [
+            11222.4,
+            7425.9
+          ],
+          [
+            11222.4,
+            5843.5
+          ],
+          [
+            11228.1,
+            5839.2
+          ],
+          [
+            11228.1,
+            6762.5
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-1_2025"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.21,
+        "best": 11236.1,
+        "best_x": 6236.1,
+        "stuck_frac": 0.21818181818181817,
+        "causes": {
+          "OOB": 7,
+          "Stall": 24,
+          "Enemy": 43,
+          "Pit": 14
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 41.1,
+        "completion_rate": 0.2,
+        "mean_completion_time": 29.0,
+        "completion_time_stddev": 2.5,
+        "progress_at_death": 0.187,
+        "deaths_per_run": 8.0,
+        "death_hist": [
+          55,
+          6,
+          7,
+          4,
+          0,
+          8,
+          2,
+          6,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.567,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.133,
+        "curve": [
+          [
+            11236.1,
+            1266.9
+          ],
+          [
+            11236.1,
+            1346.7
+          ],
+          [
+            11236.1,
+            2780.7
+          ],
+          [
+            11236.1,
+            3343.2
+          ],
+          [
+            11236.1,
+            2991.4
+          ],
+          [
+            11236.1,
+            3983.7
+          ],
+          [
+            11236.1,
+            4778.6
+          ],
+          [
+            11236.1,
+            3825.8
+          ],
+          [
+            11236.1,
+            4204.9
+          ],
+          [
+            11236.1,
+            4627.5
+          ],
+          [
+            11236.1,
+            4559.2
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-1_31337"
+      }
+    ],
+    "Mario1-2": [
+      {
+        "level": "Mario1-2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 26,
+        "win_rate": 0.0,
+        "best": 5120.9,
+        "best_x": 5120.9,
+        "stuck_frac": 0.5125,
+        "causes": {
+          "Stall": 205,
+          "Enemy": 79,
+          "Pit": 116
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0281,
+        "train_time_s": 150.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.486,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          12,
+          0,
+          52,
+          202,
+          13,
+          0,
+          1,
+          6,
+          23,
+          91
+        ],
+        "death_cluster_entropy": 0.611,
+        "coin_collection_rate": 0.105,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            1952.5,
+            687.0
+          ],
+          [
+            1953.0,
+            1314.6
+          ],
+          [
+            1953.0,
+            1568.7
+          ],
+          [
+            1953.0,
+            1806.9
+          ],
+          [
+            2272.6,
+            1902.0
+          ],
+          [
+            2272.6,
+            1778.8
+          ],
+          [
+            2272.6,
+            1860.6
+          ],
+          [
+            2272.6,
+            1871.9
+          ],
+          [
+            2272.6,
+            1959.1
+          ],
+          [
+            4971.6,
+            2182.9
+          ],
+          [
+            4971.6,
+            2286.6
+          ],
+          [
+            4971.6,
+            2473.6
+          ],
+          [
+            5083.6,
+            2704.1
+          ],
+          [
+            5083.6,
+            2777.9
+          ],
+          [
+            5083.6,
+            2670.5
+          ],
+          [
+            5120.1,
+            3015.8
+          ],
+          [
+            5120.1,
+            3652.3
+          ],
+          [
+            5120.1,
+            3394.0
+          ],
+          [
+            5120.1,
+            3165.8
+          ],
+          [
+            5120.1,
+            3111.2
+          ],
+          [
+            5120.1,
+            3200.2
+          ],
+          [
+            5120.1,
+            3200.3
+          ],
+          [
+            5120.1,
+            3267.4
+          ],
+          [
+            5120.1,
+            3046.2
+          ],
+          [
+            5120.1,
+            3200.2
+          ],
+          [
+            5120.9,
+            3428.3
+          ],
+          [
+            5120.9,
+            3048.6
+          ],
+          [
+            5120.9,
+            3070.3
+          ],
+          [
+            5120.9,
+            3198.2
+          ],
+          [
+            5120.9,
+            3513.7
+          ],
+          [
+            5120.9,
+            3218.9
+          ],
+          [
+            5120.9,
+            2980.5
+          ],
+          [
+            5120.9,
+            3187.3
+          ],
+          [
+            5120.9,
+            3082.1
+          ],
+          [
+            5120.9,
+            3057.1
+          ],
+          [
+            5120.9,
+            3411.9
+          ],
+          [
+            5120.9,
+            3168.1
+          ],
+          [
+            5120.9,
+            3198.3
+          ],
+          [
+            5120.9,
+            2986.6
+          ],
+          [
+            5120.9,
+            3423.7
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-2_1234"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 5472.9,
+        "best_x": 5472.9,
+        "stuck_frac": 0.835,
+        "causes": {
+          "Stall": 334,
+          "Enemy": 40,
+          "Pit": 26
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 203.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.855,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          11,
+          1,
+          32,
+          14,
+          0,
+          0,
+          4,
+          3,
+          14,
+          321
+        ],
+        "death_cluster_entropy": 0.352,
+        "coin_collection_rate": 0.015,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            5472.8,
+            1072.7
+          ],
+          [
+            5472.9,
+            2292.7
+          ],
+          [
+            5472.9,
+            2966.7
+          ],
+          [
+            5472.9,
+            3796.4
+          ],
+          [
+            5472.9,
+            5085.9
+          ],
+          [
+            5472.9,
+            5432.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            3500.1
+          ],
+          [
+            5472.9,
+            4619.9
+          ],
+          [
+            5472.9,
+            4699.4
+          ],
+          [
+            5472.9,
+            4347.0
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4699.8
+          ],
+          [
+            5472.9,
+            5422.1
+          ],
+          [
+            5472.9,
+            4957.6
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5422.4
+          ],
+          [
+            5472.9,
+            4935.6
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5330.7
+          ],
+          [
+            5472.9,
+            5048.4
+          ],
+          [
+            5472.9,
+            5080.9
+          ],
+          [
+            5472.9,
+            5309.6
+          ],
+          [
+            5472.9,
+            5046.4
+          ],
+          [
+            5472.9,
+            5046.4
+          ],
+          [
+            5472.9,
+            4659.4
+          ],
+          [
+            5472.9,
+            5006.4
+          ],
+          [
+            5472.9,
+            5434.2
+          ],
+          [
+            5472.9,
+            5047.8
+          ],
+          [
+            5472.9,
+            5379.6
+          ],
+          [
+            5472.9,
+            4232.9
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5011.1
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4872.7
+          ],
+          [
+            5472.9,
+            5046.4
+          ],
+          [
+            5472.9,
+            5008.9
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-2_2025"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 39,
+        "win_rate": 0.0,
+        "best": 5473.0,
+        "best_x": 5473.0,
+        "stuck_frac": 0.89,
+        "causes": {
+          "Stall": 356,
+          "Enemy": 39,
+          "Pit": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0051,
+        "train_time_s": 202.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.829,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          20,
+          0,
+          29,
+          26,
+          1,
+          0,
+          2,
+          0,
+          0,
+          322
+        ],
+        "death_cluster_entropy": 0.319,
+        "coin_collection_rate": 0.009,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            1602.9,
+            334.4
+          ],
+          [
+            1602.9,
+            675.1
+          ],
+          [
+            5472.8,
+            2164.8
+          ],
+          [
+            5472.8,
+            3982.3
+          ],
+          [
+            5472.9,
+            5309.5
+          ],
+          [
+            5472.9,
+            3576.3
+          ],
+          [
+            5472.9,
+            4312.9
+          ],
+          [
+            5472.9,
+            4752.1
+          ],
+          [
+            5472.9,
+            4811.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4347.1
+          ],
+          [
+            5472.9,
+            5085.9
+          ],
+          [
+            5472.9,
+            5120.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4699.1
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5089.3
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5086.4
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5437.2
+          ],
+          [
+            5472.9,
+            5089.2
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            4733.8
+          ],
+          [
+            5472.9,
+            5117.6
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4743.5
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            4314.2
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5085.6
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            4036.6
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5120.8
+          ],
+          [
+            5472.9,
+            4708.7
+          ],
+          [
+            5472.9,
+            5120.8
+          ],
+          [
+            5473.0,
+            4724.6
+          ],
+          [
+            5473.0,
+            3995.8
+          ]
+        ],
+        "dir": "runs/gasweep/mario/novice/p10g40_memory-2/Mario1-2_31337"
+      }
+    ]
+  }
+}
