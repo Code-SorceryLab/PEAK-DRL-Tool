@@ -376,8 +376,40 @@ def _verdicts(row: dict, strat: tuple[int, float] | None, th: dict) -> str:
     for label, ok, partial, tip in out:
         cls = "pill-ok" if ok else ("pill-warn" if partial else "pill-bad")
         word = "in band" if ok else ("partial" if partial else "off band")
-        pills.append(f'<span class="pill {cls} tip" data-tip="{tip}">{label}: {word}</span>')
+        pills.append(f'<span class="pill {cls} tip" data-tip="{tip}" tabindex="0">{label}: {word}</span>')
     return " ".join(pills)
+
+
+def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, str, str]:
+    """(word, colour, one plain-English sentence) a designer can act on without reading the tiles."""
+    wr, solved, seeds = row["win_rate_mean"], row["solved_by"], row["seeds"]
+    hist = row.get("death_hist") or []
+    peak = max(range(len(hist)), key=lambda i: hist[i]) if hist and max(hist) else None
+    cause = _cause_name(row["dominant_cause"])
+    frac = row["dominant_cause_frac"]
+    where = f"in the {peak * 10}–{peak * 10 + 10} % stretch" if peak is not None else "with no single hotspot"
+    if solved == 0:
+        word, color = "too hard", "var(--red)"
+        pad = row.get("progress_at_death_mean")
+        sent = (f"No seed ever reached the goal — the best agents die at {pad:.0%} of the level, "
+                f"<b>{cause}</b> accounts for {frac:.0%} of deaths {where}. "
+                "Ease that stretch or give the player a tool for it.") if pad is not None else \
+               f"No seed ever reached the goal; <b>{cause}</b> accounts for {frac:.0%} of deaths {where}."
+    elif solved < seeds:
+        word, color = "luck-dependent", "var(--yellow)"
+        sent = (f"Only {solved} of {seeds} seeds cracked it and winners then win {wr:.0%} of the time — "
+                f"<b>{cause}</b> kills {frac:.0%} {where}. A level some playtesters never beat is a spike, not a curve.")
+    elif wr >= 0.5:
+        word, color = "learnable", "var(--green)"
+        sent = (f"Every seed wins and keeps winning ({wr:.0%} after the first win). "
+                f"<b>{cause}</b> is still the main killer ({frac:.0%}, {where})"
+                + (f"; {strat[0]} distinct winning routes." if strat else "."))
+    else:
+        word, color = "inconsistent", "var(--yellow)"
+        sent = (f"Every seed wins at least once, but only {wr:.0%} of the time afterwards — "
+                f"<b>{cause}</b> ({frac:.0%} of deaths, {where}) keeps catching agents that already know the way. "
+                "That is a precision demand, not a discovery problem.")
+    return word, color, sent
 
 
 # ── HTML pieces ──────────────────────────────────────────────────────────────
@@ -391,8 +423,14 @@ CSS = """
   *{box-sizing:border-box;margin:0}
   html{font-size:clamp(15px,1.05vw + 10px,17px);scroll-behavior:smooth}
   body{background:var(--bg);color:var(--txt);font:1rem/1.55 var(--ui);
-    padding:0 clamp(12px,3vw,32px) clamp(12px,3vw,32px)}
+    padding:0 clamp(12px,3vw,32px) clamp(12px,3vw,32px);caret-color:var(--red)}
+  ::selection{background:rgba(239,68,68,.3);color:#fff}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+  :focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:4px}
+  .skip{position:absolute;left:-999px;top:8px;background:var(--red);color:#fff;padding:8px 12px;border-radius:6px;z-index:99}
+  .skip:focus{left:8px}
   main{max-width:1280px;margin:0 auto}
+  h1,h2,h3{font-size:inherit;font-weight:inherit}
 
   /* top navigation */
   nav{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:14px;
@@ -407,9 +445,8 @@ CSS = """
     color:var(--dim);text-decoration:none;border:1px solid var(--line2);border-radius:6px;
     padding:0 12px;height:34px;transition:all .15s}
   nav a:hover{color:#fff;border-color:var(--red)}
-  nav a.doc{color:var(--blue);border-color:#1d3a5f}
-  nav a.doc.abl{color:var(--yellow);border-color:#5a4a10}
-  nav a.doc.ga{color:var(--green);border-color:#14532d}
+  nav a.doc{color:var(--txt)}
+  nav a[aria-current]{color:#fff;border-color:var(--red)}
   a.navbtn{text-decoration:none}
 
   /* sensor ablation page */
@@ -450,9 +487,14 @@ CSS = """
   .verdict{display:inline-flex;align-items:center;gap:8px;font:700 .72rem var(--mono);letter-spacing:.12em;
     text-transform:uppercase;border:1px solid var(--c);color:var(--c);border-radius:999px;padding:4px 12px;
     background:color-mix(in srgb,var(--c) 10%,transparent)}
-  .verdict::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+  .verdict::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
   .vsent{font:400 .9rem/1.5 var(--ui);color:var(--txt);margin-top:10px}
   .vsent b{color:var(--c)}
+  .dverdict{--c:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:start;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0 0}
+  .dverdict .verdict{align-self:center}
+  .dverdict .vsent{margin:0;font-size:.95rem}
+  .dverdict .verdicts{grid-column:1/-1;margin:2px 0 0}
   .gsrec{border-top:3px solid var(--green)}
   .gsrec .recrow{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
   .recchip{display:inline-flex;align-items:baseline;gap:6px;font:400 .74rem var(--mono);color:var(--dim);
@@ -514,7 +556,9 @@ CSS = """
   .gamehead{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:16px}
   .gametag{font:700 1.05rem var(--mono);letter-spacing:.14em;text-transform:uppercase;
     color:#fff;background:var(--red-dim);border-radius:6px;padding:5px 14px}
-  .gamemeta{font:400 .78rem var(--mono);color:var(--faint)}
+  .pchip{font:700 .8rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--c);
+    border:1px solid var(--c);border-radius:6px;padding:5px 12px;background:color-mix(in srgb,var(--c) 12%,transparent)}
+  .gamemeta{font:400 .78rem var(--mono);color:var(--dim)}
   code.cmd{display:block;font:600 .8rem var(--mono);color:var(--yellow);background:#151517;
     padding:8px 10px;border-radius:6px;margin:6px 0;user-select:all;overflow-x:auto;white-space:nowrap}
   .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
@@ -535,6 +579,13 @@ CSS = """
   th:first-child,td:first-child{text-align:left}
   td:first-child{color:var(--txt);font-weight:600}
   tr:hover td{background:#141416}
+  table.metrics th:first-child,table.metrics td:first-child{position:sticky;left:0;z-index:1;background:var(--panel2)}
+  table.metrics th[data-sort]{cursor:pointer;user-select:none}
+  table.metrics th[data-sort]:hover{color:var(--txt)}
+  table.metrics th[aria-sort="ascending"]::after{content:" ▴";color:var(--red)}
+  table.metrics th[aria-sort="descending"]::after{content:" ▾";color:var(--red)}
+  table.metrics tbody tr{cursor:pointer}
+  table.metrics tbody tr:focus-visible td{background:#1a1a1e}
   .wr-good{color:var(--green);font-weight:700}.wr-mid{color:var(--yellow);font-weight:700}
   .wr-bad{color:var(--red);font-weight:700}.wr-na{color:var(--faint)}
   .ovnote{font:400 .74rem var(--ui);color:var(--faint);margin-top:8px}
@@ -544,21 +595,26 @@ CSS = """
   .pill-warn{color:var(--yellow);background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.35)}
   .pill-bad{color:var(--red);background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4)}
 
-  /* hover info bubbles */
+  /* info bubbles: hover, keyboard focus, or tap */
   .tip{position:relative;cursor:help}
-  .tip:hover::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 8px);
-    z-index:60;width:min(300px,70vw);background:#1b1b1f;color:var(--txt);border:1px solid var(--line2);
-    border-left:3px solid var(--blue);border-radius:6px;padding:9px 12px;
+  .tip:hover::after,.tip:focus-visible::after,.tip.open::after{content:attr(data-tip);position:absolute;left:0;
+    bottom:calc(100% + 8px);z-index:60;width:min(300px,70vw);background:#1b1b1f;color:var(--txt);
+    border:1px solid #2d3f5c;border-radius:6px;padding:9px 12px;
     font:400 .74rem/1.5 var(--ui);letter-spacing:0;text-transform:none;white-space:normal;
-    text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+    text-align:left;box-shadow:0 10px 28px -6px rgba(0,0,0,.7)}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
   .lvlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
   .lvlcard{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;overflow:hidden;
-    transition:border-color .15s}
+    transition:border-color .15s;display:flex;flex-direction:column}
   .lvlcard:hover{border-color:var(--faint)}
-  .lvlcard:has(dialog[open]){border-color:var(--red)}
+  .lvlcard:has(dialog[open]),.lvlcard:has(.cardhead:focus-visible){border-color:var(--red)}
   .cardhead{display:block;width:100%;text-align:left;background:none;border:0;color:var(--txt);
-    font:inherit;cursor:pointer;padding:14px 16px}
+    font:inherit;cursor:pointer;padding:14px 16px;flex:1}
+  .cardhead:focus-visible{outline:none}
+  .cardfoot{display:flex;align-items:center;gap:10px;padding:8px 16px 10px;border-top:1px solid var(--line)}
+  .cardfoot .watchbtn{padding:4px 10px;font-size:.66rem}
+  .cardfoot small{font:400 .68rem var(--mono);color:var(--dim)}
   .lvlname{font:600 .9rem var(--mono);color:#e5e5e5;margin-bottom:8px;display:flex;
     justify-content:space-between;align-items:center;gap:8px}
   .bignum{font:700 1.9rem var(--mono)}
@@ -595,8 +651,9 @@ CSS = """
   .cfglbl{align-self:center;font:600 .68rem var(--ui);letter-spacing:.1em;text-transform:uppercase;
     color:var(--faint);margin-right:4px}
   .cfgbtn{display:inline-flex;align-items:baseline;gap:8px;cursor:pointer;text-align:left;
-    background:var(--panel2);border:1px solid var(--line2);border-left:3px solid var(--c);border-radius:8px;
+    background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
     padding:8px 14px;color:var(--dim);transition:all .15s}
+  .cfgbtn::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c);align-self:center;flex:none}
   .cfgbtn b{font:700 .8rem var(--mono);letter-spacing:.06em;color:var(--txt)}
   .cfgbtn small{font:400 .68rem var(--mono);color:var(--faint)}
   .cfgbtn:hover{border-color:var(--c)}
@@ -670,11 +727,21 @@ CSS = """
   .vt .faint{font-weight:400;color:var(--faint)}
   .legend .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
   .verdicts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:14px 0 16px}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-  .stat .lbl{font:400 .64rem var(--ui);color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
-  .stat .val{font:600 1.1rem var(--mono);margin-top:2px}
-  .stat .sub{font:400 .68rem var(--mono);color:var(--faint);margin-top:1px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin:14px 0 16px}
+  .stats.headline{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin:12px 0 10px}
+  .stats.headline .stat .val{font-size:1.25rem}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+  .stat .lbl{font:400 .66rem var(--ui);color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+  .stat .val{font:600 1.05rem var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .sub{font:400 .68rem var(--mono);color:var(--dim);margin-top:1px}
+  details.more{margin:4px 0 10px}
+  details.more summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:8px;
+    font:600 .74rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line2);border-radius:6px;padding:6px 12px}
+  details.more summary::-webkit-details-marker{display:none}
+  details.more summary::before{content:"▸";color:var(--faint)}
+  details.more[open] summary::before{content:"▾"}
+  details.more summary:hover{color:var(--txt);border-color:var(--faint)}
   .viz{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px}
   .viz .vt{font:600 .76rem var(--ui);color:var(--dim);margin-bottom:8px}
   .caption{font:400 .72rem var(--ui);color:var(--faint);margin-top:6px;line-height:1.5}
@@ -706,10 +773,15 @@ CSS = """
 
   .tbltitle{font:600 .78rem var(--ui);letter-spacing:.1em;text-transform:uppercase;
     color:var(--dim);margin:20px 0 8px}
-  .gloss{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--blue);
-    border-radius:8px;padding:14px 18px;margin-top:22px;font-size:.82rem;color:var(--dim);line-height:1.7}
+  .gloss{background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:12px 18px;margin:0 0 18px;font-size:.82rem;color:var(--dim);line-height:1.7}
   .gloss b{color:var(--txt)}
-  footer{color:var(--faint);font:400 .72rem var(--mono);margin:22px 0 8px}
+  .gloss summary{cursor:pointer;font-weight:600;color:var(--txt);list-style:none;display:flex;align-items:center;gap:8px}
+  .gloss summary::-webkit-details-marker{display:none}
+  .gloss summary::before{content:"▸";color:var(--faint)}
+  .gloss[open] summary::before{content:"▾"}
+  .gloss[open] summary{margin-bottom:6px}
+  footer{color:var(--dim);font:400 .74rem var(--ui);margin:22px 0 8px}
   .doc-body{max-width:860px}
   .doc-body h2{font:700 1.05rem var(--mono);color:var(--red);margin:26px 0 8px;letter-spacing:.06em}
   .doc-body p,.doc-body li{color:var(--dim);font-size:.92rem}
@@ -733,11 +805,6 @@ CSS = """
   section.game{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
   section.game.seen{opacity:1;transform:none}
   .mini i{width:0;transition:width .8s cubic-bezier(.2,.7,.3,1)}
-  .gametag{position:relative;overflow:hidden}
-  .gametag::after{content:'';position:absolute;inset:0;
-    background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);
-    transform:translateX(-100%);animation:sheen 4.5s ease-in-out infinite}
-  @keyframes sheen{0%,60%{transform:translateX(-100%)}80%,100%{transform:translateX(100%)}}
   @media (prefers-reduced-motion:reduce){
     *{transition:none !important;animation:none !important}
     section.game{opacity:1;transform:none}
@@ -806,7 +873,7 @@ def _causebar(causes: dict[str, int]) -> str:
 
 def _stat(label: str, value: str, sub: str = "") -> str:
     tip = TIPS.get(label, "")
-    return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}">{label} ⓘ</div>'
+    return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}" tabindex="0" aria-label="{label}: {tip}">{label} ⓘ</div>'
             f'<div class="val">{value}</div>'
             + (f'<div class="sub">{sub}</div>' if sub else "") + "</div>")
 
@@ -819,8 +886,8 @@ def _npz_meta(path: str) -> dict:
         return {}
 
 
-def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> str:
-    """Replay command for the strongest seed whose best.npz is still on disk.
+def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> tuple[str, str | None]:
+    """(replay block html, /watch href or None) for the strongest seed whose best.npz is still on disk.
     Legacy probes (pre-tag layout) live at runs/probes/<game>/<level>_<seed>."""
     for c in sorted(cells, key=lambda c: -c["best"]):
         d = c.get("dir") or os.path.join(PROBES_ROOT, game, f"{level}_{c['seed']}".replace(" ", "_"))
@@ -829,7 +896,7 @@ def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> str:
             break
     else:
         return ('<div class="viz"><div class="vt">Watch the best agent</div><div class="caption">'
-                'No saved genome found for this level — re-probe it (menu 13) to get one.</div></div>')
+                'No saved genome found for this level — re-probe it (menu 13) to get one.</div></div>', None)
     meta = _npz_meta(npz)
     note = ""
     if meta and (meta.get("persona") != persona or str(meta.get("level")) != str(level)):
@@ -838,16 +905,16 @@ def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> str:
                 f'(fitness {meta.get("fitness"):,}) — re-probe for a genome from this persona.')
     npz = npz.replace(os.sep, "/")
     from urllib.parse import urlencode
-    href = "/watch?" + urlencode({"game": game, "npz": npz})
+    href = "/watch?" + urlencode({"game": game, "npz": npz, "label": f"{game} · {persona} · {level}"})
     return (f'<div class="viz"><div class="vt">Watch this agent — best genome, seed {c["seed"]}, '
             f'fitness {c["best"]:,.0f}</div>'
             f'<div class="cmdrow"><a class="watchbtn" href="{href}" target="_blank" rel="noopener">'
             f'▶ Watch replay</a><code class="cmd">python -m code.neuro.trainer --game {game} '
             f'--replay {npz}</code><button class="copybtn" type="button">copy</button></div>'
-            f'<div class="caption"><span class="served-only">The button launches the replay and opens '
-            f'the live dashboard (menu 12 serves this page).</span><span class="file-only">Open the '
-            f'command center via <b>menu 12</b> for a one-click button; as a plain file, run the command '
-            f'from the repo root (or menu 6 → pick this probe).</span>{note}</div></div>')
+            f'<div class="caption"><span class="served-only">Starts the replay and opens the live dashboard '
+            f'in a new tab; a replay already running is replaced after you confirm.</span><span class="file-only">'
+            f'Open the command center via <b>menu 12</b> for a one-click button; as a plain file, run the command '
+            f'from the repo root (or menu 6 → pick this probe).</span>{note}</div></div>', href)
 
 
 def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None) -> str:
@@ -879,19 +946,21 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     grid = _level_grid(game, row["level"])
     cfg_html = _config_html(_level_config(game, row["level"], grid))
 
-    stats = [
+    headline = [  # the four a designer reads first; the rest sit behind "all metrics"
         _stat("Win rate", f"{wr:.0%} ± {_ci(row):.0%}", "measured 10 gens after first win"),
         _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved"),
+        _stat("Dominant cause", _cause_name(row["dominant_cause"]),
+              f"{row['dominant_cause_frac']:.0%} of deaths"),
+        _stat("Death spread", f"{row.get('death_cluster_entropy_mean', 0):.2f}",
+              "0 = one hotspot · 1 = everywhere"),
+    ]
+    stats = [
         _stat("Best gen", bg_full, "where the record genome appeared"),
         _stat("Improvement", f"{rate:+.1%}/gen" if rate is not None else "—", "of the level per generation"),
         _stat("Completion", f"{row.get('completion_rate_mean', 0):.0%}", "wins / all episodes"),
         _stat("Mean win time", mct, "mean ± std of winning runs"),
         _stat("Progress at death", pad, "how far failers get"),
         _stat("Deaths per gen", f"{row.get('deaths_per_run_mean', 0)}", f"of {pop} attempts" if pop else "per generation"),
-        _stat("Death spread", f"{row.get('death_cluster_entropy_mean', 0):.2f}",
-              "0 = one hotspot · 1 = everywhere"),
-        _stat("Dominant cause", _cause_name(row["dominant_cause"]),
-              f"{row['dominant_cause_frac']:.0%} of deaths"),
         _stat("Coin rate", f"{row.get('coin_collection_rate_mean', 1):.0%}", "collected / available"),
         _stat("Skill gap", f"{gap:+.0%}", "late-gen wins − early-gen wins"),
         _stat("Stuck rate", f"{row['stuck_frac_mean']:.0%}", "episodes ending in a stall"),
@@ -900,6 +969,9 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     if strat is not None:
         stats.append(_stat("Strategies", str(strat[0]), "distinct winning routes"))
         stats.append(_stat("Dominant path", f"{strat[1]:.0%}", "share on the top route"))
+    vword, vcolor, vsent = _verdict_sentence(row, strat)
+    watch_html, watch_href = _watch_cmd(game, persona, row["level"], cells)
+    did = "d_" + "".join(ch if ch.isalnum() else "_" for ch in f"{game}_{persona}_{tag or 'legacy'}_{row['level']}")
 
     curves = json.dumps([c.get("curve", []) for c in cells])
     route_viz = ""
@@ -910,35 +982,43 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
                                        ("E", "#ef4444"), ("C", "#eab308"), ("S", "#2563eb"),
                                        ("H", "#7c3aed"), ("P", "#22c55e"), ("G", "#14532d"))
                           if any(k in r for r in grid))
+        n_win = sum(1 for r in routes if r["w"])
         route_viz = f"""
         <div class="viz"><div class="vt">Agent routes on the level
             <span style="color:var(--green)">— wins</span>
             <span style="color:var(--red)">— deaths</span>
             <button class="fsbtn" type="button">⛶ full screen</button></div>
-          <div class="routewrap"><canvas class="routes" width="1100" height="200" data-routes='{payload}'></canvas></div>
+          <div class="routewrap"><canvas class="routes" width="1100" height="200" data-routes='{payload}' role="img"
+            aria-label="{row['level']} drawn as tiles with {n_win} winning and {len(routes) - n_win} failed agent routes"></canvas></div>
           <div class="legend">{legend}</div>
           <div class="caption">Level geometry and entities with sampled agent traces: green = winning
           runs, red = failed runs (drawn faint). Where red lines stop is where agents die.
           {'' if routes else 'No route traces logged for this level yet.'}</div></div>"""
 
+    foot = (f'<div class="cardfoot"><a class="watchbtn" href="{watch_href}" target="_blank" rel="noopener" '
+            f'aria-label="Watch the best {row["level"]} agent">▶ watch</a>'
+            f'<small>best seed replay · dashboard</small></div>' if watch_href else "")
     return f"""
     <div class="lvlcard">
-      <button class="cardhead" type="button">
+      <button class="cardhead" type="button" aria-haspopup="dialog" aria-controls="{did}" data-dialog="{did}">
         <div class="lvlname">{row['level']} {_pill(row)}</div>
         <div class="bignum" style="color:{color}">{wr:.0%}</div>
         <div class="lvlsub">win rate · {fw}</div>
         <div class="mini"><i style="width:{max(2, wr * 100):.0f}%;background:{color}"></i></div>
       </button>
-      <dialog class="detail">
+      {foot}
+      <dialog class="detail" id="{did}" aria-labelledby="{did}_t">
         <div class="dhead">
-          <div class="lvlname">{game} · {persona} · {row['level']} {_pill(row)}</div>
+          <h3 class="lvlname" id="{did}_t">{game} · {persona} · {row['level']} {_pill(row)}</h3>
           <div class="bignum" style="color:{color}">{wr:.0%}</div>
-          <button class="close" type="button" aria-label="close">✕</button>
+          <button class="close" type="button" aria-label="Close level details">✕</button>
         </div>
-        <div class="verdicts">{_verdicts(row, strat, th)}</div>
-        <div class="stats">{''.join(stats)}</div>
-        {cfg_html}
-        {_watch_cmd(game, persona, row["level"], cells)}
+        <div class="dverdict" style="--c:{vcolor}">
+          <span class="verdict">{vword}</span>
+          <p class="vsent">{vsent}</p>
+          <div class="verdicts">{_verdicts(row, strat, th)}</div>
+        </div>
+        <div class="stats headline">{''.join(headline)}</div>
         {route_viz}
         <div class="viz"><div class="vt">Where agents die (start → goal)</div>
           {_heat(row.get('death_hist') or [0] * 10)}
@@ -946,8 +1026,13 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
           chokepoint; many lit bins = difficulty spread across the level.</div></div>
         <div class="viz"><div class="vt">What kills them</div>
           {_causebar(row.get('causes') or {})}</div>
+        {watch_html}
+        <details class="more"><summary>All {len(stats) + 4} metrics</summary>
+          <div class="stats">{''.join(stats)}</div></details>
+        {cfg_html}
         <div class="viz"><div class="vt">Learning curves — fitness per generation, one color per seed</div>
-          <canvas class="curve" width="1100" height="260" data-curves='{curves}'></canvas>
+          <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
+            aria-label="Fitness per generation for each seed on {row['level']}"></canvas>
           <div class="caption">Solid line: the best genome each generation. Faint line: population
           average. A jump above the dashed line means winning runs (win bonus). Flat = stuck.</div></div>
       </dialog>
@@ -968,7 +1053,7 @@ def _metric_table(rows: list[dict]) -> str:
         rate = (f"{r['improvement_rate_mean']:+.1%}" if r.get("improvement_rate_mean") is not None else "—")
         pad = f"{r['progress_at_death_mean']:.0%}" if r.get("progress_at_death_mean") is not None else "—"
         trs.append(
-            f"<tr><td>{r['level']}</td>"
+            f"<tr data-level=\"{r['level']}\" tabindex=\"0\" title=\"Open {r['level']}\"><td>{r['level']}</td>"
             f"<td class='{solved_cls}'>{r['solved_by']}/{r['seeds']}</td>"
             f"<td>{fw}</td><td>{bg}</td><td>{rate}</td><td>{wr}</td>"
             f"<td>{r.get('completion_rate_mean', 0):.0%}</td><td>{mct}</td>"
@@ -979,10 +1064,10 @@ def _metric_table(rows: list[dict]) -> str:
             f"<td>{_cause_name(r['dominant_cause'])} ({r['dominant_cause_frac']:.0%})</td>"
             f"<td>{r['stuck_frac_mean']:.0%}</td>"
             f"<td>{fmt_hms(r.get('train_time_s') or 0)}</td></tr>")
-    tip = lambda k: f'class="tip" data-tip="{TIPS[k]}"'  # noqa: E731
+    tip = lambda k: f'scope="col" data-sort class="tip" data-tip="{TIPS[k]}" tabindex="0"'  # noqa: E731
     return f"""
-    <div class="ovwrap"><table>
-      <thead><tr><th>Level</th><th {tip("Solved")}>Solved</th><th {tip("First win")}>First win</th>
+    <div class="ovwrap"><table class="metrics">
+      <thead><tr><th scope="col" data-sort>Level</th><th {tip("Solved")}>Solved</th><th {tip("First win")}>First win</th>
         <th {tip("Best gen")}>Best gen</th><th {tip("Improvement")}>Rate/gen</th>
         <th {tip("Win rate")}>Win rate ±CI</th><th {tip("Completion")}>Completion</th>
         <th {tip("Mean win time")}>Mean time</th><th {tip("Progress at death")}>Progress@death</th>
@@ -991,7 +1076,8 @@ def _metric_table(rows: list[dict]) -> str:
         <th {tip("Dominant cause")}>Dominant cause</th><th {tip("Stuck rate")}>Stuck</th>
         <th {tip("Train time")}>Train time</th></tr></thead>
       <tbody>{''.join(trs)}</tbody>
-    </table></div>"""
+    </table></div>
+    <div class="ovnote">Click a column to sort, a row to open that level.</div>"""
 
 
 def _overview(personas: dict[str, dict]) -> str:
@@ -1001,7 +1087,8 @@ def _overview(personas: dict[str, dict]) -> str:
             if r["level"] not in order:
                 order.append(r["level"])
     pnames = list(personas)
-    ths = "".join(f"<th>{p}<br><span style='letter-spacing:0;font-weight:400'>win rate · first win</span></th>"
+    ths = "".join(f"<th scope='col' style='color:{PERSONA_COLOR.get(p, 'var(--dim)')}'>{p}<br>"
+                  f"<span style='letter-spacing:0;font-weight:400;color:var(--dim)'>win rate · first win</span></th>"
                   for p in pnames)
     trs = []
     for lvl in order:
@@ -1023,7 +1110,7 @@ def _overview(personas: dict[str, dict]) -> str:
         trs.append("<tr>" + "".join(tds) + "</tr>")
     return f"""
       <div class="ovwrap"><table>
-        <thead><tr><th>Level</th><th class="tip" data-tip="{TIPS['Status']}">Status ⓘ</th>{ths}</tr></thead>
+        <thead><tr><th scope="col">Level</th><th scope="col" class="tip" data-tip="{TIPS['Status']}" tabindex="0">Status ⓘ</th>{ths}</tr></thead>
         <tbody>{''.join(trs)}</tbody>
       </table></div>
     <div class="ovnote">Status = best across personas. Select a persona tab for the full
@@ -1032,6 +1119,11 @@ def _overview(personas: dict[str, dict]) -> str:
 
 CONFIG_COLORS = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316", "#14b8a6", "#ec4899"]
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
+PERSONA_COLOR = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#22c55e"}
+
+
+def _persona_chip(persona: str) -> str:
+    return f'<span class="pchip" style="--c:{PERSONA_COLOR.get(persona, "var(--dim)")}">{persona}</span>'
 
 
 def _tag_label(tag: str | None, data: dict) -> str:
@@ -1051,27 +1143,29 @@ def _game_chart(game: str, by_tag: dict, idx: int) -> str:
                 if r["level"] not in order:
                     order.append(r["level"])
     series, legend = [], []
+    by_persona = len(by_tag) == 1  # one config: persona is the only variable, so it owns the colour
     for ti, (tag, personas) in enumerate(by_tag.items()):
-        color = CONFIG_COLORS[ti % len(CONFIG_COLORS)]
         for pname, data in personas.items():
+            color = PERSONA_COLOR.get(pname, "#9a9aa0") if by_persona else CONFIG_COLORS[ti % len(CONFIG_COLORS)]
+            dash = [] if by_persona else PERSONA_DASH.get(pname, [4, 3])
             rows = {r["level"]: r for r in data["levels"]}
             series.append({"name": f"{tag or 'legacy'} · {pname}", "tag": tag or "legacy",
-                           "persona": pname, "color": color, "dash": PERSONA_DASH.get(pname, [4, 3]),
+                           "persona": pname, "color": color, "dash": dash,
                            "vals": [round((rows.get(l) or {}).get("win_rate_mean", 0.0), 3) for l in order]})
-            legend.append(f'<button class="lchip" type="button" data-series="{len(series) - 1}" '
-                          f'style="--c:{color}"><i class="{pname}"></i>{tag or "legacy"} '
-                          f'<small>{pname}</small></button>')
+            legend.append(f'<button class="lchip" type="button" data-series="{len(series) - 1}" aria-pressed="true" '
+                          f'style="--c:{color}"><i class="{"" if by_persona else pname}"></i>'
+                          f'{pname if by_persona else tag or "legacy"} '
+                          f'<small>{tag or "legacy" if by_persona else pname}</small></button>')
     payload = json.dumps({"axes": [str(v) for v in order], "series": series})
     kind = "radar" if len(order) >= 3 else "bars"
-    how = ("Each spoke is a level; distance from centre = win rate (rings at 25 / 50 / 75 / 100%). "
-           "A bigger shape = an easier game for that config; dents point at the hard levels."
-           if kind == "radar" else
-           "One group per level, one bar per config × persona (win rate). Radar needs 3+ levels.")
+    enc = ("colour = persona" if by_persona else
+           "colour = config · solid experienced / dashed novice / dotted speedrunner")
     return f"""
-    <div class="viz chartbox"><div class="vt">Win rate per level <span class="faint">— {kind} · selected config shown,
-      click a chip to add or hide a series · solid experienced / dashed novice / dotted speedrunner</span></div>
+    <div class="viz chartbox"><div class="vt">Win rate per level <span class="faint">— {kind} · {enc} ·
+      click a chip to add or hide a series</span></div>
       <div class="chartwrap"><canvas class="chart" width="720" height="400" data-kind="{kind}"
-        data-chart='{payload}' data-section="{idx}"></canvas>
+        data-chart='{payload}' data-section="{idx}" role="img"
+        aria-label="Win rate per level for {game}, one series per persona and config"></canvas>
         <div class="legend chips">{''.join(legend)}</div></div></div>"""
 
 
@@ -1251,16 +1345,18 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
         btns.append(f'<button class="cfgbtn{" active" if ti == 0 else ""}" type="button" data-view="{cid}" '
                     f'data-tag="{tag or "legacy"}" style="--c:{color}"><b>{tag or "legacy"}</b>'
                     f'<small>{_tag_label(tag, data)} · {len(data["seeds"])} seeds</small></button>')
-        tabs = [f'<button class="tab t-overview active" data-view="{cid}_ov" type="button">Overview</button>']
-        pviews = [f'<div class="view active" id="{cid}_ov">{_overview(personas)}</div>']
+        tabs = [f'<button class="tab t-overview active" role="tab" aria-selected="true" aria-controls="{cid}_ov" '
+                f'data-view="{cid}_ov" type="button">Overview</button>']
+        pviews = [f'<div class="view active" role="tabpanel" id="{cid}_ov">{_overview(personas)}</div>']
         for pi, (pname, pdata) in enumerate(personas.items()):
             vid = f"{cid}_{pi}"
-            tabs.append(f'<button class="tab" data-view="{vid}" type="button">{pname}</button>')
+            tabs.append(f'<button class="tab" role="tab" aria-selected="false" aria-controls="{vid}" data-view="{vid}" '
+                        f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--red)")}">{pname}</button>')
             cell_map = pdata.get("cells", {})
             cards = "".join(_card(game, pname, r, cell_map.get(r["level"], []), th, tag)
                             for r in pdata["levels"])
             pviews.append(f"""
-            <div class="view" id="{vid}">
+            <div class="view" role="tabpanel" id="{vid}">
               <div class="lvlgrid">{cards}</div>
               <div class="tbltitle">Full metric table — {pname}</div>
               {_metric_table(pdata["levels"])}
@@ -1268,7 +1364,7 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
         views.append(f"""
         <div class="cfgview{" active" if ti == 0 else ""}" id="{cid}">
           <div class="toolbar">
-            <div class="tabs">{''.join(tabs)}</div>
+            <div class="tabs" role="tablist" aria-label="Persona">{''.join(tabs)}</div>
             <button class="brainbtn tip" type="button" data-dialog="brain_{sid}"
               data-tip="GA + network hyperparameters used for this config">{_BRAIN_SVG} hyperparameters</button>
             {ga_link}
@@ -1277,14 +1373,14 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
           {_brain_dialog(sid, game, personas)}
         </div>""")
     return f"""
-  <section class="game" id="g_{game}">
+  <section class="game" id="g_{game}" aria-labelledby="g_{game}_t">
     <div class="gamehead">
-      <button class="chev" type="button" aria-label="collapse section">▾</button>
-      <span class="gametag">{_game_icon(game)}{game}</span>
+      <button class="chev" type="button" aria-expanded="true" aria-controls="g_{game}_body" aria-label="Collapse {game}">▾</button>
+      <h2 class="gametag" id="g_{game}_t">{_game_icon(game)}{game}</h2>
       <span class="gamemeta">{len(by_tag)} config{'s' if len(by_tag) != 1 else ''} · {n_levels} levels
         · total train time {fmt_hms(total)}</span>
     </div>
-    <div class="body">
+    <div class="body" id="g_{game}_body">
       {_game_chart(game, by_tag, idx)}
       <div class="cfgbar"><span class="cfglbl">Config</span>{''.join(btns)}</div>
       {''.join(views)}
@@ -1328,15 +1424,15 @@ def _runs_section() -> str:
     if not rows:
         return ""
     return f"""
-  <section class="game" id="g_runs">
+  <section class="game" id="g_runs" aria-labelledby="g_runs_t">
     <div class="gamehead">
-      <button class="chev" type="button" aria-label="collapse section">▾</button>
-      <span class="gametag" style="background:#1d3a5f">Training runs</span>
+      <button class="chev" type="button" aria-expanded="true" aria-label="Collapse training runs">▾</button>
+      <h2 class="gametag" id="g_runs_t" style="background:#1d3a5f">Training runs</h2>
       <span class="gamemeta">every run found under runs/ · resume with
       <span style="color:var(--yellow)">--resume runs/&lt;name&gt;</span></span></div>
     <div class="body"><div class="ovwrap"><table>
-      <thead><tr><th>Run</th><th>Persona</th><th>Gens</th><th>Best fitness</th>
-        <th>Best level</th><th>Total wins</th><th>Train time</th></tr></thead>
+      <thead><tr><th scope="col">Run</th><th scope="col">Persona</th><th scope="col">Gens</th><th scope="col">Best fitness</th>
+        <th scope="col">Best level</th><th scope="col">Total wins</th><th scope="col">Train time</th></tr></thead>
       <tbody>{''.join(rows)}</tbody>
     </table></div></div>
   </section>"""
@@ -1346,11 +1442,40 @@ JS = """
 for (const tab of document.querySelectorAll('.tab')){
   tab.addEventListener('click', () => {
     const scope = tab.closest('.cfgview') || tab.closest('section.game');
-    scope.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    scope.querySelectorAll('.tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
     scope.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    tab.classList.add('active');
+    tab.classList.add('active'); tab.setAttribute('aria-selected', 'true');
     scope.querySelector('#' + tab.dataset.view).classList.add('active');
   });
+}
+// info bubbles open on tap/Enter too, not just hover
+for (const t of document.querySelectorAll('.tip[tabindex]')){
+  t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); t.classList.toggle('open'); } if (e.key === 'Escape') t.classList.remove('open'); });
+  t.addEventListener('blur', () => t.classList.remove('open'));
+}
+// full metric tables: click a header to sort, a row to open that level's window
+const num = s => { const m = s.replace(/,/g, '').match(/-?\\d+(\\.\\d+)?/); return m ? +m[0] : -Infinity; };
+for (const table of document.querySelectorAll('table.metrics')){
+  const ths = [...table.querySelectorAll('th[data-sort]')];
+  ths.forEach((th, col) => {
+    const sort = () => {
+      const dir = th.getAttribute('aria-sort') === 'descending' ? 'ascending' : 'descending';
+      ths.forEach(x => x.removeAttribute('aria-sort')); th.setAttribute('aria-sort', dir);
+      const tb = table.tBodies[0], rows = [...tb.rows];
+      const key = r => col ? num(r.cells[col].textContent) : r.cells[0].textContent;
+      rows.sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * (dir === 'ascending' ? 1 : -1));
+      rows.forEach(r => tb.appendChild(r));
+    };
+    th.addEventListener('click', e => { if (!e.target.classList.contains('open')) sort(); });
+    th.addEventListener('keydown', e => { if (e.key === 'Enter' && !th.classList.contains('open')) sort(); });
+  });
+  const open = r => { const card = [...r.closest('.view').querySelectorAll('.lvlcard')]
+      .find(c => c.querySelector('.lvlname').firstChild.textContent.trim() === r.dataset.level);
+    card?.querySelector('.cardhead').click(); };
+  for (const r of table.tBodies[0].rows){
+    r.addEventListener('click', () => open(r));
+    r.addEventListener('keydown', e => { if (e.key === 'Enter') open(r); });
+  }
 }
 // config selector: one config's tables/cards at a time; the chart highlights it
 const HIDDEN = new WeakMap();  // per-chart set of hidden series indices
@@ -1363,7 +1488,7 @@ function focusConfig(section, tag){
   const set = new Set();
   d.series.forEach((s, i) => { if (s.tag !== tag) set.add(i); });
   HIDDEN.set(cv, set);
-  cv.closest('.chartwrap')?.querySelectorAll('.lchip').forEach(c => c.classList.toggle('off', set.has(+c.dataset.series)));
+  cv.closest('.chartwrap')?.querySelectorAll('.lchip').forEach(c => { const off = set.has(+c.dataset.series); c.classList.toggle('off', off); c.setAttribute('aria-pressed', !off); });
 }
 for (const b of document.querySelectorAll('.cfgbtn')){
   b.addEventListener('click', () => {
@@ -1382,8 +1507,18 @@ for (const s of document.querySelectorAll('section.game')){
   if (active) focusConfig(s, active.dataset.tag);
 }
 // cards open a mini window (native <dialog>): Esc, ✕, or a backdrop click closes it
+// level windows: the URL hash remembers which one is open (#d_<game>_<persona>_<config>_<level>)
+function openLevel(dlg, push){
+  if (!dlg || dlg.open) return;
+  const section = dlg.closest('section.game'), view = dlg.closest('.view'), cfg = dlg.closest('.cfgview');
+  if (section){ section.classList.remove('collapsed'); syncChev(section); }
+  if (cfg && !cfg.classList.contains('active')) section.querySelector(`.cfgbtn[data-view="${cfg.id}"]`)?.click();
+  if (view && !view.classList.contains('active')) cfg.querySelector(`.tab[data-view="${view.id}"]`)?.click();
+  dlg.showModal();
+  if (push) history.replaceState(null, '', '#' + dlg.id);
+}
 for (const head of document.querySelectorAll('.cardhead')){
-  head.addEventListener('click', () => head.closest('.lvlcard').querySelector('dialog').showModal());
+  head.addEventListener('click', () => openLevel(document.getElementById(head.dataset.dialog), true));
 }
 for (const b of document.querySelectorAll('.brainbtn')){
   b.addEventListener('click', () => document.getElementById(b.dataset.dialog).showModal());
@@ -1391,11 +1526,18 @@ for (const b of document.querySelectorAll('.brainbtn')){
 for (const dlg of document.querySelectorAll('dialog')){
   dlg.querySelector('.close').addEventListener('click', () => dlg.close());
   dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener('close', () => { if (location.hash === '#' + dlg.id) history.replaceState(null, '', location.pathname); });
 }
 // collapsible sections + collapse/expand all
 const sections = [...document.querySelectorAll('section.game')];
 const toggleAll = document.getElementById('toggleAll');
+const syncChev = s => {
+  const c = s.querySelector('.chev'), open = !s.classList.contains('collapsed');
+  const name = s.querySelector('.gametag')?.textContent.trim() || 'section';
+  c.setAttribute('aria-expanded', open); c.setAttribute('aria-label', (open ? 'Collapse ' : 'Expand ') + name);
+};
 const syncToggle = () => {
+  sections.forEach(syncChev);
   if (!toggleAll) return;
   const allClosed = sections.every(s => s.classList.contains('collapsed'));
   toggleAll.textContent = allClosed ? 'Expand all' : 'Collapse all';
@@ -1403,6 +1545,8 @@ const syncToggle = () => {
 for (const s of sections){
   s.querySelector('.chev').addEventListener('click', () => { s.classList.toggle('collapsed'); syncToggle(); });
 }
+syncToggle();
+if (location.hash.startsWith('#d_')) openLevel(document.getElementById(location.hash.slice(1)), false);
 if (toggleAll) toggleAll.addEventListener('click', () => {
   const close = !sections.every(s => s.classList.contains('collapsed'));
   sections.forEach(s => s.classList.toggle('collapsed', close));
@@ -1571,9 +1715,11 @@ function drawChart(cv, t){
       ctx.fillText((q * 25) + '%', 6, y + 4);
     }
     const shown = d.series.map((s, i) => i).filter(i => visible[i]);
-    const groupW = plotW / n, barW = Math.max(3, (groupW * 0.72) / Math.max(1, shown.length));
+    // few levels: cap the group width and centre the groups instead of stretching two bars across the canvas
+    const groupW = Math.min(plotW / n, 60 + 34 * Math.max(1, shown.length)), off = (plotW - groupW * n) / 2;
+    const barW = Math.max(3, (groupW * 0.72) / Math.max(1, shown.length));
     d.axes.forEach((ax, k) => {
-      const gx = L + k * groupW + groupW * 0.14;
+      const gx = L + off + k * groupW + groupW * 0.14;
       shown.forEach((si, bi) => {
         const s = d.series[si], v = Math.min(1, s.vals[k] || 0) * t, h = v * plotH;
         ctx.globalAlpha = alpha(s);
@@ -1587,7 +1733,7 @@ function drawChart(cv, t){
         ctx.globalAlpha = 1;
       });
       ctx.fillStyle = '#9a9aa0'; ctx.textAlign = 'center';
-      ctx.fillText(ax, L + k * groupW + groupW / 2, H - 12);
+      ctx.fillText(ax, L + off + k * groupW + groupW / 2, H - 12);
       ctx.textAlign = 'left';
     });
     return;
@@ -1642,7 +1788,7 @@ for (const cv of document.querySelectorAll('canvas.chart')){
     chip.addEventListener('click', () => {
       const set = HIDDEN.get(cv) || new Set(), i = +chip.dataset.series;
       set.has(i) ? set.delete(i) : set.add(i);
-      HIDDEN.set(cv, set); chip.classList.toggle('off', set.has(i));
+      HIDDEN.set(cv, set); chip.classList.toggle('off', set.has(i)); chip.setAttribute('aria-pressed', !set.has(i));
       drawChart(cv, 1);
     });
   }
@@ -1730,8 +1876,8 @@ for (const b of document.querySelectorAll('.copybtn')){
 """
 
 GLOSSARY = """
-  <div class="gloss">
-    <b>Reading this report</b> —
+  <details class="gloss">
+    <summary>How to read this page</summary>
     Each game opens on the <b>Overview</b>: one row per level, one column per persona, so skill
     tiers sit side by side. The number is the <b>win rate</b>
     (<span style="color:#22c55e">green ≥ 50%</span>,
@@ -1739,29 +1885,31 @@ GLOSSARY = """
     <span style="color:#ef4444">red = never solved</span>).
     <b>Status</b>: <span class="pill pill-ok">solved</span> every seed won at least once ·
     <span class="pill pill-warn">n/N seeds</span> some did · <span class="pill pill-bad">unsolved</span>
-    none did. Click a card for its mini window; hover any metric label or column header for what it
-    means; formulas and episode statuses are on the <b>Instructions</b> page in the top bar.
-  </div>"""
+    none did. Click a card for its window — it opens on a one-line verdict, then the routes the agents
+    took. Hover, tap, or focus any <b>ⓘ</b> label for the definition; formulas and episode statuses are
+    on the <b>Instructions</b> page.
+  </details>"""
 
 
 def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") -> str:
-    img = f'<img src="data:image/png;base64,{logo}" alt="PEAK">' if logo else ""
+    img = f'<img src="data:image/png;base64,{logo}" alt="">' if logo else ""
     links = "" if page != "report" else "".join(
         f'<a href="report.html#g_{g}">{_game_icon(g)}{g}</a>' for g in games)
     if has_runs and page == "report":
         links += '<a href="report.html#g_runs">runs</a>'
     if page != "report":
-        links += '<a class="doc" href="report.html">← Back to command</a>'
-    if page != "ablation":
-        links += '<a class="doc abl" href="ablation.html">Sensor ablation</a>'
-    if page != "gasweep":
-        links += '<a class="doc ga" href="gasweep.html">GA sweep</a>'
-    if page != "instructions":
-        links += '<a class="doc" href="instructions.html">Instructions</a>'
+        links += '<a class="doc" href="report.html">← Balance report</a>'
+    links += ('<a class="doc" href="ablation.html"' + (' aria-current="page"' if page == "ablation" else "")
+              + '>Sensor ablation</a>')
+    links += ('<a class="doc" href="gasweep.html"' + (' aria-current="page"' if page == "gasweep" else "")
+              + '>GA sweep</a>')
+    links += ('<a class="doc" href="instructions.html"' + (' aria-current="page"' if page == "instructions" else "")
+              + '>Instructions</a>')
     if page == "report":
         links += '<button class="navbtn" id="toggleAll" type="button">Collapse all</button>'
     return f"""
-  <nav>{img}<span class="brand">PEAK <em>BALANCE COMMAND</em></span>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav aria-label="Pages">{img}<h1 class="brand">PEAK <em>BALANCE COMMAND</em></h1>
     <div class="links">{links}</div>
   </nav>"""
 
@@ -2022,11 +2170,11 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
     sid = f"abl{idx}"
     legend = " vs ".join(f'<span style="color:{MODE_COLOR[m]}">■ {m}</span>' for m in modes)
     return f"""
-  <section class="game collapsed" id="abl_{idx}">
+  <section class="game collapsed" id="abl_{idx}" aria-labelledby="abl_{idx}_t">
     <div class="gamehead">
-      <button class="chev" type="button" aria-label="expand section">▾</button>
-      <span class="gametag">{_game_icon(game)}{game}</span>
-      <span class="gamemeta">{persona} · {base} · seeds {meta['seeds']} · pop {meta.get('pop_size', '?')} ×
+      <button class="chev" type="button" aria-expanded="false" aria-label="Expand {game} {persona}">▾</button>
+      <h2 class="gametag" id="abl_{idx}_t">{_game_icon(game)}{game}</h2>{_persona_chip(persona)}
+      <span class="gamemeta">{base} · seeds {meta['seeds']} · pop {meta.get('pop_size', '?')} ×
         {meta.get('gens_budget', '?')} gens/probe</span>
     </div>
     <div class="body">
@@ -2136,13 +2284,13 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Balance Command — Sensor Ablation</title><style>{CSS}</style></head><body>
 {_nav(list(games), False, logo, page="ablation")}
-<main>
-  <div style="font:400 .78rem var(--mono);color:var(--faint);margin-bottom:16px">
+<main id="main">
+  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
     sensor ablation · same GA, same seeds, same levels — only what the agent sees changes · generated {stamp}</div>
   <div class="ablhero">{hero}</div>
   {score}
   {sections}
-  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance/ablation_*_p*g*[_grid].json (probes: runs/ablation)</footer>
+  <footer>Generated by PEAK from the sensor-ablation probes on disk. Regenerate from the menu (12) after a new ablation.</footer>
 </main><script>{JS}</script></body></html>"""
 
 
@@ -2370,7 +2518,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
                      f'(baseline {base["wr"] if base else 0:.0%}) · first win gen <b>{best_pt["fw"]:.1f}</b> '
                      f'(baseline {base["fw"] if base else 0:.1f}) · {best_pt["n_params"]:,} weights</div>')
         lv = max(best_pt["data"]["levels"], key=lambda r: r.get("win_rate_mean") or 0)
-        best_line += _watch_cmd(game, persona, lv["level"], best_pt["data"]["cells"][lv["level"]])
+        best_line += _watch_cmd(game, persona, lv["level"], best_pt["data"]["cells"][lv["level"]])[0]
     else:
         best_line = ('<div class="caption" style="margin-top:8px">Not confirmed yet — the composite assumes the axes '
                      'do not interact. Probe it once:</div>'
@@ -2458,11 +2606,11 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
 
     personas = {persona: base["data"] if base else datas[0]}
     return f"""
-  <section class="game collapsed" id="gs_{idx}">
+  <section class="game collapsed" id="gs_{idx}" aria-labelledby="gs_{idx}_t">
     <div class="gamehead">
-      <button class="chev" type="button" aria-label="expand section">▾</button>
-      <span class="gametag">{_game_icon(game)}{game}</span>
-      <span class="gamemeta">{persona} · {len(pts)} configs · {n_levels} levels · seeds {seeds} · {budget} gens/probe
+      <button class="chev" type="button" aria-expanded="false" aria-label="Expand {game} {persona}">▾</button>
+      <h2 class="gametag" id="gs_{idx}_t">{_game_icon(game)}{game}</h2>{_persona_chip(persona)}
+      <span class="gamemeta">{len(pts)} configs · {n_levels} levels · seeds {seeds} · {budget} gens/probe
         · {sensors} · train time {fmt_hms(total)} · baseline {_gs_baseline_label(base_ga)}</span>
     </div>
     <div class="body">
@@ -2519,8 +2667,8 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23070708'/><circle cx='8' cy='8' r='4' stroke='%2322c55e' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Balance Command — GA Sweep</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="gasweep")}
-<main>
-  <div style="font:400 .78rem var(--mono);color:var(--faint);margin-bottom:16px">
+<main id="main">
+  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
     GA hyperparameter ablation · one knob at a time against literature bounds · same seeds, same levels · generated {stamp}</div>
   {kpis}
   {sections}
@@ -2529,7 +2677,7 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
     <ul style="font:400 .8rem/1.6 var(--ui);color:var(--dim);margin:10px 0 0 18px">{axes_doc}</ul>
     <p class="caption" style="margin-top:8px">One-factor-at-a-time isolates each knob's effect but ignores interactions —
     the recommended config is the per-axis composite; <code>--confirm</code> probes it once to check.</p></details>
-  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance/gasweep_*.json ← runs/gasweep/</footer>
+  <footer>Generated by PEAK from the GA-sweep cells on disk. Regenerate from the menu (12) after a new sweep.</footer>
 </main><script>{JS}</script></body></html>"""
 
 
@@ -2564,12 +2712,12 @@ def build(balance_dir: str) -> dict[str, str]:
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23070708'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Balance Command</title><style>{CSS}</style></head><body>
 {_nav(list(games), bool(runs_html), logo)}
-<main>
-  <div style="font:400 .78rem var(--mono);color:var(--faint);margin-bottom:16px">
+<main id="main">
+  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
     multi-seed neuroevolution probes · generated {stamp} · total probe train time {fmt_hms(total)}</div>
-  {body}
   {GLOSSARY}
-  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance + runs/probes + runs/*</footer>
+  {body}
+  <footer>Generated by PEAK from the balance probes on disk. Regenerate from the menu (12) after a new sweep.</footer>
 </main><script>{JS}</script></body></html>"""
     return {"report.html": report,
             "instructions.html": _instructions_page(list(games), logo),
@@ -2607,18 +2755,46 @@ def serve(balance_dir: str, port: int, open_browser: bool) -> None:
         def log_message(self, *a) -> None:  # quiet
             pass
 
+        def _page(self, status: int, title: str, body_html: str, script: str = "") -> None:
+            body = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{title}</title>"
+                    f"<style>{CSS}.card{{max-width:640px;margin:10vh auto 0;background:var(--panel);border:1px solid var(--line);"
+                    f"border-radius:12px;padding:26px 30px}}.card h1{{font:700 1.2rem var(--mono);color:#fff;margin-bottom:10px}}"
+                    f".card p{{color:var(--dim);margin:8px 0}}.card code{{color:var(--yellow);font:600 .8rem var(--mono)}}"
+                    f".row{{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}}.watchbtn.quiet{{background:var(--panel2);"
+                    f"border:1px solid var(--line2);color:var(--txt)}}</style></head><body><main id='main'>"
+                    f"<div class='card'>{body_html}</div></main><script>{script}</script></body></html>").encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self) -> None:
             u = urllib.parse.urlparse(self.path)
             if u.path != "/watch":
                 return super().do_GET()
             q = urllib.parse.parse_qs(u.query)
             game, npz = q.get("game", [""])[0], q.get("npz", [""])[0]
+            label = q.get("label", [npz])[0]
             ok = (game in _ADAPTERS and npz.startswith("runs/") and ".." not in npz
                   and npz.endswith("best.npz") and os.path.exists(npz))
             if not ok:
-                return self.send_error(400, "bad replay request")
+                return self._page(400, "PEAK — replay not found",
+                                  "<h1>That genome isn't on disk any more</h1>"
+                                  f"<p><code>{npz or '(no file)'}</code> was probably deleted or re-probed. "
+                                  "Regenerate the command center (menu 12) so the buttons point at current files.</p>"
+                                  "<div class='row'><a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>")
             proc = state["proc"]
-            if proc is not None and proc.poll() is None:
+            running = proc is not None and proc.poll() is None
+            if running and q.get("replace", ["0"])[0] != "1":
+                return self._page(200, "PEAK — a replay is already running",
+                                  "<h1>A replay is already running</h1>"
+                                  f"<p>Watching <b>{state.get('label', '')}</b> right now. Only one replay can use the dashboard at a time.</p>"
+                                  f"<p>Replace it with <b>{label}</b>?</p>"
+                                  f"<div class='row'><a class='watchbtn' href='{self.path}&replace=1'>▶ Replace it</a>"
+                                  "<a class='watchbtn quiet' href='http://127.0.0.1:8000/' target='_blank' rel='noopener'>Keep watching the current one</a>"
+                                  "<a class='watchbtn quiet' href='/report.html'>← Back</a></div>")
+            if running:
                 proc.terminate()
                 try:
                     proc.wait(timeout=5)
@@ -2626,17 +2802,23 @@ def serve(balance_dir: str, port: int, open_browser: bool) -> None:
                     proc.kill()
             state["proc"] = subprocess.Popen(
                 [sys.executable, "-m", "code.neuro.trainer", "--game", game, "--replay", npz])
+            state["label"] = label
             print(f"replay: {game} {npz}", flush=True)
             dash = f"http://127.0.0.1:8000/{game}/index.html"
-            body = (f"<!doctype html><meta charset='utf-8'><meta http-equiv='refresh' content='3;url={dash}'>"
-                    f"<body style='background:#070708;color:#e8e8ea;font:16px IBM Plex Mono,monospace;"
-                    f"padding:40px'>Launching replay of <b>{npz}</b>… the dashboard opens in a moment "
-                    f"(<a style='color:#4a9eff' href='{dash}'>open it now</a>).</body>").encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            script = f"""
+const dash = {json.dumps(dash)}, t0 = Date.now(), st = document.getElementById('st');
+(async function poll(){{
+  try {{ await fetch(dash, {{mode: 'no-cors', cache: 'no-store'}}); location.replace(dash); return; }} catch {{}}
+  const s = Math.round((Date.now() - t0) / 1000);
+  st.textContent = s < 20 ? `Starting the trainer… ${{s}} s` : `Still waiting after ${{s}} s — check the terminal that runs menu 12 for errors.`;
+  setTimeout(poll, 700);
+}})();"""
+            self._page(200, "PEAK — starting replay",
+                       f"<h1>Starting the replay</h1><p><b>{label}</b></p>"
+                       f"<p id='st'>Starting the trainer…</p>"
+                       "<p>The live dashboard opens in this tab as soon as it answers. Ctrl+C in the menu-12 terminal stops it.</p>"
+                       f"<div class='row'><a class='watchbtn quiet' href='{dash}'>Open the dashboard now</a>"
+                       "<a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>", script)
 
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     import signal

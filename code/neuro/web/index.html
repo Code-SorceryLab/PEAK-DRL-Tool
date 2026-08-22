@@ -12,252 +12,251 @@
 <style type="text/tailwindcss">
   @layer base {
     body {
-      @apply bg-[#09090b] text-zinc-300 font-sans antialiased selection:bg-red-500/30 selection:text-red-200 overflow-y-scroll;
+      @apply bg-[#09090b] text-zinc-300 font-sans antialiased selection:bg-red-500/30 selection:text-red-100 overflow-y-scroll;
+      caret-color: #ef4444;
     }
-    canvas {
-      image-rendering: pixelated;
-    }
-    /* Minimal Scrollbar */
+    canvas { image-rendering: pixelated; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { @apply bg-transparent; }
     ::-webkit-scrollbar-thumb { @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors; }
+    :focus-visible { @apply outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-[#09090b]; }
 
     select {
-      @apply bg-zinc-900/50 border border-white/5 rounded-md text-zinc-300 px-2 py-1 font-mono text-xs focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all appearance-none cursor-pointer hover:bg-zinc-800/50;
+      @apply bg-zinc-900/50 border border-white/10 rounded-md text-zinc-200 px-2 py-1 font-mono text-xs appearance-none cursor-pointer hover:bg-zinc-800/50 transition-colors;
+    }
+    kbd {
+      @apply font-mono text-[10px] text-zinc-400 bg-zinc-900 border border-white/10 rounded px-1 py-px leading-none;
     }
   }
 
   @layer components {
-    .eyebrow {
-      @apply text-[9px] font-bold tracking-[0.2em] uppercase text-zinc-500;
-    }
-    .metric-group {
-      @apply flex flex-col gap-1;
-    }
-    .metric-val {
-      @apply font-mono text-lg font-medium text-zinc-100;
-    }
+    .eyebrow { @apply text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-400; }
+    .metric-group { @apply flex flex-col gap-1; }
+    .metric-val { @apply font-mono text-lg font-medium text-zinc-100 tabular-nums; }
     .btn-sleek {
-      @apply px-3 py-1.5 rounded bg-zinc-900 border border-white/5 text-[10px] font-bold tracking-widest uppercase text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 hover:border-white/10 transition-all focus:outline-none;
+      @apply inline-flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold tracking-widest uppercase text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-white/20 transition-colors;
     }
-    .btn-sleek.on {
-      @apply bg-zinc-800 text-zinc-100 border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.03)];
-    }
-    #b_manual.on {
-      @apply bg-red-500/10 text-red-500 border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.15)] hover:bg-red-500/20;
-    }
+    .btn-sleek.on { @apply bg-zinc-800 text-white border-white/30; }
+    .btn-sleek kbd { @apply text-zinc-500 bg-black/40; }
+    .btn-sleek.on kbd { @apply text-zinc-300; }
+    #b_manual { @apply text-red-400 border-red-500/30; }
+    #b_manual.on { @apply bg-red-500/15 text-red-400 border-red-500/50 hover:bg-red-500/25; }
 
-    /* Sleek table */
-    .table-header { @apply sticky top-0 bg-[#09090b] backdrop-blur-md z-10 text-left p-3 eyebrow border-b border-white/10; }
-    .table-cell { @apply p-3 border-b border-white/5 font-mono text-xs text-zinc-400 text-right group-hover:text-zinc-300 transition-colors; }
+    .table-header { @apply sticky top-0 bg-[#09090b] z-10 text-left px-3 py-2.5 eyebrow !text-[9px] border-b border-white/10 whitespace-nowrap; }
+    .table-cell { @apply px-3 py-2.5 border-b border-white/5 font-mono text-xs text-zinc-400 text-right tabular-nums whitespace-nowrap group-hover:text-zinc-200 transition-colors; }
+
+    .confirm-strip { @apply flex items-center gap-3 mt-3 px-3 py-2 rounded border border-amber-500/30 bg-amber-500/5 text-xs text-amber-200; }
   }
 
   @layer utilities {
-    /* JS mapped dynamic colors */
     .c-RUNNING { @apply text-emerald-400; }
-    .c-STUCK { @apply text-amber-500; }
-    .c-DEAD { @apply text-red-500; }
-    .c-WON { @apply text-blue-400; }
-
-    .d-RUNNING { @apply bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]; }
-    .d-STUCK { @apply bg-amber-500; }
+    .c-STUCK { @apply text-amber-400; }
+    .c-DEAD { @apply text-red-400; }
+    .c-WON { @apply text-sky-400; }
+    .d-RUNNING { @apply bg-emerald-400; }
+    .d-STUCK { @apply bg-amber-400; }
     .d-DEAD { @apply bg-red-500; }
-    .d-WON { @apply bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]; }
+    .d-WON { @apply bg-sky-400; }
 
-    /* Specimen Wall dynamic states */
     .s-DEAD canvas { filter: grayscale(1) brightness(0.3); }
     .s-STUCK canvas { filter: saturate(0.2) brightness(0.5); }
-    .spec.watched .canvas-wrap { @apply ring-1 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]; }
+    .spec.watched .canvas-wrap { @apply ring-1 ring-red-500/60; }
     .spec.watched .canvas-wrap canvas { @apply opacity-100; }
+    .spec .frozen { @apply hidden; }
+    body.turbo .spec:not(.watched) .frozen { @apply flex; }
+    body.turbo .spec:not(.watched) canvas { @apply opacity-30; }
 
-    /* Sensor bar styling for JS toggling */
     .stale .sbar-fill { @apply bg-zinc-800 !important; }
     .stale .sbar-out { @apply text-zinc-600 !important; }
+
+    /* offline: numbers are history, not a live reading */
+    body.offline .live-num { @apply opacity-40; }
+    body.offline #bezel { @apply grayscale; }
+
+    @keyframes firstwin { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.7); } 100% { box-shadow: 0 0 0 18px rgba(56,189,248,0); } }
+    .won-flash { animation: firstwin 1.2s cubic-bezier(.16,1,.3,1) 1; }
   }
 </style>
 <script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Inter', 'sans-serif'],
-          mono: ['JetBrains Mono', 'monospace'],
-        }
-      }
-    }
-  }
+  tailwind.config = { theme: { extend: { fontFamily: {
+    sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
+    mono: ['JetBrains Mono', 'ui-monospace', 'Cascadia Mono', 'Consolas', 'monospace'],
+  } } } }
 </script>
 </head>
 <body class="p-4 md:p-8 max-w-[1600px] mx-auto flex flex-col gap-8">
 
   <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/5">
 
-    <!-- Branding & Live Stats -->
     <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
-      <div class="pr-8 border-r border-white/10">
-        <div class="eyebrow mb-1.5">Neuroevolution Lab</div>
-        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          PEAK <span id="h_game" class="text-red-500 uppercase text-[10px] tracking-widest px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20">mario</span>
-        </h1>
-      </div>
+      <h1 class="pr-8 border-r border-white/10 text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+        PEAK <span id="h_game" class="text-red-400 uppercase text-[10px] tracking-widest px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30">mario</span>
+      </h1>
 
       <div class="metric-group items-center pr-8 border-r border-white/10">
         <span class="eyebrow">Generation</span>
-        <b id="s_gen" class="font-mono text-3xl font-medium text-red-500 leading-none">0</b>
+        <b id="s_gen" class="live-num font-mono text-3xl font-medium text-red-500 leading-none tabular-nums">0</b>
       </div>
 
       <div class="flex items-center gap-6">
-        <div class="metric-group"><span class="eyebrow">All-time best</span><b class="metric-val text-red-400" id="s_atb">–</b></div>
-        <div class="metric-group"><span class="eyebrow">Last gen best</span><b class="metric-val" id="s_lgb">–</b></div>
-        <div class="metric-group"><span class="eyebrow">Avg fitness</span><b class="metric-val text-zinc-400" id="s_avg">–</b></div>
-        <div class="metric-group hidden sm:flex"><span class="eyebrow">Steps / s</span><b class="metric-val text-zinc-400" id="s_sps">–</b></div>
-        <div class="metric-group hidden md:flex"><span class="eyebrow">Win rate (10g)</span><b class="metric-val text-zinc-400" id="s_wr">–</b></div>
-        <div class="metric-group hidden lg:flex"><span class="eyebrow">Elapsed</span><b class="metric-val text-zinc-500" id="s_elapsed">–</b></div>
+        <div class="metric-group"><span class="eyebrow">Level best</span><b class="live-num metric-val text-white" id="s_lvb">–</b></div>
+        <div class="metric-group"><span class="eyebrow">Last gen</span><b class="live-num metric-val" id="s_lgb">–</b></div>
+        <div class="metric-group"><span class="eyebrow">Average</span><b class="live-num metric-val text-zinc-400" id="s_avg">–</b></div>
+        <div class="metric-group hidden md:flex" title="Share of the last 10 generations' episodes that reached the goal">
+          <span class="eyebrow">Win rate · 10 gens</span><b class="live-num metric-val text-zinc-400" id="s_wr">–</b></div>
+        <div class="metric-group hidden sm:flex" title="Simulation steps per second across the whole population">
+          <span class="eyebrow">Steps / s</span><b class="live-num metric-val text-zinc-400" id="s_sps">–</b></div>
       </div>
     </div>
 
-    <!-- Toggles -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <button id="b_turbo" class="btn-sleek">Turbo</button>
-      <button id="b_sensors" class="btn-sleek on">Sensors</button>
-      <button id="b_hitboxes" class="btn-sleek">Hitboxes</button>
-      <button id="b_grid" class="btn-sleek">Grid</button>
-      <div class="w-px h-6 bg-white/10 mx-2"></div>
-      <button id="b_manual" class="btn-sleek text-red-400 border-red-500/20">Take control</button>
+    <div class="flex items-center gap-2 flex-wrap" role="group" aria-label="View toggles">
+      <button id="b_turbo" class="btn-sleek" aria-pressed="false" title="Max speed: only the watched specimen keeps streaming frames">Turbo <kbd>T</kbd></button>
+      <button id="b_sensors" class="btn-sleek on" aria-pressed="true" title="Draw the agent's raycasts on the feed">Sensors <kbd>S</kbd></button>
+      <button id="b_hitboxes" class="btn-sleek" aria-pressed="false" title="Show collision boxes">Hitboxes <kbd>H</kbd></button>
+      <button id="b_grid" class="btn-sleek" aria-pressed="false" title="Show the tile grid">Grid <kbd>G</kbd></button>
 
-      <!-- Connection Ping -->
-      <div class="flex items-center gap-2 ml-2 pl-4 border-l border-white/5" id="conn">
-        <i class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block transition-colors duration-300"></i>
-        <span id="connlabel" class="eyebrow !text-[9px] !text-zinc-600">Connecting</span>
+      <div class="flex items-center gap-2 ml-2 pl-4 border-l border-white/5" id="conn" role="status" aria-live="polite">
+        <i class="w-1.5 h-1.5 rounded-full bg-zinc-600 inline-block transition-colors duration-300"></i>
+        <span id="connlabel" class="font-mono text-[10px] tracking-widest uppercase text-zinc-400">Connecting</span>
       </div>
     </div>
   </header>
 
   <main class="grid grid-cols-1 xl:grid-cols-12 gap-8 lg:gap-12">
 
-    <!-- Left Column: Video Feed & Stats -->
-    <div class="xl:col-span-8 flex flex-col gap-8">
+    <div class="xl:col-span-8 flex flex-col gap-8 min-w-0">
 
-      <!-- Live Feed -->
-      <section id="feedwrap" class="flex flex-col relative group transition-all duration-300">
-        <div class="flex items-end justify-between mb-3">
+      <!-- Watched specimen -->
+      <section id="feedwrap" class="flex flex-col relative">
+        <div class="flex items-end justify-between mb-3 gap-4 flex-wrap">
           <div class="flex items-baseline gap-4">
-            <h2 class="eyebrow">Watched Specimen</h2>
-            <b id="f_env" class="font-mono text-lg font-medium text-white">ENV 1</b>
-            <b id="f_status" class="font-mono text-[10px] font-bold tracking-widest c-RUNNING">RUNNING</b>
+            <h2 class="eyebrow">Watched specimen</h2>
+            <b id="f_env" class="font-mono text-lg font-medium text-white">#01</b>
+            <b id="f_status" class="font-mono text-[10px] font-bold tracking-widest c-RUNNING" role="status" aria-live="polite">RUNNING</b>
+            <span id="f_firstwin" class="hidden font-mono text-[10px] tracking-widest uppercase text-sky-400">first win · gen <span></span></span>
           </div>
-          <span id="f_meta" class="font-mono text-xs text-zinc-500 hidden sm:block">x 0 · fit 0</span>
+          <button id="b_manual" class="btn-sleek" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD">Take control <kbd>M</kbd></button>
         </div>
 
-        <div id="bezel" class="relative bg-black rounded-lg overflow-hidden ring-1 ring-white/5 shadow-2xl">
-          <canvas id="watch" width="800" height="600" class="w-full h-auto block"></canvas>
-          <div id="boot" class="absolute inset-0 flex items-center justify-center font-mono text-xs font-bold tracking-widest text-zinc-600 bg-black/90 backdrop-blur z-10">
-            WAITING FOR TRAINER...
+        <div id="bezel" class="relative bg-black rounded-lg overflow-hidden ring-1 ring-white/10 transition-shadow">
+          <canvas id="watch" width="800" height="600" class="w-full h-auto block" role="img" aria-label="Live view of the watched specimen playing the level"></canvas>
+          <div id="boot" class="absolute inset-0 flex flex-col items-center justify-center gap-2 font-mono text-xs font-bold tracking-widest text-zinc-400 bg-black/90 z-10 text-center px-6">
+            <span id="boottext">WAITING FOR TRAINER</span>
+            <span id="bootsub" class="text-[10px] font-normal tracking-wider text-zinc-500 normal-case">Start one from <span class="text-zinc-300">python menu.py</span> → Train, then this page fills in.</span>
+          </div>
+          <div id="ribbon" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase bg-red-500/15 text-red-300 border border-red-500/40 rounded whitespace-nowrap">
+            Manual control — arrows / WASD move, space jumps
           </div>
         </div>
 
-        <div id="ribbon" class="hidden absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase bg-red-500/10 text-red-500 border border-red-500/20 rounded backdrop-blur-md whitespace-nowrap shadow-lg">
-          Manual control active — Use Arrows/WASD
+        <!-- Level progress: the number the whole run is about -->
+        <div class="mt-3 flex items-center gap-4" title="How far along the level the watched specimen is; the tick marks the best reach this generation">
+          <div class="flex-1 relative h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
+            <i id="p_fill" class="absolute inset-y-0 left-0 bg-red-500 rounded-full transition-[width] duration-300" style="width:0%"></i>
+            <i id="p_best" class="absolute inset-y-0 w-px bg-sky-400" style="left:0%"></i>
+          </div>
+          <b id="p_pct" class="live-num font-mono text-sm font-medium text-white tabular-nums w-16 text-right">0 %</b>
+          <span class="eyebrow hidden sm:inline">of level</span>
+        </div>
+        <div id="f_meta" class="mt-2 font-mono text-xs text-zinc-400 tabular-nums flex flex-wrap gap-x-4 gap-y-1">
+          <span title="Horizontal position in pixels">x <b class="text-zinc-200" id="m_x">–</b></span>
+          <span title="Fitness = distance covered + win / score bonuses">fitness <b class="text-zinc-200" id="m_fit">–</b></span>
+          <span title="In-game score">score <b class="text-zinc-200" id="m_score">–</b></span>
+          <span title="Coins collected this episode">coins <b class="text-zinc-200" id="m_coins">–</b></span>
+          <span title="In-game timer remaining">time <b class="text-zinc-200" id="m_time">–</b></span>
+          <span id="m_cause_wrap" class="hidden">ended by <b class="text-red-300" id="m_cause">–</b></span>
         </div>
       </section>
 
-      <!-- Specimen Wall -->
+      <!-- Population wall -->
       <section id="wallwrap" class="flex flex-col pt-4 border-t border-white/5">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div class="flex items-baseline gap-3">
             <h2 class="eyebrow">Population</h2>
-            <span class="font-mono text-xs text-zinc-500">Gen <span id="wallgen" class="text-zinc-300">0</span></span>
+            <span class="font-mono text-xs text-zinc-400">gen <span id="wallgen" class="text-zinc-200">0</span></span>
+            <span id="turbonote" class="hidden font-mono text-[10px] tracking-widest uppercase text-amber-400">turbo · only the watched specimen streams</span>
           </div>
-          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4"></div>
+          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4" aria-live="polite"></div>
         </div>
-
-        <!-- Wall Grid -->
-        <div id="wall" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          <!-- Injected via JS -->
-        </div>
-
-        <div id="turbonote" class="hidden mt-6 text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center">
-          [ Turbo Mode Active — Feeds Throttled ]
-        </div>
+        <p class="sr-only">Click a specimen to watch it. <kbd>[</kbd> and <kbd>]</kbd> cycle specimens.</p>
+        <div id="wall" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" role="group" aria-label="Specimens this generation"></div>
       </section>
 
-      <!-- Results Table -->
+      <!-- Results ledger -->
       <section id="resultswrap" class="flex flex-col pt-4 border-t border-white/5">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="eyebrow">Results Ledger</h2>
-          <span id="census2" class="font-mono text-[10px] text-zinc-600"></span>
+          <h2 class="eyebrow">Results ledger</h2>
+          <span id="census2" class="font-mono text-[10px] text-zinc-400"></span>
         </div>
-
-        <div id="resultsbox" class="max-h-[300px] overflow-y-auto pr-2 rounded-lg border border-white/5 bg-[#0a0a0c]">
-          <table id="results" class="w-full border-collapse">
+        <div id="resultsbox" class="max-h-[300px] overflow-auto rounded-lg border border-white/5 bg-[#0a0a0c]">
+          <table id="results" class="w-full border-collapse min-w-[640px]">
             <thead>
               <tr>
-                <th class="table-header !pl-4">Gen</th>
-                <th class="table-header">Level</th>
-                <th class="table-header text-right">Best</th>
-                <th class="table-header text-right">Avg</th>
-                <th class="table-header text-right">Med</th>
-                <th class="table-header text-right">Wins</th>
-                <th class="table-header text-right">Stuck</th>
-                <th class="table-header text-right">Dead</th>
-                <th class="table-header text-right !pr-4">Coins</th>
+                <th scope="col" class="table-header !pl-4">Gen</th>
+                <th scope="col" class="table-header">Level</th>
+                <th scope="col" class="table-header text-right">Best</th>
+                <th scope="col" class="table-header text-right">Avg</th>
+                <th scope="col" class="table-header text-right" title="Furthest point reached, as a share of the level">Reach</th>
+                <th scope="col" class="table-header text-right">Wins</th>
+                <th scope="col" class="table-header text-right">Stuck</th>
+                <th scope="col" class="table-header text-right">Dead</th>
+                <th scope="col" class="table-header text-right !pr-4">Coins</th>
               </tr>
             </thead>
-            <tbody class="text-zinc-300 divide-y divide-white/5">
-              <!-- Injected via JS -->
-            </tbody>
+            <tbody class="text-zinc-300"></tbody>
           </table>
         </div>
       </section>
-
     </div>
 
     <div id="side" class="xl:col-span-4 flex flex-col gap-8 min-w-0">
 
-      <!-- Sensors -->
+      <!-- Telemetry -->
       <section id="sensorcard">
         <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
           <h2 class="eyebrow">Telemetry</h2>
-          <small id="sensewho" class="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">env 1</small>
+          <small id="sensewho" class="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">specimen 01</small>
         </div>
-        <div id="sensors" class="flex flex-col gap-1.5">
-          <!-- Sensors injected here -->
-        </div>
+        <div id="sensors" class="flex flex-col gap-1.5"></div>
       </section>
 
-      <!-- Fitness Chart -->
+      <!-- Fitness -->
       <section>
         <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
-          <h2 class="eyebrow">Fitness Trajectory</h2>
-          <div class="flex items-center gap-3 font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+          <h2 class="eyebrow">Fitness trajectory</h2>
+          <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
             <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-red-500"></i> best</span>
-            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-zinc-600"></i> avg</span>
+            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-zinc-500"></i> avg</span>
+            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-sky-400"></i> first win</span>
           </div>
         </div>
         <div class="bg-[#0a0a0c] rounded-lg border border-white/5 p-3">
-          <canvas id="chart" width="680" height="300" class="w-full h-auto block opacity-90"></canvas>
+          <canvas id="chart" width="680" height="300" class="w-full h-auto block cursor-crosshair" role="img" aria-label="Best and average fitness per generation"></canvas>
+          <div id="chartread" class="mt-2 font-mono text-[10px] text-zinc-400 tabular-nums h-4">hover for a generation's numbers</div>
         </div>
       </section>
 
-      <!-- Config -->
+      <!-- Run configuration -->
       <section>
-        <div class="mb-4 pb-2 border-b border-white/5">
-          <h2 class="eyebrow">Run Configuration</h2>
-        </div>
+        <div class="mb-4 pb-2 border-b border-white/5"><h2 class="eyebrow">Run configuration</h2></div>
         <div class="grid grid-cols-2 gap-y-4 gap-x-4">
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Level</span><select id="k_levelsel"></select></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-300">real-time</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Population</span><b id="k_pop" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Elite</span><b id="k_elite" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Mutation</span><b id="k_mut" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Net</span><b id="k_hidden" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Won</span><b id="k_wins" class="font-mono text-sm font-medium text-blue-400">0</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Total Frames</span><b id="k_frames" class="font-mono text-sm font-medium text-zinc-500">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow !text-[8px]">Train Time</span><b id="k_traintime" class="font-mono text-sm font-medium text-zinc-300">–</b></div>
+          <div class="flex flex-col gap-1"><label for="k_levelsel" class="eyebrow">Level</label><select id="k_levelsel"></select></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-200">real-time</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Network</span><b id="k_hidden" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Population</span><b id="k_pop" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Elite · mutation</span><b class="font-mono text-sm font-medium text-zinc-200"><span id="k_elite">–</span> · <span id="k_mut">–</span></b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Wins this gen</span><b id="k_wins" class="live-num font-mono text-sm font-medium text-sky-400">0</b></div>
+          <div class="flex flex-col gap-1" title="Best fitness across every level this run has trained on"><span class="eyebrow">All-time best</span><b id="k_atb" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="eyebrow">Frames simulated</span><b id="k_frames" class="live-num font-mono text-sm font-medium text-zinc-400">–</b></div>
+          <div class="flex flex-col gap-1" title="Cumulative evolution time, survives --resume"><span class="eyebrow">Train time</span><b id="k_traintime" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
+        </div>
+        <div id="levelconfirm" class="confirm-strip hidden" role="alertdialog" aria-labelledby="levelconfirmtext">
+          <span id="levelconfirmtext" class="flex-1">Switch to <b></b> at the next generation? The population carries over.</span>
+          <button id="levelyes" class="btn-sleek !border-amber-500/40 !text-amber-200">Switch</button>
+          <button id="levelno" class="btn-sleek">Keep</button>
         </div>
       </section>
-
     </div>
   </main>
 
@@ -265,50 +264,54 @@
 "use strict";
 
 const RAY_COLORS = {0:"rgba(255,255,255,.10)", 1:"#ef4444", 2:"#ec4899"};
-const TILE_STYLES = {
-  1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"},
-  2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}
-};
+const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}};
 const STATUS = ["RUNNING","STUCK","DEAD","WON"];
 
 const SENSORS = [
   {g:"Proximity rays", color:"bg-zinc-300", rows:[
-    {i:0,l:"FWD"},{i:1,l:"U30"},{i:2,l:"U60"},{i:3,l:"D30"},{i:4,l:"D60"},{i:5,l:"BCK"}]},
-  {g:"Threats", color:"bg-red-500", rows:[{i:6,l:"NMY"},{i:7,l:"PIT"}]},
-  {g:"Kinematics", color:"bg-blue-400", rows:[{i:9,l:"VX",center:true},{i:10,l:"VY",center:true},{i:8,l:"GND"},{i:11,l:"JMP"}]},
-  {g:"Objectives", color:"bg-amber-400", rows:[{i:12,l:"BLK"}]},
+    {i:0,l:"FWD",d:"Ray straight ahead — distance to the nearest solid"},
+    {i:1,l:"U30",d:"Ray 30° up and ahead"},{i:2,l:"U60",d:"Ray 60° up and ahead"},
+    {i:3,l:"D30",d:"Ray 30° down and ahead"},{i:4,l:"D60",d:"Ray 60° down and ahead"},
+    {i:5,l:"BCK",d:"Ray straight back"}]},
+  {g:"Threats", color:"bg-red-500", rows:[
+    {i:6,l:"NMY",d:"Enemy ahead in the agent's corridor (1 = touching)"},
+    {i:7,l:"PIT",d:"Pit probe — a gap in the floor ahead"}]},
+  {g:"Kinematics", color:"bg-sky-400", rows:[
+    {i:9,l:"VX",center:true,d:"Horizontal velocity, centred at zero"},
+    {i:10,l:"VY",center:true,d:"Vertical velocity, centred at zero (up is negative)"},
+    {i:8,l:"GND",d:"On the ground"},{i:11,l:"JMP",d:"Jump currently held"}]},
+  {g:"Objectives", color:"bg-amber-400", rows:[{i:12,l:"BLK",d:"Question blocks visible ahead"}]},
 ];
 const INVERT = new Set([0,1,2,3,4,5,6]);
 
-let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0;
+let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0, levelLen=0, curLevel="", lastSeen=0, hadFirstWin=false;
+let history=[], hitboxes=false, gridOn=false;
 const lastImg={}, specEls=[], senseEls=[];
 const keys={left:false,right:false,jump:false};
 const $ = id => document.getElementById(id);
 const send = o => { if (ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
+const fmt = v => v===undefined||v===null ? "–" : (+v).toLocaleString("en-US",{maximumFractionDigits:0});
+const pad2 = i => String(i+1).padStart(2,"0");
+const pct = x => levelLen > 0 ? Math.max(0, Math.min(100, x / levelLen * 100)) : 0;
 
 (function buildSensors(){
   const root = $("sensors");
   for (const grp of SENSORS){
     const h = document.createElement("div");
-    h.className = "text-[8px] font-bold tracking-widest uppercase text-zinc-700 mt-3 first:mt-0";
+    h.className = "text-[10px] font-bold tracking-widest uppercase text-zinc-400 mt-3 first:mt-0";
     h.textContent = grp.g;
     root.appendChild(h);
-
     for (const r of grp.rows){
       const row = document.createElement("div");
       row.className = "flex items-center gap-3 group";
-
-      let barInner = `<div class="relative h-1 flex-1 bg-zinc-900 rounded-full overflow-hidden border border-white/5">`;
-      if(r.center) {
-          barInner += `<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/20 z-10"></div>`;
-      }
-      barInner += `<i class="absolute top-0 bottom-0 left-0 rounded-full ${grp.color} sbar-fill transition-all duration-150 ease-out opacity-80 group-hover:opacity-100"></i></div>`;
-
+      const id = "sense_" + r.i;
       row.innerHTML = `
-        <label class="w-7 text-right font-mono text-[9px] font-bold text-zinc-500">${r.l}</label>
-        ${barInner}
-        <output class="w-8 font-mono text-[9px] text-zinc-500 sbar-out tabular-nums text-left">–</output>
-      `;
+        <abbr id="${id}_l" title="${r.d}" class="w-8 text-right font-mono text-[10px] font-bold text-zinc-400 underline decoration-dotted decoration-zinc-600 underline-offset-2 cursor-help" tabindex="0">${r.l}</abbr>
+        <div class="relative h-1 flex-1 bg-zinc-900 rounded-full overflow-hidden border border-white/5" aria-hidden="true">
+          ${r.center ? '<div class="absolute left-1/2 top-0 bottom-0 w-px bg-white/20 z-10"></div>' : ''}
+          <i class="absolute top-0 bottom-0 left-0 rounded-full ${grp.color} sbar-fill transition-[width,left] duration-150 ease-out opacity-80 group-hover:opacity-100"></i>
+        </div>
+        <output for="${id}_l" aria-labelledby="${id}_l" class="w-10 font-mono text-[10px] text-zinc-400 sbar-out tabular-nums text-left">–</output>`;
       root.appendChild(row);
       senseEls[r.i] = {bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center, idx:r.i};
     }
@@ -321,48 +324,47 @@ function buildWall(n){
   wall.innerHTML = ""; specEls.length = 0;
   for (let i=0;i<n;i++){
     const b = document.createElement("button");
-    b.className = "spec group text-left relative focus:outline-none flex flex-col gap-2";
-    b.setAttribute("aria-label", `Watch env ${i+1}`);
-
-    // Minimal sleek grid item
+    b.className = "spec group text-left relative flex flex-col gap-2 rounded min-w-0";
+    b.setAttribute("aria-label", `Watch specimen ${pad2(i)}`);
+    b.setAttribute("aria-pressed", "false");
     b.innerHTML = `
-      <div class="canvas-wrap relative rounded overflow-hidden bg-[#050505] transition-all duration-300 ring-1 ring-white/5 group-hover:ring-white/20">
-        <canvas width="280" height="210" class="w-full h-auto block opacity-60 group-hover:opacity-100 transition-opacity"></canvas>
+      <div class="canvas-wrap relative rounded overflow-hidden bg-[#050505] transition-shadow ring-1 ring-white/5 group-hover:ring-white/20">
+        <canvas width="280" height="210" class="w-full h-auto block opacity-60 group-hover:opacity-100 transition-opacity" aria-hidden="true"></canvas>
+        <div class="frozen absolute inset-0 items-center justify-center font-mono text-[9px] tracking-widest uppercase text-amber-300/80 bg-black/40">frozen · turbo</div>
       </div>
       <div class="flex flex-col gap-1 w-full">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-1.5">
             <i class="dot w-1.5 h-1.5 rounded-full flex-none bg-zinc-700"></i>
-            <b class="font-mono text-[10px] font-bold text-zinc-400 group-hover:text-zinc-200 transition-colors">ENV ${String(i+1).padStart(2,"0")}</b>
+            <b class="font-mono text-[10px] font-bold text-zinc-300 group-hover:text-white transition-colors">#${pad2(i)}</b>
           </div>
-          <em class="status-text font-mono text-[9px] font-bold tracking-widest not-italic uppercase text-zinc-600">–</em>
+          <em class="status-text font-mono text-[10px] font-bold tracking-widest not-italic uppercase text-zinc-500">–</em>
         </div>
-        <div class="flex justify-between font-mono text-[9px] text-zinc-600 tabular-nums">
-          <span class="nx">x –</span><span class="nf">fit –</span>
+        <div class="flex justify-between font-mono text-[10px] text-zinc-400 tabular-nums">
+          <span class="nx">–</span><span class="nf">fit –</span>
         </div>
-        <div class="h-[2px] w-full bg-zinc-900 rounded-full overflow-hidden mt-0.5">
-          <i class="rail block h-full bg-zinc-700 w-0 transition-all duration-300"></i>
+        <div class="h-[3px] w-full bg-zinc-900 rounded-full overflow-hidden mt-0.5" title="Progress along the level">
+          <i class="rail block h-full bg-zinc-700 w-0 transition-[width] duration-300"></i>
         </div>
       </div>`;
-
-    b.onclick = () => { watched = i; send({cmd:"watch", env:i}); };
+    b.onclick = () => watchEnv(i);
     wall.appendChild(b);
-
     const pctx = b.querySelector("canvas").getContext("2d");
     pctx.fillStyle = "#09090b"; pctx.fillRect(0, 0, 280, 210);
-    pctx.fillStyle = "#3f3f46"; pctx.font = "500 12px 'JetBrains Mono', monospace";
-    pctx.textAlign = "center"; pctx.fillText("WAITING", 140, 110);
-
-    specEls.push({
-      el:b,
-      cv:b.querySelector("canvas"),
-      dot:b.querySelector(".dot"),
-      st:b.querySelector(".status-text"),
-      nx:b.querySelector(".nx"),
-      nf:b.querySelector(".nf"),
-      rail:b.querySelector(".rail")
-    });
+    pctx.fillStyle = "#52525b"; pctx.font = "500 12px 'JetBrains Mono', monospace";
+    pctx.textAlign = "center"; pctx.fillText("no frame yet", 140, 110);
+    specEls.push({el:b, cv:b.querySelector("canvas"), dot:b.querySelector(".dot"), st:b.querySelector(".status-text"),
+                  nx:b.querySelector(".nx"), nf:b.querySelector(".nf"), rail:b.querySelector(".rail")});
   }
+}
+
+function watchEnv(i){
+  if (!nEnvs) return;
+  watched = (i + nEnvs) % nEnvs;
+  send({cmd:"watch", env:watched});
+  specEls.forEach((sp, j) => { sp.el.classList.toggle("watched", j===watched); sp.el.setAttribute("aria-pressed", j===watched); });
+  const cache = lastImg[watched];
+  if (cache) paintEnv({id:watched});
 }
 
 function drawRays(ctx, rays, k, tiles){
@@ -404,13 +406,12 @@ function paintEnv(e){
 function updateSensors(e){
   if (!e.sensors) return;
   $("sensors").classList.remove("stale");
-  $("sensewho").textContent = "env " + (e.id+1);
+  $("sensewho").textContent = "specimen " + pad2(e.id);
   for (const s of senseEls){
     if (!s) continue;
     let v = e.sensors[s.idx];
     const shown = v;
     if (INVERT.has(s.idx)) v = 1 - v;
-
     if (s.center){
       const half = Math.min(Math.abs(v),1) * 50;
       s.bar.style.left  = v < 0 ? (50-half)+"%" : "50%";
@@ -423,135 +424,159 @@ function updateSensors(e){
   }
 }
 
-function drawChart(history){
-  const cv = $("chart"), ctx = cv.getContext("2d");
-  const W = cv.width, H = cv.height, L = 30, R = 10, T = 15, B = 20;
+// ── fitness chart: best/avg lines, first-win marker, level boundaries, hover readout ──
+const CH = {L:46, R:12, T:18, B:24};
+function chartGeom(){
+  const cv = $("chart"), W = cv.width, H = cv.height;
+  const max = Math.max(...history.map(h=>h[0])) * 1.05 || 1;
+  return {cv, W, H, max,
+    px: i => CH.L + i*(W-CH.L-CH.R)/Math.max(1, history.length-1),
+    py: v => H-CH.B - (v/max)*(H-CH.T-CH.B)};
+}
+function drawChart(hover){
+  const {cv, W, H, max, px, py} = chartGeom(), ctx = cv.getContext("2d");
   ctx.clearRect(0,0,W,H);
-  if (!history || history.length < 2){
-    ctx.fillStyle = "#3f3f46"; ctx.font = "500 12px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("waiting for data...", W/2, H/2);
+  ctx.font = "400 13px 'JetBrains Mono', monospace";
+  if (history.length < 2){
+    ctx.fillStyle = "#71717a"; ctx.textAlign = "center";
+    ctx.fillText("two generations in, the curve starts", W/2, H/2);
     ctx.textAlign = "left";
     return;
   }
-  const max = Math.max(...history.map(h=>h[0])) * 1.05 || 1;
-  const px = i => L + i*(W-L-R)/(history.length-1);
-  const py = v => H-B - (v/max)*(H-T-B);
-
-  // Grid
-  ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.fillStyle = "#52525b";
-  ctx.font = "400 9px 'JetBrains Mono', monospace"; ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.fillStyle = "#71717a"; ctx.lineWidth = 1;
   for (let q=0;q<=4;q++){
     const y = py(max*q/4);
-    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(W-R,y); ctx.stroke();
-    ctx.fillText(Math.round(max*q/4), 0, y+3);
+    ctx.beginPath(); ctx.moveTo(CH.L,y); ctx.lineTo(W-CH.R,y); ctx.stroke();
+    ctx.fillText(fmt(max*q/4), 0, y+3);
   }
+  // level boundaries
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.setLineDash([3,3]);
+  for (let i=1;i<history.length;i++) if (history[i][3] !== history[i-1][3]){
+    ctx.beginPath(); ctx.moveTo(px(i),CH.T); ctx.lineTo(px(i),H-CH.B); ctx.stroke();
+    ctx.fillStyle = "#a1a1aa"; ctx.fillText(history[i][3], px(i)+4, CH.T+10);
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#71717a";
+  const g0 = "g" + (history[0][4] ?? 1), g1 = "g" + (history[history.length-1][4] ?? history.length);
+  ctx.fillText(g0, CH.L, H-2);
+  ctx.fillText(g1, W-CH.R-ctx.measureText(g1).width, H-2);
 
-  ctx.fillText("g1", L, H-2);
-  const endLbl = "g" + history.length;
-  ctx.fillText(endLbl, W-R-ctx.measureText(endLbl).width, H-2);
-
-  // Area fill under best
   ctx.beginPath();
   history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[0])) : ctx.moveTo(px(0),py(h[0])));
-  ctx.lineTo(px(history.length-1),H-B); ctx.lineTo(L,H-B); ctx.closePath();
-  const grad = ctx.createLinearGradient(0,T,0,H-B);
+  ctx.lineTo(px(history.length-1),H-CH.B); ctx.lineTo(CH.L,H-CH.B); ctx.closePath();
+  const grad = ctx.createLinearGradient(0,CH.T,0,H-CH.B);
   grad.addColorStop(0,"rgba(239,68,68,0.15)"); grad.addColorStop(1,"rgba(239,68,68,0)");
   ctx.fillStyle = grad; ctx.fill();
 
-  // Avg Line
   ctx.beginPath();
   history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[1])) : ctx.moveTo(px(0),py(h[1])));
-  ctx.strokeStyle = "#52525b"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = "#71717a"; ctx.lineWidth = 1; ctx.stroke();
 
-  // Best Line
   ctx.beginPath();
   history.forEach((h,i)=> i ? ctx.lineTo(px(i),py(h[0])) : ctx.moveTo(px(0),py(h[0])));
-  ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 1.5;
-  ctx.lineJoin = "round"; ctx.stroke();
+  ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.stroke();
+
+  // first win per level
+  const seen = new Set();
+  history.forEach((h,i)=>{
+    if (!h[2] || seen.has(h[3])) return;
+    seen.add(h[3]);
+    ctx.fillStyle = "#38bdf8"; ctx.beginPath(); ctx.arc(px(i), py(h[0]), 3.5, 0, 7); ctx.fill();
+  });
+
+  if (hover !== undefined && history[hover]){
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.moveTo(px(hover),CH.T); ctx.lineTo(px(hover),H-CH.B); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(px(hover), py(history[hover][0]), 3, 0, 7); ctx.fill();
+  }
 }
+$("chart").addEventListener("mousemove", ev => {
+  if (history.length < 2) return;
+  const {cv, W} = chartGeom();
+  const x = (ev.offsetX / cv.clientWidth) * W;
+  const i = Math.max(0, Math.min(history.length-1, Math.round((x-CH.L) / ((W-CH.L-CH.R)/(history.length-1)))));
+  const h = history[i];
+  $("chartread").textContent = `gen ${h[4] ?? i+1} · ${h[3]} · best ${fmt(h[0])} · avg ${fmt(h[1])}${h[2] ? " · " + h[2] + " won" : ""}`;
+  drawChart(i);
+});
+$("chart").addEventListener("mouseleave", () => { $("chartread").textContent = "hover for a generation's numbers"; drawChart(); });
 
 function onUpdate(m){
   const s = m.stats || {};
+  lastSeen = Date.now();
   if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
   if (s.game) $("h_game").textContent = s.game;
+  if (s.level_len !== undefined) levelLen = s.level_len;
+  if (s.level) curLevel = s.level;
 
-  const fmt = v => v===undefined||v===null ? "–" : (+v).toLocaleString("en-US",{maximumFractionDigits:0});
   if (s.gen !== undefined){ $("s_gen").textContent = s.gen; $("wallgen").textContent = s.gen; }
-  $("s_atb").textContent = fmt(s.all_time_best);
+  $("s_lvb").textContent = fmt(s.level_best ?? s.all_time_best);
+  $("k_atb").textContent = fmt(s.all_time_best);
   $("s_lgb").textContent = fmt(s.last_gen_best);
   $("s_avg").textContent = fmt(s.avg_fitness);
   $("s_sps").textContent = fmt(s.sps);
-  if (s.win_rate10 !== undefined) $("s_wr").textContent = s.win_rate10 + "%";
-  if (s.elapsed !== undefined){
-    const mins = Math.floor(s.elapsed/60), sec = s.elapsed%60;
-    $("s_elapsed").textContent = mins + ":" + String(sec).padStart(2,"0");
-  }
+  if (s.win_rate10 !== undefined) $("s_wr").textContent = s.win_rate10 + " %";
   if (s.total_frames !== undefined) $("k_frames").textContent = fmt(s.total_frames);
   if (s.train_time !== undefined){
     const t = Math.round(s.train_time), h = Math.floor(t/3600), mm = Math.floor((t%3600)/60), ss = t%60;
     $("k_traintime").textContent = (h ? h + ":" + String(mm).padStart(2,"0") : mm) + ":" + String(ss).padStart(2,"0");
   }
+  const fw = $("f_firstwin");
+  fw.classList.toggle("hidden", s.first_win_gen === null || s.first_win_gen === undefined);
+  if (s.first_win_gen != null){
+    fw.querySelector("span").textContent = s.first_win_gen;
+    if (!hadFirstWin && s.gen === s.first_win_gen){ $("bezel").classList.add("won-flash"); setTimeout(()=>$("bezel").classList.remove("won-flash"), 1300); }
+    hadFirstWin = true;
+  } else hadFirstWin = false;
   if (s.results) drawResults(s.results);
 
   if (s.levels && s.levels.length){
     const sel = $("k_levelsel");
-    const want = s.levels.join("\\u0001");
+    const want = s.levels.join("");
     if (sel.dataset.levels !== want){
       sel.dataset.levels = want;
       sel.innerHTML = s.levels.map(l => `<option value="${l}">${l}</option>`).join("");
-      sel.onchange = () => send({cmd:"level", level: sel.value});
     }
-    if (s.level && document.activeElement !== sel) sel.value = s.level;
+    if (s.level && document.activeElement !== sel && $("levelconfirm").classList.contains("hidden")) sel.value = s.level;
   }
 
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
-  if (s.elite !== undefined) $("k_elite").textContent = s.elite;
-  if (s.mut_rate !== undefined) $("k_mut").textContent = Math.round(s.mut_rate*100)+"%";
+  if (s.elite !== undefined) $("k_elite").textContent = "elite " + s.elite;
+  if (s.mut_rate !== undefined) $("k_mut").textContent = "mut " + Math.round(s.mut_rate*100)+"%";
   if (s.hidden) $("k_hidden").textContent = s.hidden + " hidden · " + (s.sensors || "rays");
   $("k_mode").textContent = s.turbo ? "turbo" : "real-time";
   if (s.persona) $("k_persona").textContent = s.persona;
 
-  if (s.turbo !== undefined && s.turbo !== turbo){
-    turbo = s.turbo;
-    $("b_turbo").classList.toggle("on", turbo);
-    $("turbonote").style.display = turbo ? "block" : "none";
-  }
-
+  if (s.turbo !== undefined && s.turbo !== turbo) setTurbo(s.turbo, false);
   if (s.manual !== undefined && s.manual !== manual) setManual(s.manual, false);
 
   if (s.statuses){
     const c = {}; STATUS.forEach(k=>c[k]=0);
     s.statuses.forEach(k=>c[k]=(c[k]||0)+1);
-
     $("census").innerHTML = STATUS
-      .map(k=>`<div class="flex items-baseline gap-1"><b class="c-${k} text-xs">${c[k]}</b> <span class="text-[9px] uppercase text-zinc-600">${k}</span></div>`)
+      .map(k=>`<div class="flex items-baseline gap-1"><b class="c-${k} text-xs">${c[k]}</b> <span class="text-[10px] uppercase text-zinc-400">${k}</span></div>`)
       .join("<span class='text-white/10'>/</span>");
-
     $("k_wins").textContent = c.WON;
-
-    const genBest = Math.max(...(s.live_fitness||[1]), 1);
-
-    (s.statuses).forEach((st,i)=>{
+    s.statuses.forEach((st,i)=>{
       const sp = specEls[i]; if (!sp) return;
-
-      // Update wall item classes
-      sp.el.className = `spec group text-left relative focus:outline-none flex flex-col gap-2 s-${st} ${i===watched ? 'watched' : ''}`;
+      sp.el.className = `spec group text-left relative flex flex-col gap-2 rounded min-w-0 s-${st} ${i===watched ? 'watched' : ''}`;
+      sp.el.setAttribute("aria-pressed", i===watched);
       sp.dot.className = `dot w-1.5 h-1.5 rounded-full flex-none d-${st}`;
       sp.st.textContent = st;
-      sp.st.className = `status-text font-mono text-[9px] font-bold tracking-widest not-italic uppercase c-${st}`;
-
+      sp.st.className = `status-text font-mono text-[10px] font-bold tracking-widest not-italic uppercase c-${st}`;
       const f = (s.live_fitness||[])[i];
-      if (f !== undefined){
-        sp.nf.textContent = "fit " + fmt(f);
-        sp.rail.style.width = Math.max(2, f/genBest*100) + "%";
-        if(st === 'WON') sp.rail.className = "rail block h-full w-0 transition-all duration-300 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
-        else sp.rail.className = "rail block h-full w-0 transition-all duration-300 bg-red-500";
-      }
+      if (f !== undefined) sp.nf.textContent = "fit " + fmt(f);
+      sp.rail.className = `rail block h-full w-0 transition-[width] duration-300 ${st === 'WON' ? 'bg-sky-400' : 'bg-red-500'}`;
     });
   }
-  drawChart(s.history);
+  if (s.history){
+    // [best, avg, wins, level] rows, oldest first; tag each with its generation number
+    const g1 = (s.gen ?? s.history.length) - s.history.length + 1;
+    history = s.history.map((h,i)=>[h[0], h[1], h[2]||0, h[3]||"", g1+i]);
+    drawChart();
+  }
 
+  let bestX = 0;
   for (const e of (m.envs||[])){
     if (e.watched !== undefined && e.watched) watched = e.id;
     if (e.img){
@@ -559,22 +584,31 @@ function onUpdate(m){
       img.onload = () => { lastImg[e.id] = {img, rays:e.rays, tiles:e.tiles, scale:e.scale}; paintEnv(e); };
       img.src = "data:image/jpeg;base64," + e.img;
     } else paintEnv(e);
-
+    bestX = Math.max(bestX, e.x || 0);
     const sp = specEls[e.id];
-    if (sp) sp.nx.textContent = "x " + Math.round(e.x);
+    if (sp){ sp.nx.textContent = Math.round(pct(e.x)) + " %"; sp.rail.style.width = Math.max(1, pct(e.x)) + "%"; }
 
     if (e.id === watched){
-      $("f_env").textContent = "ENV " + String(e.id+1).padStart(2,"0");
+      $("f_env").textContent = "#" + pad2(e.id);
       $("f_status").textContent = e.status;
       $("f_status").className = `font-mono text-[10px] font-bold tracking-widest uppercase c-${e.status}`;
-
-      let meta = `x ${Math.round(e.x)} · fit ${fmt(e.fitness)}`;
-      if (e.live) meta += ` · scr ${fmt(e.live.score)} · cns ${e.live.coins} · t ${Math.max(0,Math.round(e.live.time_left))}`;
-      if (e.live && e.live.cause && e.status !== "RUNNING") meta += ` · ${e.live.cause.toLowerCase()}`;
-      $("f_meta").textContent = meta;
+      $("p_fill").style.width = pct(e.x) + "%";
+      $("p_fill").className = `absolute inset-y-0 left-0 rounded-full transition-[width] duration-300 ${e.status === 'WON' ? 'bg-sky-400' : 'bg-red-500'}`;
+      $("p_pct").textContent = Math.round(pct(e.x)) + " %";
+      $("m_x").textContent = Math.round(e.x);
+      $("m_fit").textContent = fmt(e.fitness);
+      if (e.live){
+        $("m_score").textContent = fmt(e.live.score);
+        $("m_coins").textContent = e.live.coins;
+        $("m_time").textContent = Math.max(0, Math.round(e.live.time_left));
+        const ended = e.live.cause && e.status !== "RUNNING";
+        $("m_cause_wrap").classList.toggle("hidden", !ended);
+        if (ended) $("m_cause").textContent = e.live.cause.toLowerCase();
+      }
       updateSensors(e);
     }
   }
+  if (m.envs && m.envs.length) $("p_best").style.left = pct(bestX) + "%";
 }
 
 let resultCount = 0;
@@ -586,90 +620,109 @@ function drawResults(rows){
   for (const r of [...rows].reverse()){
     const tr = document.createElement("tr");
     tr.className = "hover:bg-zinc-800/20 transition-colors group";
-
+    const reach = levelLen > 0 && r.best_x != null ? Math.round(r.best_x / levelLen * 100) + " %" : "–";
     const cells = [
-      {v: r.gen, c: "table-cell !text-left !pl-4 font-bold text-zinc-300 group-first:text-red-400"},
+      {v: r.gen, c: "table-cell !text-left !pl-4 font-bold text-zinc-200 group-first:text-red-400"},
       {v: r.level ?? "–", c: "table-cell !text-left"},
-      {v: Math.round(r.best), c: "table-cell"},
+      {v: Math.round(r.best), c: "table-cell text-zinc-200"},
       {v: Math.round(r.avg), c: "table-cell"},
-      {v: Math.round(r.median ?? 0), c: "table-cell"},
-      {v: r.wins ?? 0, c: `table-cell ${(r.wins>0)?'text-blue-400 font-medium':'text-zinc-600'}`},
-      {v: r.stuck ?? 0, c: `table-cell ${(r.stuck===0)?'text-zinc-600':'text-amber-400/80'}`},
-      {v: r.dead ?? 0, c: `table-cell ${(r.dead===0)?'text-zinc-600':'text-red-400/80'}`},
-      {v: r.coins ?? 0, c: "table-cell !pr-4 text-amber-500/80"}
+      {v: reach, c: "table-cell"},
+      {v: r.wins ?? 0, c: `table-cell ${(r.wins>0)?'text-sky-400 font-medium':'text-zinc-500'}`},
+      {v: r.stuck ?? 0, c: `table-cell ${(r.stuck===0)?'text-zinc-500':'text-amber-400/80'}`},
+      {v: r.dead ?? 0, c: `table-cell ${(r.dead===0)?'text-zinc-500':'text-red-400/80'}`},
+      {v: r.coins ?? 0, c: "table-cell !pr-4 text-amber-400/80"}
     ];
-
     tr.innerHTML = cells.map(cell => `<td class="${cell.c}">${cell.v}</td>`).join("");
     tb.appendChild(tr);
   }
-  $("census2").textContent = rows.length + " gens";
+  $("census2").textContent = rows.length + " generations";
 }
 
+// ── controls ──
+function setPressed(id, on){ const b = $(id); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); }
+function setTurbo(on, notify=true){
+  turbo = on;
+  setPressed("b_turbo", on);
+  document.body.classList.toggle("turbo", on);
+  $("turbonote").classList.toggle("hidden", !on);
+  if (notify) send({cmd:"turbo", on});
+}
 function setManual(on, notify=true){
   manual = on;
-  $("b_manual").classList.toggle("on", on);
-  $("b_manual").textContent = on ? "Release control" : "Take control";
-
-  const fwrap = $("bezel");
-  if(on) {
-      fwrap.classList.add("ring-red-500/50", "shadow-[0_0_30px_rgba(239,68,68,0.2)]");
-      fwrap.classList.remove("ring-white/5", "shadow-2xl");
-      $("ribbon").classList.remove("hidden");
-  } else {
-      fwrap.classList.remove("ring-red-500/50", "shadow-[0_0_30px_rgba(239,68,68,0.2)]");
-      fwrap.classList.add("ring-white/5", "shadow-2xl");
-      $("ribbon").classList.add("hidden");
-  }
-
+  setPressed("b_manual", on);
+  $("b_manual").innerHTML = (on ? "Release control" : "Take control") + " <kbd>M</kbd>";
+  const bz = $("bezel");
+  bz.classList.toggle("ring-red-500/60", on); bz.classList.toggle("ring-white/10", !on);
+  bz.classList.toggle("shadow-[0_12px_40px_-8px_rgba(239,68,68,0.45)]", on);
+  $("ribbon").classList.toggle("hidden", !on);
+  if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();  // keys go to the game, not a button
   if (!on) keys.left = keys.right = keys.jump = false;
   if (notify) send({cmd:"manual", on});
 }
-
 $("b_manual").onclick = () => setManual(!manual);
-$("b_turbo").onclick = () => {
-  turbo = !turbo;
-  $("b_turbo").classList.toggle("on", turbo);
-  $("turbonote").style.display = turbo ? "block" : "none";
-  send({cmd:"turbo", on:turbo});
-};
-$("b_sensors").onclick = function(){
-  sensorsOn = !sensorsOn;
-  this.classList.toggle("on", sensorsOn);
-  if(!sensorsOn) $("sensors").classList.add("stale");
-  else $("sensors").classList.remove("stale");
-  send({cmd:"sensors", on:sensorsOn});
-};
-let hitboxes = false, gridOn = false;
-$("b_hitboxes").onclick = function(){ hitboxes = !hitboxes; this.classList.toggle("on", hitboxes); send({cmd:"hitboxes", on:hitboxes}); };
-$("b_grid").onclick = function(){ gridOn = !gridOn; this.classList.toggle("on", gridOn); send({cmd:"grid", on:gridOn}); };
+$("b_turbo").onclick = () => setTurbo(!turbo);
+$("b_sensors").onclick = () => { sensorsOn = !sensorsOn; setPressed("b_sensors", sensorsOn); $("sensors").classList.toggle("stale", !sensorsOn); send({cmd:"sensors", on:sensorsOn}); };
+$("b_hitboxes").onclick = () => { hitboxes = !hitboxes; setPressed("b_hitboxes", hitboxes); send({cmd:"hitboxes", on:hitboxes}); };
+$("b_grid").onclick = () => { gridOn = !gridOn; setPressed("b_grid", gridOn); send({cmd:"grid", on:gridOn}); };
 
+// level switch: confirm inline, apply at the next generation boundary
+const levelSel = $("k_levelsel");
+levelSel.onchange = () => {
+  if (levelSel.value === curLevel) return;
+  $("levelconfirm").querySelector("b").textContent = levelSel.value;
+  $("levelconfirm").classList.remove("hidden");
+  $("levelyes").focus();
+};
+$("levelyes").onclick = () => { send({cmd:"level", level: levelSel.value}); $("levelconfirm").classList.add("hidden"); };
+$("levelno").onclick = () => { levelSel.value = curLevel; $("levelconfirm").classList.add("hidden"); levelSel.focus(); };
+
+// keys: manual-mode game input, plus view hotkeys; never while typing in a form control
 const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};
-function setKey(ev, down){
+const HOTKEYS = {t:"b_turbo", s:"b_sensors", h:"b_hitboxes", g:"b_grid", m:"b_manual"};
+const inField = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement||{}).tagName || "");
+document.addEventListener("keydown", ev => {
+  if (inField() || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const k = KEYMAP[ev.key];
-  if (!manual || k === undefined) return;
+  if (manual && k !== undefined){ ev.preventDefault(); if (!keys[k]){ keys[k] = true; send({cmd:"keys", ...keys}); } return; }
+  if (ev.repeat) return;
+  if (ev.key === "[") return watchEnv(watched-1);
+  if (ev.key === "]") return watchEnv(watched+1);
+  if (ev.key === "Escape" && manual) return setManual(false);
+  const id = HOTKEYS[ev.key.toLowerCase()];
+  if (id) $(id).click();
+});
+document.addEventListener("keyup", ev => {
+  const k = KEYMAP[ev.key];
+  if (!manual || k === undefined || inField()) return;
   ev.preventDefault();
-  if (keys[k] !== down){ keys[k] = down; send({cmd:"keys", ...keys}); }
-}
-document.addEventListener("keydown", ev => setKey(ev,true));
-document.addEventListener("keyup", ev => setKey(ev,false));
+  if (keys[k]){ keys[k] = false; send({cmd:"keys", ...keys}); }
+});
 
+// ── connection: offline is a state, not a frozen screenshot ──
+let offlineTimer = null;
+function setConn(state){
+  const dot = $("conn").querySelector("i"), lbl = $("connlabel");
+  dot.className = "w-1.5 h-1.5 rounded-full inline-block transition-colors duration-300 " +
+    (state === "live" ? "bg-emerald-400" : state === "offline" ? "bg-red-500" : "bg-zinc-600");
+  lbl.className = "font-mono text-[10px] tracking-widest uppercase " +
+    (state === "live" ? "text-emerald-400" : state === "offline" ? "text-red-400" : "text-zinc-400");
+  lbl.textContent = state === "live" ? "Live" : state === "offline" ? "Offline" : "Connecting";
+  document.body.classList.toggle("offline", state === "offline");
+  clearInterval(offlineTimer);
+  if (state === "offline"){
+    $("boot").style.display = "flex";
+    $("boottext").textContent = lastSeen ? "TRAINER OFFLINE" : "WAITING FOR TRAINER";
+    const tick = () => { $("bootsub").innerHTML = lastSeen
+      ? `Last update ${Math.round((Date.now()-lastSeen)/1000)} s ago — numbers below are from then. Reconnecting…`
+      : `Start one from <span class="text-zinc-300">python menu.py</span> → Train, then this page fills in.`; };
+    tick(); offlineTimer = setInterval(tick, 1000);
+  }
+}
 function connect(){
   ws = new WebSocket("ws://127.0.0.1:8765");
-  ws.onopen = () => {
-    const c = $("conn");
-    c.querySelector("i").className = "w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shadow-[0_0_8px_rgba(16,185,129,0.8)]";
-    $("connlabel").textContent = "Live";
-    $("connlabel").classList.replace("text-zinc-600", "text-emerald-500");
-  };
+  ws.onopen = () => setConn("live");
   ws.onmessage = ev => onUpdate(JSON.parse(ev.data));
-  ws.onclose = () => {
-    const c = $("conn");
-    c.querySelector("i").className = "w-1.5 h-1.5 rounded-full bg-red-500 inline-block shadow-[0_0_8px_rgba(239,68,68,0.8)]";
-    $("connlabel").textContent = "Offline";
-    $("connlabel").classList.replace("text-emerald-500", "text-zinc-600");
-    $("boot").style.display = "flex";
-    setTimeout(connect, 1500);
-  };
+  ws.onclose = () => { setConn("offline"); setTimeout(connect, 1500); };
 }
 connect();
 </script>

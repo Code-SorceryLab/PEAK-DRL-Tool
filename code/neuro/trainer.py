@@ -172,9 +172,13 @@ class Trainer:
         hist = self.pop.history
         last10 = hist[-10:]
         episodes10 = len(last10) * self.cfg.pop_size
+        cur = [h for h in hist if h.get("level") == (self.level or "auto")]  # this level only
         self.state.publish(stats={
             "gen": self.pop.generation,
             "all_time_best": round(self.pop.best_fitness if hist else 0.0, 1),
+            "level_best": round(max((h["best"] for h in cur), default=0.0), 1),
+            "first_win_gen": next((h["gen"] for h in cur if h.get("wins")), None),
+            "level_len": self.slots[0].adapter.episode_stats().get("level_len") or 0 if self.slots else 0,
             "last_gen_best": round(hist[-1]["best"], 1) if hist else 0.0,
             "avg_fitness": round(hist[-1]["avg"], 1) if hist else 0.0,
             "elite": self.cfg.elite,
@@ -189,7 +193,8 @@ class Trainer:
             "sps": round(sps),
             "turbo": self.state.controls.turbo,
             "manual": self.state.controls.manual,
-            "history": [[round(h["best"], 1), round(h["avg"], 1)] for h in hist[-400:]],
+            "history": [[round(h["best"], 1), round(h["avg"], 1), h.get("wins", 0), h.get("level") or "auto"]
+                        for h in hist[-400:]],
             "live_fitness": [round(f, 1) for f in fitnesses],
             "statuses": statuses,
             "results": [
