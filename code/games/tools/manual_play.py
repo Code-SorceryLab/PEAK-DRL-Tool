@@ -32,7 +32,8 @@ if args.game == "mario":
     args.game = "platformer"
 
 # Fail fast on a level the core can't load (otherwise it falls back to a blank world).
-if level_id and not level_file and args.game != "meatboy":
+INDEXED_GAMES = {"meatboy", "bomberman"}   # levels are list indices, not named ids
+if level_id and not level_file and args.game not in INDEXED_GAMES:
     from code.neuro.adapters import validate_level
     validate_level("mario" if args.game == "platformer" else args.game, level_id)
 
@@ -132,8 +133,17 @@ def _sonic_action(keys) -> list:
     return [move, int(bool(jump)), int(bool(down))]
 
 
+def _bomberman_action(keys) -> list:
+    """[dx, dy, bomb] — arrows / WASD move, SPACE (or Z) drops a bomb."""
+    k = pygame.key.get_pressed()
+    dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT])
+    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP])
+    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z]))]
+
+
 ACTION_MAPPING = {
     "platformer": _platformer_action,
+    "bomberman": _bomberman_action,
     "mario": _platformer_action,
     "megaman": _megaman_action,
     "sonic": _sonic_action,
@@ -149,6 +159,8 @@ def _random_action() -> list:
         return [random.randrange(5), random.randrange(3), random.randrange(2), random.randrange(2)]
     if args.game == "meatboy":
         return [random.randrange(3), random.randrange(2), random.randrange(2)]
+    if args.game == "bomberman":
+        return [random.randrange(-1, 2), random.randrange(-1, 2), int(random.random() < 0.05)]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
 
@@ -164,7 +176,9 @@ if level_file:
 
 # --- Build the core directly (let it load the default first level on __init__)
 env_kwargs = {}
-if level_id:
+if args.game == "bomberman":
+    env_kwargs = {"level_idx": int(level_id)} if level_id else {}
+elif level_id:
     env_kwargs['world'] = level_id
     env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
@@ -178,6 +192,7 @@ if args.game == "platformer":
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
     core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
+substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixed-dt cores keep real-time pace
 # Meatboy draws onto whatever surface it is given; the other cores own a window.
 screen = core_game._surf if hasattr(core_game, "_surf") else \
     pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
@@ -230,14 +245,17 @@ while running:
     if hasattr(core_game, 'debug_manager') and core_game.debug_manager.free_cam_active:
         action = _IDLE.get(args.game, [0, 0, 0])
 
-    _, _, terminated, truncated, info = core_game.step(action)
-    done = terminated or truncated
+    for _ in range(substeps):
+        _, _, terminated, truncated, info = core_game.step(action)
+        done = terminated or truncated
+        if done:
+            break
 
     core_game.render(screen, blit_only=True)
     pygame.display.flip()
 
     if info.get("episode_end", False) or done:
-        if args.game == "meatboy" and level_id:
+        if args.game in INDEXED_GAMES and level_id:
             core_game.won = False          # reset() would otherwise advance to the next level
             core_game._level_idx = int(level_id)
         core_game.reset()
