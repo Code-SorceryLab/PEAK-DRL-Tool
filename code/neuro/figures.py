@@ -28,7 +28,7 @@ MARK_OPEN, MARK_CLOSE = "<!-- figures:auto -->", "<!-- /figures:auto -->"
 BG, PANEL, TXT, DIM, FAINT, GRID = "#070708", "#101012", "#e8e8ea", "#9a9aa0", "#606066", "#232326"
 PCOL = {"novice": "#4a9eff", "experienced": "#ef4444", "speedrunner": "#22c55e"}
 PORDER = ["novice", "experienced", "speedrunner"]
-GNAME = {"mario": "Mario", "meatboy": "Meat Boy", "megaman": "Mega Man", "sonic": "Sonic"}
+GNAME = {"mario": "Mario", "meatboy": "Meat Boy", "megaman": "Mega Man", "sonic": "Sonic", "bomberman": "Bomberman"}
 
 plt.rcParams.update({
     "figure.facecolor": BG, "axes.facecolor": PANEL, "savefig.facecolor": BG,

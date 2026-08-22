@@ -21,7 +21,7 @@ import time
 import numpy as np
 import pygame
 
-from .adapters import GameAdapter, list_levels, make_adapter
+from .adapters import N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet, make_net
@@ -120,6 +120,7 @@ class Trainer:
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
+        cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))  # top-down games steer on two axes
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities

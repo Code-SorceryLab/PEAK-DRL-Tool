@@ -27,6 +27,7 @@ from datetime import datetime
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
+from .adapters import INDEXED_GAMES
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
@@ -86,8 +87,8 @@ def _load_thresholds() -> dict:
 def _level_file(game: str, level: str) -> str | None:
     import yaml
     try:
-        if game == "meatboy":
-            with open(os.path.join(GAMES_DIR, "meatboy_config.yaml"), encoding="utf-8") as f:
+        if game in INDEXED_GAMES:
+            with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
                 lv = (yaml.safe_load(f) or {}).get("levels", [])
             i = int(level)
             return os.path.join(GAMES_DIR, "levels", lv[i]) if 0 <= i < len(lv) else None
@@ -144,8 +145,8 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
     import yaml
     sections: list[tuple[str, dict]] = []
     try:
-        if game == "meatboy":
-            with open(os.path.join(GAMES_DIR, "meatboy_config.yaml"), encoding="utf-8") as f:
+        if game in INDEXED_GAMES:
+            with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
                 g = yaml.safe_load(f) or {}
             entry = {"file": (g.get("levels") or [None] * (int(level) + 1))[int(level)]}
         else:
@@ -190,6 +191,12 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
         for k in ("physics", "movement", "jump", "wall"):
             phys.update(_flatten(g.get(k), k + "."))
         sections.append(("Player physics", phys))
+    elif game == "bomberman":
+        sections.append(("Player", _flatten(g.get("player"))))
+        sections.append(("Bombs", _flatten(g.get("bomb"))))
+        sections.append(("Enemies", {f"{v.get('name', k)}": f"{v.get('speed')} px/s · chase {v.get('chase')}"
+                                     + (" · walks through bricks" if v.get("passes_bricks") else "")
+                                     for k, v in (g.get("enemies") or {}).items()}))
     else:
         sections.append(("Player", _flatten((g.get("defaults") or {}).get("player"))))
         phys = _flatten(g.get("physics"))
@@ -308,6 +315,14 @@ def _logo_b64() -> str | None:
 
 
 # stylized Meat-Boy-ish cube of our own; nothing copyrighted
+_BOMBERMAN_SVG = (  # white helmet, blue suit, a lit bomb
+    "data:image/svg+xml;utf8," + "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 36'>"
+    "<circle cx='12' cy='11' r='9' fill='%23f4f4f8'/><rect x='5' y='10' width='14' height='5' rx='2' fill='%23f7c9bf'/>"
+    "<circle cx='9.5' cy='12.5' r='1.2' fill='%23202030'/><circle cx='14.5' cy='12.5' r='1.2' fill='%23202030'/>"
+    "<rect x='5' y='19' width='14' height='11' rx='4' fill='%233b78ff'/>"
+    "<circle cx='23' cy='27' r='5' fill='%23181820'/><path d='M24 22 l2 -4' stroke='%23a0a0a8' stroke-width='1.6'/>"
+    "<circle cx='26.4' cy='17.6' r='1.6' fill='%23ffc83c'/></svg>"
+)
 _MEATBOY_SVG = (
     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
     "<rect x='2' y='4' width='20' height='18' rx='4' fill='%23c81e1e'/>"
@@ -339,6 +354,9 @@ def _game_icon(game: str) -> str:
         _icon_cache[game] = src
     elif game == "meatboy":
         src = _MEATBOY_SVG
+        _icon_cache[game] = src
+    elif game == "bomberman":
+        src = _BOMBERMAN_SVG
         _icon_cache[game] = src
     else:
         _icon_cache[game] = None
@@ -820,7 +838,7 @@ CSS = """
   }
 """
 
-CAUSE_COLORS = {"Enemy": "#ef4444", "Pit": "#4a9eff", "OOB": "#eab308", "Spike": "#a855f7",
+CAUSE_COLORS = {"Enemy": "#ef4444", "Pit": "#4a9eff", "OOB": "#eab308", "Spike": "#a855f7", "Bomb": "#f97316",
                 "Saw": "#a855f7", "Stall": "#eab308", "Timeout": "#9a9aa0", "?": "#606066"}
 
 

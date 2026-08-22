@@ -34,7 +34,8 @@ DISABLED_LEVELS_KEY = "disabled_levels"
 CHIME_PATH = Path("chime.wav")
 
 # Adapter keys → game_config.yaml section key (platformer sits at the root).
-GAMES = ["mario", "megaman", "sonic", "meatboy"]
+GAMES = ["mario", "megaman", "sonic", "meatboy", "bomberman"]
+INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
 CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic"}
 
 # ============================================================================
@@ -186,10 +187,10 @@ def get_available_games():
 
 def get_levels_for_game(game: str) -> list:
     """Enabled level ids for an adapter game. Meatboy levels are indices."""
-    if game == "meatboy":
+    if game in INDEXED_GAMES:
         try:
             import yaml
-            data = yaml.safe_load(Path("code/games/meatboy_config.yaml").read_text(encoding="utf-8")) or {}
+            data = yaml.safe_load(Path(f"code/games/{game}_config.yaml").read_text(encoding="utf-8")) or {}
             return [str(i) for i in range(len(data.get("levels", [])))]
         except Exception:
             return []
@@ -619,6 +620,7 @@ _PLAY_CONTROLS = {
     "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
                 ("S", "Crouch / spin dash")],
     "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
+    "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
 }
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
                ("F4", "Hitboxes"), ("F5", "Agent max view")]
@@ -648,7 +650,7 @@ def run_manual_play():
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
-    if game != "meatboy":  # meatboy has no debug manager
+    if game not in INDEXED_GAMES:  # meatboy / bomberman have no debug manager
         print()
         print(f"    {_BOLD('Debug overlays')}")
         for key, what in _DEBUG_KEYS:
@@ -913,7 +915,7 @@ def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str 
     Every ENABLED level of each chosen game is probed."""
     games = toggle_select("GAMES", get_available_games(),
                           default_indices=[i for i, g in enumerate(get_available_games())
-                                           if g in ("mario", "meatboy")])
+                                           if g in ("mario", "meatboy", "bomberman")])
     if not games:
         return None
     personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))

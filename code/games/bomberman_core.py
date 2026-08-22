@@ -118,7 +118,7 @@ class BombermanCore:
         idx = self._level_idx if idx is None else idx
         if not 0 <= idx < len(levels):
             raise IndexError(f"bomberman level {idx} out of range (0..{len(levels) - 1})")
-        return os.path.join(_HERE, levels[idx]["file"])
+        return os.path.join(_HERE, "levels", levels[idx])
 
     def _load_level(self) -> LevelData:
         with open(self.level_file(), encoding="utf-8") as f:
@@ -166,6 +166,7 @@ class BombermanCore:
         self.coins_total = 0       # power-ups collected (the adapter's "coins")
         self.kills_total = 0
         self.bricks_destroyed = 0
+        self.safe_detonations = 0  # bombs that went off while the player stood clear (learned retreat)
         self.timer = float(self.cfg.get("time_limit", 200))
         self.won = False
         self.alive = True
@@ -227,6 +228,8 @@ class BombermanCore:
                 cy = int((p.y + p.height / 2) // ts)
                 ahead = int((p.x + (p.width if dx > 0 else -1) + dx * step) // ts)
                 for lane, sgn in ((cy - 1, -1), (cy + 1, 1)):
+                    if dy and sgn != dy:
+                        continue  # never nudge against a direction the player is actively pushing
                     overlaps = (p.y < (lane + 1) * ts) if sgn < 0 else (p.y + p.height > lane * ts)
                     if overlaps and not self.solid(ahead, lane) and self.bomb_at(ahead, lane) is None:
                         target = lane * ts + (ts - p.height) / 2
@@ -242,6 +245,8 @@ class BombermanCore:
                 cx = int((p.x + p.width / 2) // ts)
                 ahead = int((p.y + (p.height if dy > 0 else -1) + dy * step) // ts)
                 for lane, sgn in ((cx - 1, -1), (cx + 1, 1)):
+                    if dx and sgn != dx:
+                        continue
                     overlaps = (p.x < (lane + 1) * ts) if sgn < 0 else (p.x + p.width > lane * ts)
                     if overlaps and not self.solid(lane, ahead) and self.bomb_at(lane, ahead) is None:
                         target = lane * ts + (ts - p.width) / 2
@@ -370,10 +375,12 @@ class BombermanCore:
             if b.passable and not (p.x < (b.tx + 1) * ts and p.x + p.width > b.tx * ts
                                    and p.y < (b.ty + 1) * ts and p.y + p.height > b.ty * ts):
                 b.passable = False
+        exploded = 0
         for b in list(self.bombs):
             b.fuse -= 1
             if b.fuse <= 0 and b in self.bombs:
                 self._explode(b)
+                exploded += 1
         for bl in list(self.blasts):
             bl.frames -= 1
             if bl.frames <= 0:
@@ -402,6 +409,8 @@ class BombermanCore:
             self.level_data.grid[pty][ptx] = FLOOR
         if (ptx, pty) in burning and self.alive:
             self._die("Bomb")
+        elif exploded and self.alive:
+            self.safe_detonations += exploded
         if self.alive and self.timer <= 0:
             self._die("Timeout")
         if self.alive and (ptx, pty) == self.level_data.exit and self.tile(ptx, pty) == EXIT \
