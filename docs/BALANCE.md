@@ -14,9 +14,10 @@ probes.*
    `runs/balance/report_<game>_<persona>_<tag>.json` (tag = `p<pop>g<gens>[_grid]`; new probes
    extend the file; they don't clobber it).
    **Sensor ablation:** `--sensors grid` swaps the 6 rays for the 3×11×11 tile window
-   (solid / collectible / hazard, Dijkstra dropped, 368 inputs). Probes land under a
-   `p10g25_grid` tag so they never overwrite the ray probes; `--compare` prints both side by
-   side (generations-to-first-win ± CI, win rate) per level.
+   (solid / collectible / hazard, Dijkstra dropped, 368 inputs). Menu 14 runs both arms with
+   `--ablation`: probes land under `runs/ablation/` and aggregate into `ablation_*.json`, so the
+   ablation never touches the real sweeps in `runs/probes/`; `--compare --ablation` prints both
+   side by side (generations-to-first-win ± CI, win rate) per level.
    **GA hyperparameter ablation (menu 15, `python -m code.neuro.gasweep`):** one `GAConfig`
    knob at a time is moved to a literature-grounded low and high bound while everything else
    stays at the baseline (the `GAConfig` defaults) — population 10 · 30 · 100 (Grefenstette 1986,
@@ -212,7 +213,8 @@ each (level x seed) cell is independent, so wall clock divides by the worker cou
 The trainer also skips all frame JPEG encoding while no dashboard tab is connected.
 
 **Per-config reports:** probe checkpoints live under
-`runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` where `tag = p<pop_size>g<gens>[_grid]` (e.g. `p10g40`),
+`runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` (sensor ablation: `runs/ablation/…`, GA sweep:
+`runs/gasweep/…`) where `tag = p<pop_size>g<gens>[_grid]` (e.g. `p10g40`),
 so different personas, population sizes, and generation budgets never overwrite each other;
 re-probing a level with the same config replaces just that level. The Balance Command
 (`python -m code.neuro.report --open`, menu 12) re-aggregates every probe on disk into

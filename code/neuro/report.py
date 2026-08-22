@@ -2129,8 +2129,8 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
                      f'Run the other mode (menu 14) to add them to the comparison.</div>')
     if not paired and not unpaired:
         sections = ('<p style="color:var(--dim)">No sensor probes yet — run <b>14 Sensor Ablation</b> from '
-                    '<code>python menu.py</code> (or <code>balance --sensors rays</code> and '
-                    '<code>--sensors grid</code>) and rebuild this page.</p>')
+                    '<code>python menu.py</code> (or <code>balance --ablation --sensors rays</code> and '
+                    '<code>--ablation --sensors grid</code>) and rebuild this page.</p>')
     sections = overview + sections
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2142,7 +2142,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
   <div class="ablhero">{hero}</div>
   {score}
   {sections}
-  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance/report_*_p*g*[_grid].json</footer>
+  <footer>PEAK ENGINE · code/neuro/report.py · data: runs/balance/ablation_*_p*g*[_grid].json (probes: runs/ablation)</footer>
 </main><script>{JS}</script></body></html>"""
 
 
@@ -2541,12 +2541,13 @@ def build(balance_dir: str) -> dict[str, str]:
     ga_anchor: dict[str, str] = {}
     for i, key in enumerate(gs_groups):
         ga_anchor.setdefault(key[0], f"gs_{i}")
-    flat: dict[tuple[str, str | None], dict[str, dict]] = {}  # (game, tag) -> persona -> data
-    for f in sorted(glob.glob(os.path.join(balance_dir, "report_*.json"))):
-        with open(f, encoding="utf-8") as fh:
-            data = json.load(fh)
-        persona = data.get("persona") or "experienced"
-        flat.setdefault((data["game"], data.get("tag")), {})[persona] = data
+    def _flat(prefix: str) -> dict[tuple[str, str | None], dict[str, dict]]:  # (game, tag) -> persona -> data
+        out: dict[tuple[str, str | None], dict[str, dict]] = {}
+        for data in _load_json_glob(os.path.join(balance_dir, f"{prefix}_*.json")):
+            out.setdefault((data["game"], data.get("tag")), {})[data.get("persona") or "experienced"] = data
+        return out
+    flat = _flat("report")       # real sweeps
+    flat_abl = _flat("ablation")  # sensor-ablation arms (runs/ablation) — kept apart from the real sweeps
     games: dict[str, dict] = {}  # game -> tag -> persona -> data (tagged configs first, legacy last)
     for (g, t), personas in sorted(flat.items(), key=lambda kv: (kv[0][0], kv[0][1] is None, kv[0][1] or "")):
         games.setdefault(g, {})[t] = personas
@@ -2572,7 +2573,7 @@ def build(balance_dir: str) -> dict[str, str]:
 </main><script>{JS}</script></body></html>"""
     return {"report.html": report,
             "instructions.html": _instructions_page(list(games), logo),
-            "ablation.html": _ablation_page(flat, logo, stamp),
+            "ablation.html": _ablation_page(flat_abl, logo, stamp),
             "gasweep.html": _gasweep_page(gs_groups, list(games), logo, stamp)}
 
 

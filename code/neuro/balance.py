@@ -35,6 +35,7 @@ from .personas import PERSONAS, Persona, get_persona
 from .sensors import SENSOR_MODES
 
 PROBES_ROOT = os.path.join("runs", "probes")
+ABLATION_ROOT = os.path.join("runs", "ablation")  # sensor-ablation probes never mix with the real sweeps
 BALANCE_DIR = os.path.join("runs", "balance")
 
 # two-sided 95% t critical values for small n (paper used the same approach)
@@ -329,10 +330,10 @@ def format_compare(by_mode: dict[str, list[dict]], game: str) -> str:
     return "\n".join(out)
 
 
-def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR) -> str:
+def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR, prefix: str = "report") -> str:
     by_mode: dict[str, list[dict]] = {}
     for mode in SENSOR_MODES:
-        path = os.path.join(out_dir, f"report_{game}_{persona}_{config_tag(GAConfig().pop_size, gens, mode)}.json")
+        path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{config_tag(GAConfig().pop_size, gens, mode)}.json")
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
                 by_mode[mode] = json.load(f)["levels"]
@@ -403,15 +404,16 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
 def rebuild(out_dir: str = BALANCE_DIR) -> list[str]:
     """Regenerate every report JSON from the probe dirs on disk (new layout only)."""
     written = []
-    for d in sorted(glob.glob(os.path.join(PROBES_ROOT, "*", "*", "p*g*"))):
-        tag = os.path.basename(d)
-        persona = os.path.basename(os.path.dirname(d))
-        game = os.path.basename(os.path.dirname(os.path.dirname(d)))
-        if _parse_tag(tag) is None:
-            continue
-        path = write_report(game, persona, tag, out_dir)
-        if path:
-            written.append(path)
+    for root, prefix in ((PROBES_ROOT, "report"), (ABLATION_ROOT, "ablation")):
+        for d in sorted(glob.glob(os.path.join(root, "*", "*", "p*g*"))):
+            tag = os.path.basename(d)
+            persona = os.path.basename(os.path.dirname(d))
+            game = os.path.basename(os.path.dirname(os.path.dirname(d)))
+            if _parse_tag(tag) is None:
+                continue
+            path = write_report(game, persona, tag, out_dir, root=root, prefix=prefix)
+            if path:
+                written.append(path)
     return written
 
 
@@ -432,14 +434,17 @@ def main() -> None:
                     help="print rays-vs-grid table from existing reports and exit (no training)")
     ap.add_argument("--rebuild", action="store_true",
                     help="regenerate report JSONs from runs/probes and exit (no training)")
+    ap.add_argument("--ablation", action="store_true",
+                    help="sensor-ablation arm: probes under runs/ablation, JSONs as ablation_*.json")
     args = ap.parse_args()
+    root, prefix = (ABLATION_ROOT, "ablation") if args.ablation else (PROBES_ROOT, "report")
 
     if args.rebuild:
         for path in rebuild(args.out):
             print(f"rebuilt {path}")
         return
     if args.compare:
-        print(compare(args.game, args.persona, args.gens, args.out))
+        print(compare(args.game, args.persona, args.gens, args.out, prefix))
         return
 
     from .adapters import list_levels, validate_level
@@ -456,17 +461,18 @@ def main() -> None:
         for lvl in args.levels:
             validate_level(args.game, lvl)
     tag = config_tag(GAConfig().pop_size, args.gens, args.sensors)
-    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors) for lvl in levels for seed in args.seeds]
+    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors, None,
+             probe_dir(args.game, persona.name, tag, lvl, seed, root)) for lvl in levels for seed in args.seeds]
     workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
     print(f"balance probe: {len(levels)} levels x {len(args.seeds)} seeds = {len(jobs)} jobs, "
-          f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag}]\n", flush=True)
+          f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag} · {root}]\n", flush=True)
 
     t0 = time.time()
     run_jobs(jobs, workers)
 
     # The probe dirs are the source of truth: re-aggregate everything under this config,
     # so earlier levels probed with the same config stay and re-probed levels are replaced.
-    out_path = write_report(args.game, persona.name, tag, args.out)
+    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix)
     with open(out_path, encoding="utf-8") as f:
         rows = json.load(f)["levels"]
     print("\n" + format_report([r for r in rows if r["level"] in levels], args.game), flush=True)

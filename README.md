@@ -67,7 +67,9 @@ same run — bit for bit.
 
 ## What the probes found
 
-Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders.
+<!-- figures:auto -->
+Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-08-22 from 6 sweep reports, 12 ablation arms and 144 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
+<!-- /figures:auto -->
 
 <p align="center">
   <img src="docs/img/fig_difficulty.png" alt="Win rate per level per persona for Mario and Meat Boy" width="900">
@@ -117,11 +119,13 @@ The menu drives everything — train, watch, play, edit levels, run probes, open
 |--:|---|--:|---|--:|---|
 | 1 | Project status | 5 | Play manually (any game / level) | 9 | Level editor |
 | 2 | Train single (game · level · persona · sensors) | 6 | Watch a trained agent | 10 | Toggle levels |
-| 3 | Train all levels of one game | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
-| 4 | Train the full game × level grid | 8 | Watch a random agent | 12 | Balance Command center |
+| 3 | Train all levels of one game (persona · sensors · tag) | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
+| 4 | Train the full game × level grid (persona · sensors · tag) | 8 | Watch a random agent | 12 | Balance Command center |
 | | | | | 13 | Full sweep (games × personas × seeds) |
-| | | | | 14 | Sensor ablation (rays vs grid) |
+| | | | | 14 | Sensor ablation (rays vs grid → `runs/ablation`) |
 | | | | | 15 | GA sweep (one knob at a time vs literature bounds) |
+| | | | | 16 | README figures (regenerate `docs/img/fig_*.png`, update README) |
+| | | | | D | Delete runs (pick runs / probe trees, or everything) |
 
 <details>
 <summary><b>Command line equivalents</b></summary>
@@ -138,12 +142,13 @@ python -m code.neuro.trainer --game mario --replay runs/mario/best.npz # watch t
 
 # Probe — every enabled level × 3 seeds, parallel across cores
 python -m code.neuro.balance --game mario --gens 40 --persona experienced
-python -m code.neuro.balance --game mario --gens 40 --sensors grid
-python -m code.neuro.balance --game mario --compare                    # rays-vs-grid table, no training
+python -m code.neuro.balance --game mario --gens 40 --ablation --sensors grid   # ablation arm → runs/ablation
+python -m code.neuro.balance --game mario --gens 40 --compare --ablation        # rays-vs-grid table, no training
 python -m code.neuro.gasweep --game mario --gens 40 --axes hidden memory --confirm
 
 # Report
 python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
+python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
 streamlit run code/stats/dashboard/app.py                              # B1/B2/B3 stats dashboard
 
 # Play
