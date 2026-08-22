@@ -71,7 +71,7 @@
 
     /* offline: numbers are history, not a live reading */
     body.offline .live-num { @apply opacity-40; }
-    body.offline #bezel { @apply grayscale; }
+    body.offline #bezel, body.offline #wall { @apply grayscale; }
 
     @keyframes firstwin { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.7); } 100% { box-shadow: 0 0 0 18px rgba(56,189,248,0); } }
     .won-flash { animation: firstwin 1.2s cubic-bezier(.16,1,.3,1) 1; }
@@ -135,7 +135,7 @@
             <b id="f_status" class="font-mono text-[10px] font-bold tracking-widest c-RUNNING" role="status" aria-live="polite">RUNNING</b>
             <span id="f_firstwin" class="hidden font-mono text-[10px] tracking-widest uppercase text-sky-400">first win · gen <span></span></span>
           </div>
-          <button id="b_manual" class="btn-sleek" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD">Take control <kbd>M</kbd></button>
+          <button id="b_manual" class="btn-sleek" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD (turbo pauses while you drive; Esc releases)">Take control <kbd>M</kbd></button>
         </div>
 
         <div id="bezel" class="relative bg-black rounded-lg overflow-hidden ring-1 ring-white/10 transition-shadow">
@@ -145,7 +145,7 @@
             <span id="bootsub" class="text-[10px] font-normal tracking-wider text-zinc-500 normal-case">Start one from <span class="text-zinc-300">python menu.py</span> → Train, then this page fills in.</span>
           </div>
           <div id="ribbon" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase bg-red-500/15 text-red-300 border border-red-500/40 rounded whitespace-nowrap">
-            Manual control — arrows / WASD move, space jumps
+            Manual control — arrows / WASD move, space jumps, Esc releases · turbo paused
           </div>
         </div>
 
@@ -176,7 +176,7 @@
             <span class="font-mono text-xs text-zinc-400">gen <span id="wallgen" class="text-zinc-200">0</span></span>
             <span id="turbonote" class="hidden font-mono text-[10px] tracking-widest uppercase text-amber-400">turbo · only the watched specimen streams</span>
           </div>
-          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4" aria-live="polite"></div>
+          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4"></div>
         </div>
         <p class="sr-only">Click a specimen to watch it. <kbd>[</kbd> and <kbd>]</kbd> cycle specimens.</p>
         <div id="wall" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" role="group" aria-label="Specimens this generation"></div>
@@ -251,10 +251,14 @@
           <div class="flex flex-col gap-1"><span class="eyebrow">Frames simulated</span><b id="k_frames" class="live-num font-mono text-sm font-medium text-zinc-400">–</b></div>
           <div class="flex flex-col gap-1" title="Cumulative evolution time, survives --resume"><span class="eyebrow">Train time</span><b id="k_traintime" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
         </div>
-        <div id="levelconfirm" class="confirm-strip hidden" role="alertdialog" aria-labelledby="levelconfirmtext">
+        <div id="levelconfirm" class="confirm-strip hidden" role="alertdialog" aria-labelledby="levelconfirmtext" aria-describedby="levelconfirmtext">
           <span id="levelconfirmtext" class="flex-1">Switch to <b></b> at the next generation? The population carries over.</span>
           <button id="levelyes" class="btn-sleek !border-amber-500/40 !text-amber-200">Switch</button>
           <button id="levelno" class="btn-sleek">Keep</button>
+        </div>
+        <div id="levelpend" class="confirm-strip hidden" role="status" aria-live="polite">
+          <span class="flex-1">Switching to <b></b> at generation <em class="not-italic tabular-nums"></em> — this one finishes first.</span>
+          <button id="levelcancel" class="btn-sleek">Cancel</button>
         </div>
       </section>
     </div>
@@ -285,7 +289,7 @@ const SENSORS = [
 const INVERT = new Set([0,1,2,3,4,5,6]);
 
 let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0, levelLen=0, curLevel="", lastSeen=0, hadFirstWin=false;
-let history=[], hitboxes=false, gridOn=false;
+let history=[], hitboxes=false, gridOn=false, pendingLevel=null;
 const lastImg={}, specEls=[], senseEls=[];
 const keys={left:false,right:false,jump:false};
 const $ = id => document.getElementById(id);
@@ -537,7 +541,9 @@ function onUpdate(m){
       sel.dataset.levels = want;
       sel.innerHTML = s.levels.map(l => `<option value="${l}">${l}</option>`).join("");
     }
-    if (s.level && document.activeElement !== sel && $("levelconfirm").classList.contains("hidden")) sel.value = s.level;
+    if (pendingLevel && s.level === pendingLevel){ pendingLevel = null; $("levelpend").classList.add("hidden"); }
+    if (pendingLevel) $("levelpend").querySelector("em").textContent = (s.gen ?? 0) + 1;
+    if (s.level && !pendingLevel && document.activeElement !== sel && $("levelconfirm").classList.contains("hidden")) sel.value = s.level;
   }
 
   if (s.pop_size) $("k_pop").textContent = s.pop_size;
@@ -561,6 +567,7 @@ function onUpdate(m){
       const sp = specEls[i]; if (!sp) return;
       sp.el.className = `spec group text-left relative flex flex-col gap-2 rounded min-w-0 s-${st} ${i===watched ? 'watched' : ''}`;
       sp.el.setAttribute("aria-pressed", i===watched);
+      sp.el.setAttribute("aria-label", `Watch specimen ${pad2(i)} · ${st.toLowerCase()} · ${sp.nx.textContent}`);
       sp.dot.className = `dot w-1.5 h-1.5 rounded-full flex-none d-${st}`;
       sp.st.textContent = st;
       sp.st.className = `status-text font-mono text-[10px] font-bold tracking-widest not-italic uppercase c-${st}`;
@@ -649,6 +656,7 @@ function setTurbo(on, notify=true){
 }
 function setManual(on, notify=true){
   manual = on;
+  if (on && turbo) setTurbo(false);  // real-time only: you can't drive a frame-skipping feed
   setPressed("b_manual", on);
   $("b_manual").innerHTML = (on ? "Release control" : "Take control") + " <kbd>M</kbd>";
   const bz = $("bezel");
@@ -673,8 +681,19 @@ levelSel.onchange = () => {
   $("levelconfirm").classList.remove("hidden");
   $("levelyes").focus();
 };
-$("levelyes").onclick = () => { send({cmd:"level", level: levelSel.value}); $("levelconfirm").classList.add("hidden"); };
+$("levelyes").onclick = () => {
+  pendingLevel = levelSel.value;
+  send({cmd:"level", level: pendingLevel});
+  $("levelconfirm").classList.add("hidden");
+  const p = $("levelpend"); p.querySelector("b").textContent = pendingLevel; p.classList.remove("hidden");
+  $("levelcancel").focus();
+};
 $("levelno").onclick = () => { levelSel.value = curLevel; $("levelconfirm").classList.add("hidden"); levelSel.focus(); };
+$("levelconfirm").addEventListener("keydown", ev => { if (ev.key === "Escape"){ ev.stopPropagation(); $("levelno").click(); } });
+$("levelcancel").onclick = () => {
+  pendingLevel = null; send({cmd:"level", level: ""});  // empty = drop the request
+  $("levelpend").classList.add("hidden"); levelSel.value = curLevel; levelSel.focus();
+};
 
 // keys: manual-mode game input, plus view hotkeys; never while typing in a form control
 const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};
@@ -682,12 +701,15 @@ const HOTKEYS = {t:"b_turbo", s:"b_sensors", h:"b_hitboxes", g:"b_grid", m:"b_ma
 const inField = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement||{}).tagName || "");
 document.addEventListener("keydown", ev => {
   if (inField() || ev.ctrlKey || ev.metaKey || ev.altKey) return;
-  const k = KEYMAP[ev.key];
-  if (manual && k !== undefined){ ev.preventDefault(); if (!keys[k]){ keys[k] = true; send({cmd:"keys", ...keys}); } return; }
+  if (manual){  // the game owns the keyboard: move keys drive, Escape releases, nothing else toggles views
+    const k = KEYMAP[ev.key];
+    if (k !== undefined){ ev.preventDefault(); if (!keys[k]){ keys[k] = true; send({cmd:"keys", ...keys}); } }
+    else if (ev.key === "Escape") setManual(false);
+    return;
+  }
   if (ev.repeat) return;
   if (ev.key === "[") return watchEnv(watched-1);
   if (ev.key === "]") return watchEnv(watched+1);
-  if (ev.key === "Escape" && manual) return setManual(false);
   const id = HOTKEYS[ev.key.toLowerCase()];
   if (id) $(id).click();
 });
