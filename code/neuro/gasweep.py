@@ -22,6 +22,9 @@ import os
 import re
 import statistics
 import time
+from collections import Counter
+
+import yaml
 
 from .balance import (BALANCE_DIR, config_tag, fmt_hms, probe_dir, run_jobs, write_report)
 from .evolution import GAConfig
@@ -29,6 +32,7 @@ from .personas import PERSONAS, get_persona
 from .sensors import SENSOR_MODES
 
 GASWEEP_ROOT = os.path.join("runs", "gasweep")
+BEST_PATH = os.path.join(os.path.dirname(__file__), "ga_best.yaml")
 
 # value lists: [low, baseline, high] (architecture axes: baseline first). Sources in docs/BALANCE.md.
 AXES: dict[str, list] = {
@@ -186,6 +190,93 @@ def best_config(reports: list[dict]) -> dict:
     return out
 
 
+def _sweep_groups(reports: list[dict]) -> dict[tuple, list[dict]]:
+    """One group per (game, persona, budget, sensors, baseline) — the unit `best_config` reads."""
+    groups: dict[tuple, list[dict]] = {}
+    for r in reports:
+        key = (r.get("game"), r.get("persona") or "experienced", r.get("gens_budget"),
+               (r.get("ga_config") or {}).get("sensors", "rays"), tag_base_sig(r.get("tag") or "") or "")
+        groups.setdefault(key, []).append(r)
+    return groups
+
+
+def best_per_game(reports: list[dict]) -> dict:
+    """Roll every sweep up into one recommendation per game.
+
+    Each (game, persona) sweep votes with its own OFAT winner; a knob only reaches the game-level
+    recommendation if it wins a strict majority of that game's sweeps, so one lucky persona cannot
+    move a default on its own. Ties and minorities fall back to the baseline."""
+    out: dict = {}
+    for (game, persona, gens, sensors, _sig), rs in sorted(_sweep_groups(reports).items(),
+                                                           key=lambda kv: [str(x) for x in kv[0]]):
+        if not game:
+            continue
+        ov = best_config(rs)
+        base = next((r for r in rs if (parse_sweep_tag(r.get("tag") or "") or ("", None))[0] == "base"), None)
+        comp = next((r for r in rs if (parse_sweep_tag(r.get("tag") or "") or ("", None))[0] == "best"), None)
+        g = out.setdefault(game, {"recommended": {}, "per_sweep": {}})
+        g["per_sweep"][f"{persona} / {gens} gens / {sensors}"] = {
+            "overrides": ov or None,
+            "baseline_win_rate": round(sweep_point(base)[0], 4) if base else None,
+            "confirmed_win_rate": round(sweep_point(comp)[0], 4) if comp else None,
+            "configs": len(rs),
+        }
+    for game, g in out.items():
+        n = len(g["per_sweep"])
+        tally: dict[str, list] = {}
+        for v in g["per_sweep"].values():
+            for k, val in (v["overrides"] or {}).items():
+                tally.setdefault(k, []).append(val)
+        rec = {}
+        for axis in AXES:                                  # AXES order keeps the file stable
+            if axis not in tally:
+                continue
+            val, votes = Counter(tally[axis]).most_common(1)[0]
+            if votes * 2 > n:                              # strict majority of this game's sweeps
+                rec[axis] = val
+        g["recommended"] = rec
+        g["sweeps"] = n
+    return out
+
+
+def write_best_yaml(reports: list[dict], path: str | None = None) -> dict:
+    """Write the per-game recommendation file the trainer and probes read with --best."""
+    path = path or BEST_PATH          # resolved per call, so BEST_PATH stays overridable
+    games = best_per_game(reports)
+    doc = {"generated": time.strftime("%Y-%m-%d %H:%M"),
+           "baseline": {k: v for k, v in vars(GAConfig()).items() if k in AXES},
+           "games": games}
+    header = (
+        "# Best GA hyperparameters per game — WRITTEN BY `python -m code.neuro.gasweep`.\n"
+        "# Edit the sweep, not this file: any rerun overwrites it.\n"
+        "#\n"
+        "# `recommended` is the one-factor-at-a-time winner for each knob, kept only when it wins a\n"
+        "# strict majority of that game's (persona x budget x sensors) sweeps; everything else stays\n"
+        "# at the `baseline` below. Use it with:\n"
+        "#     python -m code.neuro.trainer --game mario --best\n"
+        "#     python -m code.neuro.balance  --game mario --best\n"
+        "# or in code: GAConfig.for_game('mario').\n"
+        "#\n"
+        "# OFAT composites ignore interactions between knobs — `confirmed_win_rate` is the composite\n"
+        "# actually probed by `--confirm`, next to the `baseline_win_rate` it has to beat.\n"
+    )
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(header)
+        yaml.safe_dump(doc, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    return games
+
+
+def load_best(game: str, path: str | None = None) -> dict:
+    """GAConfig overrides recommended for `game`, or {} when the sweep never covered it."""
+    try:
+        with open(path or BEST_PATH, encoding="utf-8") as f:
+            doc = yaml.safe_load(f) or {}
+    except OSError:
+        return {}
+    entry = ((doc.get("games") or {}).get(game) or {})
+    return {k: v for k, v in (entry.get("recommended") or {}).items() if k in AXES}
+
+
 def load_reports(out_dir: str = BALANCE_DIR, game: str | None = None,
                  persona: str | None = None) -> list[dict]:
     reports = []
@@ -241,6 +332,17 @@ def format_sweep(reports: list[dict]) -> str:
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
+def _publish_best(out_dir: str = BALANCE_DIR, path: str | None = None) -> dict:
+    games = write_best_yaml(load_reports(out_dir), path)
+    if games:
+        print(f"\nwrote {path or BEST_PATH}", flush=True)
+        for game, g in sorted(games.items()):
+            rec = g["recommended"]
+            body = " · ".join(f"{k} {v}" for k, v in rec.items()) if rec else "baseline wins every knob"
+            print(f"  {game:<10} ({g['sweeps']} sweep(s))  {body}", flush=True)
+    return games
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="GA hyperparameter ablation sweep (one knob at a time)")
     ap.add_argument("--game", default="mario")
@@ -257,12 +359,13 @@ def main() -> None:
     ap.add_argument("--confirm", action="store_true",
                     help="after the sweep, probe the per-axis-winner composite once as '<tag>_best'")
     ap.add_argument("--rebuild", action="store_true",
-                    help="regenerate gasweep JSONs from runs/gasweep and exit (no training)")
+                    help="regenerate gasweep JSONs from runs/gasweep (and ga_best.yaml) and exit")
     args = ap.parse_args()
 
     if args.rebuild:
         for path in rebuild(args.out):
             print(f"rebuilt {path}")
+        _publish_best(args.out)
         return
 
     from .adapters import list_levels, validate_level
@@ -293,6 +396,7 @@ def main() -> None:
         t0 = time.time()
         run_jobs(jobs, workers, label=lambda j: f"{os.path.basename(os.path.dirname(j[7]))} · {j[1]} seed {j[2]}")
         rebuild(args.out)
+        _publish_best(args.out)
         print(f"\n{fmt_hms(time.time() - t0)} wall", flush=True)
 
     def this_sweep() -> list[dict]:

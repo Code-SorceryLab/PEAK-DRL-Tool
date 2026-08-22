@@ -428,6 +428,9 @@ def main() -> None:
     ap.add_argument("--out", default=BALANCE_DIR)
     ap.add_argument("--workers", type=int, default=None,
                     help="probe processes; default = min(jobs, cores-1), 1 = sequential")
+    ap.add_argument("--best", action="store_true",
+                    help="probe with this game's GA-sweep winners (code/neuro/ga_best.yaml) "
+                         "instead of the GAConfig baseline")
     ap.add_argument("--sensors", default="rays", choices=SENSOR_MODES,
                     help="agent exteroception: rays (default) or the 3x11x11 tile grid")
     ap.add_argument("--compare", action="store_true",
@@ -460,8 +463,16 @@ def main() -> None:
     if args.levels:
         for lvl in args.levels:
             validate_level(args.game, lvl)
-    tag = config_tag(GAConfig().pop_size, args.gens, args.sensors)
-    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors, None,
+    best_ov: dict = {}
+    if args.best:
+        from .gasweep import load_best
+        best_ov = load_best(args.game)
+        print(f"--best: {args.game} -> {best_ov or 'baseline (this game has no sweep yet)'}", flush=True)
+    # A different GA is a different experiment: tag it apart so it never lands on baseline probes.
+    tag = config_tag(best_ov.get("pop_size", GAConfig().pop_size), args.gens, args.sensors)
+    if best_ov:
+        tag += "_best"
+    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors, best_ov or None,
              probe_dir(args.game, persona.name, tag, lvl, seed, root)) for lvl in levels for seed in args.seeds]
     workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
     print(f"balance probe: {len(levels)} levels x {len(args.seeds)} seeds = {len(jobs)} jobs, "

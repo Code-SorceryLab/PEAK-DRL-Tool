@@ -145,6 +145,11 @@ python -m code.neuro.balance --game mario --gens 40 --persona experienced
 python -m code.neuro.balance --game mario --gens 40 --ablation --sensors grid   # ablation arm → runs/ablation
 python -m code.neuro.balance --game mario --gens 40 --compare --ablation        # rays-vs-grid table, no training
 python -m code.neuro.gasweep --game mario --gens 40 --axes hidden memory --confirm
+python -m code.neuro.gasweep --rebuild                                 # refresh code/neuro/ga_best.yaml only
+
+# Train or probe with what the sweep found for that game
+python -m code.neuro.trainer --game mario --best
+python -m code.neuro.balance --game mario --gens 40 --best
 
 # Report
 python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
@@ -225,6 +230,7 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 - Per-episode CSVs: persona, cause of death, jumps, coins, velocity, progress at death, sampled route
 - Command center: per-game sections, radar, level dialogs with death heatmaps, routes, per-seed learning curves, the exact GA config, ▶ Watch replays
 - Rays-vs-grid ablation page; GA sweep page with capacity curve, per-axis bound tracks and a recommended config per game (`--confirm` probes it)
+- **Best config per game, written back as YAML**: every sweep updates `code/neuro/ga_best.yaml`, which `--best` feeds straight into training and probing
 
 **Live dashboard**
 - Grid of all ten envs with per-env HUD; large watched view with rays, hit dots, tile outlines, pit-probe boxes
@@ -380,6 +386,43 @@ or the fitness — not the GA.
 | Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
 
 ---
+
+## Best hyperparameters per game
+
+Every GA sweep writes **`code/neuro/ga_best.yaml`** — the per-game recommendation, kept next to the
+code rather than buried in a run directory:
+
+```yaml
+games:
+  mario:
+    recommended:            # feeds --best
+      elite: 6
+      tournament_k: 2
+      anneal_factor: 0.5
+      memory: 2
+    per_sweep:
+      experienced / 40 gens / rays:
+        overrides: {anneal_factor: 0.5, memory: 2, tournament_k: 2, ...}
+        baseline_win_rate: 0.2333
+        confirmed_win_rate: 0.3533     # the composite --confirm actually probed
+```
+
+A knob only reaches `recommended` if it wins a **strict majority** of that game's
+(persona × budget × sensors) sweeps, so one lucky persona cannot move a default on its own;
+everything else stays at the `baseline` block the file also records. Then use it:
+
+```bash
+python -m code.neuro.gasweep --game mario --gens 40 --confirm   # sweep, then write the yaml
+python -m code.neuro.gasweep --rebuild                          # or just rewrite it from existing runs
+python -m code.neuro.trainer --game mario --best                # train with mario's winners
+python -m code.neuro.balance --game mario --gens 40 --best      # probe with them (tagged `_best`, never
+                                                                # overwriting baseline probes)
+```
+
+In code: `GAConfig.for_game("mario")`. Flags you pass explicitly always beat the file, and a game
+the sweep has never covered simply falls back to the baseline.
+
+***
 
 ## Tests
 

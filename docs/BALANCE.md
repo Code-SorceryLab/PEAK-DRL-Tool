@@ -137,10 +137,64 @@ mysteriously unsolvable, one rung after a level agents beat in a single generati
 - **A kill must not be worth less on a crowded level.** Scoring kills purely as a share of the
   enemies present paid 500 for the only enemy but 250 each for two — least reward where the task is
   hardest. Kills now also pay a flat per-kill bonus.
-- **Two enemies is the ladder's wall.** One Ballom is cleared by most seeds; two is unsolved at a
-  40-generation budget even in an open arena, because a single range-1 bomb has to catch a wandering
-  target twice. That cliff is the ladder's honest hard end, not a bug — it is exactly the kind of
-  difficulty step the tool exists to locate.
+- **Self-inflicted blasts, not difficulty, were the ceiling.** Levels 8-14 went 0/3 in every
+  sweep, and the dominant death on *every* level was the agent's own bomb (55-97 % of episodes).
+  A 2.5 s fuse is not enough time for a reactive policy to walk clear, so any genome that learned
+  to bomb also learned to die. Lengthening the fuse to 4 s (`bomb.fuse_frames: 240`) was the single
+  biggest win in the sweep: `06_hidden_exit` went 0/3 → 2/3 and `02`/`03`/`08_corridor` all gained
+  a seed. Measured, not guessed — every alternative below was probed the same way.
+- **A range-1 bomb cannot be aimed, but widening it is worse.** Bombing a wandering Ballom
+  point-blank killed it **0 times in 200 trials** (unchanged at fuses of 45, 60, 90 and 150
+  frames); at range 2 the same shot lands **100 %** of the time. Raising the blast anyway made
+  the ladder *worse* — `08_corridor` fell 3/3 → 0/3 and `09_two_balloms` 2/3 → 1/3 — because a
+  bigger cross needs a longer run to escape and the agent has to leave from inside it. What did
+  unlock the two-enemy wall was slowing the enemies to 0.7× so a blast has time to matter:
+  `09_two_balloms` went 0/3 → 2/3, the first wins that level has ever recorded.
+- **Do not gate a maze on kills.** `10_brick_maze` … `15_gauntlet` required a cleared arena, but a
+  blast almost never catches a wandering enemy in a corridor maze, so the exit could not open.
+  Those six now set `requires_clear: false`: their lesson is routing and bomb survival, while the
+  open arenas (`07`-`09`) stay gated, where clearing really is the lesson.
+- **Brick density has a playable ceiling near 20 %.** Every level the probes solve sits at 0-19 %
+  bricks as a share of walkable space; every level they never solve sat at 28-57 %, with 5-11 bombs
+  needed in sequence to reach the exit. Thinning the six mazes to a graded 21-32 % and their routes
+  to at most three bombs lifted mean progress on them from 0.06-0.10 to 0.29-0.56 and bricks opened
+  per episode from 0 to 0.7-2.5 — real movement, but they still do not finish.
+- **`11_buried_exit` … `15_gauntlet` remain unsolved, and that is the honest hard end.** They ask
+  for three or more bombs chained through a maze while two enemies hunt you, and 80 generations
+  does not get there either. The ladder now reads: 10 of 15 rungs cleared by at least one
+  seed, a smooth ramp through `09_two_balloms`, then a cliff — which is exactly the kind of
+  step this tool exists to locate, now that it is a real one rather than an unaimable bomb.
+
+- **The agent cannot tell a wall from a brick — and every fix for that made things worse.** The
+  four rays return distance to whatever blocks the way; `solid()` treats permanent wall and
+  destructible brick alike, so a maze reads exactly like a dead end (verified: the east ray is
+  0.064 either way). Only one aggregate slot, "bricks a bomb here would open", carries the
+  difference, and it has no direction. Two fixes were probed and both lost: **four extra
+  "that one is breakable" slots plus a buried-exit flag** (16 → 21 inputs) dropped the ladder from
+  57 seed-solves to 31, and folding the same bit into the **sign of the existing rays** (no extra
+  inputs) dropped it to 8. The information is real; paying for it in input width costs more search
+  than it returns at pop 10, and overloading the distance slots corrupts a signal the policy
+  already leans on. Left as-is deliberately — the same shape of result as "bigger nets don't win
+  sooner".
+
+**Per-level overrides (`bomberman_config.yaml`).** A `levels:` entry is either a bare path or
+`{file: ..., range: N, fuse: F, enemy_speed: X, requires_clear: false}`. `range` and `fuse` set the
+blast arms and fuse the player starts that level with, `enemy_speed` scales every enemy on it, and
+`requires_clear: false` opens the exit on arrival. The knobs are how the ladder's difficulty is
+stated explicitly, and how each claim above was A/B-probed.
+
+### Best hyperparameters per game — `code/neuro/ga_best.yaml`
+
+Every sweep (`python -m code.neuro.gasweep`, and `--rebuild`) rewrites `code/neuro/ga_best.yaml`:
+per game, the OFAT winner for each knob, kept only when it wins a **strict majority** of that
+game's (persona × budget × sensors) sweeps — one persona's luck cannot move a default. The file
+also records each sweep's `baseline_win_rate` and the `confirmed_win_rate` of the composite that
+`--confirm` actually probed, so the OFAT-ignores-interactions caveat stays visible next to the
+recommendation.
+
+Consume it with `--best` on the trainer or the probe, or `GAConfig.for_game(game)` in code.
+Explicit flags always beat the file, and probes run with `--best` are tagged `_best` so they never
+land on baseline probe directories.
 
 **Selecting levels live:** the dashboard's Run panel has a level dropdown — picking one
 switches the whole population at the next generation boundary (the curriculum resumes from

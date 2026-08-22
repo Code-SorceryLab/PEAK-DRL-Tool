@@ -24,6 +24,7 @@ WALL, FLOOR, BRICK = "#", ".", "?"
 EXIT, EXIT_HIDDEN = "G", "@"
 POWERUPS = {"C": "bombs", "F": "range", "S": "speed"}       # under a brick until bombed
 REVEALED = {"C": "c", "F": "f", "S": "s", "@": "G"}          # what a bombed brick leaves behind
+DESTRUCTIBLE = (BRICK, "C", "F", "S", EXIT_HIDDEN)          # every tile a blast opens
 ITEM_OF = {"c": "bombs", "f": "range", "s": "speed"}
 ENEMY_GLYPHS = "EkKMB"
 DIRS = {0: (0, 0), 1: (0, -1), 2: (1, 0), 3: (0, 1), 4: (-1, 0)}  # idle, up, right, down, left
@@ -114,12 +115,18 @@ class BombermanCore:
         self.reset()
 
     # ── level ────────────────────────────────────────────────────────────────
-    def level_file(self, idx: int | None = None) -> str:
+    def level_entry(self, idx: int | None = None) -> dict:
+        """A level is either a bare path or a dict of per-level overrides around one.
+        Overrides: range (blast arms), enemy_speed (x multiplier), requires_clear (exit rule)."""
         levels = self.cfg["levels"]
         idx = self._level_idx if idx is None else idx
         if not 0 <= idx < len(levels):
             raise IndexError(f"bomberman level {idx} out of range (0..{len(levels) - 1})")
-        return os.path.join(_HERE, "levels", levels[idx])
+        entry = levels[idx]
+        return dict(entry) if isinstance(entry, dict) else {"file": entry}
+
+    def level_file(self, idx: int | None = None) -> str:
+        return os.path.join(_HERE, "levels", self.level_entry(idx)["file"])
 
     def _load_level(self) -> LevelData:
         with open(self.level_file(), encoding="utf-8") as f:
@@ -152,17 +159,26 @@ class BombermanCore:
             self._seed = seed
         self.rng = random.Random(self._seed)
         self.level_data = self._load_level()
+        opts = self.level_entry()
         ts = self.tile_size
         pc = self.cfg["player"]
         size = int(pc.get("size", 24))
         sx, sy = self.level_data.start
         self.player = Player(sx * ts + (ts - size) / 2, sy * ts + (ts - size) / 2, size, size,
                              speed=float(pc.get("walk_speed", 112)), bombs_max=int(pc.get("bombs", 1)),
-                             blast_range=int(pc.get("range", 1)))
+                             blast_range=int(opts.get("range", pc.get("range", 1))))
         ec = self.cfg["enemies"]
-        self.enemies = [Enemy(k, x * ts + 4, y * ts + 4, float(ec[k]["speed"]), bool(ec[k]["passes_bricks"]),
+        espeed = float(opts.get("enemy_speed", 1.0))
+        self.enemies = [Enemy(k, x * ts + 4, y * ts + 4, float(ec[k]["speed"]) * espeed,
+                              bool(ec[k]["passes_bricks"]),
                               float(ec[k]["chase"]), direction=self.rng.choice([1, 2, 3, 4]))
                         for k, x, y in self.level_data.spawns]
+        # Some levels gate the exit on a cleared arena (killing is the lesson); others only ask
+        # the player to reach it (the lesson is the maze and staying alive).
+        self.requires_clear = bool(opts.get("requires_clear", True))
+        # A bigger blast needs a longer walk to clear it: levels that raise `range` can buy the
+        # retreat time back with `fuse`, or every bomb the agent drops is a suicide.
+        self.fuse_frames = int(opts.get("fuse", self.cfg["bomb"]["fuse_frames"]))
         self.bombs: list[Bomb] = []
         self.blasts: list[Blast] = []
         self.score = 0
@@ -197,7 +213,7 @@ class BombermanCore:
         t = self.tile(x, y)
         if t == WALL:
             return True
-        if t in (BRICK, "C", "F", "S", EXIT_HIDDEN):
+        if t in DESTRUCTIBLE:
             return not (for_enemy is not None and for_enemy.passes_bricks)
         return False
 
@@ -267,7 +283,7 @@ class BombermanCore:
         tx, ty = self._center_tile(p.x, p.y, p.width, p.height)
         if self.bomb_at(tx, ty) is not None or len(self.bombs) >= p.bombs_max:
             return False
-        self.bombs.append(Bomb(tx, ty, int(self.cfg["bomb"]["fuse_frames"]), p.blast_range))
+        self.bombs.append(Bomb(tx, ty, self.fuse_frames, p.blast_range))
         return True
 
     # ── bombs & blasts ───────────────────────────────────────────────────────
@@ -281,7 +297,7 @@ class BombermanCore:
                 if t == WALL:
                     break
                 cells.add((x, y))
-                if t in (BRICK, "C", "F", "S", EXIT_HIDDEN):
+                if t in DESTRUCTIBLE:
                     break
         return cells
 
@@ -305,7 +321,7 @@ class BombermanCore:
         opened = 0
         for x, y in cells:
             t = self.tile(x, y)
-            if t in (BRICK, "C", "F", "S", EXIT_HIDDEN):
+            if t in DESTRUCTIBLE:
                 opened += 1
                 ld.grid[y][x] = REVEALED.get(t, FLOOR)
                 self.bricks_destroyed += 1
@@ -432,7 +448,7 @@ class BombermanCore:
         if self.alive and self.timer <= 0:
             self._die("Timeout")
         if self.alive and (ptx, pty) == self.level_data.exit and self.tile(ptx, pty) == EXIT \
-                and all(not e.alive for e in self.enemies):
+                and self.arena_clear:
             self.won = True
             self.score += 1000
         if self._steps >= self.max_steps and self.alive and not self.won:
@@ -474,12 +490,17 @@ class BombermanCore:
                 t = self.tile(nx, ny)
                 if t == WALL:
                     continue
-                cost = self.BRICK_COST if t in (BRICK, "C", "F", "S", EXIT_HIDDEN) else 1.0
+                cost = self.BRICK_COST if t in DESTRUCTIBLE else 1.0
                 nd = dist[y, x] + cost
                 if nd < dist[ny, nx]:
                     dist[ny, nx] = nd
                     frontier.append((nx, ny))
         return dist
+
+    @property
+    def arena_clear(self) -> bool:
+        """Is the exit live? Every enemy dead, or this level does not gate on that."""
+        return not self.requires_clear or all(not e.alive for e in self.enemies)
 
     def goal_cost(self) -> float:
         p = self.player
@@ -505,7 +526,7 @@ class BombermanCore:
             for i in range(W):
                 gx, gy = px - half + i, py - half + j
                 t = self.tile(gx, gy)
-                if t == WALL or t in (BRICK, "C", "F", "S", EXIT_HIDDEN) or self.bomb_at(gx, gy) is not None:
+                if t == WALL or t in DESTRUCTIBLE or self.bomb_at(gx, gy) is not None:
                     out[0, j, i] = 1.0
                 if t in ITEM_OF or t == EXIT:
                     out[1, j, i] = 1.0
@@ -545,7 +566,7 @@ class BombermanCore:
                     pygame.draw.line(surface, self.PAL["wall_hi"], r.topleft, r.bottomleft, 3)
                     pygame.draw.line(surface, self.PAL["wall_lo"], r.bottomleft, r.bottomright, 3)
                     pygame.draw.line(surface, self.PAL["wall_lo"], r.topright, r.bottomright, 3)
-                elif t in (BRICK, "C", "F", "S", EXIT_HIDDEN):
+                elif t in DESTRUCTIBLE:
                     pygame.draw.rect(surface, self.PAL["brick"], r)
                     for k in range(4):  # mortar lines, offset every other course
                         yy = r.top + k * ts // 4
@@ -555,7 +576,7 @@ class BombermanCore:
                     pygame.draw.line(surface, self.PAL["brick_hi"], r.topleft, r.topright, 1)
                 elif t == EXIT:
                     pygame.draw.rect(surface, self.PAL["exit"], r.inflate(-6, -6), border_radius=4)
-                    if all(not e.alive for e in self.enemies):
+                    if self.arena_clear:
                         glow = 120 + int(60 * math.sin(self._steps / 8))
                         pygame.draw.rect(surface, (glow, glow - 30, 40), r.inflate(-14, -14), border_radius=3)
                 elif t in ITEM_OF:
@@ -622,14 +643,20 @@ if __name__ == "__main__":  # smoke: walk level 0 to the exit with a scripted pa
     for _ in range(60 * 6):
         core.step((0, 1, 0))
     assert core.won, (core.alive, core.death_cause, core.player.x, core.player.y)
-    core = BombermanCore(level_idx=1)
+    core = BombermanCore(level_idx=3)   # 04_one_wall: a brick wall at x = 7, player starts on row 1
     for _ in range(60 * 2):
-        core.step((1, 0, 0))
+        core.step((1, 0, 0))            # walk right until the brick stops us
     assert not core.won and core.alive
-    core.step((0, 0, 1))            # drop a bomb against the wall
+    core.step((0, 0, 1))                # drop a bomb against that brick
     for _ in range(60 * 2):
-        core.step((-1, 0, 0))       # run away
+        core.step((-1, 0, 0))           # run away
     for _ in range(200):
         core.step((0, 0, 0))
-    assert core.alive and core.bricks_destroyed == 1, (core.alive, core.death_cause, core.bricks_destroyed)
+    assert core.alive and core.bricks_destroyed >= 1, (core.alive, core.death_cause, core.bricks_destroyed)
+
+    core = BombermanCore(level_idx=9)   # per-level overrides: 10_brick_maze is a maze, not a kill list
+    assert not core.requires_clear, core.level_entry()
+    assert core.enemies and all(e.speed < 48 for e in core.enemies), [e.speed for e in core.enemies]
+    assert BombermanCore(level_idx=8).requires_clear                # 09_two_balloms is an arena: gated
+    assert core.fuse_frames == 240, core.fuse_frames
     print("bomberman core ok")

@@ -10,7 +10,8 @@ player:
   bombs: 1                 # starting bomb count
   range: 1                 # starting blast range (tiles per arm)
 bomb:
-  fuse_frames: 150         # 2.5 s
+  fuse_frames: 240         # 4 s. Was 150: at 2.5 s the agent could not walk clear of its own
+                           # blast, and 55-97 % of every level's deaths were self-inflicted.
   blast_frames: 30         # how long the flames stay lethal
   danger_lookahead: 30     # frames: hazard channel marks cells that explode within this window
 enemies:                   # speed in px/s; chase = probability per tile of turning toward the player
@@ -23,18 +24,28 @@ scoring:
   brick: 10
   enemy: {E: 100, k: 200, K: 400, M: 1000, B: 2000}
 levels:                    # index = level id (menu / --level N); paths relative to levels/
+  # An entry is either a bare path or {file: ..., <overrides>}:
+  #   range           blast arms the player starts with (default player.range)
+  #   fuse            frames before a bomb detonates (default bomb.fuse_frames)
+  #   enemy_speed     multiplier on every enemy's configured speed (default 1.0)
+  #   requires_clear  false = the exit opens on arrival; enemies are hazards, not a kill list
+  #
+  # The ladder splits in two. 07-09 are open arenas where clearing the enemies IS the lesson,
+  # so they stay gated on a clear arena. 10-15 are dense mazes whose lesson is routing and
+  # surviving your own bombs; gating those on kills as well made them unwinnable, because a
+  # blast almost never catches a wandering enemy in a corridor maze.
   - bomberman/01_open_floor.txt
   - bomberman/02_first_bomb.txt
   - bomberman/03_dead_end.txt
   - bomberman/04_one_wall.txt
   - bomberman/05_sparse_bricks.txt
   - bomberman/06_hidden_exit.txt
-  - bomberman/07_arena.txt
-  - bomberman/08_corridor.txt
-  - bomberman/09_two_balloms.txt
-  - bomberman/10_brick_maze.txt
-  - bomberman/11_buried_exit.txt
-  - bomberman/12_chasers.txt
-  - bomberman/13_brick_walkers.txt
-  - bomberman/14_powder_keg.txt
-  - bomberman/15_gauntlet.txt
+  - {file: bomberman/07_arena.txt,         enemy_speed: 0.7}
+  - {file: bomberman/08_corridor.txt,      enemy_speed: 0.7}
+  - {file: bomberman/09_two_balloms.txt,   enemy_speed: 0.7}
+  - {file: bomberman/10_brick_maze.txt,    enemy_speed: 0.7, requires_clear: false}
+  - {file: bomberman/11_buried_exit.txt,   enemy_speed: 0.7, requires_clear: false}
+  - {file: bomberman/12_chasers.txt,       enemy_speed: 0.7, requires_clear: false}
+  - {file: bomberman/13_brick_walkers.txt, enemy_speed: 0.7, requires_clear: false}
+  - {file: bomberman/14_powder_keg.txt,    enemy_speed: 0.7, requires_clear: false}
+  - {file: bomberman/15_gauntlet.txt,      enemy_speed: 0.7, requires_clear: false}

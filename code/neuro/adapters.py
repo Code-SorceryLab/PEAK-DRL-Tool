@@ -763,7 +763,7 @@ class BombermanAdapter:
         core, p = self.core, self.core.player
         ox, oy = self.x, self.y
         ts = float(self.tile_size)
-        fuse = float(core.cfg["bomb"]["fuse_frames"])
+        fuse = float(getattr(core, "fuse_frames", core.cfg["bomb"]["fuse_frames"]))
         tx, ty = core._center_tile(p.x, p.y, p.width, p.height)
         vec = np.empty(16, dtype=np.float32)
         rays, tiles = [], []
@@ -815,9 +815,10 @@ class BombermanAdapter:
         return max(0.0, min(1.0, 1.0 - self._best_cost / self._start_cost))
 
     def fitness(self) -> float:
-        """Two halves when the level has enemies (the exit only opens on a clear arena): cost-to-exit
-        progress and share of enemies killed — so a kill always beats camping the exit. Small
-        bonuses for bricks opened and bombs survived keep early, sparse behaviour learnable."""
+        """Two halves when the exit is gated on a clear arena: cost-to-exit progress and share of
+        enemies killed — so a kill always beats camping the exit. Where the exit is not gated,
+        killing is optional, so progress carries the full scale and kills only add their bonus.
+        Small bonuses for bricks opened and bombs survived keep early, sparse behaviour learnable."""
         core = self.core
         bonus = (self.BRICK_BONUS * core.bricks_destroyed
                  + self.RETREAT_BONUS * min(core.safe_detonations, 1)
@@ -825,10 +826,11 @@ class BombermanAdapter:
         if self.won:
             return self._FIT_SCALE + bonus + self.win_bonus + _win_time_bonus(self)
         n = len(core.enemies)
-        if n:
+        kill_bonus = self.KILL_BONUS * core.kills_total + self.AIM_BONUS * core.best_aim
+        if n and getattr(core, "requires_clear", True):
             return (0.5 * self._FIT_SCALE * (self.progress() + core.kills_total / n)
-                    + self.KILL_BONUS * core.kills_total + self.AIM_BONUS * core.best_aim + bonus)
-        return self.progress() * self._FIT_SCALE + bonus
+                    + kill_bonus + bonus)
+        return self.progress() * self._FIT_SCALE + (kill_bonus if n else 0.0) + bonus
 
     def episode_stats(self) -> dict:
         st = _episode_stats(self, self.progress() * self._FIT_SCALE)

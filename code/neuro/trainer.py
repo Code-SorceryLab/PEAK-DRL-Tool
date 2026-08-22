@@ -15,6 +15,7 @@ import csv
 import io
 import json
 import os
+import sys
 import threading
 import time
 
@@ -269,7 +270,7 @@ class Trainer:
             if new:
                 w.writerow(["persona", "game", "world", "cause_of_death", "jump_count",
                             "coins_collected", "avg_vx", "progress_ratio", "route",
-                            "enemies_killed", "elapsed_time"])
+                            "enemies_killed", "bricks_destroyed", "elapsed_time"])
             for slot, rec in zip(self.slots, env_rows):
                 cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
                 level_len = rec.get("level_len") or 1.0
@@ -277,7 +278,7 @@ class Trainer:
                 w.writerow([self.persona.name, self.game, self.level or "auto", cause,
                             slot.jump_count, rec.get("coins", 0),
                             round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
-                            repr(slot.route), rec.get("kills", 0),
+                            repr(slot.route), rec.get("kills", 0), rec.get("bricks", 0),
                             round(slot.frames / 60.0, 2)])
 
     def _steps_per_sec(self) -> float:
@@ -556,6 +557,9 @@ def main() -> None:
                     help="feed the previous action (move, jump) back in as 2 extra inputs")
     ap.add_argument("--memory", type=int, default=0,
                     help="Jordan memory units: extra outputs looped back as inputs next frame")
+    ap.add_argument("--best", action="store_true",
+                    help="start from this game's GA-sweep winners (code/neuro/ga_best.yaml); "
+                         "flags you pass explicitly still win")
     args = ap.parse_args()
 
     if args.results:
@@ -583,8 +587,19 @@ def main() -> None:
         print(f"resumed {args.resume} at gen {pop.generation}", flush=True)
     else:
         pop = None
-        cfg = GAConfig(seed=args.seed, sensors=args.sensors, hidden=args.hidden,
-                       action_feedback=args.action_feedback, memory=args.memory)
+        given = {"seed": args.seed, "sensors": args.sensors, "hidden": args.hidden,
+                 "action_feedback": args.action_feedback, "memory": args.memory}
+        fields = {}
+        if args.best:
+            from .gasweep import load_best
+            fields = load_best(args.game)
+            print(f"--best: {args.game} -> {fields or 'baseline (this game has no sweep yet)'}", flush=True)
+        # a flag the user actually typed beats the sweep; an argparse default does not
+        typed = {a.lstrip("-").split("=")[0].replace("-", "_") for a in sys.argv if a.startswith("--")}
+        for k, v in given.items():
+            if k not in fields or k in typed:
+                fields[k] = v
+        cfg = GAConfig(**fields)
 
     if args.level is not None:
         from .adapters import validate_level

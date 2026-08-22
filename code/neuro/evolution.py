@@ -34,6 +34,16 @@ class GAConfig:
     n_outputs: int = 3           # 3 = left/right/jump (side-scrollers); 5 adds up/down (bomberman: jump = bomb)
     n_inputs: int = 0            # 0 = derive from the sensor mode; a game with its own ray layout sets its own
 
+    @classmethod
+    def for_game(cls, game: str, **overrides) -> "GAConfig":
+        """Baseline plus whatever the GA sweep recommends for `game` (code/neuro/ga_best.yaml).
+
+        Explicit keyword arguments still win, so --seed / --sensors on the command line are never
+        silently overridden by the sweep. Falls back to the plain baseline when the sweep has not
+        covered this game."""
+        from .gasweep import load_best
+        return cls(**{**load_best(game), **overrides})
+
 
 class Population:
     """Holds pop_size flat weight vectors and evolves them from fitness scores."""
