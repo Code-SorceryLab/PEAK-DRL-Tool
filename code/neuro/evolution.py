@@ -31,6 +31,7 @@ class GAConfig:
     hidden: int = 16
     action_feedback: bool = False
     memory: int = 0
+    n_outputs: int = 3           # 3 = left/right/jump (side-scrollers); 5 adds up/down (bomberman: jump = bomb)
 
 
 class Population:

@@ -291,16 +291,18 @@ const INVERT = new Set([0,1,2,3,4,5,6]);
 let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0, levelLen=0, curLevel="", lastSeen=0, hadFirstWin=false;
 let history=[], hitboxes=false, gridOn=false, pendingLevel=null;
 const lastImg={}, specEls=[], senseEls=[];
-const keys={left:false,right:false,jump:false};
+const keys={left:false,right:false,jump:false,up:false,down:false};
 const $ = id => document.getElementById(id);
 const send = o => { if (ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
 const fmt = v => v===undefined||v===null ? "–" : (+v).toLocaleString("en-US",{maximumFractionDigits:0});
 const pad2 = i => String(i+1).padStart(2,"0");
 const pct = x => levelLen > 0 ? Math.max(0, Math.min(100, x / levelLen * 100)) : 0;
 
-(function buildSensors(){
+let sensorKey = "";
+function buildSensors(groups){
   const root = $("sensors");
-  for (const grp of SENSORS){
+  root.innerHTML = ""; senseEls.length = 0;
+  for (const grp of groups){
     const h = document.createElement("div");
     h.className = "text-[10px] font-bold tracking-widest uppercase text-zinc-400 mt-3 first:mt-0";
     h.textContent = grp.g;
@@ -317,10 +319,12 @@ const pct = x => levelLen > 0 ? Math.max(0, Math.min(100, x / levelLen * 100)) :
         </div>
         <output for="${id}_l" aria-labelledby="${id}_l" class="w-10 font-mono text-[10px] text-zinc-400 sbar-out tabular-nums text-left">–</output>`;
       root.appendChild(row);
-      senseEls[r.i] = {bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center, idx:r.i};
+      senseEls[r.i] = {bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center, idx:r.i,
+                       inv: r.inv !== undefined ? !!r.inv : INVERT.has(r.i)};
     }
   }
-})();
+}
+buildSensors(SENSORS);
 
 function buildWall(n){
   nEnvs = n;
@@ -415,7 +419,7 @@ function updateSensors(e){
     if (!s) continue;
     let v = e.sensors[s.idx];
     const shown = v;
-    if (INVERT.has(s.idx)) v = 1 - v;
+    if (s.inv) v = 1 - v;  // distances read as "closeness" so a full bar = danger near
     if (s.center){
       const half = Math.min(Math.abs(v),1) * 50;
       s.bar.style.left  = v < 0 ? (50-half)+"%" : "50%";
@@ -509,8 +513,12 @@ function onUpdate(m){
   const s = m.stats || {};
   lastSeen = Date.now();
   if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
-  if (s.game) $("h_game").textContent = s.game;
+  if (s.game){ $("h_game").textContent = s.game; KEYMAP = TOPDOWN.has(s.game) ? KEYMAPS.topdown : KEYMAPS.side;
+    $("ribbon").textContent = TOPDOWN.has(s.game) ? "Manual control — arrows / WASD move, space drops a bomb, Esc releases · turbo paused"
+                                                   : "Manual control — arrows / WASD move, space jumps, Esc releases · turbo paused"; }
   if (s.level_len !== undefined) levelLen = s.level_len;
+  const sk = JSON.stringify(s.sensor_labels || null);   // top-down games ship their own telemetry layout
+  if (sk !== sensorKey){ sensorKey = sk; buildSensors(s.sensor_labels || SENSORS); }
   if (s.level) curLevel = s.level;
 
   if (s.gen !== undefined){ $("s_gen").textContent = s.gen; $("wallgen").textContent = s.gen; }
@@ -664,7 +672,7 @@ function setManual(on, notify=true){
   bz.classList.toggle("shadow-[0_12px_40px_-8px_rgba(239,68,68,0.45)]", on);
   $("ribbon").classList.toggle("hidden", !on);
   if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();  // keys go to the game, not a button
-  if (!on) keys.left = keys.right = keys.jump = false;
+  if (!on) keys.left = keys.right = keys.jump = keys.up = keys.down = false;
   if (notify) send({cmd:"manual", on});
 }
 $("b_manual").onclick = () => setManual(!manual);
@@ -696,7 +704,12 @@ $("levelcancel").onclick = () => {
 };
 
 // keys: manual-mode game input, plus view hotkeys; never while typing in a form control
-const KEYMAP = {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"};
+const KEYMAPS = {  // side-scrollers: up = jump; top-down (bomberman): WASD/arrows move, space drops a bomb (the "jump" output)
+  side:    {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"},
+  topdown: {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"up",w:"up",ArrowDown:"down",s:"down"," ":"jump"},
+};
+const TOPDOWN = new Set(["bomberman"]);
+let KEYMAP = KEYMAPS.side;
 const HOTKEYS = {t:"b_turbo", s:"b_sensors", h:"b_hitboxes", g:"b_grid", m:"b_manual"};
 const inField = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement||{}).tagName || "");
 document.addEventListener("keydown", ev => {

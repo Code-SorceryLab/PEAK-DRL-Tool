@@ -42,7 +42,7 @@ class Controls:
         self.watch_env = 0
         self.sensors_on = True
         self.manual = False  # human plays the watched env instead of its net
-        self.keys = {"left": False, "right": False, "jump": False}
+        self.keys = {"left": False, "right": False, "jump": False, "up": False, "down": False}
         self.hitboxes = False  # classic PEAK debug overlays, drawn by the game cores
         self.grid = False
         self.level_request: str | None = None  # dashboard level pick; applied at the next gen boundary
@@ -179,6 +179,7 @@ class Trainer:
             "level_best": round(max((h["best"] for h in cur), default=0.0), 1),
             "first_win_gen": next((h["gen"] for h in cur if h.get("wins")), None),
             "level_len": self.slots[0].adapter.episode_stats().get("level_len") or 0 if self.slots else 0,
+            "sensor_labels": getattr(self.slots[0].adapter, "SENSOR_LABELS", None) if self.slots else None,
             "last_gen_best": round(hist[-1]["best"], 1) if hist else 0.0,
             "avg_fitness": round(hist[-1]["avg"], 1) if hist else 0.0,
             "elite": self.cfg.elite,
@@ -317,10 +318,11 @@ class Trainer:
                 if i == manual_idx:
                     k = ctrl.keys
                     move_x = (1 if k["right"] else 0) - (1 if k["left"] else 0)
+                    move_y = (1 if k.get("down") else 0) - (1 if k.get("up") else 0)
                     jump = k["jump"]
                 else:
-                    move_x, jump = slot.net.act(vec)
-                slot.adapter.step(move_x, jump)
+                    move_x, jump, move_y = slot.net.act(vec)
+                slot.adapter.step(move_x, jump, move_y)
                 slot.frames += 1
                 self._step_accum += 1
                 if jump and not slot.prev_jump:
@@ -512,8 +514,8 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
             vec, rays, tiles = read_sensors(adapter, sensors)
             slot0 = trainer.slots[0]
             slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
-            move_x, jump = net.act(vec)
-            adapter.step(move_x, jump)
+            move_x, jump, move_y = net.act(vec)
+            adapter.step(move_x, jump, move_y)
             if state is not None:
                 trainer._publish_frames(encode_thumbs=True)
                 trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)

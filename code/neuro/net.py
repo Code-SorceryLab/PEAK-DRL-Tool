@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 N_INPUTS = 14
 N_HIDDEN = 16
-N_OUTPUTS = 3  # left, right, jump
+N_OUTPUTS = 3  # left, right, jump — top-down games use 5: + up, down (jump = bomb)
 
 
 class NeuralNet:
@@ -58,8 +58,9 @@ class NeuralNet:
         h = np.tanh(x @ self._w1 + self._b1)
         return 1.0 / (1.0 + np.exp(-(h @ self._w2 + self._b2)))
 
-    def act(self, x: np.ndarray) -> tuple[int, bool]:
-        """Sensor vector -> (move_x in {-1,0,+1}, jump). Left/right conflict resolves by argmax."""
+    def act(self, x: np.ndarray) -> tuple[int, bool, int]:
+        """Sensor vector -> (move_x, jump, move_y), each axis in {-1,0,+1}; opposing outputs resolve
+        by argmax. move_y is always 0 for 3-output nets (side-scrollers)."""
         if self.carry.size:
             x = np.concatenate((x, self.carry))
         out = self.forward(x)
@@ -68,12 +69,18 @@ class NeuralNet:
         if left > 0.5 or right > 0.5:
             move_x = -1 if left > right else 1
         jump = bool(jump > 0.5)
+        move_y = 0
+        if self.n_outputs >= 5:
+            up, down = out[3:5]
+            if up > 0.5 or down > 0.5:
+                move_y = -1 if up > down else 1
         if self.carry.size:
             head = [float(move_x), float(jump)] if self.feedback else []
-            self.carry = np.concatenate((head, out[3:])).astype(np.float32)
-        return move_x, jump
+            self.carry = np.concatenate((head, out[self.n_outputs:])).astype(np.float32)
+        return move_x, jump, move_y
 
 
 def make_net(cfg: "GAConfig") -> NeuralNet:
     """The net a GAConfig describes: sensor mode sets the inputs, the GA-sweep knobs the rest."""
-    return NeuralNet(sensor_dim(cfg.sensors), cfg.hidden, feedback=cfg.action_feedback, memory=cfg.memory)
+    return NeuralNet(sensor_dim(cfg.sensors), cfg.hidden, getattr(cfg, "n_outputs", N_OUTPUTS),
+                     feedback=cfg.action_feedback, memory=cfg.memory)

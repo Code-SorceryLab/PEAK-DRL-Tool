@@ -33,7 +33,7 @@ class GameAdapter(Protocol):
     def camera(self) -> tuple[float, float]: ...
 
     def reset(self) -> None: ...
-    def step(self, move_x: int, jump: bool) -> None: ...
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None: ...
     def render(self, surface: pygame.Surface) -> None: ...
     def solid_at(self, wx: float, wy: float) -> bool: ...
     def enemy_positions(self) -> list[tuple[float, float]]: ...
@@ -204,7 +204,7 @@ class MarioAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
@@ -331,7 +331,7 @@ class MegamanAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), 0, int(jump), 0])
@@ -448,7 +448,7 @@ class SonicAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
@@ -575,7 +575,7 @@ class MeatboyAdapter:
         self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, info = self.core.step(

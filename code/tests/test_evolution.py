@@ -17,7 +17,7 @@ def test_act_conflict_resolves_by_argmax():
     net = NeuralNet(n_inputs=2, n_hidden=2, n_outputs=3)
     net.set_weights(np.zeros(net.n_params, dtype=np.float32))
     net._b2 = np.array([4.0, 6.0, -4.0], dtype=np.float32)  # left and right both fire, right wins
-    move_x, jump = net.act(np.zeros(2, dtype=np.float32))
+    move_x, jump, _ = net.act(np.zeros(2, dtype=np.float32))
     assert move_x == 1
     assert jump is False
 
@@ -78,7 +78,7 @@ def test_act_carries_feedback_and_memory():
     net._b2[1] = 5.0    # right
     net._b2[2] = 5.0    # jump
     net._b2[4] = 5.0    # memory unit 1 fires
-    move_x, jump = net.act(np.zeros(2, dtype=np.float32))
+    move_x, jump, _ = net.act(np.zeros(2, dtype=np.float32))
     assert (move_x, jump) == (1, True)
     out = net.forward(np.zeros(6, dtype=np.float32))   # 2 sensors + 2 feedback + 2 memory
     assert np.allclose(net.carry[:2], [1.0, 1.0])          # decoded action fed back
