@@ -35,6 +35,8 @@ from .gasweep import rebuild as rebuild_gasweep
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
 GLYPH_CAT = {ch: cat for cat, chars in GLYPHS.items() for ch in chars}
+# Bomberman hides things under bricks: the exit and every power-up are solid until bombed.
+GLYPH_CAT_BOMBERMAN = {**GLYPH_CAT, "@": "?", "C": "?", "F": "?", "S": "?"}
 GLYPH_NAME = {"#": "solid", "=": "one-way platform", "?": "question block", "^": "hazard / pit / saw",
               "E": "enemy", "C": "coin / ring", "G": "goal", "S": "spring", "H": "ladder",
               "P": "player start", "D": "door"}
@@ -110,9 +112,10 @@ def _level_grid(game: str, level: str) -> list[str] | None:
     if not path or not os.path.exists(path):
         return None
     rows = []
+    cat = GLYPH_CAT_BOMBERMAN if game == "bomberman" else GLYPH_CAT
     with open(path, encoding="utf-8") as f:
         for line in f.read().splitlines():
-            rows.append("".join(GLYPH_CAT.get(ch, " ") for ch in line).rstrip())
+            rows.append("".join(cat.get(ch, " ") for ch in line).rstrip())
     while rows and not rows[-1]:
         rows.pop()
     return rows or None
@@ -1290,6 +1293,16 @@ GA_DOC = {  # label, plain-language subtitle, formatter
 }
 
 
+def _ray_layout(game: str) -> str:
+    """How the "rays" mode is wired for this game — a top-down game owns its own layout."""
+    from .sensors import RAY_DIRS, RAY_MAX_DIST, RAY_STEP
+    if game == "bomberman":
+        return ("4 rays (N · E · S · W) + how soon each neighbouring tile burns + own-tile blast timer "
+                "+ nearest-enemy bearing + bombs left + bricks a bomb here would open + exit bearing")
+    return (f"{len(RAY_DIRS)} rays ({RAY_MAX_DIST:.0f} px reach, {RAY_STEP:.0f} px steps) + enemy corridor "
+            f"+ pit probe + q-block count + body state")
+
+
 def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
     """GA + network hyperparameters behind one config, read from the probes' saved config."""
     from .evolution import GAConfig
@@ -1308,9 +1321,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
                (f" + {ga['memory']} memory units" if ga.get("memory") else "")
     sensing = (f"{GRID_N}×{GRID_N} tile window centred on the agent, {GRID_CH} channels "
                f"(solid · collectible · hazard) + body state — the Mario-AI-competition-style view"
-               if mode == "grid" else
-               f"{len(RAY_DIRS)} rays ({RAY_MAX_DIST:.0f} px reach, {RAY_STEP:.0f} px steps) + enemy corridor "
-               f"+ pit probe + q-block count + body state")
+               if mode == "grid" else _ray_layout(game))
     tiles = "".join(
         f'<div class="stat"><div class="lbl">{lbl}</div><div class="val">{fmt(ga[k])}</div>'
         f'<div class="sub">{sub}</div></div>' for k, (lbl, sub, fmt) in GA_DOC.items() if k in ga)
@@ -2278,8 +2289,8 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
              if total else "")
     svgs = _mode_svgs()
     hero = ""
-    for m, blurb in (("rays", "Six raycasts (forward, ±30°, ±60°, back) plus a forward enemy corridor, a pit probe "
-                              "and a question-block count. Sees far along a few lines; blind between them."),
+    for m, blurb in (("rays", "A handful of raycasts plus the scalars that game needs — a forward enemy corridor, "
+                              "a pit probe, a question-block count. Sees far along a few lines; blind between them."),
                      ("grid", "The cores' tile window sized to 11×11 around the agent, three channels: solid / "
                               "collectible / hazard. Sees everything nearby at tile resolution; no Dijkstra oracle.")):
         nin = sensor_dim(m)

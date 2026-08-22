@@ -139,3 +139,26 @@ sprites/animation (flat colours first), detonator/remote bombs, multiplayer batt
 the command center shows a Bomberman section whose level dialog has a verdict sentence, route
 canvas over the arena, death heat-map by BFS progress; `16 README Figures` includes Bomberman in
 `fig_difficulty`; 37 + new tests green.
+
+---
+
+## 7. As built — where the plan was wrong
+
+Three things the plan got wrong, all found by running the thing:
+
+**The 14-slot vector was the wrong shape.** The plan reused the ray-mode budget with eight compass
+rays and a single "this tile is about to burn" scalar. Every agent, in every episode, on every
+level, died to its own bomb: the vector said a blast was coming but never which way was out. The
+adapter now owns a 16-slot vector (`N_INPUTS_BY_GAME`, new `GAConfig.n_inputs` seam) whose slots
+4–7 are per-direction burn timers. First win on the brick levels went from *never in 60
+generations* to generation 4.
+
+**Eight levels was too coarse a ladder.** Levels 1 → 2 jumped from "walk to the exit" to "bomb
+through a wall" to "kill an enemy" with nothing in between. The campaign is now 15 levels, one new
+demand per rung, and `test_bomberman.py` pins each rung's intent (walkable vs bomb-required) so a
+level can't silently seal itself — which is exactly what the first `05_sparse_bricks` draft did.
+
+**The safe-bomb bonus needed splitting.** One counter can't teach two lessons. Paying for *any*
+survived bomb let agents farm the tight arena with litter (first win gen 59); paying only for
+*productive* bombs starved the exploration that finds the first bomb at all (gen 26). Surviving
+your first bomb now pays once, and bombs that open a brick or land on an enemy pay per use.

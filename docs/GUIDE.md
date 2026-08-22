@@ -6,8 +6,8 @@
 
 ## 1. What this is
 
-PEAK trains neural networks to play four hand-written Pygame platformers (Mario-style,
-Megaman, Sonic, Meat Boy) using **neuroevolution**: no gradients, no reward shaping, no RL
+PEAK trains neural networks to play five hand-written Pygame games — four platformers
+(Mario-style, Megaman, Sonic, Meat Boy) and a top-down Bomberman — using **neuroevolution**: no gradients, no reward shaping, no RL
 framework. Ten small networks play the same level simultaneously; the ones that get furthest
 breed the next generation. Repeat until the population completes the level, then the
 curriculum moves everyone to the next one.
@@ -94,6 +94,30 @@ Mostly, with two honest caveats:
 Sensor bars show *proximity* (bar grows as the obstacle nears); the raw value in the right
 column is the normalized distance (1.00 = clear).
 
+### A game can own its sensor vector
+
+The table above is the side-scroller layout. A game whose geometry doesn't fit it declares its
+own: an adapter that defines `sense()` returns whatever vector it likes, its length goes in
+`N_INPUTS_BY_GAME`, and `SENSOR_LABELS` tells the dashboard how to draw it. Bomberman reads
+**16**, because moving on two axes and outrunning your own bomb needs different information:
+
+| # | Sensor | Meaning |
+|---|---|---|
+| 0–3 | N / E / S / W rays | Distance to the nearest wall, brick or solid bomb in each direction the agent can move |
+| 4–7 | !N / !E / !S / !W | How soon the neighbouring tile burns (1 = burning now, 0 = safe) |
+| 8 | BOOM | How soon *this* tile burns |
+| 9–11 | NMY / NX / NY | Nearest living enemy: distance, and its bearing on each axis |
+| 12 | BMB | Bombs left to drop |
+| 13 | BRK | Bricks a bomb dropped here would open (of 4 arms) |
+| 14–15 | EX / EY | Bearing to the exit |
+
+Outputs grow to five (`N_OUTPUTS_BY_GAME`): left, right, **bomb**, up, down.
+
+Slots 4–7 are the whole reason the game is learnable. Without them the agent knows a blast is
+coming but not which way is out, and every genome in every generation dies on its own bomb —
+that was the measured behaviour before they existed. With them, "step to the neighbour that
+burns latest" walks out of the cross one tile at a time, and a reactive net can express it.
+
 ---
 
 ## 4. Is there a reward system?
@@ -107,7 +131,9 @@ fitness = furthest x reached (max_x_seen)  [+ 5000 win bonus if the level was co
 ```
 
 (Meat Boy's levels are 2-D mazes, so it uses BFS-distance-to-goal progress scaled to ~0–1000
-instead of x.) The old persona reward functions (`adept`, `speedrunner`, `enemy_hunter`, …)
+instead of x. Bomberman scores Dijkstra cost-to-exit on the same 0–1000 scale, with bricks priced
+at 6 so blowing open the right one counts as progress the moment it happens, plus a share for
+enemies killed — its exit stays sealed until the arena is clear.) The old persona reward functions (`adept`, `speedrunner`, `enemy_hunter`, …)
 are gone with the RL stack — under a GA, "which behaviors got further" replaces "which
 actions earned points." Score and coins are **recorded** per episode as metrics, but they do
 not influence evolution. If you ever want coin-hunting behavior, the lever is adding coins
@@ -221,13 +247,13 @@ and won zero episodes in 25 generations there.
 menu.py                     PEAK ENGINE hub (train / play / watch / tools)
 code/neuro/                 the neuroevolution system (net, evolution, sensors,
                             adapters, trainer, server, web dashboard)
-code/games/                 the four engines + levels + assets (mostly untouched)
+code/games/                 the five engines + levels + assets (four platformers + bomberman)
 code/games/tools/           level_editor.py, manual_play.py, make_level_slices.py
 runs/<name>/                gen_state.npz (weights) + state.json (config, RNG,
                             full history) + best.npz (all-time best genome)
 ```
 
 Replay the best genome: `python -m code.neuro.trainer --game mario --replay runs/mario/best.npz`.
-Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (35 tests:
-GA determinism, net shapes, sensor geometry, adapter/trainer smoke tests for all four games,
+Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (76 tests:
+GA determinism, net shapes, sensor geometry, adapter/trainer smoke tests for every game,
 balance aggregation, GA-sweep tags and verdicts).

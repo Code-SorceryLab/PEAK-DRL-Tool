@@ -46,6 +46,7 @@ class GameAdapter(Protocol):
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
 TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
 N_OUTPUTS_BY_GAME = {"bomberman": 5}
+N_INPUTS_BY_GAME = {"bomberman": 16}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
 
 
 def _set_locked_level(core, level: str) -> None:
@@ -632,22 +633,36 @@ class BombermanAdapter:
 
     _FIT_SCALE = 1000.0
     BRICK_BONUS = 40.0       # exploration: bricks opened
-    SAFE_BOMB_BONUS = 60.0   # a bomb that went off with the agent standing clear (drop-and-retreat)
-    SENSOR_LABELS = [  # dashboard telemetry layout for the 14-slot ray vector below
-        {"g": "Rays (8 directions)", "color": "bg-zinc-300", "rows": [
+    RETREAT_BONUS = 60.0     # surviving your own first bomb at all — the drop-and-retreat lesson,
+                             # paid once so it cannot be farmed by littering the arena
+    SAFE_BOMB_BONUS = 60.0   # per bomb that then achieved something: opened a brick, or landed on
+    SAFE_BOMB_CAP = 5        # an enemy. An empty blast is litter and earns nothing.
+    AIM_BONUS = 120.0        # how close a blast came to an enemy: the gradient from bombing to killing
+    KILL_BONUS = 150.0       # flat, per kill — the share below shrinks per enemy, so a crowded level
+                             # would otherwise pay less for each kill exactly where killing is harder
+    SENSOR_LABELS = [  # dashboard telemetry layout for the 16-slot ray vector below
+        {"g": "Rays (4 directions)", "color": "bg-zinc-300", "rows": [
             {"i": i, "l": n, "d": f"Ray {n}: distance to the nearest wall, brick or bomb", "inv": True}
-            for i, n in enumerate(("N", "NE", "E", "SE", "S", "SW", "W", "NW"))]},
-        {"g": "Threats", "color": "bg-red-500", "rows": [
-            {"i": 8, "l": "BOOM", "d": "Own tile is in a blast line: 1 = burning now, fades with fuse time left", "inv": False},
-            {"i": 9, "l": "NMY", "d": "Nearest living enemy, straight-line distance", "inv": True}]},
+            for i, n in enumerate(("N", "E", "S", "W"))]},
+        {"g": "Blast danger", "color": "bg-red-500", "rows": [
+            *({"i": 4 + i, "l": f"!{n}", "d": f"Step {n}: how soon that tile burns (1 = burning now, 0 = safe)",
+               "inv": False} for i, n in enumerate(("N", "E", "S", "W"))),
+            {"i": 8, "l": "BOOM", "d": "This tile is in a blast line: 1 = burning now, rises as the fuse runs down",
+             "inv": False}]},
+        {"g": "Enemies", "color": "bg-orange-400", "rows": [
+            {"i": 9, "l": "NMY", "d": "Nearest living enemy, straight-line distance", "inv": True},
+            {"i": 10, "l": "NX", "d": "Nearest enemy, horizontal bearing (left negative, right positive)",
+             "center": True, "inv": False},
+            {"i": 11, "l": "NY", "d": "Nearest enemy, vertical bearing (up negative, down positive)",
+             "center": True, "inv": False}]},
         {"g": "Bombing", "color": "bg-amber-400", "rows": [
-            {"i": 10, "l": "BMB", "d": "Bombs available to drop", "inv": False},
-            {"i": 11, "l": "BRK", "d": "Bricks a bomb dropped here would destroy (of 4 arms)", "inv": False}]},
+            {"i": 12, "l": "BMB", "d": "Bombs available to drop", "inv": False},
+            {"i": 13, "l": "BRK", "d": "Bricks a bomb dropped here would destroy (of 4 arms)", "inv": False}]},
         {"g": "Exit", "color": "bg-sky-400", "rows": [
-            {"i": 12, "l": "EX", "d": "Exit direction, horizontal (left negative, right positive)", "center": True, "inv": False},
-            {"i": 13, "l": "EY", "d": "Exit direction, vertical (up negative, down positive)", "center": True, "inv": False}]},
+            {"i": 14, "l": "EX", "d": "Exit direction, horizontal (left negative, right positive)", "center": True, "inv": False},
+            {"i": 15, "l": "EY", "d": "Exit direction, vertical (up negative, down positive)", "center": True, "inv": False}]},
     ]
-    _RAY8 = [(0, -1), (0.7071, -0.7071), (1, 0), (0.7071, 0.7071), (0, 1), (-0.7071, 0.7071), (-1, 0), (-0.7071, -0.7071)]
+    _RAY4 = [(0, -1), (1, 0), (0, 1), (-1, 0)]   # N, E, S, W — the directions the agent can actually move
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
                  sprint: bool = False, time_rate: float = 0.0) -> None:
@@ -697,6 +712,7 @@ class BombermanAdapter:
         return 0.0, 0.0
 
     def reset(self) -> None:
+        self.core.won = False  # reset() advances to the next level when won is left True
         self.core.reset()
         if self.sprint:
             self.core.player.speed = float(self.core.cfg["player"].get("sprint_speed", 168))
@@ -739,24 +755,32 @@ class BombermanAdapter:
         return sum(1 for (x, y) in cells if self.core.tile(x, y) in ("?", "C", "F", "S", "@"))
 
     def sense(self, march, ray_max, hit_solid, hit_enemy, hit_none, tile_hit, tile_probe):
-        """14-slot ray vector (see SENSOR_LABELS) + overlay rays/tiles for the dashboard."""
+        """16-slot ray vector (see SENSOR_LABELS) + overlay rays/tiles for the dashboard.
+
+        The four danger slots are what makes retreat learnable: a bomb covers a cross, so
+        "step to the neighbour that burns latest" walks out of it one tile at a time."""
         import numpy as np
         core, p = self.core, self.core.player
         ox, oy = self.x, self.y
         ts = float(self.tile_size)
-        vec = np.empty(14, dtype=np.float32)
+        fuse = float(core.cfg["bomb"]["fuse_frames"])
+        tx, ty = core._center_tile(p.x, p.y, p.width, p.height)
+        vec = np.empty(16, dtype=np.float32)
         rays, tiles = [], []
-        for i, (dx, dy) in enumerate(self._RAY8):
+
+        def burn(cx: int, cy: int) -> float:
+            ttb = core.time_to_boom(cx, cy)
+            return 0.0 if ttb is None else max(0.0, 1.0 - ttb / fuse)
+
+        for i, (dx, dy) in enumerate(self._RAY4):
             d = march(self, ox, oy, dx, dy)
             vec[i] = d / ray_max
+            vec[4 + i] = burn(tx + dx, ty + dy)
             hit = d < ray_max
             rays.append((ox, oy, ox + dx * d, oy + dy * d, hit_solid if hit else hit_none))
             if hit:
                 tiles.append(((ox + dx * d) // ts * ts, (oy + dy * d) // ts * ts, ts, tile_hit))
-        tx, ty = core._center_tile(p.x, p.y, p.width, p.height)
-        ttb = core.time_to_boom(tx, ty)
-        fuse = float(core.cfg["bomb"]["fuse_frames"])
-        vec[8] = 0.0 if ttb is None else max(0.0, 1.0 - ttb / fuse)
+        vec[8] = burn(tx, ty)
         for (cx, cy) in core.danger_cells():
             tiles.append((cx * ts, cy * ts, ts, tile_probe))
         best, bx, by = ray_max, None, None
@@ -765,14 +789,27 @@ class BombermanAdapter:
             if d < best:
                 best, bx, by = d, ex, ey
         vec[9] = best / ray_max
+        vec[10] = 0.0 if bx is None else max(-1.0, min(1.0, (bx - ox) / ray_max))
+        vec[11] = 0.0 if by is None else max(-1.0, min(1.0, (by - oy) / ray_max))
         if bx is not None:
             rays.append((ox, oy, bx, by, hit_enemy))
-        vec[10] = (p.bombs_max - len(core.bombs)) / max(p.bombs_max, 1)
-        vec[11] = min(self.qblock_count_near(p.blast_range), 4) / 4.0
+        vec[12] = (p.bombs_max - len(core.bombs)) / max(p.bombs_max, 1)
+        vec[13] = min(self.qblock_count_near(p.blast_range), 4) / 4.0
         ex, ey = core.level_data.exit
-        vec[12] = max(-1.0, min(1.0, ((ex + 0.5) * ts - ox) / core.level_data.width))
-        vec[13] = max(-1.0, min(1.0, ((ey + 0.5) * ts - oy) / core.level_data.height))
+        vec[14] = max(-1.0, min(1.0, ((ex + 0.5) * ts - ox) / core.level_data.width))
+        vec[15] = max(-1.0, min(1.0, ((ey + 0.5) * ts - oy) / core.level_data.height))
         return vec, rays, tiles
+
+    @property
+    def busy(self) -> bool:
+        """Standing still with a bomb ticking is the game, not a stall — the trainer's
+        stuck rule comes from the platformers, where waiting is always wasted time."""
+        return bool(self.core.bombs or self.core.blasts)
+
+    @property
+    def reach(self) -> float:
+        """What the progress bar measures: the same 0..1000 exit-cost scale as episode_stats."""
+        return self.progress() * self._FIT_SCALE
 
     def progress(self) -> float:
         return max(0.0, min(1.0, 1.0 - self._best_cost / self._start_cost))
@@ -782,12 +819,15 @@ class BombermanAdapter:
         progress and share of enemies killed — so a kill always beats camping the exit. Small
         bonuses for bricks opened and bombs survived keep early, sparse behaviour learnable."""
         core = self.core
-        bonus = self.BRICK_BONUS * core.bricks_destroyed + self.SAFE_BOMB_BONUS * min(core.safe_detonations, 5)
+        bonus = (self.BRICK_BONUS * core.bricks_destroyed
+                 + self.RETREAT_BONUS * min(core.safe_detonations, 1)
+                 + self.SAFE_BOMB_BONUS * min(core.useful_detonations, self.SAFE_BOMB_CAP))
         if self.won:
             return self._FIT_SCALE + bonus + self.win_bonus + _win_time_bonus(self)
         n = len(core.enemies)
         if n:
-            return 0.5 * self._FIT_SCALE * (self.progress() + core.kills_total / n) + bonus
+            return (0.5 * self._FIT_SCALE * (self.progress() + core.kills_total / n)
+                    + self.KILL_BONUS * core.kills_total + self.AIM_BONUS * core.best_aim + bonus)
         return self.progress() * self._FIT_SCALE + bonus
 
     def episode_stats(self) -> dict:

@@ -21,7 +21,7 @@ import time
 import numpy as np
 import pygame
 
-from .adapters import N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
+from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet, make_net
@@ -121,6 +121,8 @@ class Trainer:
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
         cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))  # top-down games steer on two axes
+        if cfg.sensors == "rays":
+            cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)  # a game owning sense() owns its vector length
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
@@ -228,7 +230,7 @@ class Trainer:
         for i, slot in enumerate(self.slots):
             entry: dict = {
                 "id": i,
-                "x": round(slot.adapter.x, 1),
+                "x": round(getattr(slot.adapter, "reach", slot.adapter.x), 1),   # how far along, in level_len units
                 "fitness": round(slot.adapter.fitness(), 1),
                 "status": slot.adapter.status,
                 "watched": i == watch,
@@ -337,6 +339,8 @@ class Trainer:
                 if fit > slot.stuck_anchor_x + 1.0:
                     slot.stuck_anchor_x = fit
                     slot.stuck_frames = 0
+                elif getattr(slot.adapter, "busy", False):
+                    slot.stuck_frames = 0   # waiting out your own fuse is play, not stalling
                 else:
                     slot.stuck_frames += 1
                     if slot.stuck_frames >= self.cfg.stuck_frames and slot.adapter.alive:

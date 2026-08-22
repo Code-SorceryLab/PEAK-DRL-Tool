@@ -101,6 +101,47 @@ its goal floating above the running surface (agents sprinted underneath it — O
 got a full-height goal column instead. This is the tool working as intended: **probe every
 new level before shipping it.**
 
+### The Bomberman ladder — a campaign designed as a measuring instrument
+
+Bomberman's fifteen levels (`code/games/levels/bomberman/`, list in `bomberman_config.yaml`) were
+authored as a graded ladder rather than a game: each rung adds exactly one demand, so an unsolved
+level names the skill that failed instead of just "hard".
+
+| # | Level | New demand |
+|---|---|---|
+| 1 | `01_open_floor` | walk to the exit |
+| 2 | `02_first_bomb` | one brick blocks a doorway — bomb it and retreat |
+| 3 | `03_dead_end` | the same, with the retreat pointing away from the exit |
+| 4 | `04_one_wall` | a brick wall spanning the arena; any one brick opens it |
+| 5 | `05_sparse_bricks` | bricks as scenery — a clear lane exists, bombing is optional |
+| 6 | `06_hidden_exit` | the exit is under a brick |
+| 7 | `07_arena` | a small arena and one Ballom: the exit only opens on a clear arena |
+| 8 | `08_corridor` | the same kill, in the full arena |
+| 9 | `09_two_balloms` | two enemies |
+| 10–15 | `10_brick_maze` … `15_gauntlet` | dense mazes, hidden exits, chasers, brick-walkers, power-ups, three enemies |
+
+`code/tests/test_bomberman.py` pins each rung's *intent* — whether the level is beatable with no
+bomb at all — so a level can't silently drift. It caught the first `05_sparse_bricks` draft, whose
+scattered bricks happened to seal every route to the exit; the probe had reported it as
+mysteriously unsolvable, one rung after a level agents beat in a single generation.
+
+**Design constraints the probes exposed (Bomberman):**
+
+- **The agent must be able to see where is safe.** With eight wall-distance rays and one "this tile
+  is about to burn" scalar, every genome in every generation died on its own bomb — the vector said
+  a blast was coming but not which way was out. Four per-direction burn timers took first win on the
+  brick levels from *never in 60 generations* to generation 4.
+- **Waiting is play, not stalling.** The trainer's stuck rule comes from the platformers, where
+  standing still is always wasted time. Standing clear of a live fuse is the core Bomberman skill,
+  so adapters may declare themselves `busy` and pause the rule.
+- **A kill must not be worth less on a crowded level.** Scoring kills purely as a share of the
+  enemies present paid 500 for the only enemy but 250 each for two — least reward where the task is
+  hardest. Kills now also pay a flat per-kill bonus.
+- **Two enemies is the ladder's wall.** One Ballom is cleared by most seeds; two is unsolved at a
+  40-generation budget even in an open arena, because a single range-1 bomb has to catch a wandering
+  target twice. That cliff is the ladder's honest hard end, not a bug — it is exactly the kind of
+  difficulty step the tool exists to locate.
+
 **Selecting levels live:** the dashboard's Run panel has a level dropdown — picking one
 switches the whole population at the next generation boundary (the curriculum resumes from
 there). `--level` on the CLI locks a single level; menu Train Single prompts for one.

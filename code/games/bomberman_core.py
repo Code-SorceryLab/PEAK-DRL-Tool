@@ -110,6 +110,7 @@ class BombermanCore:
         self._seed = seed
         self.rng = random.Random(seed)
         self._font = None
+        self.won = False
         self.reset()
 
     # ── level ────────────────────────────────────────────────────────────────
@@ -145,6 +146,8 @@ class BombermanCore:
         return LevelData(grid, len(grid), cols, self.tile_size, start, exit_, hidden, spawns)
 
     def reset(self, *, seed=None, options=None):
+        if self.won:  # beating a level advances to the next (wrapping); dying/timeout replays
+            self._level_idx = (self._level_idx + 1) % len(self.cfg["levels"])
         if seed is not None:
             self._seed = seed
         self.rng = random.Random(self._seed)
@@ -166,7 +169,9 @@ class BombermanCore:
         self.coins_total = 0       # power-ups collected (the adapter's "coins")
         self.kills_total = 0
         self.bricks_destroyed = 0
-        self.safe_detonations = 0  # bombs that went off while the player stood clear (learned retreat)
+        self.safe_detonations = 0    # bombs that went off while the player stood clear (learned retreat)
+        self.useful_detonations = 0  # ...of those, the ones that opened a brick or landed on an enemy
+        self.best_aim = 0.0        # closest a blast came to a living enemy (1 = hit); the aiming gradient
         self.timer = float(self.cfg.get("time_limit", 200))
         self.won = False
         self.alive = True
@@ -280,7 +285,9 @@ class BombermanCore:
                     break
         return cells
 
-    def _explode(self, first: Bomb) -> None:
+    def _explode(self, first: Bomb) -> bool:
+        """Detonate a bomb (chaining neighbours). True if the blast opened a brick or
+        landed next to an enemy — an empty blast is just litter and earns nothing."""
         queue, done, cells = [first], set(), set()
         while queue:
             b = queue.pop()
@@ -295,14 +302,24 @@ class BombermanCore:
                 if (other.tx, other.ty) in bc:
                     queue.append(other)
         ld = self.level_data
+        opened = 0
         for x, y in cells:
             t = self.tile(x, y)
             if t in (BRICK, "C", "F", "S", EXIT_HIDDEN):
+                opened += 1
                 ld.grid[y][x] = REVEALED.get(t, FLOOR)
                 self.bricks_destroyed += 1
                 self.score += int(self.cfg["scoring"]["brick"])
+        alive = [self._center_tile(e.x, e.y, e.width, e.height) for e in self.enemies if e.alive]
+        gap = None
+        if alive:  # how near the blast came: a smooth gradient from "bombed nowhere" to "killed it"
+            gap = min(abs(ex - cx) + abs(ey - cy) for cx, cy in cells for ex, ey in alive)
+            self.best_aim = max(self.best_aim, 1.0 - min(gap, self.AIM_REACH) / self.AIM_REACH)
         self.blasts.append(Blast(cells, int(self.cfg["bomb"]["blast_frames"])))
         self._dist = self._distance_field()
+        return opened > 0 or (gap is not None and gap <= 1)
+
+    AIM_REACH = 4    # tiles: how far from an enemy a blast still counts as "aimed at it"
 
     def danger_cells(self, lookahead: int | None = None) -> set:
         """Cells that are burning now or will be within `lookahead` frames (for sensing)."""
@@ -375,12 +392,12 @@ class BombermanCore:
             if b.passable and not (p.x < (b.tx + 1) * ts and p.x + p.width > b.tx * ts
                                    and p.y < (b.ty + 1) * ts and p.y + p.height > b.ty * ts):
                 b.passable = False
-        exploded = 0
+        exploded = useful = 0
         for b in list(self.bombs):
             b.fuse -= 1
             if b.fuse <= 0 and b in self.bombs:
-                self._explode(b)
                 exploded += 1
+                useful += int(self._explode(b))
         for bl in list(self.blasts):
             bl.frames -= 1
             if bl.frames <= 0:
@@ -411,6 +428,7 @@ class BombermanCore:
             self._die("Bomb")
         elif exploded and self.alive:
             self.safe_detonations += exploded
+            self.useful_detonations += useful
         if self.alive and self.timer <= 0:
             self._die("Timeout")
         if self.alive and (ptx, pty) == self.level_data.exit and self.tile(ptx, pty) == EXIT \

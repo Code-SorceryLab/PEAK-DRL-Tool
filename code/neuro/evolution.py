@@ -32,6 +32,7 @@ class GAConfig:
     action_feedback: bool = False
     memory: int = 0
     n_outputs: int = 3           # 3 = left/right/jump (side-scrollers); 5 adds up/down (bomberman: jump = bomb)
+    n_inputs: int = 0            # 0 = derive from the sensor mode; a game with its own ray layout sets its own
 
 
 class Population:

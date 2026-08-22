@@ -82,5 +82,6 @@ class NeuralNet:
 
 def make_net(cfg: "GAConfig") -> NeuralNet:
     """The net a GAConfig describes: sensor mode sets the inputs, the GA-sweep knobs the rest."""
-    return NeuralNet(sensor_dim(cfg.sensors), cfg.hidden, getattr(cfg, "n_outputs", N_OUTPUTS),
+    return NeuralNet(getattr(cfg, "n_inputs", 0) or sensor_dim(cfg.sensors),
+                     cfg.hidden, getattr(cfg, "n_outputs", N_OUTPUTS),
                      feedback=cfg.action_feedback, memory=cfg.memory)

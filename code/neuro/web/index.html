@@ -159,7 +159,7 @@
           <span class="eyebrow hidden sm:inline">of level</span>
         </div>
         <div id="f_meta" class="mt-2 font-mono text-xs text-zinc-400 tabular-nums flex flex-wrap gap-x-4 gap-y-1">
-          <span title="Horizontal position in pixels">x <b class="text-zinc-200" id="m_x">–</b></span>
+          <span id="m_x_wrap" title="Horizontal position in pixels"><span id="m_x_lbl">x</span> <b class="text-zinc-200" id="m_x">–</b></span>
           <span title="Fitness = distance covered + win / score bonuses">fitness <b class="text-zinc-200" id="m_fit">–</b></span>
           <span title="In-game score">score <b class="text-zinc-200" id="m_score">–</b></span>
           <span title="Coins collected this episode">coins <b class="text-zinc-200" id="m_coins">–</b></span>
@@ -514,6 +514,9 @@ function onUpdate(m){
   lastSeen = Date.now();
   if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
   if (s.game){ $("h_game").textContent = s.game; KEYMAP = TOPDOWN.has(s.game) ? KEYMAPS.topdown : KEYMAPS.side;
+    $("m_x_lbl").textContent = TOPDOWN.has(s.game) ? "reach" : "x";
+    $("m_x_wrap").title = TOPDOWN.has(s.game) ? "How much of the route to the exit is behind the agent"
+                                              : "Horizontal position in pixels";
     $("ribbon").textContent = TOPDOWN.has(s.game) ? "Manual control — arrows / WASD move, space drops a bomb, Esc releases · turbo paused"
                                                    : "Manual control — arrows / WASD move, space jumps, Esc releases · turbo paused"; }
   if (s.level_len !== undefined) levelLen = s.level_len;

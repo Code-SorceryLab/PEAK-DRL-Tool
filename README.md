@@ -10,13 +10,13 @@
   <img src="https://img.shields.io/badge/agent-291%20weights-ef4444?style=flat-square" alt="291 weights">
   <img src="https://img.shields.io/badge/deterministic-seed%2042-22c55e?style=flat-square" alt="Deterministic">
   <img src="https://img.shields.io/badge/GPU-not%20required-9a9a9a?style=flat-square" alt="No GPU">
-  <img src="https://img.shields.io/badge/tests-35%20passing-22c55e?style=flat-square" alt="35 tests">
+  <img src="https://img.shields.io/badge/tests-76%20passing-22c55e?style=flat-square" alt="76 tests">
 </p>
 
 <p align="center">
   <img src="docs/img/engines.png" alt="Four game engines — Mario-style, Megaman, Sonic, Meat Boy — each played by the same evolved agent; red lines are its raycast sensors" width="900">
 </p>
-<p align="center"><sub>Four hand-written engines, one probe. The red fan is what the agent sees: six raycasts, a pit probe and an enemy corridor — 14 numbers into a 291-weight network.</sub></p>
+<p align="center"><sub>Four of the five hand-written engines, one probe. The red fan is what the agent sees: six raycasts, a pit probe and an enemy corridor — 14 numbers into a 291-weight network. The fifth, a top-down Bomberman, senses on its own 16-slot vector.</sub></p>
 
 **PEAK** is a game-balancing engine built for Ontario Tech University's Master's program. Instead of
 asking humans to play a level a thousand times, it evolves populations of tiny neural networks
@@ -68,7 +68,7 @@ same run — bit for bit.
 ## What the probes found
 
 <!-- figures:auto -->
-Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-08-22 from 6 sweep reports, 12 ablation arms and 144 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
+Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-08-22 from 9 sweep reports, 12 ablation arms and 144 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
 <!-- /figures:auto -->
 
 <p align="center">
@@ -167,7 +167,7 @@ python -m code.games.tools.manual_play --game meatboy --level 3        # Meat Bo
 
 ```mermaid
 flowchart LR
-    A[("ASCII level<br/>game_config.yaml")] --> E["Game engine<br/>Mario · Megaman · Sonic · Meat Boy"]
+    A[("ASCII level<br/>game_config.yaml")] --> E["Game engine<br/>Mario · Megaman · Sonic<br/>Meat Boy · Bomberman"]
     E --> S["Sensors<br/>14 rays or 368-cell grid"]
     S --> N["NeuralNet<br/>14 → 16 tanh → 3"]
     N -->|move · jump| E
@@ -180,7 +180,7 @@ flowchart LR
 
 | Layer | Where | What it does |
 |---|---|---|
-| Engines | `code/games/*_core.py` | Four deterministic Pygame platformers sharing ASCII level loading and debug tooling |
+| Engines | `code/games/*_core.py` | Five deterministic Pygame games — four platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling |
 | Adapters | `code/neuro/adapters.py` | One `GameAdapter` face per engine: reset, step, solid/hazard queries, fitness, episode stats |
 | Sensors | `code/neuro/sensors.py` | Raycast marching + scalar senses → 14 floats; or a 3 × 11 × 11 tile window + body senses → 368 |
 | Evolution | `code/neuro/evolution.py` | `GAConfig` + `Population`: flat weight vectors, elitism, tournament, uniform crossover, gaussian mutation, checkpoints with RNG state |
@@ -279,6 +279,96 @@ up at the next generation — no restart.
 
 ---
 
+## Adding a game to the engine
+
+PEAK is engine-agnostic: the evolution loop never imports a game. It talks to one small adapter
+face, and everything else — dashboard, probes, report, figures — follows from registering the
+game's key. Bomberman was added this way; the walkthrough below is that work, in order.
+
+### 1. Write the core — `code/games/<game>_core.py`
+
+A core owns the rules, the level, and the pixels. It must be **deterministic** (one seed → identical
+run) and **headless-capable** (`render_mode="none"`, no display required). The trainer only calls:
+
+| Member | Contract |
+|---|---|
+| `reset(*, seed=None, options=None)` | Rebuild the level and the entities. Advance to the next level if `self.won` is still `True` from the last episode (that is how manual play walks the campaign; the adapter clears the flag to stay pinned) |
+| `step(action)` | One fixed-`dt` tick → `(obs, reward, terminated, truncated, info)`. The reward is ignored — fitness lives in the adapter |
+| `render(surface=None, blit_only=False)` | Draw a frame onto the given surface |
+| `alive` · `won` · `score` · `death_cause` | Episode state. `death_cause` becomes the report's cause-of-death breakdown, so name the causes well ("Bomb", "Enemy", "Timeout") |
+| `tile_size` · `fps` · `WIDTH` · `HEIGHT` · `level_data` | Geometry the sensors and the dashboard canvas read |
+
+Give it a `__main__` smoke test that scripts a win and a death — cheaper than debugging through
+the GA later.
+
+### 2. Levels — `code/games/levels/<game>/*.txt` + `<game>_config.yaml`
+
+ASCII grids, one file per level, glyphs documented in `code/games/levels/common/ASCII_TILEMAP.md`.
+Name them `NN_slug.txt` so the campaign ordering is obvious, and list them in a `levels:` block:
+
+```yaml
+levels:                    # index = level id (menu / --level N)
+  - bomberman/01_open_floor.txt
+  - bomberman/02_first_bomb.txt
+```
+
+Levels addressed by index instead of by name go in `INDEXED_GAMES` (`adapters.py`, `menu.py`,
+`manual_play.py`). Design the ladder so each rung adds exactly one demand — the probe reads a
+ladder far better than it reads a difficulty cliff.
+
+### 3. Adapter — `code/neuro/adapters.py`
+
+One class implementing the `GameAdapter` protocol at the top of that file, plus an entry in
+`_ADAPTERS`. Beyond the obvious `reset` / `step` / `render`, three methods carry the interesting
+decisions:
+
+- **`solid_at(wx, wy)`** — what a raycast stops on. Include hazards the agent should see; exclude
+  things it can walk through (a bomb it is still standing on isn't a wall yet).
+- **`fitness()`** — the only thing evolution optimises. Use a *dense* signal: distance covered, or
+  cost-to-goal progress on a 0–1000 scale, plus the win bonus. Prefer a measure that improves the
+  moment the world improves — Bomberman scores Dijkstra cost-to-exit with bricks priced at 6, so
+  blowing up the right brick pays immediately, without moving.
+- **`episode_stats()`** — the per-episode CSV row: `end_x`, `level_len`, `cause`, `coins`, `kills`.
+  `end_x / level_len` becomes the reach percentage everywhere, so both must measure the same thing.
+
+Optional hooks a non-platformer will want:
+
+| Hook | Why |
+|---|---|
+| `TOPDOWN_GAMES` + `N_OUTPUTS_BY_GAME` | Grow the network's output layer past `left/right/jump` — Bomberman uses 5 (jump = drop a bomb, plus up/down) |
+| `N_INPUTS_BY_GAME` + `sense()` + `SENSOR_LABELS` | Own the ray-mode sensor vector. `sensors.py` hands `sense()` the ray marcher and returns whatever you build; `SENSOR_LABELS` is what the dashboard's telemetry panel renders, so every slot gets a name and a one-line explanation |
+| `reach` | What the progress bar measures, when it isn't pixel-x |
+
+**Sensors are the whole ballgame.** Bomberman first trained with eight wall-distance rays and a
+single "this tile is about to burn" scalar: every agent in every episode died to its own bomb,
+because nothing in the vector said *which way is out*. Adding four slots — how soon each
+neighbouring tile burns — took the first win from never to generation 4. If a level is unsolvable,
+ask what the agent cannot see before you touch the fitness.
+
+### 4. Register the key everywhere it shows up
+
+```
+menu.py                     GAMES, _PLAY_CONTROLS, INDEXED_GAMES
+code/games/tools/manual_play.py   ACTION_MAPPING (keyboard → action), _random_action
+code/neuro/figures.py       GNAME (display name on the README figures)
+code/neuro/report.py        the config-section block, the game icon, glyph overrides
+code/neuro/web/index.html   TOPDOWN (which keymap manual takeover uses)
+```
+
+### 5. Prove it end to end
+
+```bash
+python -m pytest code/tests/test_<game>.py -q             # levels, rules, sensor dims
+python -m code.games.tools.manual_play --game <game> --random --fps 600
+python -m code.neuro.trainer --game <game> --level 0 --gens 40 --turbo --no-serve
+python -m code.neuro.balance --game <game> --gens 20      # then: python -m code.neuro.report
+```
+
+Level 0 should be solved within a handful of generations. If it isn't, the problem is the sensors
+or the fitness — not the GA.
+
+---
+
 ## Research use
 
 | Question | What to run | What to read |
@@ -297,9 +387,11 @@ up at the next generation — no restart.
 python -m pytest code/tests -q
 ```
 
-35 tests: GA determinism (seeded mutation, crossover, elitism), net parameter counts and the
+76 tests: GA determinism (seeded mutation, crossover, elitism), net parameter counts and the
 feedback/memory carry, raycasts and the tile grid on synthetic levels, headless adapter and trainer
-smoke tests, balance-probe aggregation, and the GA-sweep config / tag / verdict logic.
+smoke tests, balance-probe aggregation, the GA-sweep config / tag / verdict logic, and — for
+Bomberman — every level file's geometry and reachability, blast and chain-reaction rules, and the
+sensor contract.
 
 Known wart: the top-level package is named `code`, which shadows a stdlib module. Renaming it
 touches every import under `code/games/` and hasn't been worth the churn.
