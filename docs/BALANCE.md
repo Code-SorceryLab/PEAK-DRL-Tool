@@ -103,7 +103,9 @@ new level before shipping it.**
 
 ### The Bomberman ladder — a campaign designed as a measuring instrument
 
-Bomberman's fifteen levels (`code/games/levels/bomberman/`, list in `bomberman_config.yaml`) were
+Bomberman's authored ladder is fifteen levels (`code/games/levels/bomberman/`, list in
+`bomberman_config.yaml`); **twelve are enabled** — 13-15 sit under `disabled_levels` because they
+stayed 0/3 at every budget, so they cost sweep time without ranking anything. The rungs were
 authored as a graded ladder rather than a game: each rung adds exactly one demand, so an unsolved
 level names the skill that failed instead of just "hard".
 

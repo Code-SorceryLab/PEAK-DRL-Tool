@@ -43,8 +43,11 @@ def test_level_file_is_well_formed(core, level):
 # What each rung of the campaign is for. "walk" = beatable with no bomb at all (the bricks are
 # scenery); "bomb" = the exit is sealed until something is blown open. A level that drifts from its
 # intent is a design bug the probe would otherwise report as mysterious difficulty.
-LADDER = ["walk", "bomb", "bomb", "bomb", "walk", "bomb", "walk", "walk",
-          "walk", "bomb", "bomb", "bomb", "bomb", "bomb", "bomb"]
+# One rung per authored level. Disabled levels are always a suffix of the list (see
+# bomberman_config.yaml), so slicing to the enabled count keeps this aligned either way.
+LADDER_AUTHORED = ["walk", "bomb", "bomb", "bomb", "walk", "bomb", "walk", "walk",
+                   "walk", "bomb", "bomb", "bomb", "bomb", "bomb", "bomb"]
+LADDER = LADDER_AUTHORED[:len(LEVELS)]
 
 
 def _walk_only_cost(core) -> int | None:
@@ -81,7 +84,8 @@ def test_ladder_ramps_up():
     assert costs[0] == (22.0, 0), "level 1 is a plain walk to the exit"
     assert costs[1][0] > costs[0][0], "level 2 must cost a bomb"
     assert len(LADDER) == len(LEVELS), "every level needs a rung"
-    assert max(n for _, n in costs) == costs[-1][1] >= 3, "the last level holds the most enemies"
+    assert len(LADDER_AUTHORED) >= len(LEVELS), "a level was added without a rung"
+    assert costs[-1][1] == max(n for _, n in costs) >= 2, "the ladder ends on its most crowded level"
 
 
 def test_blast_stops_at_wall_and_ends_on_brick(core):

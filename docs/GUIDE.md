@@ -247,7 +247,8 @@ and won zero episodes in 25 generations there.
 menu.py                     PEAK ENGINE hub (train / play / watch / tools)
 code/neuro/                 the neuroevolution system (net, evolution, sensors,
                             adapters, trainer, server, web dashboard)
-code/games/                 the five engines + levels + assets (four platformers + bomberman)
+code/games/                 the five engines + levels + assets (four platformers + bomberman;
+                            megaman and sonic are archived — see adapters.ARCHIVED_GAMES)
 code/games/tools/           level_editor.py, manual_play.py, make_level_slices.py
 runs/<name>/                gen_state.npz (weights) + state.json (config, RNG,
                             full history) + best.npz (all-time best genome)

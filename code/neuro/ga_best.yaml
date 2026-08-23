@@ -10,7 +10,7 @@
 #
 # OFAT composites ignore interactions between knobs — `confirmed_win_rate` is the composite
 # actually probed by `--confirm`, next to the `baseline_win_rate` it has to beat.
-generated: 2026-08-22 19:02
+generated: 2026-08-22 20:49
 baseline:
   pop_size: 10
   elite: 4
@@ -26,96 +26,30 @@ baseline:
 games:
   mario:
     recommended:
-      elite: 6
+      hidden: 64
+      pop_size: 30
+      elite: 1
       tournament_k: 2
       crossover_rate: 0.0
       mutation_sigma: 0.5
-      anneal_factor: 0.5
+      anneal_factor: 0.3
       init_sigma: 1.0
       action_feedback: true
       memory: 2
     per_sweep:
-      "experienced\xB740gen\xB7rays":
+      experienced / 40 gens / rays:
         overrides:
+          pop_size: 30
           action_feedback: true
-          anneal_factor: 0.5
+          anneal_factor: 0.3
           crossover_rate: 0.0
+          elite: 1
           hidden: 64
           init_sigma: 1.0
           memory: 2
           mutation_sigma: 0.5
           tournament_k: 2
-        baseline_win_rate: 0.2333
-        confirmed_win_rate: 0.3533
+        baseline_win_rate: 0.2583
+        confirmed_win_rate: 0.2078
         configs: 24
-      "novice\xB740gen\xB7rays":
-        overrides:
-          anneal_factor: 0.5
-          elite: 6
-          hidden: 32
-          memory: 3
-          mutation_rate: 0.005
-        baseline_win_rate: 0.3117
-        confirmed_win_rate: 0.4633
-        configs: 24
-      "speedrunner\xB740gen\xB7rays":
-        overrides:
-          action_feedback: true
-          anneal_factor: 0.5
-          crossover_rate: 0.0
-          elite: 6
-          hidden: 8
-          init_sigma: 1.0
-          memory: 2
-          mutation_rate: 0.5
-          mutation_sigma: 0.5
-          tournament_k: 2
-        baseline_win_rate: 0.3717
-        confirmed_win_rate: 0.5083
-        configs: 24
-    sweeps: 3
-  meatboy:
-    recommended:
-      pop_size: 30
-      tournament_k: 8
-      crossover_rate: 0.95
-      mutation_rate: 0.005
-      anneal_factor: 0.5
-      memory: 2
-    per_sweep:
-      "experienced\xB740gen\xB7rays":
-        overrides:
-          anneal_factor: 0.5
-        baseline_win_rate: 0.2321
-        confirmed_win_rate: 0.2976
-        configs: 24
-      "novice\xB740gen\xB7rays":
-        overrides:
-          pop_size: 30
-          anneal_factor: 0.5
-          crossover_rate: 0.95
-          elite: 6
-          hidden: 32
-          memory: 2
-          mutation_rate: 0.005
-          tournament_k: 8
-        baseline_win_rate: 0.1582
-        confirmed_win_rate: 0.4451
-        configs: 24
-      "speedrunner\xB740gen\xB7rays":
-        overrides:
-          pop_size: 30
-          action_feedback: true
-          anneal_factor: 0.5
-          crossover_rate: 0.95
-          elite: 1
-          hidden: 8
-          init_sigma: 1.0
-          memory: 2
-          mutation_rate: 0.005
-          mutation_sigma: 0.02
-          tournament_k: 8
-        baseline_win_rate: 0.2306
-        confirmed_win_rate: 0.5194
-        configs: 24
-    sweeps: 3
+    sweeps: 1

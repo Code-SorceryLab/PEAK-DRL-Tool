@@ -46,6 +46,12 @@ levels:                    # index = level id (menu / --level N); paths relative
   - {file: bomberman/10_brick_maze.txt,    enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/11_buried_exit.txt,   enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/12_chasers.txt,       enemy_speed: 0.7, requires_clear: false}
+
+disabled_levels:           # kept on disk, off the ladder: ids stay 0-11 for the enabled set.
+  # 13-15 stayed 0/3 across every persona and both 40- and 80-generation budgets. They ask for
+  # three or more bombs chained through a dense maze while two enemies hunt, which is past what
+  # a 291-weight reactive policy reaches — so they cost sweep budget without ranking anything.
+  # Re-enable by moving an entry back under `levels:`.
   - {file: bomberman/13_brick_walkers.txt, enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/14_powder_keg.txt,    enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/15_gauntlet.txt,      enemy_speed: 0.7, requires_clear: false}

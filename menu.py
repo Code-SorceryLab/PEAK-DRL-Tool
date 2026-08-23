@@ -34,7 +34,19 @@ DISABLED_LEVELS_KEY = "disabled_levels"
 CHIME_PATH = Path("chime.wav")
 
 # Adapter keys → game_config.yaml section key (platformer sits at the root).
-GAMES = ["mario", "megaman", "sonic", "meatboy", "bomberman"]
+def _active_games() -> list[str]:
+    """Roster minus archived games (code/neuro/adapters.py). Read without importing numpy/pygame."""
+    try:
+        import re
+        src = (Path(__file__).parent / "code" / "neuro" / "adapters.py").read_text(encoding="utf-8")
+        archived = set(re.findall(r'"(\w+)"', re.search(r"ARCHIVED_GAMES = \{([^}]*)\}", src).group(1)))
+        order = re.findall(r'^    "(\w+)": \w+Adapter,', src, re.M)
+        return [g for g in order if g not in archived] or ["mario", "meatboy", "bomberman"]
+    except Exception:
+        return ["mario", "meatboy", "bomberman"]
+
+
+GAMES = _active_games()
 INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
 CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic"}
 

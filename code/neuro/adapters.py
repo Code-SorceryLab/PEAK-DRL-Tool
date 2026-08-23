@@ -47,6 +47,9 @@ INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not n
 TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
 N_OUTPUTS_BY_GAME = {"bomberman": 5}
 N_INPUTS_BY_GAME = {"bomberman": 16}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
+# Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,
+# but kept out of the menus and off the default sweep roster so they do not cost probe budget.
+ARCHIVED_GAMES = {"megaman", "sonic"}
 
 
 def _set_locked_level(core, level: str) -> None:
@@ -62,7 +65,10 @@ def list_levels(game: str, include_disabled: bool = False) -> list[str]:
     if game in INDEXED_GAMES:  # meatboy / bomberman: levels are a list, ids are indices
         with open(os.path.join(games_dir, f"{game}_config.yaml"), encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-        return [str(i) for i in range(len(data.get("levels", [])))]
+        n = len(data.get("levels") or [])
+        if include_disabled:      # disabled entries follow the enabled ones, so ids stay stable
+            n += len(data.get("disabled_levels") or [])
+        return [str(i) for i in range(n)]
     with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     sections = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}
@@ -852,6 +858,11 @@ _ADAPTERS = {
     "meatboy": MeatboyAdapter,
     "bomberman": BombermanAdapter,
 }
+
+
+def active_games() -> list[str]:
+    """The games menus and sweeps offer by default — every adapter except the archived ones."""
+    return [g for g in _ADAPTERS if g not in ARCHIVED_GAMES]
 
 
 def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float,
