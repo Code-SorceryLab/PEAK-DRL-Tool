@@ -19,8 +19,13 @@ LevelLoader integration
           - x: 416          # centre, world pixels
             y: 240
             diameter: 96    # optional, default 64
-            end: [416, 80]  # optional -> moving saw (ping-pong)
+            end: [416, 80]  # optional -> moving saw (ping-pong along a rail)
             period: 4.0     # optional, seconds for a full A->B->A cycle
+            pivot: [416, 240]   # optional -> saw on a swinging ARM around this point
+            arc: [-60, 60]      # optional, degrees swept; omit for a full circle
+
+  A saw may use `end` (slides along a rail) or `pivot` (swings on an arm), not
+  both. The rail and the arm are drawn, so the mount is visible like the real game.
 """
 
 from __future__ import annotations
@@ -37,6 +42,9 @@ from ..Parameters.Map_parameters import TILE_SIZE
 _COL_BLADE = (110, 110, 120)
 _COL_TEETH = (160, 160, 170)
 _COL_HUB = (70, 70, 80)
+_COL_ARM = (88, 90, 100)     # the bar a swinging saw hangs off
+_COL_RAIL = (64, 66, 74)     # the track a sliding saw rides
+_COL_MOUNT = (54, 56, 64)    # bolted anchor plate
 
 
 @dataclass
@@ -46,8 +54,10 @@ class Saw:
     cx: float
     cy: float
     diameter: float = 64.0
-    end: Optional[Tuple[float, float]] = None   # second waypoint -> moving saw
+    end: Optional[Tuple[float, float]] = None   # second waypoint -> saw on a rail
     period: float = 4.0                          # seconds per full cycle
+    pivot: Optional[Tuple[float, float]] = None  # anchor -> saw on a swinging arm
+    arc: Optional[Tuple[float, float]] = None    # degrees swept; None = full circle
     type_id: EntityType = field(default=EntityType.SAW, init=False, repr=False)
 
     def __post_init__(self):
@@ -56,6 +66,17 @@ class Saw:
             self.end = (float(self.end[0]), float(self.end[1]))
         self._direction = 1
         self._spin = 0.0   # render-only blade rotation
+        # Arm mode: remember how long the arm is and where it starts, then drive
+        # the blade round the pivot instead of sliding it down a rail.
+        self._arm = 0.0
+        self._angle = 0.0
+        if self.pivot is not None:
+            self.pivot = (float(self.pivot[0]), float(self.pivot[1]))
+            self._arm = math.hypot(self.cx - self.pivot[0], self.cy - self.pivot[1])
+            self._angle = math.atan2(self.cy - self.pivot[1], self.cx - self.pivot[0])
+            self._angle0 = self._angle
+            if self.arc is not None:
+                self.arc = (float(self.arc[0]), float(self.arc[1]))
 
     @property
     def radius(self) -> float:
@@ -67,9 +88,14 @@ class Saw:
         self.cx, self.cy = self._start
         self._direction = 1
         self._spin = 0.0
+        if self.pivot is not None:
+            self._angle = self._angle0
 
     def update(self, dt: float, context=None) -> None:
         self._spin += dt * 8.0
+        if self.pivot is not None:
+            self._update_arm(dt)
+            return
         if self.end is None:
             return
         target = self.end if self._direction == 1 else self._start
@@ -85,6 +111,26 @@ class Saw:
         else:
             self.cx += dx / dist * move
             self.cy += dy / dist * move
+
+    def _update_arm(self, dt: float) -> None:
+        """Swing the blade around `pivot`. With `arc` it ping-pongs between the two
+        angles; without it the arm rotates continuously."""
+        rate = 2.0 * math.pi / max(self.period, 1e-6)
+        if self.arc is None:
+            self._angle += rate * dt
+        else:
+            a0 = self._angle0 + math.radians(self.arc[0])
+            a1 = self._angle0 + math.radians(self.arc[1])
+            span = abs(a1 - a0)
+            speed = 2.0 * span / max(self.period, 1e-6)
+            self._angle += self._direction * speed * dt
+            lo, hi = min(a0, a1), max(a0, a1)
+            if self._angle >= hi:
+                self._angle, self._direction = hi, -1
+            elif self._angle <= lo:
+                self._angle, self._direction = lo, 1
+        self.cx = self.pivot[0] + self._arm * math.cos(self._angle)
+        self.cy = self.pivot[1] + self._arm * math.sin(self._angle)
 
     # ── Collision ─────────────────────────────────────────────────────────
     def hits_rect(self, rect: pygame.Rect) -> bool:
@@ -115,6 +161,18 @@ class Saw:
         """Draw at screen-space centre (sx, sy)."""
         r = int(self.radius)
         cx, cy = int(sx), int(sy)
+        # Mount first, so the blade is drawn on top of it.
+        if self.pivot is not None:      # swinging arm back to the anchor
+            px = int(sx + (self.pivot[0] - self.cx))
+            py = int(sy + (self.pivot[1] - self.cy))
+            pygame.draw.line(surface, _COL_ARM, (px, py), (cx, cy), max(3, r // 6))
+            pygame.draw.circle(surface, _COL_MOUNT, (px, py), max(4, r // 4))
+        elif self.end is not None:      # the rail it slides along
+            ax = int(sx + (self._start[0] - self.cx)); ay = int(sy + (self._start[1] - self.cy))
+            bx = int(sx + (self.end[0] - self.cx));    by = int(sy + (self.end[1] - self.cy))
+            pygame.draw.line(surface, _COL_RAIL, (ax, ay), (bx, by), 3)
+            pygame.draw.circle(surface, _COL_MOUNT, (ax, ay), 4)
+            pygame.draw.circle(surface, _COL_MOUNT, (bx, by), 4)
         # teeth: alternating outer/inner vertices around the rim
         pts = []
         n = 16

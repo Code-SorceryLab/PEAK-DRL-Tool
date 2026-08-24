@@ -127,20 +127,48 @@ def _sonic_action(keys) -> list:
     return [move, int(bool(jump)), int(bool(down))]
 
 
+def _meatboy_action(keys) -> list:
+    """Return a Meat Boy action [move, run, jump].
+      move : 0=idle  1=left  2=right      (3-valued, unlike the platformer's 5)
+      run  : 0/1 held  ·  jump : 0/1 held
+    MeatboyPlayer.handle_input also reads the keyboard directly in human mode, so
+    this mapping and that read agree; both are ORed together."""
+    k = pygame.key.get_pressed()
+
+    left  = k[pygame.K_a] or k[pygame.K_LEFT]
+    right = k[pygame.K_d] or k[pygame.K_RIGHT]
+    jump  = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
+
+    if left and right:
+        move = 0
+    elif left:
+        move = 1
+    elif right:
+        move = 2
+    else:
+        move = 0
+
+    return [move, int(bool(run)), int(bool(jump))]
+
+
 ACTION_MAPPING = {
     "platformer": _platformer_action,
     "mario": _platformer_action,
     "megaman": _megaman_action,
     "sonic": _sonic_action,
+    "meatboy": _meatboy_action,
 }
 
-_IDLE = {"megaman": [0, 0, 0, 0]}
+_IDLE = {"megaman": [0, 0, 0, 0], "meatboy": [0, 0, 0]}
 
 
 def _random_action() -> list:
     """Uniform random action in the game's MultiDiscrete space."""
     if args.game == "megaman":
         return [random.randrange(5), random.randrange(3), random.randrange(2), random.randrange(2)]
+    if args.game == "meatboy":
+        return [random.randrange(3), random.randrange(2), random.randrange(2)]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
 
@@ -156,7 +184,9 @@ if level_file:
 
 # --- Build the core directly (let it load the default first level on __init__)
 env_kwargs = {}
-if level_id:
+if args.game == "meatboy":
+    pass          # meatboy takes no world/curriculum kwargs; level is picked below
+elif level_id:
     env_kwargs['world'] = level_id
     env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
@@ -188,6 +218,23 @@ if level_file:
     core_game.load_level()
     print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
+# Meat Boy is not a platformer_core subclass: it has no _surf, no config_manager
+# and no `world` id. Open a window for it and select the level by list index.
+if args.game == "meatboy":
+    if level_file:
+        core_game.levels = [str(Path(level_file).resolve())]
+        core_game._level_idx = 0
+        print(f"[Play] Loaded file: {Path(level_file).name}")
+    elif level_id is not None:
+        try:                                   # an index into meatboy_config levels
+            core_game._level_idx = int(level_id) % len(core_game.levels)
+        except ValueError:                     # or a level file name
+            match = [i for i, p in enumerate(core_game.levels) if level_id in p]
+            core_game._level_idx = match[0] if match else 0
+        print(f"[Play] Level: {core_game.levels[core_game._level_idx]}")
+    core_game._surf = pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
+    pygame.display.set_caption("PEAK — Super Meat Boy")
+
 core_game.reset()
 running = True
 random_action = _random_action()
@@ -204,7 +251,8 @@ while running:
     keys = pygame.key.get_pressed()
 
     if args.random:
-        if core_game.frame % 8 == 0:   # re-roll every 8 frames so movement is visible
+        _frame = getattr(core_game, "frame", getattr(core_game, "_steps", 0))
+        if _frame % 8 == 0:            # re-roll every 8 frames so movement is visible
             random_action = _random_action()
         action = random_action
     else:
@@ -223,6 +271,8 @@ while running:
 
     if info.get("episode_end", False) or done:
         core_game.reset()
+        if args.game == "meatboy":
+            continue          # meatboy.reset() already re-selects its own level
         # Keep locked level after reset
         active_id = level_id or (TEMP_ID if level_file else None)
         if active_id and hasattr(core_game, 'world'):

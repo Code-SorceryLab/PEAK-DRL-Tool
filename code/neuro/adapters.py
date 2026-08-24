@@ -16,6 +16,12 @@ class GameAdapter(Protocol):
     won: bool
     status: str            # RUNNING | STUCK | DEAD | WON
     tile_size: int
+    # The game's action space. The first three are the locomotion core every game
+    # shares and map onto net outputs 0-2; anything after that is a game-specific
+    # button delivered to step() as `extras`, in this order. Keeping the count
+    # per-game means adding a button to one game does not change any other game's
+    # weight vector, so existing runs and saved models stay comparable.
+    BUTTONS: tuple[str, ...]
 
     @property
     def x(self) -> float: ...
@@ -33,11 +39,14 @@ class GameAdapter(Protocol):
     def camera(self) -> tuple[float, float]: ...
 
     def reset(self) -> None: ...
-    def step(self, move_x: int, jump: bool) -> None: ...
+    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None: ...
     def render(self, surface: pygame.Surface) -> None: ...
     def solid_at(self, wx: float, wy: float) -> bool: ...
     def enemy_positions(self) -> list[tuple[float, float]]: ...
     def qblock_count_near(self, r_tiles: int) -> int: ...
+    def goal_frame(self) -> tuple[float, float, float, float]: ...
+    max_frames: int
+    frames_used: int
     def fitness(self) -> float: ...
     def episode_stats(self) -> dict: ...
     def set_level(self, level: str) -> None: ...
@@ -86,8 +95,51 @@ def _move_md(move_x: int, sprint: bool) -> int:
 
 
 def _win_time_bonus(adapter) -> float:
-    """Speedrunner fitness: time left on the clock pays out on a win."""
-    return adapter.time_rate * max(float(getattr(adapter.core, "timer", 0.0) or 0.0), 0.0)
+    """Speedrunner fitness: the share of win_bonus earned by finishing early.
+
+    Scored on unused *frames*, not on core.timer. Meatboy has no timer, so the old
+    clock-based version silently paid 0 there and the speedrunner persona was inert
+    on the very game the balance probes study. Every core takes the same frame
+    budget, so frames work everywhere.
+
+    Bounded by win_bonus: time_rate is a fraction in [0, 1], so the bonus can never
+    outweigh the win itself. The old rate was an unbounded fitness-per-second and
+    paid 7500 on mario against a win_bonus of 5000.
+    """
+    budget = max(int(getattr(adapter, "max_frames", 0)), 1)
+    saved = max(budget - int(getattr(adapter, "frames_used", 0)), 0) / budget
+    return adapter.time_rate * adapter.win_bonus * saved
+
+
+def _goal_frame_from_goals(core, gx: float | None = None, gy: float | None = None
+                          ) -> tuple[float, float, float, float]:
+    """(agent_x, agent_y, goal_x, goal_y), each divided by the level size so every
+    value sits in [0, 1] regardless of level dimensions.
+
+    Absolute, NOT facing-relative: the first network layer is linear, so from these
+    four it can form the goal offset (gx - px, gy - py) on its own, and it also gets
+    "where am I in this level", which a per-level GA can use as a lookup key.
+    Games without a goal object fall back to the right edge at mid-height, which is
+    the implicit goal of the max_x fitness those games use.
+    """
+    ld = core.level_data
+    lw = max(float(getattr(ld, "width", 0.0)), 1.0)
+    lh = max(float(getattr(ld, "height", 0.0)), 1.0)
+    if gx is None:
+        goals = getattr(ld, "goals", None) or []
+        if goals:
+            gx, gy = float(goals[0].gObj.x), float(goals[0].gObj.y)
+        else:
+            gx, gy = lw, lh * 0.5
+    px, py = _agent_xy(core)
+    clip = lambda v: float(min(max(v, 0.0), 1.0))
+    return clip(px / lw), clip(py / lh), clip(gx / lw), clip(gy / lh)
+
+
+def _agent_xy(core) -> tuple[float, float]:
+    p = core.player
+    g = getattr(p, "gObj", None)
+    return (float(g.x), float(g.y)) if g is not None else (float(p.x), float(p.y))
 
 
 def _count_coins(core) -> int:
@@ -117,6 +169,7 @@ class MarioAdapter:
     """Wraps PlatformerCore, pinned to one level, one life, no curriculum, no gym obs."""
 
     # move_x -1/0/+1 -> MultiDiscrete move component (1=left, 0=idle, 3=right; walk speed only)
+    BUTTONS = ("left", "right", "jump")
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
@@ -129,6 +182,8 @@ class MarioAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.max_frames = max_frames  # persona objective: the budget time_rate is scored against
+        self.frames_used = 0          # steps taken this episode (reset in reset())
         self.sprint = sprint        # persona capability: run/sprint action variants
         self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}  # None -> first level in game_config.yaml
@@ -193,6 +248,7 @@ class MarioAdapter:
     # ── control ──────────────────────────────────────────────────────────
 
     def reset(self) -> None:
+        self.frames_used = 0
         self.core.reset()
         self.core.lives = 1
         self.alive = True
@@ -201,9 +257,10 @@ class MarioAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
         if not self.alive:
             return
+        self.frames_used += 1
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
         if terminated or truncated:
             self.alive = False
@@ -248,6 +305,9 @@ class MarioAdapter:
                 n += 1
         return n
 
+    def goal_frame(self) -> tuple[float, float, float, float]:
+        return _goal_frame_from_goals(self.core)
+
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
@@ -261,6 +321,7 @@ class MarioAdapter:
 class MegamanAdapter:
     """Wraps MegamanCore. Horizontal progress fitness; enemies shoot but the net can't (fire=0)."""
 
+    BUTTONS = ("left", "right", "jump")
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
@@ -273,6 +334,8 @@ class MegamanAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.max_frames = max_frames  # persona objective: the budget time_rate is scored against
+        self.frames_used = 0          # steps taken this episode (reset in reset())
         self.sprint = sprint        # persona capability: run/sprint action variants
         self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}
@@ -321,6 +384,7 @@ class MegamanAdapter:
         return float(self.core.camera_x), float(self.core.camera_y)
 
     def reset(self) -> None:
+        self.frames_used = 0
         self.core.reset()
         self.alive = True
         self.won = False
@@ -328,9 +392,10 @@ class MegamanAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
         if not self.alive:
             return
+        self.frames_used += 1
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), 0, int(jump), 0])
         if terminated or truncated:
             self.alive = False
@@ -361,6 +426,9 @@ class MegamanAdapter:
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
+    def goal_frame(self) -> tuple[float, float, float, float]:
+        return _goal_frame_from_goals(self.core)
+
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
@@ -374,6 +442,7 @@ class MegamanAdapter:
 class SonicAdapter:
     """Wraps SonicCore. Goal does NOT terminate the core's episode — we end it on info['won']."""
 
+    BUTTONS = ("left", "right", "jump")
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
@@ -386,6 +455,8 @@ class SonicAdapter:
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
         self.tile_size = TILE_SIZE
         self.win_bonus = win_bonus
+        self.max_frames = max_frames  # persona objective: the budget time_rate is scored against
+        self.frames_used = 0          # steps taken this episode (reset in reset())
         self.sprint = sprint        # persona capability: run/sprint action variants
         self.time_rate = time_rate  # persona objective: fitness per second left on a win
         level_kw = {"world": level} if level else {}
@@ -437,6 +508,7 @@ class SonicAdapter:
         return float(self.core.camera_x), float(self.core.camera_y)
 
     def reset(self) -> None:
+        self.frames_used = 0
         self.core.reset()
         self.core.lives = 1
         self.alive = True
@@ -445,9 +517,10 @@ class SonicAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
         if not self.alive:
             return
+        self.frames_used += 1
         _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
         won = bool(info.get("won"))  # core.reached_goal is wiped by the mid-step level reload
         if won or terminated or truncated:
@@ -489,6 +562,9 @@ class SonicAdapter:
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
+    def goal_frame(self) -> tuple[float, float, float, float]:
+        return _goal_frame_from_goals(self.core)
+
     def fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
@@ -503,6 +579,7 @@ class MeatboyAdapter:
     """Wraps MeatboyCore (plain class, no gym). Levels are 2-D mazes, so fitness is
     BFS-distance-to-goal progress scaled to ~pixels (0..1000) instead of max_x."""
 
+    BUTTONS = ("left", "right", "jump")
     _MOVE_MD = {-1: 1, 0: 0, 1: 2}
     _FIT_SCALE = 1000.0
 
@@ -516,9 +593,19 @@ class MeatboyAdapter:
         )
         self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
         self.win_bonus = win_bonus
+        self.max_frames = max_frames  # persona objective: the budget time_rate is scored against
+        self.frames_used = 0          # steps taken this episode (reset in reset())
         self.sprint = sprint        # persona capability: run/sprint action variants
         self.time_rate = time_rate  # persona objective: fitness per second left on a win
         self.core = MeatboyCore(render_mode="none", max_steps=max_frames)
+        # PEAK_MEATBOY_LEVELS points the core at a different level set (e.g. the
+        # newMeat rebuild of World 1) without touching meatboy_config.yaml.
+        _alt = os.environ.get("PEAK_MEATBOY_LEVELS")
+        if _alt:
+            import yaml as _yaml
+            _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games", _alt)
+            with open(_p, encoding="utf-8") as _f:
+                self.core.levels = (_yaml.safe_load(_f) or {}).get("levels", self.core.levels)
         self.tile_size = int(self.core.tile_size)
         if level is not None:
             self.core._level_idx = int(level)  # meatboy levels are indexed, not named
@@ -563,6 +650,7 @@ class MeatboyAdapter:
         return float(cx), float(cy)
 
     def reset(self) -> None:
+        self.frames_used = 0
         self.core.won = False  # reset() advances to the next level when won is left True
         self.core.reset()
         self.alive = True
@@ -572,9 +660,10 @@ class MeatboyAdapter:
         self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
 
-    def step(self, move_x: int, jump: bool) -> None:
+    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
         if not self.alive:
             return
+        self.frames_used += 1
         _, _, terminated, truncated, info = self.core.step(
             [self._MOVE_MD[move_x], int(self.sprint), int(jump)])
         bfs = float(info.get("bfs_dist", -1.0))
@@ -604,6 +693,10 @@ class MeatboyAdapter:
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
+    def goal_frame(self) -> tuple[float, float, float, float]:
+        gx, gy = self.core._goal_xy   # world px, set at level load
+        return _goal_frame_from_goals(self.core, gx, gy)
+
     def fitness(self) -> float:
         if self.won:
             return self._FIT_SCALE + self.win_bonus + _win_time_bonus(self)
@@ -623,6 +716,20 @@ _ADAPTERS = {
     "sonic": SonicAdapter,
     "meatboy": MeatboyAdapter,
 }
+
+
+def buttons(game: str) -> tuple[str, ...]:
+    """The game's action space, e.g. ("left", "right", "jump")."""
+    try:
+        return tuple(_ADAPTERS[game].BUTTONS)
+    except KeyError:
+        raise ValueError(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})") from None
+
+
+def n_buttons(game: str) -> int:
+    """How many output units the net needs for this game. The trainer sizes NeuralNet
+    with it, so a game that gains a button only changes its own weight count."""
+    return len(buttons(game))
 
 
 def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float,

@@ -13,7 +13,7 @@ from .modules.System.MeatboyPhysicsManager import MeatboyPhysicsManager, Meatboy
 from .modules.Parameters.Map_parameters import (
     TILE_SIZE, TILE_GOAL, TILE_SPIKE, TILE_PIT, TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK,
     TILE_AIR, TILE_CRUMBLE,
-    COLOR_SKY, COLOR_GROUND, COLOR_SPIKE, COLOR_GOAL, COLOR_CRUMBLE,
+    COLOR_SKY, COLOR_GROUND, COLOR_SPIKE, COLOR_GOAL, COLOR_CRUMBLE, COLOR_PLATFORM,
 )
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "meatboy_config.yaml")
@@ -118,6 +118,7 @@ class MeatboyCore:
         self.won = False
         self.death_cause = ""
         self._crumble_timers = {}
+        self._stamped = []
         # Clear the shaping anchor at the episode boundary. The shared
         # _ScoreTracker only resets on `terminated`, NOT on truncation, so
         # relying on it leaked a stale distance across timed-out episodes and
@@ -126,6 +127,8 @@ class MeatboyCore:
         # exactly when an episode begins.
         self._bfs_prev = None
         self._load_level()
+        for cr in self.level_data.crushers:   # after _load_level: level_data now exists
+            cr.reset()
         self._spawn_player()
         obs, info = self._obs(), self._info()
         if info["bfs_dist"] >= 0.0:
@@ -136,9 +139,18 @@ class MeatboyCore:
         self._steps += 1
         self.player.handle_input(action)
         self.player.control(1 / 60.0, self.ctx)          # velocity only
-        self.physics.step(self.player, self.level_data.grid, self.ctx, 1 / 60.0)
+        # Dynamic obstacles move BEFORE the physics pass, then get stamped into the
+        # grid: Meat Boy's physics reads solidity off the grid, not an object list,
+        # so this is how a crusher or a moving platform becomes something you can
+        # stand on and be shoved by. _unstamp() puts the grid back after _obs().
         for saw in self.level_data.saws:
             saw.update(1 / 60.0)
+        for cr in self.level_data.crushers:
+            cr.update(1 / 60.0)
+        for mp in self.level_data.moving_platforms:
+            mp.update(1 / 60.0, self.ctx)
+        self._stamp_dynamic_solids()
+        self.physics.step(self.player, self.level_data.grid, self.ctx, 1 / 60.0)
         self._update_crumble(1 / 60.0)
 
         terminated = False
@@ -160,9 +172,40 @@ class MeatboyCore:
             truncated = True
 
         obs, info = self._obs(), self._info()
+        self._unstamp_dynamic_solids()
         if info["bfs_dist"] >= 0.0:        # advance anchor only on valid cells
             self._bfs_prev = info["bfs_dist"]
         return obs, 0.0, terminated, truncated, info
+
+    # ---- dynamic solids ----
+    def _stamp_dynamic_solids(self):
+        """Write crushers and moving platforms into the tile grid as solid.
+
+        Only AIR cells are taken, so a moving obstacle can never overwrite real
+        geometry, and unstamping can never resurrect a crumble tile that dissolved
+        while it was covered."""
+        grid = self.level_data.grid
+        rows, cols = self.level_data.rows, self.level_data.cols
+        ts = self.tile_size
+        self._stamped = []
+        for cr in self.level_data.crushers:
+            for (col, row) in cr.covered_cells(ts, rows, cols):
+                if grid[row][col] == TILE_AIR:
+                    grid[row][col] = TILE_GROUND
+                    self._stamped.append((row, col))
+        for mp in self.level_data.moving_platforms:
+            r = mp.gObj.get_rect() if hasattr(mp, "gObj") else mp.get_rect()
+            for col in range(max(0, r.left // ts), min(cols - 1, (r.right - 1) // ts) + 1):
+                for row in range(max(0, r.top // ts), min(rows - 1, (r.bottom - 1) // ts) + 1):
+                    if grid[row][col] == TILE_AIR:
+                        grid[row][col] = TILE_PLATFORM
+                        self._stamped.append((row, col))
+
+    def _unstamp_dynamic_solids(self):
+        grid = self.level_data.grid
+        for (row, col) in getattr(self, "_stamped", ()):
+            grid[row][col] = TILE_AIR
+        self._stamped = []
 
     # ---- hazards / crumble ----
     def _update_crumble(self, dt):
@@ -197,6 +240,9 @@ class MeatboyCore:
         for saw in self.level_data.saws:
             if saw.hits_rect(prect):
                 return "Saw"
+        for cr in self.level_data.crushers:
+            if cr.hits_rect(prect):
+                return "Crusher"
         for (row, col) in self._player_cells():
             t = self.level_data.grid[row][col]
             if t in (TILE_SPIKE, TILE_PIT):
@@ -241,6 +287,13 @@ class MeatboyCore:
                     q.append((nx, ny))
         self._dist = dist
         self._dist_max = max(1.0, float(dist.max()))
+
+    def _crusher_cells(self):
+        ts = self.tile_size
+        cells = []
+        for cr in self.level_data.crushers:
+            cells.extend(cr.covered_cells(ts, self.level_data.rows, self.level_data.cols))
+        return cells
 
     def _saw_cells(self):
         ts = self.tile_size
@@ -306,7 +359,7 @@ class MeatboyCore:
         ts = self.tile_size
         px = int((self.player.x + self.player.width / 2) // ts)
         py = int((self.player.y + self.player.height / 2) // ts)
-        grids = self._build_grids(px, py, self._saw_cells())
+        grids = self._build_grids(px, py, self._saw_cells() + self._crusher_cells())
         return {"grids": grids, "scalars": self._build_scalars()}
 
     def _bfs_norm_dist(self):
@@ -386,6 +439,12 @@ class MeatboyCore:
                     pygame.draw.rect(surface, col, (c * ts - camx, r * ts - camy, ts, ts))
         for saw in self.level_data.saws:
             saw.render(surface, saw.cx - camx, saw.cy - camy)
+        for cr in self.level_data.crushers:
+            cr.render(surface, cr.x - camx, cr.y - camy)
+        for mp in self.level_data.moving_platforms:
+            r = mp.gObj.get_rect() if hasattr(mp, "gObj") else mp.get_rect()
+            pygame.draw.rect(surface, COLOR_PLATFORM,
+                             pygame.Rect(r.x - camx, r.y - camy, r.width, r.height))
         pygame.draw.rect(surface, (210, 40, 60),
                          (int(self.player.x - camx), int(self.player.y - camy),
                           self.player.width, self.player.height))

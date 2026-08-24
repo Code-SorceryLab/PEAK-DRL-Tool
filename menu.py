@@ -35,7 +35,8 @@ CHIME_PATH = Path("chime.wav")
 
 # Adapter keys → game_config.yaml section key (platformer sits at the root).
 GAMES = ["mario", "megaman", "sonic", "meatboy"]
-CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic"}
+CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic",
+              "meatboy": "meatboy"}
 
 # ============================================================================
 # MAIN MENU — PEAK ENGINE
@@ -652,11 +653,11 @@ def run_manual_play():
         pad     = W - 2 - key_w - len(val)
         print(_DIM("    ║") + k_part + v_part + _DIM(" " * max(pad, 0) + "║"))
 
-    # ── Resolve available games (meatboy has no manual key mapping) ───────────
+    # ── Resolve available games ───────────────────────────────────────────────
     _refresh_screen()
     _section("MANUAL PLAY  ›  Select Game")
 
-    available_games = [g for g in get_available_games() if g != "meatboy"]
+    available_games = list(get_available_games())
     if not available_games:
         print(_RED("  ✖  No game configurations found"))
         return
@@ -713,6 +714,9 @@ def run_manual_play():
     elif selected_game.lower() == "sonic":
         _box_kv("SHIFT",     "Run")
         _box_kv("S / DOWN",  "Crouch / spin dash")
+    elif selected_game.lower() == "meatboy":
+        _box_kv("SHIFT",     "Sprint")
+        _box_kv("Into a wall", "Slide, then SPACE to wall-jump")
     else:
         _box_kv("SHIFT",     "Run")
     _box_kv("ESC",           "Quit session")
@@ -813,7 +817,7 @@ def watch_random_agent():
     _refresh_screen()
     _section("WATCH  ›  Random Agent")
 
-    available = [g for g in get_available_games() if g != "meatboy"]
+    available = list(get_available_games())
     game = ask_index("\n  Choose a game:", available, default=available[0])
     if not game:
         return
@@ -849,7 +853,7 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
-    game_choices = ["platformer", "megaman", "sonic"]
+    game_choices = ["platformer", "megaman", "sonic", "meatboy"]
     game = ask_index(
         "\n  Choose which game to edit:",
         game_choices,

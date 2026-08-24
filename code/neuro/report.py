@@ -1019,15 +1019,37 @@ _BRAIN_SVG = ("<svg viewBox='0 0 24 24' width='16' height='16' fill='none' strok
 BODY = ["grounded", "vx / 300", "vy / 600", "can jump", "bias (1.0)"]
 
 
-def _net_svg(mode: str = "rays") -> str:
-    """Inline diagram of the evolved net. rays: 14 labelled sensors → hidden → 3 outputs.
-    grid: an 11×11×3 tile window + 5 body scalars → hidden → 3 outputs."""
-    from .net import N_HIDDEN, N_OUTPUTS
+# Output-node colours, by button name. Anything a game invents beyond these falls
+# back to the neutral tone rather than reusing a locomotion colour.
+OUT_COLORS = {"left": "#eab308", "right": "#22c55e", "jump": "#ef4444",
+              "attack": "#a855f7", "dash": "#06b6d4", "bomb": "#f97316"}
+OUT_FALLBACK = "#9a9aa0"
+
+
+def _game_buttons(game: str) -> tuple[str, ...]:
+    """The game's action space, or the shared locomotion core for a game this build
+    does not know about (old reports name games whose adapter may since have gone)."""
+    from .adapters import buttons
+    try:
+        return buttons(game)
+    except ValueError:
+        return ("left", "right", "jump")
+
+
+def _net_svg(mode: str = "rays", btns: tuple[str, ...] = ("left", "right", "jump")) -> str:
+    """Inline diagram of the evolved net: sensors → hidden → one node per button.
+
+    rays: 14 labelled sensors. grid: an 11×11×3 tile window + 5 body scalars.
+    `btns` is the game's action space (adapters.buttons), so a game with an extra
+    button draws an extra output node instead of silently showing three."""
+    from .net import N_HIDDEN
     from .sensors import GRID_CH, GRID_N, N_BODY
+    n_out = len(btns)
     W, H = 600, 392
     xi, xh, xo = 215, 390, 525
     yh = lambda j: 22 + j * (H - 44) / (N_HIDDEN - 1)
-    yo = lambda k: H / 2 + (k - 1) * 60
+    # Keep the nodes centred and inside the canvas however many buttons there are.
+    yo = lambda k: H / 2 + (k - (n_out - 1) / 2) * min(60.0, (H - 60) / max(n_out - 1, 1))
     out = [f'<svg class="net" viewBox="0 0 {W} {H}" role="img" aria-label="network diagram">']
     if mode == "grid":
         # input side: a mini tile window (3 channels stacked) + the body scalars
@@ -1072,16 +1094,17 @@ def _net_svg(mode: str = "rays") -> str:
         in_cap = f"{len(SENSORS)} ray sensors"
     out.append('<g stroke="#ef4444" stroke-opacity=".22" stroke-width="1">')
     out += [f'<line x1="{xh}" y1="{yh(j):.0f}" x2="{xo}" y2="{yo(k):.0f}"/>'
-            for j in range(N_HIDDEN) for k in range(N_OUTPUTS)]
+            for j in range(N_HIDDEN) for k in range(n_out)]
     out.append('</g>')
     for j in range(N_HIDDEN):
         out.append(f'<circle cx="{xh}" cy="{yh(j):.0f}" r="5.5" fill="#1a1a1f" stroke="#9a9aa0" stroke-width="1.5"/>')
-    for k, (name, col) in enumerate((("left", "#eab308"), ("right", "#22c55e"), ("jump", "#ef4444"))):
+    for k, name in enumerate(btns):
+        col = OUT_COLORS.get(name, OUT_FALLBACK)
         out.append(f'<circle cx="{xo}" cy="{yo(k):.0f}" r="7" fill="{col}22" stroke="{col}" stroke-width="2"/>'
                    f'<text x="{xo + 14}" y="{yo(k) + 4:.0f}" class="lbl out" fill="{col}">{name}</text>')
     out.append(f'<text x="{xi if mode != "grid" else 110}" y="{H - 2}" text-anchor="middle" class="cap">{in_cap}</text>'
                f'<text x="{xh}" y="{H - 2}" text-anchor="middle" class="cap">{N_HIDDEN} tanh</text>'
-               f'<text x="{xo}" y="{H - 2}" text-anchor="middle" class="cap">{N_OUTPUTS} sigmoid</text></svg>')
+               f'<text x="{xo}" y="{H - 2}" text-anchor="middle" class="cap">{n_out} sigmoid</text></svg>')
     return "".join(out)
 
 
@@ -1115,7 +1138,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
     ga = dict(vars(GAConfig()) | (ga or {}))
     mode = ga.get("sensors") or ("grid" if (data.get("tag") or "").endswith("_grid") else "rays")
     ga["sensors"] = mode
-    n_params = NeuralNet(sensor_dim(mode)).n_params
+    n_params = NeuralNet(sensor_dim(mode), n_outputs=len(_game_buttons(game))).n_params
     sensing = (f"{GRID_N}×{GRID_N} tile window centred on the agent, {GRID_CH} channels "
                f"(solid · collectible · hazard) + body state — the Mario-AI-competition-style view"
                if mode == "grid" else
@@ -1148,7 +1171,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
       <div class="brainrow">
         <div class="viz netbox"><div class="vt">The brain — {n_params:,} weights, no gradients
           <span class="faint">· {mode} sensing · inputs in [−1, 1] · outputs fire above 0.5 · left/right conflict → argmax</span></div>
-          {_net_svg(mode)}
+          {_net_svg(mode, _game_buttons(game))}
           <div class="caption"><b>Sensing:</b> {sensing}. <b>Fitness:</b> furthest x reached,
           +{ga['win_bonus']:,.0f} on a win (+ seconds left × persona time rate).</div></div>
         <div class="viz"><div class="vt">Genetic algorithm (GAConfig)</div>
@@ -1899,6 +1922,8 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
         nin = sensor_dim(m)
         hero += (f'<div class="ablmode" style="--c:{MODE_COLOR[m]}">{svgs[m]}<div><h3>{m}</h3><p>{blurb}</p>'
                  f'<div class="chips"><span class="chip" style="--c:{MODE_COLOR[m]}"><b>{nin}</b> inputs</span>'
+                 # Cross-game hero: the ablation compares sensor modes, so this counts the
+                 # shared 3-button head. A game with extra buttons is shown per-game in _brain_dialog.
                  f'<span class="chip" style="--c:{MODE_COLOR[m]}"><b>{NeuralNet(nin).n_params:,}</b> weights</span>'
                  f'<span class="chip" style="--c:{MODE_COLOR[m]}"><b>5</b> shared body scalars</span></div></div></div>')
     sections = "".join(_ablation_section(g, p, b, by_mode, i)

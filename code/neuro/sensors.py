@@ -1,10 +1,12 @@
 """Game-agnostic sensors: ray marching + scalar state, computed via GameAdapter queries.
 
 Two exteroception modes, selected by GAConfig.sensors (same body scalars in both):
-  "rays" — 14 floats (below), the default
+  "rays" — 18 floats (below), the default
   "grid" — the cores' obs window sized to 11x11 around the agent, 3 channels
            (solid / collectible / hazard; the Dijkstra oracle channel is dropped) + 5 body
-           scalars = 368 floats. The Mario-AI-competition-style input, for the sensor ablation.
+           scalars + 4 goal = 372 floats. The Mario-AI-competition-style input, for the sensor ablation.
+           Mirrored left-right when the agent faces left, matching the way the rays flip, so
+           one learned reflex covers both travel directions instead of two.
 
 Ray sensor vector (14 floats, all roughly [-1, 1]):
   0-5  solid-ray distances (fwd, fwd-up30, fwd-up60, fwd-down30, fwd-down60, back); 1.0 = clear
@@ -16,10 +18,12 @@ Ray sensor vector (14 floats, all roughly [-1, 1]):
   11   can_jump
   12   qblock count within 5 tiles / 5
   13   bias (1.0)
+  14-17 goal frame: agent x, agent y, goal x, goal y, each / level size (see _goal)
 """
 from __future__ import annotations
 
 import math
+import os
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -31,7 +35,12 @@ SENSOR_MODES = ("rays", "grid")
 GRID_HALF = 5   # 11x11 window centred on the agent's tile
 GRID_N = 2 * GRID_HALF + 1
 GRID_CH = 3     # solid, collectible, hazard
+# Mirror the grid window when the agent travels left. Set PEAK_GRID_MIRROR=0 to
+# read the window in absolute world frame instead (sensor-ablation A/B).
+GRID_MIRROR = os.environ.get("PEAK_GRID_MIRROR", "1") != "0"
+
 N_BODY = 5      # grounded, vx, vy, can_jump, bias
+N_GOAL = 4      # agent x/y and goal x/y, each as a fraction of the level size
 RAY_MAX_DIST = 250.0
 RAY_STEP = 8.0
 VX_NORM = 300.0
@@ -74,10 +83,28 @@ def _march(adapter: "GameAdapter", ox: float, oy: float, dx: float, dy: float) -
     return RAY_MAX_DIST
 
 
+def _facing(adapter: "GameAdapter") -> float:
+    """+1 travelling right, -1 travelling left. Both modes use it to build a
+    facing-relative view, so a reflex learned going right also works going left."""
+    return -1.0 if adapter.vx < -1.0 else 1.0
+
+
 def sensor_dim(mode: str) -> int:
     if mode not in SENSOR_MODES:
         raise ValueError(f"unknown sensor mode {mode!r}, expected one of {SENSOR_MODES}")
-    return 14 if mode == "rays" else GRID_CH * (2 * GRID_HALF + 1) ** 2 + N_BODY
+    base = 14 if mode == "rays" else GRID_CH * (2 * GRID_HALF + 1) ** 2 + N_BODY
+    return base + N_GOAL
+
+
+def _goal(adapter: "GameAdapter") -> list[float]:
+    """Absolute goal awareness, identical in both sensor modes so the ablation stays fair.
+
+    Four floats in [0, 1]: the agent's position and the goal's position, each as a
+    fraction of the level size. Deliberately absolute rather than facing-relative --
+    the first layer is linear, so the net can form the goal offset itself, and it
+    additionally gets "where am I", which a per-level GA can use as a lookup key.
+    """
+    return list(adapter.goal_frame())
 
 
 def _body(adapter: "GameAdapter") -> list[float]:
@@ -109,8 +136,12 @@ def _read_grid(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Tile
         _fit_window(core)
     win = core._obs()["grids"][:GRID_CH]  # (3, 11, 11); the agent's tile is the centre cell
     assert win.shape[1:] == (GRID_N, GRID_N), win.shape
-    vec = np.concatenate([win.ravel(), _body(adapter)]).astype(np.float32)
-    # overlay: outline the solid cells the agent sees, so the crop is visibly centred
+    # Facing-relative view: mirror the columns when moving left, so "ahead" is always
+    # to the right of centre. Body scalars keep their signed vx, exactly as the rays do.
+    view = win if (not GRID_MIRROR or _facing(adapter) > 0) else win[:, :, ::-1]
+    vec = np.concatenate([view.ravel(), _body(adapter), _goal(adapter)]).astype(np.float32)
+    # overlay: outline the solid cells the agent sees, so the crop is visibly centred.
+    # Drawn from the unmirrored window — the overlay shows the world, not the net's frame.
     tile = float(adapter.tile_size)
     ox = adapter.x // tile * tile - GRID_HALF * tile
     oy = adapter.y // tile * tile - GRID_HALF * tile
@@ -124,9 +155,9 @@ def read_sensors(adapter: "GameAdapter", mode: str = "rays") -> tuple[np.ndarray
     if mode == "grid":
         return _read_grid(adapter)
     ox, oy = adapter.x, adapter.y
-    facing = -1.0 if adapter.vx < -1.0 else 1.0  # rays flip when moving left
+    facing = _facing(adapter)  # rays flip when moving left
     tile = float(adapter.tile_size)
-    vec = np.empty(14, dtype=np.float32)
+    vec = np.empty(14 + N_GOAL, dtype=np.float32)
     rays: list[Ray] = []
     tiles: list[Tile] = []
 
@@ -164,4 +195,5 @@ def read_sensors(adapter: "GameAdapter", mode: str = "rays") -> tuple[np.ndarray
     vec[8:12] = _body(adapter)[:4]
     vec[12] = min(adapter.qblock_count_near(5), 5) / 5.0
     vec[13] = 1.0
+    vec[14:14 + N_GOAL] = _goal(adapter)
     return vec, rays, tiles

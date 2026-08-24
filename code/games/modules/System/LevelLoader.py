@@ -27,6 +27,7 @@ from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
 from ..Objects.Ladder import Ladder
 from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
+from ..Objects.Crusher import Crusher
 from ..Objects.Spring import Spring
 from ..Objects.Saw import Saw
 from .SpatialHash import SpatialHash
@@ -56,6 +57,7 @@ class LevelData:
     pits:             List[Any]               = field(default_factory=list)
     saws:             List[Saw]               = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
+    crushers:         List[Crusher]            = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
     rows:             int                      = 0
@@ -386,7 +388,7 @@ class LevelLoader:
     def _spawn_entities_from_yaml(self, dynamics: Dict[str, Any], data: LevelData):
         """
         Parses the 'dynamics' section of a YAML config or sidecar file.
-        Supports: enemies, coins, powerups, moving_platforms.
+        Supports: enemies, coins, powerups, saws, crushers, moving_platforms.
         """
         if 'enemies' in dynamics:
             for e in dynamics['enemies']:
@@ -421,14 +423,31 @@ class LevelLoader:
         if 'saws' in dynamics:
             for s in dynamics['saws']:
                 end = s.get('end')
+                pivot = s.get('pivot')
+                arc = s.get('arc')
                 saw = Saw(
                     cx=float(s.get('x', 0)),
                     cy=float(s.get('y', 0)),
                     diameter=float(s.get('diameter', 64.0)),
                     end=tuple(end) if end else None,
                     period=float(s.get('period', 4.0)),
+                    pivot=tuple(pivot) if pivot else None,
+                    arc=tuple(arc) if arc else None,
                 )
                 data.saws.append(saw)
+
+        if 'crushers' in dynamics:
+            for c in dynamics['crushers']:
+                end = c.get('end')
+                data.crushers.append(Crusher(
+                    x=float(c.get('x', 0)),
+                    y=float(c.get('y', 0)),
+                    width=float(c.get('width', 2 * self.tile_size)),
+                    height=float(c.get('height', self.tile_size)),
+                    end=tuple(end) if end else None,
+                    period=float(c.get('period', 2.5)),
+                    dwell=float(c.get('dwell', 0.4)),
+                ))
 
         if 'moving_platforms' in dynamics:
             for mp_data in dynamics['moving_platforms']:

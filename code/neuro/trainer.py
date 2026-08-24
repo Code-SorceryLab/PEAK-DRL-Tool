@@ -18,10 +18,12 @@ import os
 import threading
 import time
 
+from collections import deque
+
 import numpy as np
 import pygame
 
-from .adapters import GameAdapter, list_levels, make_adapter
+from .adapters import GameAdapter, list_levels, make_adapter, n_buttons
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet
@@ -83,9 +85,12 @@ class SharedState:
 
 
 class EnvSlot:
-    def __init__(self, adapter: GameAdapter, net: NeuralNet) -> None:
+    def __init__(self, adapter: GameAdapter, net: NeuralNet, sensor_period: int = 1) -> None:
         self.adapter = adapter
         self.net = net
+        # Persona reaction lag: holds the last `sensor_period` sensor vectors, so [0] is
+        # what the player "sees" now. maxlen 1 == no lag, which is the default persona.
+        self.sensor_lag: deque[np.ndarray] = deque(maxlen=max(int(sensor_period), 1))
         self.frames = 0
         self.stuck_anchor_x = 0.0
         self.stuck_frames = 0
@@ -120,8 +125,8 @@ class Trainer:
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
-        self.net_proto = NeuralNet(sensor_dim(cfg.sensors))
-        self.pop = population or Population(cfg, self.net_proto.n_params)
+        self.net_proto = NeuralNet(sensor_dim(cfg.sensors), n_outputs=n_buttons(game))
+        self.pop = population or Population(cfg, self.net_proto.n_params, self.net_proto.param_scale())
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.game = game  # tags embedded in best.npz
 
@@ -143,7 +148,8 @@ class Trainer:
         self.slots = [
             EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus,
                                  sprint=self.persona.sprint, time_rate=self.persona.time_rate),
-                    NeuralNet(self.net_proto.n_inputs))
+                    NeuralNet(self.net_proto.n_inputs, n_outputs=self.net_proto.n_outputs),
+                    sensor_period=self.persona.sensor_period)
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
@@ -283,6 +289,7 @@ class Trainer:
         for i, slot in enumerate(self.slots):
             slot.net.set_weights(self.pop.weights[i])
             slot.adapter.reset()
+            slot.sensor_lag.clear()   # lag must not carry senses across an episode
             slot.frames = 0
             slot.stuck_anchor_x = 0.0
             slot.stuck_frames = 0
@@ -300,19 +307,25 @@ class Trainer:
             for i, slot in enumerate(self.slots):
                 if not slot.adapter.alive:
                     continue
-                # Persona reaction time: the novice only gets fresh senses every Nth frame
-                if slot.frames % self.persona.sensor_period == 0:
-                    vec, rays, tiles = read_sensors(slot.adapter, self.cfg.sensors)
-                    slot.last_sensors, slot.last_rays, slot.last_tiles = vec, rays, tiles
-                else:
-                    vec = slot.last_sensors
+                # Persona reaction lag: senses are read every frame, but the net acts on
+                # the vector from (sensor_period - 1) frames ago. Skipping the read
+                # instead would feed the same vector to a deterministic net for N frames
+                # -- i.e. action repeat, which HELPS evolutionary search and made the
+                # "novice" handicap an advantage. Lagging without repeating is monotone:
+                # more lag is always worse.
+                vec, rays, tiles = read_sensors(slot.adapter, self.cfg.sensors)
+                slot.last_rays, slot.last_tiles = rays, tiles   # overlay shows the truth
+                slot.sensor_lag.append(vec)
+                vec = slot.sensor_lag[0]     # maxlen == sensor_period, so [0] is the oldest
+                slot.last_sensors = vec
                 if i == manual_idx:
                     k = ctrl.keys
                     move_x = (1 if k["right"] else 0) - (1 if k["left"] else 0)
                     jump = k["jump"]
+                    extras: tuple[bool, ...] = ()
                 else:
-                    move_x, jump = slot.net.act(vec)
-                slot.adapter.step(move_x, jump)
+                    move_x, jump, extras = slot.net.act(vec)
+                slot.adapter.step(move_x, jump, extras)
                 slot.frames += 1
                 self._step_accum += 1
                 if jump and not slot.prev_jump:
@@ -485,7 +498,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
                   f"(where the record was set)", flush=True)
     weights = np.load(path)["weights"]
     cfg = GAConfig(pop_size=1, sensors=sensors)
-    net = NeuralNet(sensor_dim(sensors))
+    net = NeuralNet(sensor_dim(sensors), n_outputs=n_buttons(game))
     net.set_weights(weights.astype(np.float32))
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
                            sprint=persona.sprint, time_rate=persona.time_rate)
@@ -501,8 +514,8 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
             vec, rays, tiles = read_sensors(adapter, sensors)
             slot0 = trainer.slots[0]
             slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
-            move_x, jump = net.act(vec)
-            adapter.step(move_x, jump)
+            move_x, jump, extras = net.act(vec)
+            adapter.step(move_x, jump, extras)
             if state is not None:
                 trainer._publish_frames(encode_thumbs=True)
                 trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)

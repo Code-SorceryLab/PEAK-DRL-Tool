@@ -55,12 +55,18 @@ GAME_LABELS = {
     "platformer": "Mario / Platformer",
     "megaman": "Mega Man",
     "sonic": "Sonic",
+    "meatboy": "Super Meat Boy",
 }
+
+# meatboy keeps its levels in its own file, as a flat ordered LIST of paths
+# (the trainer addresses them by index), not the name->entry dict the others use.
+MEATBOY_CONFIG_NAME = "meatboy_config.yaml"
 
 GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
     "megaman": ["mm_*.txt", "mega*.txt"],
     "sonic": ["green_hill*.txt", "sonic*.txt", "gh*.txt"],
+    "meatboy": ["world1_*.txt", "meatboy*.txt", "spike_*.txt", "wall_*.txt", "1_*.txt"],
 }
 
 TILE_LIBRARY = [
@@ -92,6 +98,8 @@ TILE_LIBRARY = [
     ('D', 'Boss Door',      (255, 90, 140),  (60, 10, 30)),
     ('X', 'Boss Spawn',     (255, 120, 80),  (70, 18, 18)),
     ('P', 'Player Start',   (60, 160, 255),  (0, 30, 120)),
+    ('*', 'Saw',            (150, 150, 165),  (40, 40, 50)),   # meatboy: 2-tile kill circle
+    ('%', 'Crumble',        (150, 115, 80),   (245, 225, 200)),# meatboy: dissolves 0.5s after touch
 ]
 TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
 TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
@@ -99,8 +107,10 @@ GAME_TILE_ORDER = {
     "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
     "megaman": [' ', '#', '=', '^', 'O', 'H', 'M', 'B', 'G', 'D', 'X', 'P'],
     "sonic": [' ', '#', '=', '^', 'O', 'S', '/', '\\', '(', ')', '[', ']', 'U', 'n', 'C', 'E', 'G', 'P'],
+    # meatboy has no enemies, coins or powerups -- only geometry and kill hazards
+    "meatboy": [' ', '#', '=', '%', '^', 'O', '*', 'G', 'P'],
 }
-SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
+SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L', '%'}  # '%' crumbles, but is solid until touched
 
 def tile_entries_for(game):
     return [TILE_BY_CHAR[ch] for ch in GAME_TILE_ORDER.get(game, GAME_TILE_ORDER[DEFAULT_GAME])]
@@ -403,14 +413,16 @@ class GameConfig:
         self._load()
 
     def _root_cfg(self, data, create=False):
-        if self.game == "platformer":
-            return data
+        if self.game in ("platformer", "meatboy"):
+            return data      # meatboy has its own file, so its keys are top-level
         if create and self.game not in data:
             data[self.game] = {}
         return data.get(self.game, {})
 
     def _default_level_entry(self, filename):
         filename = self.normalize_level_file(filename)
+        if self.game == "meatboy":
+            return {"file": filename}   # serialised back out as a bare path string
         if self.game == "megaman":
             return {
                 "file": filename,
@@ -431,6 +443,12 @@ class GameConfig:
     def _write_yaml(self, data):
         if not self.config_path or yaml is None:
             return False
+        if self.game == "meatboy":
+            data = copy.deepcopy(data)
+            root = self._root_cfg(data)
+            levels = root.get('levels')
+            if isinstance(levels, dict):   # back to the ordered list of bare paths
+                root['levels'] = [c.get('file', '') for c in levels.values() if c.get('file')]
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
@@ -534,13 +552,14 @@ class GameConfig:
             return
         cwd = Path.cwd()
         sd = Path(__file__).resolve().parent
+        cfg_name = MEATBOY_CONFIG_NAME if self.game == "meatboy" else "game_config.yaml"
         for p in [
-            cwd / "game_config.yaml",
-            cwd / "code" / "games" / "platformer" / "game_config.yaml",
-            cwd / "code" / "games" / "game_config.yaml",
-            sd / "game_config.yaml",
-            sd.parent / "game_config.yaml",
-            sd.parent.parent / "game_config.yaml",
+            cwd / cfg_name,
+            cwd / "code" / "games" / "platformer" / cfg_name,
+            cwd / "code" / "games" / cfg_name,
+            sd / cfg_name,
+            sd.parent / cfg_name,
+            sd.parent.parent / cfg_name,
         ]:
             if p.exists():
                 self.config_path = p
@@ -558,6 +577,8 @@ class GameConfig:
 
         root_cfg = self._root_cfg(self.yaml_data)
         raw = root_cfg.get('levels', {}) or {}
+        if isinstance(raw, list):   # meatboy: ordered list of bare paths
+            raw = self._levels_list_to_dict(raw)
         for lid, lcfg in raw.items():
             if isinstance(lcfg, dict):
                 self.levels[str(lid)] = lcfg
@@ -583,9 +604,32 @@ class GameConfig:
             }
         self.physics = physics_cfg
 
+    @staticmethod
+    def _levels_list_to_dict(items):
+        """meatboy stores levels as an ordered list of paths. Present them to the
+        editor as the same name->entry dict every other game uses; dict order is
+        insertion order, so the round-trip preserves the index the trainer uses."""
+        out = {}
+        for item in items:
+            if isinstance(item, dict):
+                path = item.get('file', '')
+                entry = dict(item)
+            else:
+                path = str(item)
+                entry = {'file': path}
+            lid = Path(path).stem or path
+            out[lid] = entry
+        return out
+
     def _levels_dict(self, data, create=False):
         root_cfg = self._root_cfg(data, create=create)
         levels = root_cfg.get('levels')
+        if self.game == "meatboy" and isinstance(levels, list):
+            # normalise in place so callers can mutate it as a dict; _write_yaml
+            # turns it back into a list before the file is written.
+            levels = self._levels_list_to_dict(levels)
+            root_cfg['levels'] = levels
+            return levels
         if not isinstance(levels, dict):
             if create:
                 root_cfg['levels'] = {}
