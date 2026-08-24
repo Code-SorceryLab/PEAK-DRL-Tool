@@ -154,6 +154,9 @@ def read_sensors(adapter: "GameAdapter", mode: str = "rays") -> tuple[np.ndarray
     """Returns (sensor vector, rays for the debug overlay, tile highlights)."""
     if mode == "grid":
         return _read_grid(adapter)
+    sense = getattr(adapter, "sense", None)  # a game may own its ray layout (see N_INPUTS_BY_GAME)
+    if sense is not None:
+        return sense(_march, RAY_MAX_DIST, HIT_SOLID, HIT_ENEMY, HIT_NONE, TILE_HIT, TILE_PROBE)
     ox, oy = adapter.x, adapter.y
     facing = _facing(adapter)  # rays flip when moving left
     tile = float(adapter.tile_size)

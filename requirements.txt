@@ -1,8 +1,13 @@
+# Core — games, neuroevolution, live dashboard, balance reports
 pygame>=2.5
 numpy>=1.24
 gymnasium>=0.29
 pyyaml>=6.0
 websockets>=12.0
+pillow>=10.0      # report logo embedding + gif tooling
 pytest>=8.0
-pillow>=10.0   # report logo embedding + gif tooling
-psutil>=5.9     # platformer_core process/memory probes
+
+# Stats dashboard (code/stats/dashboard — `streamlit run code/stats/dashboard/app.py`)
+streamlit>=1.30
+pandas>=2.0
+matplotlib>=3.7

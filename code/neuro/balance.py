@@ -35,6 +35,7 @@ from .personas import PERSONAS, Persona, get_persona
 from .sensors import SENSOR_MODES
 
 PROBES_ROOT = os.path.join("runs", "probes")
+ABLATION_ROOT = os.path.join("runs", "ablation")  # sensor-ablation probes never mix with the real sweeps
 BALANCE_DIR = os.path.join("runs", "balance")
 
 # two-sided 95% t critical values for small n (paper used the same approach)
@@ -56,18 +57,20 @@ def config_tag(pop_size: int, gens: int, sensors: str = "rays") -> str:
     return f"p{pop_size}g{gens}" + ("" if sensors == "rays" else f"_{sensors}")
 
 
-def probe_dir(game: str, persona: str, tag: str, level: str, seed: int) -> str:
-    return os.path.join(PROBES_ROOT, game, persona, tag, f"{level}_{seed}".replace(" ", "_"))
+def probe_dir(game: str, persona: str, tag: str, level: str, seed: int,
+              root: str = PROBES_ROOT) -> str:
+    return os.path.join(root, game, persona, tag, f"{level}_{seed}".replace(" ", "_"))
 
 
 def probe(game: str, level: str, seed: int, gens: int, persona: Persona | None = None,
-          sensors: str = "rays") -> dict:
+          sensors: str = "rays", overrides: dict | None = None, run_dir: str | None = None) -> dict:
     """One (level, seed) cell: evolve a fresh population, stop WIN_WINDOW gens after
-    the first win (or at the gen budget), and summarize what happened."""
+    the first win (or at the gen budget), and summarize what happened.
+    `overrides` are extra GAConfig fields (the GA sweep varies one at a time)."""
     from .trainer import Trainer  # lazy: pulls in pygame
     persona = persona or PERSONAS["experienced"]
-    cfg = GAConfig(seed=seed, sensors=sensors)
-    run_dir = probe_dir(game, persona.name, config_tag(cfg.pop_size, gens, sensors), level, seed)
+    cfg = GAConfig(seed=seed, sensors=sensors, **(overrides or {}))
+    run_dir = run_dir or probe_dir(game, persona.name, config_tag(cfg.pop_size, gens, sensors), level, seed)
     trainer = Trainer(game, level, cfg, run_dir=run_dir, persona=persona)
     pop = trainer.pop
 
@@ -184,9 +187,28 @@ def _pool_init() -> None:
     pygame.init()
 
 
-def _probe_job(job: tuple) -> tuple[str, int, dict]:
-    game, lvl, seed, gens, persona, sensors = job
-    return lvl, seed, probe(game, lvl, seed, gens, persona, sensors)
+def _probe_job(job: tuple) -> tuple[tuple, dict]:
+    """job = the positional args of probe(); returns (job, cell) so callers can label output."""
+    return job, probe(*job)
+
+
+def run_jobs(jobs: list[tuple], workers: int, label=None) -> None:
+    """Run probe jobs sequentially (workers <= 1) or in a headless process pool, printing one
+    line per finished cell. `label(job)` names the cell (default: "<level> seed <seed>")."""
+    label = label or (lambda j: f"{j[1]} seed {j[2]}")
+
+    def _record(i: int, job: tuple, cell: dict) -> None:
+        bg = f"best gen {cell['best_gen']}" if cell["best_gen"] else "no progress"
+        print(f"[{i}/{len(jobs)}] {label(job)}: {bg}, win rate {cell['win_rate']:.0%}, "
+              f"best_x {cell['best_x']}, {fmt_hms(cell['train_time_s'])}", flush=True)
+
+    if workers <= 1:
+        for i, job in enumerate(jobs, 1):
+            _record(i, *_probe_job(job))
+    else:
+        with mp.Pool(workers, initializer=_pool_init) as pool:
+            for i, (job, cell) in enumerate(pool.imap_unordered(_probe_job, jobs), 1):
+                _record(i, job, cell)
 
 
 def aggregate(cells: list[dict]) -> dict:
@@ -274,6 +296,10 @@ def fmt_hms(sec: float) -> str:
 
 # ── rebuild from probes ──────────────────────────────────────────────────────
 
+def _natural(name: str):  # "2" < "10", "MM-Stage2" < "MM-Stage10"
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
+
+
 def _parse_tag(tag: str) -> tuple[int, int] | None:
     try:
         p, g = tag.split("_")[0][1:].split("g")
@@ -289,7 +315,7 @@ def format_compare(by_mode: dict[str, list[dict]], game: str) -> str:
            f"win rate over the {WIN_WINDOW} gens after it)"]
     hdr = f"{'LEVEL':<14}" + "".join(f"{m.upper() + ' FIRST WIN':>20}{m.upper() + ' WIN RATE':>18}" for m in modes)
     out += [hdr, "-" * len(hdr)]
-    levels = sorted({r["level"] for rows in by_mode.values() for r in rows})
+    levels = sorted({r["level"] for rows in by_mode.values() for r in rows}, key=_natural)
     for lvl in levels:
         line = f"{lvl:<14}"
         for m in modes:
@@ -304,10 +330,10 @@ def format_compare(by_mode: dict[str, list[dict]], game: str) -> str:
     return "\n".join(out)
 
 
-def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR) -> str:
+def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR, prefix: str = "report") -> str:
     by_mode: dict[str, list[dict]] = {}
     for mode in SENSOR_MODES:
-        path = os.path.join(out_dir, f"report_{game}_{persona}_{config_tag(GAConfig().pop_size, gens, mode)}.json")
+        path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{config_tag(GAConfig().pop_size, gens, mode)}.json")
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
                 by_mode[mode] = json.load(f)["levels"]
@@ -318,10 +344,11 @@ def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR) -> s
     return format_compare(by_mode, game)
 
 
-def load_probe_cells(game: str, persona: str, tag: str) -> dict[str, list[dict]]:
+def load_probe_cells(game: str, persona: str, tag: str,
+                     root: str = PROBES_ROOT) -> dict[str, list[dict]]:
     """Re-summarize every probe dir under one (game, persona, tag) from its state.json."""
     cells: dict[str, list[dict]] = {}
-    for sp in sorted(glob.glob(os.path.join(PROBES_ROOT, game, persona, tag, "*", "state.json"))):
+    for sp in sorted(glob.glob(os.path.join(root, game, persona, tag, "*", "state.json"))):
         try:
             with open(sp, encoding="utf-8") as f:
                 st = json.load(f)
@@ -346,15 +373,13 @@ def load_probe_cells(game: str, persona: str, tag: str) -> dict[str, list[dict]]
         cells.setdefault(cell["level"], []).append(cell)
     for lst in cells.values():
         lst.sort(key=lambda c: c["seed"])
-
-    def natural(name: str):  # "2" < "10", "MM-Stage2" < "MM-Stage10"
-        return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
-    return dict(sorted(cells.items(), key=lambda kv: natural(kv[0])))
+    return dict(sorted(cells.items(), key=lambda kv: _natural(kv[0])))
 
 
-def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR) -> str | None:
-    """Aggregate one (game, persona, tag) probe set into runs/balance/report_*.json."""
-    cells = load_probe_cells(game, persona, tag)
+def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
+                 root: str = PROBES_ROOT, prefix: str = "report") -> str | None:
+    """Aggregate one (game, persona, tag) probe set into <out_dir>/<prefix>_*.json."""
+    cells = load_probe_cells(game, persona, tag, root)
     if not cells:
         return None
     parsed = _parse_tag(tag) or (next(iter(cells.values()))[0]["pop_size"], 0)
@@ -365,7 +390,7 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR) 
             c.pop("_config", None)
     rows = [aggregate(c) for c in cells.values()]
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"report_{game}_{persona}_{tag}.json")
+    out_path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{tag}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({"game": game, "persona": persona, "tag": tag, "pop_size": parsed[0],
                    "gens_budget": parsed[1], "seeds": seeds,
@@ -379,15 +404,16 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR) 
 def rebuild(out_dir: str = BALANCE_DIR) -> list[str]:
     """Regenerate every report JSON from the probe dirs on disk (new layout only)."""
     written = []
-    for d in sorted(glob.glob(os.path.join(PROBES_ROOT, "*", "*", "p*g*"))):
-        tag = os.path.basename(d)
-        persona = os.path.basename(os.path.dirname(d))
-        game = os.path.basename(os.path.dirname(os.path.dirname(d)))
-        if _parse_tag(tag) is None:
-            continue
-        path = write_report(game, persona, tag, out_dir)
-        if path:
-            written.append(path)
+    for root, prefix in ((PROBES_ROOT, "report"), (ABLATION_ROOT, "ablation")):
+        for d in sorted(glob.glob(os.path.join(root, "*", "*", "p*g*"))):
+            tag = os.path.basename(d)
+            persona = os.path.basename(os.path.dirname(d))
+            game = os.path.basename(os.path.dirname(os.path.dirname(d)))
+            if _parse_tag(tag) is None:
+                continue
+            path = write_report(game, persona, tag, out_dir, root=root, prefix=prefix)
+            if path:
+                written.append(path)
     return written
 
 
@@ -402,20 +428,26 @@ def main() -> None:
     ap.add_argument("--out", default=BALANCE_DIR)
     ap.add_argument("--workers", type=int, default=None,
                     help="probe processes; default = min(jobs, cores-1), 1 = sequential")
+    ap.add_argument("--best", action="store_true",
+                    help="probe with this game's GA-sweep winners (code/neuro/ga_best.yaml) "
+                         "instead of the GAConfig baseline")
     ap.add_argument("--sensors", default="rays", choices=SENSOR_MODES,
                     help="agent exteroception: rays (default) or the 3x11x11 tile grid")
     ap.add_argument("--compare", action="store_true",
                     help="print rays-vs-grid table from existing reports and exit (no training)")
     ap.add_argument("--rebuild", action="store_true",
                     help="regenerate report JSONs from runs/probes and exit (no training)")
+    ap.add_argument("--ablation", action="store_true",
+                    help="sensor-ablation arm: probes under runs/ablation, JSONs as ablation_*.json")
     args = ap.parse_args()
+    root, prefix = (ABLATION_ROOT, "ablation") if args.ablation else (PROBES_ROOT, "report")
 
     if args.rebuild:
         for path in rebuild(args.out):
             print(f"rebuilt {path}")
         return
     if args.compare:
-        print(compare(args.game, args.persona, args.gens, args.out))
+        print(compare(args.game, args.persona, args.gens, args.out, prefix))
         return
 
     from .adapters import list_levels, validate_level
@@ -431,31 +463,27 @@ def main() -> None:
     if args.levels:
         for lvl in args.levels:
             validate_level(args.game, lvl)
-    tag = config_tag(GAConfig().pop_size, args.gens, args.sensors)
-    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors) for lvl in levels for seed in args.seeds]
+    best_ov: dict = {}
+    if args.best:
+        from .gasweep import load_best
+        best_ov = load_best(args.game)
+        print(f"--best: {args.game} -> {best_ov or 'baseline (this game has no sweep yet)'}", flush=True)
+    # A different GA is a different experiment: tag it apart so it never lands on baseline probes.
+    tag = config_tag(best_ov.get("pop_size", GAConfig().pop_size), args.gens, args.sensors)
+    if best_ov:
+        tag += "_best"
+    jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors, best_ov or None,
+             probe_dir(args.game, persona.name, tag, lvl, seed, root)) for lvl in levels for seed in args.seeds]
     workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
     print(f"balance probe: {len(levels)} levels x {len(args.seeds)} seeds = {len(jobs)} jobs, "
-          f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag}]\n", flush=True)
+          f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag} · {root}]\n", flush=True)
 
     t0 = time.time()
-
-    def _record(i: int, lvl: str, seed: int, cell: dict) -> None:
-        bg = f"best gen {cell['best_gen']}" if cell["best_gen"] else "no progress"
-        print(f"[{i}/{len(jobs)}] {lvl} seed {seed}: {bg}, win rate {cell['win_rate']:.0%}, "
-              f"best_x {cell['best_x']}, {fmt_hms(cell['train_time_s'])}", flush=True)
-
-    if workers <= 1:
-        for i, job in enumerate(jobs, 1):
-            lvl, seed, cell = _probe_job(job)
-            _record(i, lvl, seed, cell)
-    else:
-        with mp.Pool(workers, initializer=_pool_init) as pool:
-            for i, (lvl, seed, cell) in enumerate(pool.imap_unordered(_probe_job, jobs), 1):
-                _record(i, lvl, seed, cell)
+    run_jobs(jobs, workers)
 
     # The probe dirs are the source of truth: re-aggregate everything under this config,
     # so earlier levels probed with the same config stay and re-probed levels are replaced.
-    out_path = write_report(args.game, persona.name, tag, args.out)
+    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix)
     with open(out_path, encoding="utf-8") as f:
         rows = json.load(f)["levels"]
     print("\n" + format_report([r for r in rows if r["level"] in levels], args.game), flush=True)

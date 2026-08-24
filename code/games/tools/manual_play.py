@@ -18,7 +18,7 @@ for _stream in (sys.stdout, sys.stderr):
 parser = argparse.ArgumentParser()
 parser.add_argument("--game", default="platformer", help="game key")
 parser.add_argument("--fps", type=int, default=30, help="target FPS")
-parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. 1-3)")
+parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. Mario1-2; meatboy: level index)")
 parser.add_argument("--file", default=None, help="Absolute path to a .txt level file (unlisted)")
 parser.add_argument("--random", action="store_true", help="random actions instead of keyboard")
 args = parser.parse_args()
@@ -30,6 +30,12 @@ level_file = args.file  or os.environ.get('PEAK_PLAY_FILE',  None)
 # Normalize game name (mario -> platformer) if needed
 if args.game == "mario":
     args.game = "platformer"
+
+# Fail fast on a level the core can't load (otherwise it falls back to a blank world).
+INDEXED_GAMES = {"meatboy", "bomberman"}   # levels are list indices, not named ids
+if level_id and not level_file and args.game not in INDEXED_GAMES:
+    from code.neuro.adapters import validate_level
+    validate_level("mario" if args.game == "platformer" else args.game, level_id)
 
 # Enable manual play mode for platformer-like games
 if args.game in {"platformer", "megaman"}:
@@ -152,12 +158,22 @@ def _meatboy_action(keys) -> list:
     return [move, int(bool(run)), int(bool(jump))]
 
 
+def _bomberman_action(keys) -> list:
+    """[dx, dy, bomb] — arrows / WASD move, SPACE (or Z) drops a bomb."""
+    k = pygame.key.get_pressed()
+    dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT])
+    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP])
+    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z]))]
+
+
 ACTION_MAPPING = {
     "platformer": _platformer_action,
+    "bomberman": _bomberman_action,
     "mario": _platformer_action,
     "megaman": _megaman_action,
     "sonic": _sonic_action,
     "meatboy": _meatboy_action,
+    "bomberman": _bomberman_action,
 }
 
 _IDLE = {"megaman": [0, 0, 0, 0], "meatboy": [0, 0, 0]}
@@ -169,6 +185,10 @@ def _random_action() -> list:
         return [random.randrange(5), random.randrange(3), random.randrange(2), random.randrange(2)]
     if args.game == "meatboy":
         return [random.randrange(3), random.randrange(2), random.randrange(2)]
+    if args.game == "meatboy":
+        return [random.randrange(3), random.randrange(2), random.randrange(2)]
+    if args.game == "bomberman":
+        return [random.randrange(-1, 2), random.randrange(-1, 2), int(random.random() < 0.05)]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
 
@@ -186,6 +206,8 @@ if level_file:
 env_kwargs = {}
 if args.game == "meatboy":
     pass          # meatboy takes no world/curriculum kwargs; level is picked below
+elif args.game == "bomberman":
+    env_kwargs = {"level_idx": int(level_id)} if level_id else {}
 elif level_id:
     env_kwargs['world'] = level_id
     env_kwargs['lock_level'] = True
@@ -198,6 +220,12 @@ if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
 
 core_game = GameCls(render_mode="human", **env_kwargs)
+if args.game == "meatboy" and level_id:
+    core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
+substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixed-dt cores keep real-time pace
+# Meatboy draws onto whatever surface it is given; the other cores own a window.
+screen = core_game._surf if hasattr(core_game, "_surf") else \
+    pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
 
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
@@ -238,9 +266,11 @@ if args.game == "meatboy":
 core_game.reset()
 running = True
 random_action = _random_action()
+frame = 0
 
 while running:
     clock.tick(args.fps)
+    frame += 1
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -251,8 +281,8 @@ while running:
     keys = pygame.key.get_pressed()
 
     if args.random:
-        _frame = getattr(core_game, "frame", getattr(core_game, "_steps", 0))
-        if _frame % 8 == 0:            # re-roll every 8 frames so movement is visible
+        frame = getattr(core_game, "frame", getattr(core_game, "_steps", 0))
+        if frame % 8 == 0:   # re-roll every 8 frames so movement is visible
             random_action = _random_action()
         action = random_action
     else:
@@ -263,13 +293,19 @@ while running:
     if hasattr(core_game, 'debug_manager') and core_game.debug_manager.free_cam_active:
         action = _IDLE.get(args.game, [0, 0, 0])
 
-    _, _, terminated, truncated, info = core_game.step(action)
-    done = terminated or truncated
+    for _ in range(substeps):
+        _, _, terminated, truncated, info = core_game.step(action)
+        done = terminated or truncated
+        if done:
+            break
 
-    core_game.render(core_game._surf, blit_only=True)
+    core_game.render(screen, blit_only=True)
     pygame.display.flip()
 
     if info.get("episode_end", False) or done:
+        if args.game in INDEXED_GAMES and level_id:
+            core_game.won = False          # reset() would otherwise advance to the next level
+            core_game._level_idx = int(level_id)
         core_game.reset()
         if args.game == "meatboy":
             continue          # meatboy.reset() already re-selects its own level

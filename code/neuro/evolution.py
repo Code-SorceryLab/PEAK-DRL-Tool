@@ -15,8 +15,8 @@ from .sensors import sensor_dim
 class GAConfig:
     # These defaults are the GA-sweep baseline (menu 15 / code/neuro/gasweep.py): every sweep
     # axis varies exactly one of them against a literature-grounded low/high bound.
-    pop_size: int = 20
-    elite: int = 3          # raised from 2: population win rate plateaued at 23%
+    pop_size: int = 10
+    elite: int = 4          # raised from 2: population win rate plateaued at 23%
     tournament_k: int = 5   # raised from 3: stronger selection pressure toward winners
     crossover_rate: float = 0.7
     mutation_rate: float = 0.15
@@ -34,6 +34,19 @@ class GAConfig:
     hidden: int = 16
     action_feedback: bool = False
     memory: int = 0
+    n_outputs: int = 3           # 3 = left/right/jump (side-scrollers); 5 adds up/down (bomberman: jump = bomb)
+    n_inputs: int = 0            # 0 = derive from the sensor mode; a game with its own ray layout sets its own
+
+    @classmethod
+    def for_game(cls, game: str, **overrides) -> "GAConfig":
+        """Baseline plus whatever the GA sweep recommends for `game` (code/neuro/ga_best.yaml).
+
+        Explicit keyword arguments still win, so --seed / --sensors on the command line are never
+        silently overridden by the sweep. Falls back to the plain baseline when the sweep has not
+        covered this game."""
+        from .gasweep import load_best
+        return cls(**{**load_best(game), **overrides})
+
 
 def _proto_for(sensors: str, n_params: int) -> NeuralNet | None:
     """Rebuild the net shape a saved weight vector came from, or None if it no longer fits.
@@ -138,6 +151,9 @@ class Population:
             "generation": self.generation,
             "seed": self.cfg.seed,
             "sensors": self.cfg.sensors,
+            "hidden": self.cfg.hidden,
+            "action_feedback": self.cfg.action_feedback,
+            "memory": self.cfg.memory,
             "n_params": self.n_params,
         }
         np.savez_compressed(os.path.join(run_dir, "best.npz"),

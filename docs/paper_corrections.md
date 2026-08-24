@@ -1,5 +1,8 @@
 # Paper Corrections (reviewer #3 — "free" trust fixes)
 
+> **Applies to the archived deep-RL version** (`archive/drl-sb3-final`): the scripts and reward
+> columns below do not exist on the neuroevolution branch. Kept for the manuscript's history.
+
 These convert presentation issues that erode reviewer trust. Code fixes are in
 `code/scripts/agent_analyzer.py` (`_reward_cols` telemetry exclusion; cross-persona
 reward caveat). The paper-text/figure changes below are for the manuscript.

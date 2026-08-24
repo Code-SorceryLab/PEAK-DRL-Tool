@@ -34,9 +34,9 @@ DISABLED_LEVELS_KEY = "disabled_levels"
 CHIME_PATH = Path("chime.wav")
 
 # Adapter keys → game_config.yaml section key (platformer sits at the root).
-GAMES = ["mario", "megaman", "sonic", "meatboy"]
-CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic",
-              "meatboy": "meatboy"}
+GAMES = ["mario", "megaman", "sonic", "meatboy", "bomberman"]
+INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
+CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic", "meatboy": "meatboy", "bomberman": "bomberman"}
 
 # ============================================================================
 # MAIN MENU — PEAK ENGINE
@@ -86,12 +86,18 @@ def clear_cli():
 
 
 def play_chime():
-    """Victory chime after a fully successful training batch."""
-    if HAS_WINSOUND and CHIME_PATH.exists():
-        try:
+    """Victory chime after a fully successful training batch (winsound / afplay / aplay)."""
+    if not CHIME_PATH.exists():
+        return
+    try:
+        if HAS_WINSOUND:
             winsound.PlaySound(str(CHIME_PATH), winsound.SND_FILENAME)
-        except Exception:
-            pass
+            return
+        player = shutil.which("afplay") or shutil.which("aplay")
+        if player:
+            subprocess.Popen([player, str(CHIME_PATH)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 
 # ============================================================================
@@ -181,10 +187,10 @@ def get_available_games():
 
 def get_levels_for_game(game: str) -> list:
     """Enabled level ids for an adapter game. Meatboy levels are indices."""
-    if game == "meatboy":
+    if game in INDEXED_GAMES:
         try:
             import yaml
-            data = yaml.safe_load(Path("code/games/meatboy_config.yaml").read_text(encoding="utf-8")) or {}
+            data = yaml.safe_load(Path(f"code/games/{game}_config.yaml").read_text(encoding="utf-8")) or {}
             return [str(i) for i in range(len(data.get("levels", [])))]
         except Exception:
             return []
@@ -204,8 +210,10 @@ def get_run_dirs():
     including balance probes (runs/probes/<game>/<persona>/<tag>/<level>_<seed>)."""
     if not RUNS_DIR.exists():
         return []
+    gasweep = RUNS_DIR / "gasweep"  # hundreds of ablation cells — watch those from the command center
     return sorted(p.parent for p in RUNS_DIR.rglob("state.json")
-                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay")
+                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay"
+                  and gasweep not in p.parents)
 
 
 def run_meta(run_dir: Path) -> dict:
@@ -343,7 +351,7 @@ def toggle_select(title, options, default_indices=None, min_select=1, show_desc=
     Type a number to flip that item on/off.  Press Enter to confirm.
     show_desc: optional dict {option: description_string} for extra info per row.
     """
-    selected = set(default_indices or [0])   # 0-based indices
+    selected = set([0] if default_indices is None else default_indices)   # 0-based indices; [] = none ticked
 
     while True:
         print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}  {_DIM('(toggle · Enter to confirm)')}")
@@ -461,6 +469,43 @@ def _prompt_gens(default_hint="Enter = train until Ctrl+C"):
         return "invalid"
 
 
+def _prompt_persona_sensors_tag():
+    """Shared by every TRAIN entry: (persona, sensors, tag) or None on back."""
+    persona = ask_index("\n  Player persona (who should the agents play like?):",
+                        PERSONA_CHOICES, default="experienced")
+    if not persona:
+        return None
+    sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
+    if not sensors:
+        return None
+    raw = input(_DIM("\n    Run tag (optional, appended to the run dir name): ")).strip()
+    tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in raw)
+    return persona, sensors, tag
+
+
+def _run_dir(game, level, persona, sensors, tag) -> Path:
+    """runs/<game>[_<level>][_<persona>][_<sensors>][_<tag>] — every config gets its own population."""
+    name = game if not level else f"{game}_{level}"
+    if persona != "experienced":
+        name += f"_{persona}"
+    if sensors != "rays":  # a grid population has a different genome size — never share a run dir
+        name += f"_{sensors}"
+    if tag:
+        name += f"_{tag}"
+    return RUNS_DIR / name
+
+
+def _print_run_summary(**fields):
+    W = 50
+    print()
+    print(_DIM("    " + "─" * W))
+    print(f"    {_BOLD('Run Summary')}")
+    for k, v in fields.items():
+        print(f"    {k + ':':<13}{_WHT(str(v))}")
+    print(_DIM("    " + "─" * W))
+    return input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() not in ("n", "no")
+
+
 def run_training():
     """Train Single — one game, one level, live dashboard."""
     _refresh_screen()
@@ -480,39 +525,19 @@ def run_training():
         if level.startswith("auto"):
             level = None
 
-    persona = ask_index("\n  Player persona (who should the agents play like?):",
-                        ["experienced", "novice", "speedrunner"], default="experienced")
-    if not persona:
+    pst = _prompt_persona_sensors_tag()
+    if not pst:
         return
-    sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
-    if not sensors:
-        return
+    persona, sensors, tag = pst
     gens = _prompt_gens()
     if gens == "invalid":
         return
     turbo = input(_DIM("    Start in turbo? [y/N]: ")).strip().lower().startswith("y")
 
-    run_dir = RUNS_DIR / (game if not level else f"{game}_{level}")
-    if persona != "experienced":
-        run_dir = Path(str(run_dir) + f"_{persona}")
-    if sensors != "rays":  # a grid population has a different genome size — never share a run dir
-        run_dir = Path(str(run_dir) + f"_{sensors}")
-
-    W = 50
-    print()
-    print(_DIM("    " + "─" * W))
-    print(f"    {_BOLD('Run Summary')}")
-    print(f"    Game:        {_WHT(game)}")
-    print(f"    Level:       {_WHT(level or 'auto')}")
-    print(f"    Persona:     {_WHT(persona)}")
-    print(f"    Sensors:     {_WHT(sensors)}")
-    print(f"    Generations: {_WHT(str(gens) if gens else 'until stopped')}")
-    print(f"    Mode:        {_WHT('turbo' if turbo else 'real-time')}")
-    print(f"    Run dir:     {_WHT(str(run_dir))}")
-    print(_DIM("    " + "─" * W))
-
-    proceed = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
-    if proceed in ("n", "no"):
+    run_dir = _run_dir(game, level, persona, sensors, tag)
+    if not _print_run_summary(Game=game, Level=level or "auto", Persona=persona, Sensors=sensors,
+                              Tag=tag or "-", Generations=gens or "until stopped",
+                              Mode="turbo" if turbo else "real-time", **{"Run dir": run_dir}):
         return
 
     print()
@@ -542,74 +567,39 @@ def train_all_models_for_game():
     chosen = toggle_select(f"LEVELS  ·  {game}", levels, default_indices=list(range(len(levels))))
     if not chosen:
         return
-
-    gens = _prompt_gens("e.g. 60")
-    if gens in ("invalid", None):
-        if gens is None:
-            print(_RED("  A generation count is required for batch runs."))
-        return
-
-    W = 50
-    print()
-    print(_DIM("    " + "─" * W))
-    print(f"    {_BOLD('Run Summary')}")
-    print(f"    Game:        {_WHT(game)}")
-    print(f"    Levels:      {_WHT(', '.join(chosen))}")
-    print(f"    Generations: {_WHT(str(gens))} per level")
-    print(f"    Total runs:  {_WHT(str(len(chosen)))}")
-    print(_DIM("    " + "─" * W))
-
-    proceed = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
-    if proceed in ("n", "no"):
-        return
-
-    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
-    successful = 0
-    for i, level in enumerate(chosen, 1):
-        print(f"\n  {_YEL(f'[{i}/{len(chosen)}]')}  {_WHT(game)} | {_WHT(level)}")
-        run_dir = RUNS_DIR / f"{game}_{level}"
-        ok = execute_training_run(
-            _trainer_cmd(game, level, gens, turbo=True, run_dir=run_dir))
-        successful += int(ok)
-
-    print_training_summary(len(chosen), successful, len(chosen) - successful)
-    if successful == len(chosen):
-        play_chime()
+    _train_batch([(game, lvl) for lvl in chosen], Game=game, Levels=", ".join(chosen))
 
 
 def train_complete_grid():
     """Train Full Grid — every game × its enabled levels, headless turbo."""
     _refresh_screen()
     _section("TRAIN  ›  Full Grid")
-
     jobs = [(g, lvl) for g in get_available_games() for lvl in (get_levels_for_game(g) or [None])]
+    _train_batch(jobs, Games=", ".join(get_available_games()))
 
+
+def _train_batch(jobs, **summary):
+    """Back-to-back headless turbo runs for every (game, level) job — shared by Train All / Full Grid."""
+    pst = _prompt_persona_sensors_tag()
+    if not pst:
+        return
+    persona, sensors, tag = pst
     gens = _prompt_gens("e.g. 60")
     if gens in ("invalid", None):
         if gens is None:
             print(_RED("  A generation count is required for batch runs."))
         return
-
-    W = 50
-    print()
-    print(_DIM("    " + "─" * W))
-    print(f"    {_BOLD('Run Summary')}")
-    print(f"    Games:       {_WHT(', '.join(get_available_games()))}")
-    print(f"    Generations: {_WHT(str(gens))} per run")
-    print(f"    Total runs:  {_WHT(str(len(jobs)))}")
-    print(_DIM("    " + "─" * W))
-
-    proceed = input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower()
-    if proceed in ("n", "no"):
+    if not _print_run_summary(**summary, Persona=persona, Sensors=sensors, Tag=tag or "-",
+                              Generations=f"{gens} per run", **{"Total runs": len(jobs)}):
         return
 
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
     successful = 0
     for i, (game, level) in enumerate(jobs, 1):
         print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(level or 'auto')}")
-        run_dir = RUNS_DIR / (game if not level else f"{game}_{level}")
         ok = execute_training_run(
-            _trainer_cmd(game, level, gens, turbo=True, run_dir=run_dir))
+            _trainer_cmd(game, level, gens, turbo=True, run_dir=_run_dir(game, level, persona, sensors, tag),
+                         extra=("--persona", persona, "--sensors", sensors)))
         successful += int(ok)
 
     print_training_summary(len(jobs), successful, len(jobs) - successful)
@@ -621,145 +611,76 @@ def train_complete_grid():
 # PLAY / WATCH
 # ============================================================================
 
+# Keys exactly as code/games/tools/manual_play.py (and MeatboyPlayer) read them.
+_PLAY_CONTROLS = {
+    "mario":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+                ("Z", "Fire (with fire flower)")],
+    "megaman": [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE", "Jump"),
+                ("W / S", "Climb ladder"), ("Z", "Fire")],
+    "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+                ("S", "Crouch / spin dash")],
+    "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
+    "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
+}
+_DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
+               ("F4", "Hitboxes"), ("F5", "Agent max view")]
+
+
 def run_manual_play():
     """Manual gameplay interface — lets the user play any configured game with keyboard controls."""
-
-    # ── Panel width matches the main header (58 chars) ────────────────────────
-    W = 58
-
-    def _box_top():
-        print(_DIM("    ╔" + "═" * W + "╗"))
-
-    def _box_mid():
-        print(_DIM("    ╠" + "═" * W + "╣"))
-
-    def _box_bot():
-        print(_DIM("    ╚" + "═" * W + "╝"))
-
-    def _box_row(text="", color_fn=None):
-        """Print a single ║-bordered row, centered if no color_fn, left-padded otherwise."""
-        if color_fn:
-            inner = f"  {text}"
-            pad   = W - len(inner)
-            print(_DIM("    ║") + color_fn(inner) + _DIM(" " * max(pad, 0) + "║"))
-        else:
-            centered = text.center(W)
-            print(_DIM("    ║" + centered + "║"))
-
-    def _box_kv(key: str, val: str, key_w: int = 16):
-        """Print a key-value row inside the box."""
-        k_part  = _YEL(f"  {key:<{key_w}}")
-        v_part  = _WHT(val)
-        pad     = W - 2 - key_w - len(val)
-        print(_DIM("    ║") + k_part + v_part + _DIM(" " * max(pad, 0) + "║"))
-
-    # ── Resolve available games ───────────────────────────────────────────────
     _refresh_screen()
-    _section("MANUAL PLAY  ›  Select Game")
+    _section("PLAY  ›  Manual")
 
     available_games = list(get_available_games())
     if not available_games:
         print(_RED("  ✖  No game configurations found"))
         return
+    game = ask_index("\n  Choose a game:", available_games, default=available_games[0])
+    if not game:
+        return
+    levels = get_levels_for_game(game)
+    level = None
+        return
+    levels = get_levels_for_game(game)
+    level = None
+    if levels:
+        level = ask_index("\n  Choose a level:", ["auto (first level)"] + levels,
+                          default="auto (first level)")
+        if level is None:
+            return
+        if level.startswith("auto"):
+            level = None
 
-    # ── Themed game list ──────────────────────────────────────────────────────
+    W = 50
     print()
-    for i, game in enumerate(available_games, 1):
-        print(f"    {_YEL(f'[{i}]')}  {_WHT(game)}")
-    back_idx = len(available_games) + 1
-    print(f"    {_YEL(f'[{back_idx}]')}  {_DIM('Back')}")
+    print(_DIM("    " + "─" * W))
+    print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
+    for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
+        print(f"    {_YEL(f'{key:<16}')}{what}")
+    if game not in INDEXED_GAMES:  # meatboy / bomberman have no debug manager
+        print()
+        print(f"    {_BOLD('Debug overlays')}")
+        for key, what in _DEBUG_KEYS:
+            print(f"    {_YEL(f'{key:<16}')}{what}")
+    print(_DIM("    " + "─" * W))
     print()
 
-    raw = input(_BOLD("    ⟫ ")).strip()
-    try:
-        idx = int(raw)
-    except ValueError:
-        print(_RED("  ✖  Invalid selection."))
-        return
-
-    if idx == back_idx:
-        return
-    if not (1 <= idx <= len(available_games)):
-        print(_RED("  ✖  Invalid selection."))
-        return
-
-    selected_game = available_games[idx - 1]
-    config_game = CONFIG_KEY.get(selected_game, selected_game)
-
-    # ── Strip dummy SDL driver so the real window opens ───────────────────────
+    # Strip the dummy SDL driver so a real window opens.
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
-
-    script_path = Path("code/games/tools/manual_play.py")
-    if not script_path.exists():
-        print(_RED("  ✖  Manual play script not found at code/games/tools/manual_play.py"))
-        return
-
-    # ── Pre-launch banner ─────────────────────────────────────────────────────
-    print()
-    _box_top()
-    _box_row()
-    _box_row("PEAK ENGINE  ·  MANUAL PLAY", color_fn=lambda t: _BOLD(_RED("    " + t.center(W - 4))))
-    _box_row(_WHT(f"  {selected_game.upper()}").center(W), color_fn=lambda t: _BOLD(_WHT("    " + selected_game.upper().center(W - 4))))
-    _box_row()
-    _box_mid()
-    # Controls section
-    _box_row("  CONTROLS", color_fn=_BOLD)
-    _box_row()
-    _box_kv("A / D",         "Move left / right")
-    _box_kv("SPACE",         "Jump")
-    if selected_game.lower() == "megaman":
-        _box_kv("W / S",     "Climb ladder")
-        _box_kv("Z",         "Fire")
-    elif selected_game.lower() == "sonic":
-        _box_kv("SHIFT",     "Run")
-        _box_kv("S / DOWN",  "Crouch / spin dash")
-    elif selected_game.lower() == "meatboy":
-        _box_kv("SHIFT",     "Sprint")
-        _box_kv("Into a wall", "Slide, then SPACE to wall-jump")
-    else:
-        _box_kv("SHIFT",     "Run")
-    _box_kv("ESC",           "Quit session")
-    _box_row()
-    _box_mid()
-    # Debug keys section
-    _box_row("  DEBUG OVERLAY  (F-keys)", color_fn=_BOLD)
-    _box_row()
-    _box_kv("F1",  "Sensor rays   (toggle)",    key_w=5)
-    _box_kv("F2",  "Free camera   (IJKL)",       key_w=5)
-    _box_kv("F3",  "Slow motion   (0.5×)",       key_w=5)
-    _box_kv("F4",  "Hitboxes      (toggle)",     key_w=5)
-    _box_kv("F5",  "Agent vision  (max view)",   key_w=5)
-    _box_row()
-    _box_bot()
-    print()
-
-    # ── Launch ────────────────────────────────────────────────────────────────
-    print(_DIM(f"    Launching {selected_game}..."))
-    print()
-
-    subprocess.run(
-        [sys.executable, "-m", "code.games.tools.manual_play",
-         "--game", config_game, "--fps", "30"],
-        env=proc_env
-    )
-
-    # ── Session-end banner ────────────────────────────────────────────────────
-    print()
-    _box_top()
-    _box_row()
-    _box_row("SESSION ENDED", color_fn=lambda t: _BOLD(_GRN("    " + t.center(W - 4))))
-    _box_row()
-    _box_row(_DIM("  Thanks for playing  ·  PEAK ENGINE"), color_fn=lambda t: _DIM("    " + "Thanks for playing  ·  PEAK ENGINE".center(W - 4)))
-    _box_row()
-    _box_bot()
-    print()
+    config_game = CONFIG_KEY.get(game, game)
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play",
+           "--game", config_game, "--fps", "30"]
+    if level:
+        cmd += ["--level", level]
+    print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
+    subprocess.run(cmd, env=proc_env)
 
 
 def _pick_run(prompt="\n  Choose a run:"):
     runs = get_run_dirs()
     if not runs:
-        print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (14/15) first."))
+        print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (13/14) first."))
         return None
     metas = [run_meta(p) for p in runs]
     order = sorted(range(len(runs)), key=lambda i: -(metas[i].get("fitness") or 0))  # strongest first
@@ -843,7 +764,6 @@ def run_level_editor():
     # Locate the script — check both code/games/tools and project root
     candidates = [
         Path("code/games/tools/level_editor.py"),
-        Path("code/scripts/level_editor.py"),
         Path("level_editor.py"),
     ]
 
@@ -970,19 +890,44 @@ def open_balance_command():
         pass
 
 
+def run_readme_figures():
+    """README Figures — regenerate docs/img/fig_*.png from runs/balance and refresh the README stamp."""
+    _refresh_screen()
+    _section("TOOLS  ›  README Figures")
+    print(_DIM("    fig_difficulty · fig_capacity · fig_sensors · fig_knobs  ←  runs/balance/*.json"))
+    readme = input(_DIM("\n    Also update README.md (figure stamp between the <!-- figures --> markers)? [Y/n]: ")
+                   ).strip().lower() not in ("n", "no")
+    cmd = [sys.executable, "-m", "code.neuro.figures"] + (["--readme"] if readme else [])
+    print(_DIM("  >>> " + " ".join(cmd) + "\n"))
+    subprocess.run(cmd)
+
+
 SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); grid = 3×11×11 tiles (368)
 
 
-def _sweep_prompts(n_modes: int = 1, default_gens: str = "40"):
+def _persona_names() -> list[str]:
+    """Persona registry (code/neuro/personas.py) — read without importing numpy/pygame."""
+    try:
+        from code.neuro.personas import PERSONAS
+        names = list(PERSONAS)
+    except Exception:
+        names = ["experienced", "novice", "speedrunner"]
+    return ["experienced"] + sorted(n for n in names if n != "experienced")
+
+
+PERSONA_CHOICES = _persona_names()
+
+
+def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str = "sensor modes",
+                   cost_note: str = ""):
     """Shared sweep selection: games, personas, generation budget, seeds (None = back).
     Every ENABLED level of each chosen game is probed."""
     games = toggle_select("GAMES", get_available_games(),
                           default_indices=[i for i, g in enumerate(get_available_games())
-                                           if g in ("mario", "meatboy")])
+                                           if g in ("mario", "meatboy", "bomberman")])
     if not games:
         return None
-    personas = toggle_select("PERSONAS", ["experienced", "novice", "speedrunner"],
-                             default_indices=[0, 1, 2])
+    personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))
     if not personas:
         return None
     gens_raw = input(_DIM(f"\n    Generation budget per probe [{default_gens}]: ")).strip()
@@ -993,24 +938,27 @@ def _sweep_prompts(n_modes: int = 1, default_gens: str = "40"):
     n_levels = sum(len(get_levels_for_game(g)) for g in games)
     n_jobs = n_levels * len(seeds) * len(personas) * n_modes
     workers = max(1, (os.cpu_count() or 2) - 1)
-    modes = f" × {n_modes} sensor modes" if n_modes > 1 else ""
+    modes = f" × {n_modes} {modes_label}" if n_modes > 1 else ""
     print(f"\n    {_WHT(str(n_jobs))} probes ({n_levels} levels × {len(seeds)} seeds × "
           f"{len(personas)} personas{modes}), {workers} parallel workers")
+    if cost_note:
+        print(_DIM(f"    {cost_note}"))
     print(_DIM("    Only ENABLED levels are probed — use Toggle Levels [10] first if needed."))
     if input(_BOLD("    ⟫ Proceed? [Y/n]: ")).strip().lower() in ("n", "no"):
         return None
     return games, personas, gens, seeds
 
 
-def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg) -> bool:
+def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg,
+           module: str = "code.neuro.balance", extra: tuple = ()) -> bool:
     """games × personas × sensor modes probe runs; False if interrupted."""
     for game in games:
         for persona in personas:
             for sensors in sensors_list:
                 tag = f" · {sensors}" if len(sensors_list) > 1 else ""
                 print(_BOLD(f"\n  ── {game} · {persona}{tag} " + "─" * 30))
-                cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
-                       "--gens", gens, "--seeds", *seeds, "--sensors", sensors]
+                cmd = [sys.executable, "-m", module, "--game", game, "--persona", persona,
+                       "--gens", gens, "--seeds", *seeds, "--sensors", sensors, *extra]
                 try:
                     subprocess.run(cmd)
                 except KeyboardInterrupt:
@@ -1037,15 +985,49 @@ def run_sensor_ablation():
         return
     games, personas, gens, seeds = picked
     if not _sweep(games, personas, gens, seeds, SENSOR_CHOICES,
-                  "\n  Ablation interrupted — finished probes are kept; rerun to fill the gaps."):
+                  "\n  Ablation interrupted — finished probes are kept; rerun to fill the gaps.",
+                  extra=("--ablation",)):  # runs/ablation + ablation_*.json — never touches the real sweeps
         return
     print()
     for game in games:
         for persona in personas:
             subprocess.run([sys.executable, "-m", "code.neuro.balance", "--game", game,
-                            "--persona", persona, "--gens", gens, "--compare"])
+                            "--persona", persona, "--gens", gens, "--compare", "--ablation"])
     play_chime()
     _open_command_center("ablation")
+
+
+def run_ga_sweep():
+    """GA Sweep — one GAConfig knob at a time against literature bounds; best config per game."""
+    _refresh_screen()
+    _section("BALANCE  ›  GA Sweep  (hyperparameter ablation)")
+    print(_DIM("    Baseline GAConfig + one knob moved to its literature low / high bound per config\n"
+               "    (hidden size, population, elite, tournament, crossover, mutation, anneal, init,\n"
+               "    action feedback, memory units). Same coverage as Full Sweep; 23× the probes, ≈33× the episodes."))
+    from code.neuro.gasweep import AXES, AXIS_DOC, cost_multiplier, sweep_configs  # lazy: numpy import
+    sensors = ask_index("\n  Sensors for every config:", SENSOR_CHOICES, default="rays")
+    if not sensors:
+        return
+    axes = toggle_select("GA AXES", list(AXES), default_indices=list(range(len(AXES))),
+                         show_desc={a: f"{' · '.join(map(str, vs))}  —  {AXIS_DOC[a]}" for a, vs in AXES.items()})
+    if not axes:
+        return
+    confirm = input(_DIM("\n    Also probe the per-axis-winner composite afterwards (--confirm)? [Y/n]: ")
+                    ).strip().lower() not in ("n", "no")
+    configs = sweep_configs(axes)
+    picked = _sweep_prompts(n_modes=len(configs), modes_label="GA configs",
+                            cost_note=f"≈{cost_multiplier(configs):.0f}× the episodes of one Full Sweep "
+                                      f"(population axis dominates) — run overnight for all four games.")
+    if not picked:
+        return
+    games, personas, gens, seeds = picked
+    extra = ("--axes", *axes) + (("--confirm",) if confirm else ())
+    if not _sweep(games, personas, gens, seeds, [sensors],
+                  "\n  GA sweep interrupted — finished probes are kept; rerun to fill the gaps.",
+                  module="code.neuro.gasweep", extra=extra):
+        return
+    play_chime()
+    _open_command_center("gasweep")
 
 
 def run_full_sweep():
@@ -1066,40 +1048,50 @@ def run_full_sweep():
     _open_command_center()
 
 
-def delete_logs_and_models():
-    """Permanently delete all training runs (populations, checkpoints, results)."""
-    _section("DANGER  ›  Delete Logs & Models")
-    confirm = input(
-        f"This will permanently delete '{RUNS_DIR}/' (all populations, checkpoints, results).\n"
-        "Are you sure you want to continue? [y/N]: "
-    ).strip().lower()
+_RUN_GROUPS = [  # label, dir — whole probe/sweep trees are deleted as one unit
+    ("Full Sweep probes", RUNS_DIR / "probes"),
+    ("Sensor Ablation probes", RUNS_DIR / "ablation"),
+    ("GA Sweep cells", RUNS_DIR / "gasweep"),
+    ("Balance reports + command center", RUNS_DIR / "balance"),
+]
 
-    if confirm not in ("y", "yes"):
+
+def delete_logs_and_models():
+    """Delete selected training runs / probe trees — or everything under runs/."""
+    _refresh_screen()
+    _section("DANGER  ›  Delete Runs")
+    groups = [(lbl, d) for lbl, d in _RUN_GROUPS if d.exists()]
+    singles = [p for p in get_run_dirs() if not any(d in p.parents for _, d in groups)]
+    targets = [(str(p.relative_to(RUNS_DIR)), p) for p in singles] + \
+              [(f"{lbl}  ({sum(1 for _ in d.rglob('state.json'))} populations)", d) for lbl, d in groups] + \
+              [("EVERYTHING under runs/", RUNS_DIR)]
+    chosen = toggle_select("DELETE", [t for t, _ in targets], default_indices=[])
+    if not chosen:
+        print("Aborted. Nothing was deleted.")
+        return
+    paths = [p for t, p in targets if t in chosen]
+    if RUNS_DIR in paths:
+        paths = [RUNS_DIR]
+    print()
+    for p in paths:
+        print(f"    {_RED('✖')}  {p}")
+    if input(_BOLD(f"\n    ⟫ Permanently delete {len(paths)} item(s)? [y/N]: ")).strip().lower() not in ("y", "yes"):
         print("Aborted. Nothing was deleted.")
         return
 
-    def safe_clear_dir(path: Path):
-        if not path.exists():
-            return
+    for path in paths:
         for attempt in range(3):
             try:
                 shutil.rmtree(path)
+                print(f"    {_GRN('✓')}  deleted {path}")
                 break
             except Exception as e:
                 if attempt == 2:
-                    print(f"Failed to delete {path}: {e}")
-                    return
-                print(f"{path} might be in use. Retrying in 1s…")
-                time.sleep(1)
-        try:
-            path.mkdir(parents=True, exist_ok=True)
-            print(f"✓ Cleared and recreated {path}")
-        except Exception as e:
-            print(f"Deleted {path} but failed to recreate it: {e}")
-
-    safe_clear_dir(RUNS_DIR)
-
-    print("\n🧹 All logs and models deleted successfully.\n")
+                    print(_RED(f"    Failed to delete {path}: {e}"))
+                else:
+                    print(_DIM(f"    {path} might be in use. Retrying in 1s…"))
+                    time.sleep(1)
+    RUNS_DIR.mkdir(exist_ok=True)
 
 
 def show_project_status():
@@ -1131,7 +1123,7 @@ def show_project_status():
             print(f"   {p.name}: {_DIM('(unreadable state.json)')}")
 
     print(f"\nAlgorithm: {_WHT('fixed-topology GA')}  {_DIM('(elitism + tournament + crossover + mutation)')}")
-    print(f"Network:   {_WHT('14 sensors (or 368 grid cells) → 16 tanh → 3 (left/right/jump)')}")
+    print(f"Network:   {_WHT('14 sensors (or 368 grid cells) → H tanh (default 16) → 3 (left/right/jump)')}")
     print()
 
 
@@ -1162,8 +1154,10 @@ def main():
         "10": ("toggle_levels",        run_toggle_levels),
         "11": ("dashboard",            run_dashboard),
         "12": ("balance_command",      open_balance_command),
-        "15": ("full_sweep",           run_full_sweep),
-        "16": ("sensor_ablation",      run_sensor_ablation),
+        "13": ("full_sweep",           run_full_sweep),
+        "14": ("sensor_ablation",      run_sensor_ablation),
+        "15": ("ga_sweep",             run_ga_sweep),
+        "16": ("readme_figures",       run_readme_figures),
         "d":  ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -1185,7 +1179,7 @@ def main():
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
         print(_menu_item("6",  "Watch Agent",         "visualize a trained model"))
-        print(_menu_item("7",  "Watch All Models",    "side-by-side grid"))
+        print(_menu_item("7",  "Watch All Models",    "resume a run with the dashboard grid"))
         print(_menu_item("8",  "Watch Random Agent",  "random actions"))
 
         _section("TOOLS")
@@ -1193,9 +1187,15 @@ def main():
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
         print(_menu_item("12", "Balance Command",      "open the command center (all runs + probes)"))
-        print(_menu_item("15", "Full Sweep",           "games × personas × seeds, parallel"))
-        print(_menu_item("16", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
-        print(_menu_item(" D", "Delete Logs & Models", "nuclear option"))
+
+        _section("BALANCE")
+        print(_menu_item("13", "Full Sweep",           "games × personas × seeds, parallel"))
+        print(_menu_item("14", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
+        print(_menu_item("15", "GA Sweep",             "one GA knob at a time vs literature bounds; best config per game"))
+        print(_menu_item("16", "README Figures",       "regenerate docs/img/fig_*.png from the JSONs, update README"))
+
+        _section("SYSTEM")
+        print(_menu_item(" D", "Delete Runs",          "pick runs / probe trees, or everything"))
         print(_menu_item(" C", "Clear Screen",         "clear terminal output"))
 
         print()
@@ -1203,7 +1203,10 @@ def main():
         print(_menu_item("0",  _RED("Exit")))
         print()
 
-        choice = input(_BOLD("    ⟫ ")).strip().lower()
+        try:
+            choice = input(_BOLD("    ⟫ ")).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            choice = "0"
 
         if choice == "0":
             print()

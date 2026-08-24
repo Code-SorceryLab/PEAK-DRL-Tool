@@ -39,7 +39,7 @@ class GameAdapter(Protocol):
     def camera(self) -> tuple[float, float]: ...
 
     def reset(self) -> None: ...
-    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None: ...
+    def step(self, move_x: int, jump: bool, move_y: int = 0, extras: tuple[bool, ...] = ()) -> None: ...
     def render(self, surface: pygame.Surface) -> None: ...
     def solid_at(self, wx: float, wy: float) -> bool: ...
     def enemy_positions(self) -> list[tuple[float, float]]: ...
@@ -52,6 +52,12 @@ class GameAdapter(Protocol):
     def set_level(self, level: str) -> None: ...
 
 
+INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
+TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
+N_OUTPUTS_BY_GAME = {"bomberman": 5}
+N_INPUTS_BY_GAME = {"bomberman": 16}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
+
+
 def _set_locked_level(core, level: str) -> None:
     """Repoint a gym-style core at a new level; applied by its next reset()."""
     core.locked_level = str(level)
@@ -62,13 +68,16 @@ def list_levels(game: str, include_disabled: bool = False) -> list[str]:
     """Enabled level ids for a game, in config order. Meatboy levels are indices."""
     import yaml
     games_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
-    if game == "meatboy":
-        with open(os.path.join(games_dir, "meatboy_config.yaml"), encoding="utf-8") as f:
+    if game in INDEXED_GAMES:  # meatboy / bomberman: levels are a list, ids are indices
+        with open(os.path.join(games_dir, f"{game}_config.yaml"), encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return [str(i) for i in range(len(data.get("levels", [])))]
     with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    section = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}[game]
+    sections = {"mario": data, "megaman": data.get("megaman", {}), "sonic": data.get("sonic", {})}
+    if game not in sections:
+        raise SystemExit(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})")
+    section = sections[game]
     names = list((section.get("levels") or {}).keys())
     if include_disabled:
         names += list((section.get("disabled_levels") or {}).keys())
@@ -257,7 +266,8 @@ class MarioAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0, extras: tuple[bool, ...] = ()) -> None:
+
         if not self.alive:
             return
         self.frames_used += 1
@@ -392,7 +402,8 @@ class MegamanAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0, extras: tuple[bool, ...] = ()) -> None:
+
         if not self.alive:
             return
         self.frames_used += 1
@@ -517,7 +528,8 @@ class SonicAdapter:
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
 
-    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0, extras: tuple[bool, ...] = ()) -> None:
+
         if not self.alive:
             return
         self.frames_used += 1
@@ -660,7 +672,8 @@ class MeatboyAdapter:
         self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
 
-    def step(self, move_x: int, jump: bool, extras: tuple[bool, ...] = ()) -> None:
+    def step(self, move_x: int, jump: bool, move_y: int = 0, extras: tuple[bool, ...] = ()) -> None:
+
         if not self.alive:
             return
         self.frames_used += 1
@@ -710,11 +723,231 @@ class MeatboyAdapter:
         self.core.won = False
 
 
+class BombermanAdapter:
+    """Wraps BombermanCore (top-down). jump = drop a bomb; move_y is the second axis.
+    Fitness is cost-to-exit progress (Dijkstra, bricks cost extra) so bombing the right brick
+    counts as progress, plus kills (the exit only opens on a clear arena)."""
+
+    _FIT_SCALE = 1000.0
+    BRICK_BONUS = 40.0       # exploration: bricks opened
+    RETREAT_BONUS = 60.0     # surviving your own first bomb at all — the drop-and-retreat lesson,
+                             # paid once so it cannot be farmed by littering the arena
+    SAFE_BOMB_BONUS = 60.0   # per bomb that then achieved something: opened a brick, or landed on
+    SAFE_BOMB_CAP = 5        # an enemy. An empty blast is litter and earns nothing.
+    AIM_BONUS = 120.0        # how close a blast came to an enemy: the gradient from bombing to killing
+    KILL_BONUS = 150.0       # flat, per kill — the share below shrinks per enemy, so a crowded level
+                             # would otherwise pay less for each kill exactly where killing is harder
+    SENSOR_LABELS = [  # dashboard telemetry layout for the 16-slot ray vector below
+        {"g": "Rays (4 directions)", "color": "bg-zinc-300", "rows": [
+            {"i": i, "l": n, "d": f"Ray {n}: distance to the nearest wall, brick or bomb", "inv": True}
+            for i, n in enumerate(("N", "E", "S", "W"))]},
+        {"g": "Blast danger", "color": "bg-red-500", "rows": [
+            *({"i": 4 + i, "l": f"!{n}", "d": f"Step {n}: how soon that tile burns (1 = burning now, 0 = safe)",
+               "inv": False} for i, n in enumerate(("N", "E", "S", "W"))),
+            {"i": 8, "l": "BOOM", "d": "This tile is in a blast line: 1 = burning now, rises as the fuse runs down",
+             "inv": False}]},
+        {"g": "Enemies", "color": "bg-orange-400", "rows": [
+            {"i": 9, "l": "NMY", "d": "Nearest living enemy, straight-line distance", "inv": True},
+            {"i": 10, "l": "NX", "d": "Nearest enemy, horizontal bearing (left negative, right positive)",
+             "center": True, "inv": False},
+            {"i": 11, "l": "NY", "d": "Nearest enemy, vertical bearing (up negative, down positive)",
+             "center": True, "inv": False}]},
+        {"g": "Bombing", "color": "bg-amber-400", "rows": [
+            {"i": 12, "l": "BMB", "d": "Bombs available to drop", "inv": False},
+            {"i": 13, "l": "BRK", "d": "Bricks a bomb dropped here would destroy (of 4 arms)", "inv": False}]},
+        {"g": "Exit", "color": "bg-sky-400", "rows": [
+            {"i": 14, "l": "EX", "d": "Exit direction, horizontal (left negative, right positive)", "center": True, "inv": False},
+            {"i": 15, "l": "EY", "d": "Exit direction, vertical (up negative, down positive)", "center": True, "inv": False}]},
+    ]
+    _RAY4 = [(0, -1), (1, 0), (0, 1), (-1, 0)]   # N, E, S, W — the directions the agent can actually move
+
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        pygame.init()
+        from code.games.bomberman_core import BombermanCore
+        self.win_bonus = win_bonus
+        self.sprint = sprint
+        self.time_rate = time_rate
+        self.core = BombermanCore(render_mode="none", max_steps=max_frames, level_idx=int(level or 0))
+        self.tile_size = int(self.core.tile_size)
+        self.alive = True
+        self.won = False
+        self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self.reset()
+
+    # body: the platformer vocabulary, mapped honestly
+    @property
+    def x(self) -> float:
+        p = self.core.player
+        return p.x + p.width / 2.0
+
+    @property
+    def y(self) -> float:
+        p = self.core.player
+        return p.y + p.height / 2.0
+
+    @property
+    def vx(self) -> float:
+        return float(self.core.player.vx)
+
+    @property
+    def vy(self) -> float:
+        return float(self.core.player.vy)
+
+    @property
+    def grounded(self) -> bool:
+        return True
+
+    @property
+    def can_jump(self) -> bool:  # "can act": a bomb is available
+        return len(self.core.bombs) < self.core.player.bombs_max
+
+    @property
+    def camera(self) -> tuple[float, float]:
+        return 0.0, 0.0
+
+    def reset(self) -> None:
+        self.core.won = False  # reset() advances to the next level when won is left True
+        self.core.reset()
+        if self.sprint:
+            self.core.player.speed = float(self.core.cfg["player"].get("sprint_speed", 168))
+        self.alive = True
+        self.won = False
+        self.status = "RUNNING"
+        self._end_xy = None
+        self._level_coins = sum(row.count("C") + row.count("F") + row.count("S") for row in self.core.level_data.grid)
+        self._start_cost = max(self.core.start_cost(), 1.0)
+        self._best_cost = self._start_cost
+
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
+        if not self.alive:
+            return
+        _, _, terminated, truncated, _info = self.core.step((move_x, move_y, int(jump)))
+        self._best_cost = min(self._best_cost, self.core.goal_cost())
+        if terminated or truncated:
+            self.alive = False
+            self._end_xy = (self.x, self.y)
+            self.won = bool(self.core.won)
+            self.status = "WON" if self.won else "DEAD"
+
+    def render(self, surface: pygame.Surface) -> None:
+        self.core.render(surface)
+
+    def solid_at(self, wx: float, wy: float) -> bool:
+        tx, ty = int(wx // self.tile_size), int(wy // self.tile_size)
+        b = self.core.bomb_at(tx, ty)
+        return self.core.solid(tx, ty) or (b is not None and not b.passable)  # a fresh own bomb isn't a wall
+
+    def enemy_positions(self) -> list[tuple[float, float]]:
+        return [(e.x + e.width / 2.0, e.y + e.height / 2.0) for e in self.core.enemies if e.alive]
+
+    def qblock_count_near(self, r_tiles: int) -> int:
+        """Bricks a bomb on the player's tile would reach (what bombing here buys)."""
+        from code.games.bomberman_core import Bomb
+        p = self.core.player
+        tx, ty = self.core._center_tile(p.x, p.y, p.width, p.height)
+        cells = self.core.blast_cells(Bomb(tx, ty, 0, p.blast_range))
+        return sum(1 for (x, y) in cells if self.core.tile(x, y) in ("?", "C", "F", "S", "@"))
+
+    def sense(self, march, ray_max, hit_solid, hit_enemy, hit_none, tile_hit, tile_probe):
+        """16-slot ray vector (see SENSOR_LABELS) + overlay rays/tiles for the dashboard.
+
+        The four danger slots are what makes retreat learnable: a bomb covers a cross, so
+        "step to the neighbour that burns latest" walks out of it one tile at a time."""
+        import numpy as np
+        core, p = self.core, self.core.player
+        ox, oy = self.x, self.y
+        ts = float(self.tile_size)
+        fuse = float(getattr(core, "fuse_frames", core.cfg["bomb"]["fuse_frames"]))
+        tx, ty = core._center_tile(p.x, p.y, p.width, p.height)
+        vec = np.empty(16, dtype=np.float32)
+        rays, tiles = [], []
+
+        def burn(cx: int, cy: int) -> float:
+            ttb = core.time_to_boom(cx, cy)
+            return 0.0 if ttb is None else max(0.0, 1.0 - ttb / fuse)
+
+        for i, (dx, dy) in enumerate(self._RAY4):
+            d = march(self, ox, oy, dx, dy)
+            vec[i] = d / ray_max
+            vec[4 + i] = burn(tx + dx, ty + dy)
+            hit = d < ray_max
+            rays.append((ox, oy, ox + dx * d, oy + dy * d, hit_solid if hit else hit_none))
+            if hit:
+                tiles.append(((ox + dx * d) // ts * ts, (oy + dy * d) // ts * ts, ts, tile_hit))
+        vec[8] = burn(tx, ty)
+        for (cx, cy) in core.danger_cells():
+            tiles.append((cx * ts, cy * ts, ts, tile_probe))
+        best, bx, by = ray_max, None, None
+        for ex, ey in self.enemy_positions():
+            d = ((ex - ox) ** 2 + (ey - oy) ** 2) ** 0.5
+            if d < best:
+                best, bx, by = d, ex, ey
+        vec[9] = best / ray_max
+        vec[10] = 0.0 if bx is None else max(-1.0, min(1.0, (bx - ox) / ray_max))
+        vec[11] = 0.0 if by is None else max(-1.0, min(1.0, (by - oy) / ray_max))
+        if bx is not None:
+            rays.append((ox, oy, bx, by, hit_enemy))
+        vec[12] = (p.bombs_max - len(core.bombs)) / max(p.bombs_max, 1)
+        vec[13] = min(self.qblock_count_near(p.blast_range), 4) / 4.0
+        ex, ey = core.level_data.exit
+        vec[14] = max(-1.0, min(1.0, ((ex + 0.5) * ts - ox) / core.level_data.width))
+        vec[15] = max(-1.0, min(1.0, ((ey + 0.5) * ts - oy) / core.level_data.height))
+        return vec, rays, tiles
+
+    @property
+    def busy(self) -> bool:
+        """Standing still with a bomb ticking is the game, not a stall — the trainer's
+        stuck rule comes from the platformers, where waiting is always wasted time."""
+        return bool(self.core.bombs or self.core.blasts)
+
+    @property
+    def reach(self) -> float:
+        """What the progress bar measures: the same 0..1000 exit-cost scale as episode_stats."""
+        return self.progress() * self._FIT_SCALE
+
+    def progress(self) -> float:
+        return max(0.0, min(1.0, 1.0 - self._best_cost / self._start_cost))
+
+    def fitness(self) -> float:
+        """Two halves when the exit is gated on a clear arena: cost-to-exit progress and share of
+        enemies killed — so a kill always beats camping the exit. Where the exit is not gated,
+        killing is optional, so progress carries the full scale and kills only add their bonus.
+        Small bonuses for bricks opened and bombs survived keep early, sparse behaviour learnable."""
+        core = self.core
+        bonus = (self.BRICK_BONUS * core.bricks_destroyed
+                 + self.RETREAT_BONUS * min(core.safe_detonations, 1)
+                 + self.SAFE_BOMB_BONUS * min(core.useful_detonations, self.SAFE_BOMB_CAP))
+        if self.won:
+            return self._FIT_SCALE + bonus + self.win_bonus + _win_time_bonus(self)
+        n = len(core.enemies)
+        kill_bonus = self.KILL_BONUS * core.kills_total + self.AIM_BONUS * core.best_aim
+        if n and getattr(core, "requires_clear", True):
+            return (0.5 * self._FIT_SCALE * (self.progress() + core.kills_total / n)
+                    + kill_bonus + bonus)
+        return self.progress() * self._FIT_SCALE + (kill_bonus if n else 0.0) + bonus
+
+    def episode_stats(self) -> dict:
+        st = _episode_stats(self, self.progress() * self._FIT_SCALE)
+        st["level_len"] = self._FIT_SCALE            # reach % = exit-cost progress, not pixels
+        st["end_x"] = self.progress() * self._FIT_SCALE if self._end_xy else None
+        st["bricks"] = self.core.bricks_destroyed
+        st["level_coins"] = self._level_coins
+        return st
+
+    def set_level(self, level: str) -> None:
+        self.core._level_idx = int(level)
+        self.core.won = False
+
+
 _ADAPTERS = {
     "mario": MarioAdapter,
     "megaman": MegamanAdapter,
     "sonic": SonicAdapter,
     "meatboy": MeatboyAdapter,
+    "bomberman": BombermanAdapter,
 }
 
 

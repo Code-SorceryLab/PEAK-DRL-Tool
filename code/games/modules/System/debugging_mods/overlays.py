@@ -141,7 +141,7 @@ class HitboxOverlay(DebugOverlay):
             sx, sy, _ = core._world_to_screen(gObj)
             # Coins = cyan outline, hazards = red
             color = ( 50, 235, 200) if hasattr(entity, 'kind') else (255, 55, 55)
-            pygame.draw.rect(gs, color, (sx, sy, gObj.width, gObj.height), 1)
+            pygame.draw.rect(gs, color, (int(sx), int(sy), int(gObj.width), int(gObj.height)), 1)  # np.float32 coords are rejected
 
 
 class GridOverlay(DebugOverlay):

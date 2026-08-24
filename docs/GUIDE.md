@@ -6,8 +6,8 @@
 
 ## 1. What this is
 
-PEAK trains neural networks to play four hand-written Pygame platformers (Mario-style,
-Megaman, Sonic, Meat Boy) using **neuroevolution**: no gradients, no reward shaping, no RL
+PEAK trains neural networks to play five hand-written Pygame games — four platformers
+(Mario-style, Megaman, Sonic, Meat Boy) and a top-down Bomberman — using **neuroevolution**: no gradients, no reward shaping, no RL
 framework. Ten small networks play the same level simultaneously; the ones that get furthest
 breed the next generation. Repeat until the population completes the level, then the
 curriculum moves everyone to the next one.
@@ -74,7 +74,10 @@ Every frame, each agent reads **14 sensors** (all normalized to roughly [-1, 1])
 
 Rays flip direction when the agent moves left. The whole vector feeds a
 14 → 16 (tanh) → 3 (sigmoid) network; outputs are **left, right, jump** (left/right conflict
-resolves by whichever is stronger, jump fires above 0.5).
+resolves by whichever is stronger, jump fires above 0.5). The hidden size is a `GAConfig` knob
+(`--hidden`), and two optional carries exist for timing problems such as wall-jumps:
+`--action-feedback` appends the previous (move, jump) as two extra inputs, `--memory N` adds N
+Jordan memory units (extra outputs looped back as inputs next frame). Both are swept by menu 15.
 
 ### Is the THREAT panel accurate?
 
@@ -91,6 +94,30 @@ Mostly, with two honest caveats:
 Sensor bars show *proximity* (bar grows as the obstacle nears); the raw value in the right
 column is the normalized distance (1.00 = clear).
 
+### A game can own its sensor vector
+
+The table above is the side-scroller layout. A game whose geometry doesn't fit it declares its
+own: an adapter that defines `sense()` returns whatever vector it likes, its length goes in
+`N_INPUTS_BY_GAME`, and `SENSOR_LABELS` tells the dashboard how to draw it. Bomberman reads
+**16**, because moving on two axes and outrunning your own bomb needs different information:
+
+| # | Sensor | Meaning |
+|---|---|---|
+| 0–3 | N / E / S / W rays | Distance to the nearest wall, brick or solid bomb in each direction the agent can move |
+| 4–7 | !N / !E / !S / !W | How soon the neighbouring tile burns (1 = burning now, 0 = safe) |
+| 8 | BOOM | How soon *this* tile burns |
+| 9–11 | NMY / NX / NY | Nearest living enemy: distance, and its bearing on each axis |
+| 12 | BMB | Bombs left to drop |
+| 13 | BRK | Bricks a bomb dropped here would open (of 4 arms) |
+| 14–15 | EX / EY | Bearing to the exit |
+
+Outputs grow to five (`N_OUTPUTS_BY_GAME`): left, right, **bomb**, up, down.
+
+Slots 4–7 are the whole reason the game is learnable. Without them the agent knows a blast is
+coming but not which way is out, and every genome in every generation dies on its own bomb —
+that was the measured behaviour before they existed. With them, "step to the neighbour that
+burns latest" walks out of the cross one tile at a time, and a reactive net can express it.
+
 ---
 
 ## 4. Is there a reward system?
@@ -99,11 +126,14 @@ No per-step rewards — that's the deepest change from DRL. There is a **fitness
 evaluated once per episode:
 
 ```
-fitness = furthest x reached (max_x_seen)  [+ 5000 win bonus if the level was completed]
+fitness = furthest x reached (max_x_seen)  [+ 5000 win bonus if the level was completed
+                                            + time left × persona time_rate (speedrunner: 25/s)]
 ```
 
 (Meat Boy's levels are 2-D mazes, so it uses BFS-distance-to-goal progress scaled to ~0–1000
-instead of x.) The old persona reward functions (`adept`, `speedrunner`, `enemy_hunter`, …)
+instead of x. Bomberman scores Dijkstra cost-to-exit on the same 0–1000 scale, with bricks priced
+at 6 so blowing open the right one counts as progress the moment it happens, plus a share for
+enemies killed — its exit stays sealed until the arena is clear.) The old persona reward functions (`adept`, `speedrunner`, `enemy_hunter`, …)
 are gone with the RL stack — under a GA, "which behaviors got further" replaces "which
 actions earned points." Score and coins are **recorded** per episode as metrics, but they do
 not influence evolution. If you ever want coin-hunting behavior, the lever is adding coins
@@ -120,12 +150,14 @@ that's the anti-stall, replacing the old core watchdog.
    (that's why the population wall is live).
 2. An episode ends on death (enemy/pit/spike), win, STUCK, or the 3,600-frame (60s) budget.
 3. When all 10 are done: fitness is computed, and the next generation is bred —
-   the **2 best survive unchanged** (elitism); the other 8 come from tournament selection
-   (best of 3 random picks), uniform crossover (70% chance, genes mixed 50/50), and gaussian
-   mutation (each weight has a 15% chance of a ±0.3σ nudge).
+   the **4 best survive unchanged** (elitism); the other 6 come from tournament selection
+   (best of 5 random picks), uniform crossover (70% chance, genes mixed 50/50), and gaussian
+   mutation (each weight has a 15% chance of a ±0.15σ nudge; mutation is ×0.5 after a level's
+   first win — the GA sweep's most robust finding).
 4. Checkpoint written to `runs/<name>/` every generation.
 
-All knobs live in `GAConfig` (`code/neuro/evolution.py`). Everything is seeded — same seed,
+All knobs live in `GAConfig` (`code/neuro/evolution.py`); its defaults are the baseline the GA
+sweep (menu 15, `docs/BALANCE.md`) measures every knob against. Everything is seeded — same seed,
 same run, bit for bit. That's also why manual play takes a real-time lock and why the core's
 jump-arc overlay stays off during training (rendering it perturbs game state).
 
@@ -190,11 +222,11 @@ so runs stay deterministic either way.
 
 PEAK's purpose is balancing levels with agents. The paper pipeline did this with PPO
 matrices (win rate ± CI + failure-mode taxonomy, fed by the stats subsystem); the GA
-successor is `python -m code.neuro.balance --game mario` (menu **[15] Full Sweep**).
+successor is `python -m code.neuro.balance --game mario` (menu **[13] Full Sweep**).
 For each (level × seed) it evolves a fresh population, stops shortly after the first win,
 and aggregates with 95% t-CIs: **win rate, generations-to-first-win, dominant death cause,
 stuck rate, best x, learning trend** — hardest levels first. JSON lands in
-`runs/balance/report_<game>_<persona>.json`.
+`runs/balance/report_<game>_<persona>_<tag>.json` (tag = `p<pop>g<gens>[_grid]`).
 
 First real run (4 levels × 3 seeds, 12.4 min total, all seeds solved everything):
 
@@ -215,12 +247,13 @@ and won zero episodes in 25 generations there.
 menu.py                     PEAK ENGINE hub (train / play / watch / tools)
 code/neuro/                 the neuroevolution system (net, evolution, sensors,
                             adapters, trainer, server, web dashboard)
-code/games/                 the four engines + levels + assets (mostly untouched)
+code/games/                 the five engines + levels + assets (four platformers + bomberman)
 code/games/tools/           level_editor.py, manual_play.py, make_level_slices.py
 runs/<name>/                gen_state.npz (weights) + state.json (config, RNG,
                             full history) + best.npz (all-time best genome)
 ```
 
 Replay the best genome: `python -m code.neuro.trainer --game mario --replay runs/mario/best.npz`.
-Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (20 tests:
-GA determinism, sensor geometry, adapter smoke tests for all four games).
+Resume training: `--resume runs/mario`. Tests: `python -m pytest code/tests/ -q` (76 tests:
+GA determinism, net shapes, sensor geometry, adapter/trainer smoke tests for every game,
+balance aggregation, GA-sweep tags and verdicts).
