@@ -86,14 +86,32 @@ def _load_thresholds() -> dict:
         return {}
 
 
+def _indexed_entry(game: str, level: str) -> dict:
+    """One level of an indexed game (meatboy / bomberman) as a dict.
+
+    An entry is either a bare path or {file: ..., <per-level overrides>}; disabled levels are a
+    suffix of the enabled ones, so ids stay stable and a report can still draw a retired level.
+    """
+    import yaml
+    try:
+        with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
+            g = yaml.safe_load(f) or {}
+        lv = list(g.get("levels") or []) + list(g.get("disabled_levels") or [])
+        i = int(level)
+        if not 0 <= i < len(lv):
+            return {}
+        entry = lv[i]
+        return dict(entry) if isinstance(entry, dict) else {"file": entry}
+    except Exception:
+        return {}
+
+
 def _level_file(game: str, level: str) -> str | None:
     import yaml
     try:
         if game in INDEXED_GAMES:
-            with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
-                lv = (yaml.safe_load(f) or {}).get("levels", [])
-            i = int(level)
-            return os.path.join(GAMES_DIR, "levels", lv[i]) if 0 <= i < len(lv) else None
+            f = _indexed_entry(game, level).get("file")
+            return os.path.join(GAMES_DIR, "levels", f) if f else None
         with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
         section = {"mario": cfg, "megaman": cfg.get("megaman", {}), "sonic": cfg.get("sonic", {})}.get(game, {})
@@ -151,7 +169,7 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
         if game in INDEXED_GAMES:
             with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
                 g = yaml.safe_load(f) or {}
-            entry = {"file": (g.get("levels") or [None] * (int(level) + 1))[int(level)]}
+            entry = _indexed_entry(game, level)
         else:
             with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}

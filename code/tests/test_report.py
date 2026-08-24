@@ -42,3 +42,30 @@ def test_hidden_verdict():
              zip([("hidden-8", {"hidden": 8}), ("base", {}), ("hidden-64", {"hidden": 64})], (5, 15, 30))]
     assert _hidden_verdict(worse)["word"] == "degrades"
     assert _hidden_verdict(flat[:2])["word"] == "insufficient"
+
+
+# ── indexed-game level entries: bare path or {file: ..., overrides} ──────────────────
+
+def test_indexed_entry_handles_both_entry_shapes():
+    """Bomberman levels 6+ carry per-level overrides as dicts; 0-5 are bare paths.
+    Reading only the bare form silently dropped the route/config panels for 6 onward."""
+    from code.neuro.report import _indexed_entry, _level_file, _level_grid
+    from code.neuro.adapters import list_levels
+    for lvl in list_levels("bomberman"):
+        entry = _indexed_entry("bomberman", lvl)
+        assert entry.get("file", "").endswith(".txt"), f"level {lvl} has no file: {entry}"
+        assert _level_file("bomberman", lvl), f"level {lvl} resolved to no path"
+        assert _level_grid("bomberman", lvl), f"level {lvl} drew no grid"
+
+
+def test_indexed_entry_reaches_disabled_levels_and_rejects_bad_ids():
+    """Disabled levels are a suffix, so ids stay stable and old reports still draw them."""
+    from code.neuro.report import _indexed_entry
+    from code.neuro.adapters import list_levels
+    enabled = len(list_levels("bomberman"))
+    every = len(list_levels("bomberman", include_disabled=True))
+    if every > enabled:                       # a retired rung is still addressable
+        assert _indexed_entry("bomberman", str(every - 1)).get("file", "").endswith(".txt")
+    assert _indexed_entry("bomberman", str(every)) == {}
+    assert _indexed_entry("bomberman", "-1") == {}
+    assert _indexed_entry("meatboy", "0").get("file", "").endswith(".txt")   # bare-path game
