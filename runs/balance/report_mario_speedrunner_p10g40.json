@@ -1,0 +1,1247 @@
+{
+  "game": "mario",
+  "persona": "speedrunner",
+  "tag": "p10g40",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1,
+    3,
+    8,
+    7689798
+  ],
+  "train_time_s": 404.5,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-1",
+      "seeds": 4,
+      "pop_size": 10,
+      "solved_by": 4,
+      "first_win_mean": 4.0,
+      "first_win_ci": 4.1,
+      "best_gen_mean": 10.0,
+      "best_gen_ci": 8.4,
+      "win_rate_mean": 0.55,
+      "win_rate_ci": 0.332,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.4,
+      "causes": {
+        "Pit": 69,
+        "OOB": 31,
+        "Enemy": 102,
+        "Stall": 133
+      },
+      "best_x_mean": 6368.9,
+      "stuck_frac_mean": 0.216,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0591,
+      "train_time_s": 150.1,
+      "completion_rate_mean": 0.434,
+      "mean_completion_time": 21.4,
+      "completion_time_stddev": 0.9,
+      "progress_at_death_mean": 0.25,
+      "deaths_per_run_mean": 5.66,
+      "death_hist": [
+        140,
+        46,
+        22,
+        14,
+        20,
+        31,
+        31,
+        3,
+        28,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.639,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.501
+    },
+    {
+      "level": "Mario1-2",
+      "seeds": 4,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 20.0,
+      "first_win_ci": 216.0,
+      "best_gen_mean": 21.5,
+      "best_gen_ci": 19.5,
+      "win_rate_mean": 0.1,
+      "win_rate_ci": 0.277,
+      "dominant_cause": "Pit",
+      "dominant_cause_frac": 0.4,
+      "causes": {
+        "Stall": 370,
+        "Enemy": 390,
+        "Pit": 521,
+        "?": 8
+      },
+      "best_x_mean": 5363.3,
+      "stuck_frac_mean": 0.291,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0345,
+      "train_time_s": 254.4,
+      "completion_rate_mean": 0.074,
+      "mean_completion_time": 21.9,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.451,
+      "deaths_per_run_mean": 9.26,
+      "death_hist": [
+        195,
+        42,
+        201,
+        253,
+        59,
+        16,
+        138,
+        45,
+        60,
+        280
+      ],
+      "death_cluster_entropy_mean": 0.685,
+      "coin_collection_rate_mean": 0.103,
+      "novice_expert_gap_mean": 0.139
+    }
+  ],
+  "cells": {
+    "Mario1-1": [
+      {
+        "level": "Mario1-1",
+        "seed": 1,
+        "pop_size": 10,
+        "gens_run": 17,
+        "first_win_gen": 7,
+        "best_gen": 17,
+        "win_rate": 0.34,
+        "best": 18229.7,
+        "best_x": 6369.0,
+        "stuck_frac": 0.4470588235294118,
+        "causes": {
+          "Pit": 19,
+          "OOB": 14,
+          "Enemy": 26,
+          "Stall": 76
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0882,
+        "train_time_s": 43.3,
+        "completion_rate": 0.206,
+        "mean_completion_time": 23.8,
+        "completion_time_stddev": 1.6,
+        "progress_at_death": 0.226,
+        "deaths_per_run": 7.94,
+        "death_hist": [
+          73,
+          7,
+          15,
+          10,
+          10,
+          3,
+          4,
+          0,
+          13,
+          0
+        ],
+        "death_cluster_entropy": 0.664,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.5,
+        "curve": [
+          [
+            2144.8,
+            310.2
+          ],
+          [
+            2144.8,
+            322.1
+          ],
+          [
+            2144.8,
+            566.9
+          ],
+          [
+            2403.5,
+            831.5
+          ],
+          [
+            2403.5,
+            1149.9
+          ],
+          [
+            6368.8,
+            1685.9
+          ],
+          [
+            18120.5,
+            3349.5
+          ],
+          [
+            18120.5,
+            3734.5
+          ],
+          [
+            18120.5,
+            4724.9
+          ],
+          [
+            18125.0,
+            6404.4
+          ],
+          [
+            18125.0,
+            5527.2
+          ],
+          [
+            18125.0,
+            7708.7
+          ],
+          [
+            18125.0,
+            10743.5
+          ],
+          [
+            18132.7,
+            10040.0
+          ],
+          [
+            18132.7,
+            10070.4
+          ],
+          [
+            18191.3,
+            10100.3
+          ],
+          [
+            18229.7,
+            10498.3
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-1_1"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 3,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.46,
+        "best": 18230.0,
+        "best_x": 6368.9,
+        "stuck_frac": 0.2,
+        "causes": {
+          "Stall": 30,
+          "OOB": 7,
+          "Enemy": 24,
+          "Pit": 42
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1091,
+        "train_time_s": 38.3,
+        "completion_rate": 0.313,
+        "mean_completion_time": 19.7,
+        "completion_time_stddev": 0.4,
+        "progress_at_death": 0.349,
+        "deaths_per_run": 6.87,
+        "death_hist": [
+          20,
+          24,
+          5,
+          2,
+          1,
+          26,
+          19,
+          3,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.778,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.52,
+        "curve": [
+          [
+            864.7,
+            184.3
+          ],
+          [
+            864.7,
+            318.1
+          ],
+          [
+            4352.8,
+            1105.1
+          ],
+          [
+            4352.8,
+            1356.2
+          ],
+          [
+            18230.0,
+            3993.4
+          ],
+          [
+            18230.0,
+            6400.2
+          ],
+          [
+            18230.0,
+            9871.2
+          ],
+          [
+            18230.0,
+            10082.0
+          ],
+          [
+            18230.0,
+            10139.8
+          ],
+          [
+            18230.0,
+            10744.0
+          ],
+          [
+            18230.0,
+            13018.9
+          ],
+          [
+            18230.0,
+            9933.9
+          ],
+          [
+            18230.0,
+            12809.3
+          ],
+          [
+            18230.0,
+            11336.7
+          ],
+          [
+            18230.0,
+            12814.3
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-1_3"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 8,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 7,
+        "win_rate": 0.83,
+        "best": 18181.5,
+        "best_x": 6368.9,
+        "stuck_frac": 0.06363636363636363,
+        "causes": {
+          "OOB": 5,
+          "Enemy": 14,
+          "Stall": 7
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0009,
+        "train_time_s": 32.8,
+        "completion_rate": 0.764,
+        "mean_completion_time": 21.4,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.131,
+        "deaths_per_run": 2.36,
+        "death_hist": [
+          18,
+          2,
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.388,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.533,
+        "curve": [
+          [
+            18178.8,
+            1944.2
+          ],
+          [
+            18178.8,
+            3851.3
+          ],
+          [
+            18181.1,
+            12858.4
+          ],
+          [
+            18181.1,
+            18178.3
+          ],
+          [
+            18181.1,
+            18178.0
+          ],
+          [
+            18181.1,
+            18178.7
+          ],
+          [
+            18181.5,
+            18179.1
+          ],
+          [
+            18181.5,
+            15196.6
+          ],
+          [
+            18181.5,
+            15196.2
+          ],
+          [
+            18181.5,
+            16688.2
+          ],
+          [
+            18181.5,
+            16999.0
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-1_8"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 7689798,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 11,
+        "win_rate": 0.57,
+        "best": 18340.9,
+        "best_x": 6369.0,
+        "stuck_frac": 0.15384615384615385,
+        "causes": {
+          "Stall": 20,
+          "Enemy": 38,
+          "OOB": 5,
+          "Pit": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0382,
+        "train_time_s": 35.7,
+        "completion_rate": 0.454,
+        "mean_completion_time": 20.9,
+        "completion_time_stddev": 1.5,
+        "progress_at_death": 0.295,
+        "deaths_per_run": 5.46,
+        "death_hist": [
+          29,
+          13,
+          2,
+          2,
+          4,
+          2,
+          8,
+          0,
+          11,
+          0
+        ],
+        "death_cluster_entropy": 0.728,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.45,
+        "curve": [
+          [
+            1353.0,
+            285.7
+          ],
+          [
+            1353.0,
+            508.2
+          ],
+          [
+            18332.8,
+            5194.4
+          ],
+          [
+            18332.8,
+            9116.6
+          ],
+          [
+            18332.8,
+            10197.4
+          ],
+          [
+            18332.8,
+            9678.9
+          ],
+          [
+            18332.8,
+            12395.5
+          ],
+          [
+            18340.5,
+            14238.1
+          ],
+          [
+            18340.5,
+            16461.7
+          ],
+          [
+            18340.5,
+            10093.7
+          ],
+          [
+            18340.9,
+            13451.7
+          ],
+          [
+            18340.9,
+            12279.8
+          ],
+          [
+            18340.9,
+            10814.4
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-1_7689798"
+      }
+    ],
+    "Mario1-2": [
+      {
+        "level": "Mario1-2",
+        "seed": 1,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 25,
+        "win_rate": 0.0,
+        "best": 5472.8,
+        "best_x": 5472.8,
+        "stuck_frac": 0.3425,
+        "causes": {
+          "Stall": 137,
+          "Enemy": 188,
+          "Pit": 75
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0397,
+        "train_time_s": 72.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.364,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          120,
+          22,
+          50,
+          79,
+          12,
+          11,
+          28,
+          38,
+          24,
+          16
+        ],
+        "death_cluster_entropy": 0.874,
+        "coin_collection_rate": 0.022,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            288.9,
+            116.3
+          ],
+          [
+            369.8,
+            143.7
+          ],
+          [
+            427.8,
+            280.6
+          ],
+          [
+            1387.2,
+            492.9
+          ],
+          [
+            1387.2,
+            533.9
+          ],
+          [
+            1696.9,
+            703.8
+          ],
+          [
+            1696.9,
+            1002.0
+          ],
+          [
+            1722.9,
+            1189.4
+          ],
+          [
+            2624.0,
+            1408.0
+          ],
+          [
+            2624.0,
+            1639.5
+          ],
+          [
+            3601.0,
+            1915.8
+          ],
+          [
+            3601.0,
+            1570.5
+          ],
+          [
+            3601.0,
+            1609.0
+          ],
+          [
+            3601.0,
+            1913.3
+          ],
+          [
+            4448.0,
+            2585.7
+          ],
+          [
+            4448.0,
+            2199.6
+          ],
+          [
+            4928.0,
+            2524.5
+          ],
+          [
+            4928.0,
+            2341.4
+          ],
+          [
+            4928.0,
+            2172.9
+          ],
+          [
+            4928.0,
+            2349.6
+          ],
+          [
+            4928.0,
+            2221.2
+          ],
+          [
+            4928.0,
+            2510.8
+          ],
+          [
+            4928.0,
+            2552.4
+          ],
+          [
+            4928.0,
+            2112.5
+          ],
+          [
+            5472.8,
+            2788.9
+          ],
+          [
+            5472.8,
+            2380.6
+          ],
+          [
+            5472.8,
+            2613.4
+          ],
+          [
+            5472.8,
+            2601.2
+          ],
+          [
+            5472.8,
+            2524.3
+          ],
+          [
+            5472.8,
+            2488.9
+          ],
+          [
+            5472.8,
+            3265.6
+          ],
+          [
+            5472.8,
+            2848.1
+          ],
+          [
+            5472.8,
+            2737.6
+          ],
+          [
+            5472.8,
+            2699.0
+          ],
+          [
+            5472.8,
+            2814.4
+          ],
+          [
+            5472.8,
+            2878.8
+          ],
+          [
+            5472.8,
+            2680.4
+          ],
+          [
+            5472.8,
+            2747.5
+          ],
+          [
+            5472.8,
+            3304.8
+          ],
+          [
+            5472.8,
+            2806.1
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-2_1"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 3,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 37,
+        "best_gen": 37,
+        "win_rate": 0.04,
+        "best": 17204.1,
+        "best_x": 5386.6,
+        "stuck_frac": 0.335,
+        "causes": {
+          "Enemy": 90,
+          "Stall": 134,
+          "Pit": 164,
+          "?": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0069,
+        "train_time_s": 82.1,
+        "completion_rate": 0.01,
+        "mean_completion_time": 27.3,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.455,
+        "deaths_per_run": 9.9,
+        "death_hist": [
+          29,
+          20,
+          79,
+          85,
+          25,
+          5,
+          110,
+          7,
+          36,
+          0
+        ],
+        "death_cluster_entropy": 0.812,
+        "coin_collection_rate": 0.134,
+        "novice_expert_gap": 0.031,
+        "curve": [
+          [
+            1515.4,
+            278.7
+          ],
+          [
+            1515.4,
+            616.2
+          ],
+          [
+            3840.8,
+            1634.0
+          ],
+          [
+            3840.8,
+            1922.3
+          ],
+          [
+            4986.0,
+            2681.0
+          ],
+          [
+            4986.0,
+            2905.3
+          ],
+          [
+            4986.0,
+            2605.9
+          ],
+          [
+            4986.0,
+            2483.6
+          ],
+          [
+            4986.0,
+            2694.6
+          ],
+          [
+            4986.0,
+            2649.6
+          ],
+          [
+            4986.0,
+            2645.6
+          ],
+          [
+            4986.0,
+            2796.1
+          ],
+          [
+            4986.0,
+            2466.0
+          ],
+          [
+            4986.0,
+            2545.6
+          ],
+          [
+            4986.0,
+            2479.8
+          ],
+          [
+            4986.0,
+            2796.0
+          ],
+          [
+            4986.0,
+            2654.1
+          ],
+          [
+            4986.0,
+            2798.1
+          ],
+          [
+            4986.0,
+            2595.2
+          ],
+          [
+            4986.0,
+            3044.1
+          ],
+          [
+            4986.0,
+            2572.3
+          ],
+          [
+            4986.0,
+            2565.2
+          ],
+          [
+            4986.0,
+            2870.3
+          ],
+          [
+            4986.0,
+            2470.1
+          ],
+          [
+            4986.0,
+            2551.3
+          ],
+          [
+            4986.0,
+            2344.0
+          ],
+          [
+            4986.0,
+            2775.1
+          ],
+          [
+            4986.0,
+            2959.8
+          ],
+          [
+            4986.0,
+            3341.5
+          ],
+          [
+            4986.0,
+            2813.3
+          ],
+          [
+            4986.0,
+            2819.5
+          ],
+          [
+            4986.0,
+            2669.4
+          ],
+          [
+            4986.0,
+            2783.1
+          ],
+          [
+            4986.0,
+            2958.3
+          ],
+          [
+            4986.0,
+            2771.6
+          ],
+          [
+            4986.0,
+            2719.4
+          ],
+          [
+            17204.1,
+            4418.9
+          ],
+          [
+            17204.1,
+            4580.4
+          ],
+          [
+            17204.1,
+            4096.3
+          ],
+          [
+            17204.1,
+            4082.3
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-2_3"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 8,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 15,
+        "win_rate": 0.0,
+        "best": 5120.9,
+        "best_x": 5120.9,
+        "stuck_frac": 0.1325,
+        "causes": {
+          "Stall": 53,
+          "Enemy": 76,
+          "Pit": 271
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 73.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.686,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          19,
+          0,
+          63,
+          46,
+          16,
+          0,
+          0,
+          0,
+          0,
+          256
+        ],
+        "death_cluster_entropy": 0.477,
+        "coin_collection_rate": 0.154,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            5120.2,
+            678.7
+          ],
+          [
+            5120.2,
+            1064.3
+          ],
+          [
+            5120.8,
+            2674.3
+          ],
+          [
+            5120.8,
+            3284.7
+          ],
+          [
+            5120.8,
+            3076.3
+          ],
+          [
+            5120.8,
+            3780.8
+          ],
+          [
+            5120.8,
+            4132.7
+          ],
+          [
+            5120.8,
+            4170.3
+          ],
+          [
+            5120.8,
+            3384.0
+          ],
+          [
+            5120.8,
+            4450.3
+          ],
+          [
+            5120.8,
+            3492.5
+          ],
+          [
+            5120.8,
+            3529.5
+          ],
+          [
+            5120.8,
+            4200.2
+          ],
+          [
+            5120.8,
+            4450.2
+          ],
+          [
+            5120.9,
+            3718.3
+          ],
+          [
+            5120.9,
+            4139.0
+          ],
+          [
+            5120.9,
+            3603.6
+          ],
+          [
+            5120.9,
+            3602.7
+          ],
+          [
+            5120.9,
+            4030.3
+          ],
+          [
+            5120.9,
+            4070.6
+          ],
+          [
+            5120.9,
+            4450.2
+          ],
+          [
+            5120.9,
+            4457.2
+          ],
+          [
+            5120.9,
+            3821.6
+          ],
+          [
+            5120.9,
+            3852.4
+          ],
+          [
+            5120.9,
+            4408.9
+          ],
+          [
+            5120.9,
+            3498.2
+          ],
+          [
+            5120.9,
+            4169.3
+          ],
+          [
+            5120.9,
+            4237.5
+          ],
+          [
+            5120.9,
+            3721.1
+          ],
+          [
+            5120.9,
+            4803.9
+          ],
+          [
+            5120.9,
+            3478.7
+          ],
+          [
+            5120.9,
+            4487.1
+          ],
+          [
+            5120.9,
+            4455.8
+          ],
+          [
+            5120.9,
+            4488.6
+          ],
+          [
+            5120.9,
+            4772.7
+          ],
+          [
+            5120.9,
+            4455.7
+          ],
+          [
+            5120.9,
+            4020.5
+          ],
+          [
+            5120.9,
+            4804.0
+          ],
+          [
+            5120.9,
+            4107.6
+          ],
+          [
+            5120.9,
+            4766.7
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-2_8"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 7689798,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 9,
+        "win_rate": 0.36,
+        "best": 17462.4,
+        "best_x": 5472.8,
+        "stuck_frac": 0.35384615384615387,
+        "causes": {
+          "Stall": 46,
+          "Enemy": 36,
+          "Pit": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0914,
+        "train_time_s": 26.2,
+        "completion_rate": 0.285,
+        "mean_completion_time": 16.4,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.299,
+        "deaths_per_run": 7.15,
+        "death_hist": [
+          27,
+          0,
+          9,
+          43,
+          6,
+          0,
+          0,
+          0,
+          0,
+          8
+        ],
+        "death_cluster_entropy": 0.577,
+        "coin_collection_rate": 0.104,
+        "novice_expert_gap": 0.525,
+        "curve": [
+          [
+            1696.8,
+            333.5
+          ],
+          [
+            1952.8,
+            579.2
+          ],
+          [
+            17437.5,
+            2445.5
+          ],
+          [
+            17437.5,
+            2981.8
+          ],
+          [
+            17437.5,
+            3350.8
+          ],
+          [
+            17437.5,
+            3327.9
+          ],
+          [
+            17449.2,
+            5083.8
+          ],
+          [
+            17449.2,
+            6982.9
+          ],
+          [
+            17462.4,
+            10704.0
+          ],
+          [
+            17462.4,
+            13081.6
+          ],
+          [
+            17462.4,
+            8339.2
+          ],
+          [
+            17462.4,
+            10017.6
+          ],
+          [
+            17462.4,
+            13007.6
+          ]
+        ],
+        "dir": "runs/probes/mario/speedrunner/p10g40/Mario1-2_7689798"
+      }
+    ]
+  }
+}

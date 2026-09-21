@@ -1,0 +1,6338 @@
+{
+  "game": "bomberman",
+  "persona": "experienced",
+  "tag": "p10g40_b8cc78_mutation_sigma-0.5",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 884.4,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.5,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.7,
+      "first_win_ci": 5.2,
+      "best_gen_mean": 3.7,
+      "best_gen_ci": 5.2,
+      "win_rate_mean": 0.793,
+      "win_rate_ci": 0.288,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.54,
+      "causes": {
+        "Timeout": 6,
+        "Stall": 72,
+        "Bomb": 91
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.185,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1677,
+      "train_time_s": 24.0,
+      "completion_rate_mean": 0.589,
+      "mean_completion_time": 5.7,
+      "completion_time_stddev": 2.1,
+      "progress_at_death_mean": 0.484,
+      "deaths_per_run_mean": 4.11,
+      "death_hist": [
+        31,
+        9,
+        3,
+        6,
+        18,
+        46,
+        10,
+        5,
+        20,
+        21
+      ],
+      "death_cluster_entropy_mean": 0.798,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.842
+    },
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 14.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 19.3,
+      "best_gen_ci": 25.1,
+      "win_rate_mean": 0.173,
+      "win_rate_ci": 0.746,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.76,
+      "causes": {
+        "Stall": 204,
+        "Bomb": 755,
+        "Timeout": 28
+      },
+      "best_x_mean": 790.1,
+      "stuck_frac_mean": 0.199,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0461,
+      "train_time_s": 88.1,
+      "completion_rate_mean": 0.074,
+      "mean_completion_time": 22.7,
+      "completion_time_stddev": 3.7,
+      "progress_at_death_mean": 0.486,
+      "deaths_per_run_mean": 9.26,
+      "death_hist": [
+        41,
+        58,
+        33,
+        95,
+        39,
+        432,
+        259,
+        19,
+        11,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.647,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.2
+    },
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 7.5,
+      "first_win_ci": 44.5,
+      "best_gen_mean": 6.3,
+      "best_gen_ci": 10.0,
+      "win_rate_mean": 0.21,
+      "win_rate_ci": 0.453,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.79,
+      "causes": {
+        "Timeout": 16,
+        "Stall": 127,
+        "Bomb": 542
+      },
+      "best_x_mean": 975.3,
+      "stuck_frac_mean": 0.17,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0981,
+      "train_time_s": 68.3,
+      "completion_rate_mean": 0.13,
+      "mean_completion_time": 16.3,
+      "completion_time_stddev": 1.9,
+      "progress_at_death_mean": 0.69,
+      "deaths_per_run_mean": 8.7,
+      "death_hist": [
+        36,
+        19,
+        9,
+        70,
+        19,
+        27,
+        33,
+        63,
+        26,
+        383
+      ],
+      "death_cluster_entropy_mean": 0.737,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.305
+    },
+    {
+      "level": "3",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 15.0,
+      "first_win_ci": 76.2,
+      "best_gen_mean": 20.3,
+      "best_gen_ci": 24.5,
+      "win_rate_mean": 0.303,
+      "win_rate_ci": 0.745,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.81,
+      "causes": {
+        "Bomb": 654,
+        "Stall": 111,
+        "Timeout": 42
+      },
+      "best_x_mean": 913.6,
+      "stuck_frac_mean": 0.137,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0316,
+      "train_time_s": 85.0,
+      "completion_rate_mean": 0.122,
+      "mean_completion_time": 27.1,
+      "completion_time_stddev": 4.0,
+      "progress_at_death_mean": 0.485,
+      "deaths_per_run_mean": 8.78,
+      "death_hist": [
+        53,
+        51,
+        22,
+        143,
+        76,
+        249,
+        63,
+        116,
+        10,
+        24
+      ],
+      "death_cluster_entropy_mean": 0.805,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.344
+    },
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 5.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 8.0,
+      "best_gen_ci": 9.0,
+      "win_rate_mean": 0.217,
+      "win_rate_ci": 0.932,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.6,
+      "causes": {
+        "Bomb": 532,
+        "Stall": 339,
+        "Timeout": 13
+      },
+      "best_x_mean": 727.3,
+      "stuck_frac_mean": 0.321,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0141,
+      "train_time_s": 68.9,
+      "completion_rate_mean": 0.147,
+      "mean_completion_time": 7.6,
+      "completion_time_stddev": 2.9,
+      "progress_at_death_mean": 0.46,
+      "deaths_per_run_mean": 8.53,
+      "death_hist": [
+        123,
+        64,
+        13,
+        21,
+        10,
+        619,
+        0,
+        6,
+        13,
+        15
+      ],
+      "death_cluster_entropy_mean": 0.501,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.247
+    },
+    {
+      "level": "5",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 35.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 33.0,
+      "best_gen_ci": 22.1,
+      "win_rate_mean": 0.093,
+      "win_rate_ci": 0.402,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.78,
+      "causes": {
+        "Bomb": 917,
+        "Stall": 250,
+        "Timeout": 5
+      },
+      "best_x_mean": 950.0,
+      "stuck_frac_mean": 0.208,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.022,
+      "train_time_s": 90.3,
+      "completion_rate_mean": 0.023,
+      "mean_completion_time": 20.6,
+      "completion_time_stddev": 1.0,
+      "progress_at_death_mean": 0.711,
+      "deaths_per_run_mean": 9.77,
+      "death_hist": [
+        75,
+        25,
+        9,
+        40,
+        22,
+        112,
+        43,
+        168,
+        153,
+        525
+      ],
+      "death_cluster_entropy_mean": 0.728,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.072
+    },
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 4.3,
+      "first_win_ci": 8.0,
+      "best_gen_mean": 4.3,
+      "best_gen_ci": 8.0,
+      "win_rate_mean": 0.77,
+      "win_rate_ci": 0.151,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.42,
+      "causes": {
+        "Timeout": 5,
+        "Stall": 75,
+        "Bomb": 83,
+        "Enemy": 33
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.17,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0264,
+      "train_time_s": 21.4,
+      "completion_rate_mean": 0.558,
+      "mean_completion_time": 5.7,
+      "completion_time_stddev": 2.2,
+      "progress_at_death_mean": 0.541,
+      "deaths_per_run_mean": 4.42,
+      "death_hist": [
+        26,
+        5,
+        32,
+        3,
+        13,
+        42,
+        3,
+        20,
+        16,
+        36
+      ],
+      "death_cluster_entropy_mean": 0.803,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.794
+    },
+    {
+      "level": "7",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 24.0,
+      "first_win_ci": 32.9,
+      "best_gen_mean": 28.3,
+      "best_gen_ci": 26.1,
+      "win_rate_mean": 0.437,
+      "win_rate_ci": 0.884,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.66,
+      "causes": {
+        "Bomb": 529,
+        "Enemy": 46,
+        "Stall": 219,
+        "Timeout": 3
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.203,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1318,
+      "train_time_s": 95.4,
+      "completion_rate_mean": 0.169,
+      "mean_completion_time": 11.9,
+      "completion_time_stddev": 1.9,
+      "progress_at_death_mean": 0.705,
+      "deaths_per_run_mean": 8.31,
+      "death_hist": [
+        42,
+        22,
+        7,
+        20,
+        69,
+        52,
+        50,
+        149,
+        54,
+        332
+      ],
+      "death_cluster_entropy_mean": 0.782,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.489
+    },
+    {
+      "level": "8",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 7.3,
+      "first_win_ci": 3.8,
+      "best_gen_mean": 7.3,
+      "best_gen_ci": 3.8,
+      "win_rate_mean": 0.513,
+      "win_rate_ci": 0.382,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.62,
+      "causes": {
+        "Bomb": 225,
+        "Stall": 55,
+        "Enemy": 77,
+        "Timeout": 6
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.106,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.2889,
+      "train_time_s": 38.5,
+      "completion_rate_mean": 0.304,
+      "mean_completion_time": 8.4,
+      "completion_time_stddev": 0.4,
+      "progress_at_death_mean": 0.706,
+      "deaths_per_run_mean": 6.96,
+      "death_hist": [
+        27,
+        24,
+        11,
+        30,
+        4,
+        17,
+        31,
+        21,
+        16,
+        182
+      ],
+      "death_cluster_entropy_mean": 0.717,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.698
+    },
+    {
+      "level": "9",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 11.5,
+      "first_win_ci": 19.1,
+      "best_gen_mean": 15.7,
+      "best_gen_ci": 12.7,
+      "win_rate_mean": 0.253,
+      "win_rate_ci": 0.69,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.88,
+      "causes": {
+        "Bomb": 664,
+        "Stall": 67,
+        "Timeout": 2,
+        "Enemy": 19
+      },
+      "best_x_mean": 901.2,
+      "stuck_frac_mean": 0.082,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.022,
+      "train_time_s": 93.7,
+      "completion_rate_mean": 0.118,
+      "mean_completion_time": 25.7,
+      "completion_time_stddev": 1.8,
+      "progress_at_death_mean": 0.488,
+      "deaths_per_run_mean": 8.82,
+      "death_hist": [
+        67,
+        35,
+        46,
+        51,
+        145,
+        95,
+        221,
+        83,
+        9,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.833,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.28
+    },
+    {
+      "level": "10",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 19.7,
+      "best_gen_ci": 36.2,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.58,
+      "causes": {
+        "Bomb": 698,
+        "Stall": 349,
+        "Enemy": 146,
+        "Timeout": 7
+      },
+      "best_x_mean": 820.5,
+      "stuck_frac_mean": 0.291,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0518,
+      "train_time_s": 102.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.413,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        246,
+        148,
+        27,
+        175,
+        111,
+        78,
+        116,
+        242,
+        13,
+        44
+      ],
+      "death_cluster_entropy_mean": 0.827,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "11",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 25.7,
+      "best_gen_ci": 36.0,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.77,
+      "causes": {
+        "Bomb": 927,
+        "Stall": 91,
+        "Enemy": 151,
+        "Timeout": 31
+      },
+      "best_x_mean": 635.4,
+      "stuck_frac_mean": 0.076,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0082,
+      "train_time_s": 108.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.283,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        197,
+        125,
+        134,
+        485,
+        218,
+        27,
+        8,
+        5,
+        0,
+        1
+      ],
+      "death_cluster_entropy_mean": 0.669,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.81,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.12307692307692308,
+        "causes": {
+          "Timeout": 5,
+          "Stall": 16,
+          "Bomb": 27
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0227,
+        "train_time_s": 9.3,
+        "completion_rate": 0.631,
+        "mean_completion_time": 6.9,
+        "completion_time_stddev": 4.8,
+        "progress_at_death": 0.475,
+        "deaths_per_run": 3.69,
+        "death_hist": [
+          10,
+          5,
+          1,
+          1,
+          3,
+          11,
+          6,
+          0,
+          1,
+          10
+        ],
+        "death_cluster_entropy": 0.826,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.85,
+        "curve": [
+          [
+            1014.5,
+            296.7
+          ],
+          [
+            1014.5,
+            458.7
+          ],
+          [
+            6060.0,
+            992.0
+          ],
+          [
+            6060.0,
+            2235.8
+          ],
+          [
+            6060.0,
+            3904.0
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            3946.4
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5510.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5546.4
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5550.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.9,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.10625,
+        "causes": {
+          "Bomb": 51,
+          "Stall": 17,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.026,
+        "train_time_s": 9.2,
+        "completion_rate": 0.569,
+        "mean_completion_time": 5.2,
+        "completion_time_stddev": 1.2,
+        "progress_at_death": 0.61,
+        "deaths_per_run": 4.31,
+        "death_hist": [
+          7,
+          2,
+          1,
+          2,
+          4,
+          18,
+          3,
+          3,
+          19,
+          10
+        ],
+        "death_cluster_entropy": 0.835,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 1.0,
+        "curve": [
+          [
+            878.2,
+            340.7
+          ],
+          [
+            923.6,
+            489.1
+          ],
+          [
+            923.6,
+            608.5
+          ],
+          [
+            923.6,
+            670.7
+          ],
+          [
+            923.6,
+            722.2
+          ],
+          [
+            6060.0,
+            1354.0
+          ],
+          [
+            6060.0,
+            2982.7
+          ],
+          [
+            6060.0,
+            5037.3
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.67,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.325,
+        "causes": {
+          "Stall": 39,
+          "Bomb": 13
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4545,
+        "train_time_s": 5.5,
+        "completion_rate": 0.567,
+        "mean_completion_time": 5.1,
+        "completion_time_stddev": 0.2,
+        "progress_at_death": 0.366,
+        "deaths_per_run": 4.33,
+        "death_hist": [
+          14,
+          2,
+          1,
+          3,
+          11,
+          17,
+          1,
+          2,
+          0,
+          1
+        ],
+        "death_cluster_entropy": 0.734,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.675,
+        "curve": [
+          [
+            605.5,
+            228.7
+          ],
+          [
+            6000.0,
+            902.9
+          ],
+          [
+            6000.0,
+            1110.4
+          ],
+          [
+            6000.0,
+            2716.5
+          ],
+          [
+            6000.0,
+            4331.8
+          ],
+          [
+            6000.0,
+            3659.1
+          ],
+          [
+            6000.0,
+            4318.2
+          ],
+          [
+            6000.0,
+            5418.2
+          ],
+          [
+            6000.0,
+            4904.5
+          ],
+          [
+            6000.0,
+            5436.4
+          ],
+          [
+            6000.0,
+            5445.5
+          ],
+          [
+            6000.0,
+            4286.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/0_31337"
+      }
+    ],
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 13,
+        "win_rate": 0.0,
+        "best": 826.7,
+        "best_x": 703.7,
+        "stuck_frac": 0.15,
+        "causes": {
+          "Stall": 60,
+          "Bomb": 340
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0121,
+        "train_time_s": 26.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.489,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          18,
+          28,
+          8,
+          38,
+          18,
+          174,
+          100,
+          16,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.697,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            467.4,
+            168.4
+          ],
+          [
+            467.4,
+            233.7
+          ],
+          [
+            467.4,
+            269.3
+          ],
+          [
+            578.5,
+            316.1
+          ],
+          [
+            578.5,
+            333.7
+          ],
+          [
+            578.5,
+            452.2
+          ],
+          [
+            578.5,
+            500.4
+          ],
+          [
+            578.5,
+            514.7
+          ],
+          [
+            578.5,
+            503.6
+          ],
+          [
+            578.5,
+            530.4
+          ],
+          [
+            578.5,
+            528.1
+          ],
+          [
+            578.5,
+            508.1
+          ],
+          [
+            826.7,
+            587.4
+          ],
+          [
+            826.7,
+            577.7
+          ],
+          [
+            826.7,
+            496.2
+          ],
+          [
+            826.7,
+            534.7
+          ],
+          [
+            826.7,
+            562.9
+          ],
+          [
+            826.7,
+            580.3
+          ],
+          [
+            826.7,
+            596.8
+          ],
+          [
+            826.7,
+            658.4
+          ],
+          [
+            826.7,
+            696.9
+          ],
+          [
+            826.7,
+            580.9
+          ],
+          [
+            826.7,
+            557.0
+          ],
+          [
+            826.7,
+            649.9
+          ],
+          [
+            826.7,
+            652.4
+          ],
+          [
+            826.7,
+            652.1
+          ],
+          [
+            826.7,
+            683.2
+          ],
+          [
+            826.7,
+            696.9
+          ],
+          [
+            826.7,
+            647.3
+          ],
+          [
+            826.7,
+            675.5
+          ],
+          [
+            826.7,
+            713.1
+          ],
+          [
+            826.7,
+            659.9
+          ],
+          [
+            826.7,
+            653.3
+          ],
+          [
+            826.7,
+            641.0
+          ],
+          [
+            826.7,
+            672.1
+          ],
+          [
+            826.7,
+            675.5
+          ],
+          [
+            826.7,
+            716.8
+          ],
+          [
+            826.7,
+            642.1
+          ],
+          [
+            826.7,
+            702.9
+          ],
+          [
+            826.7,
+            670.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 24,
+        "first_win_gen": 14,
+        "best_gen": 14,
+        "win_rate": 0.52,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.22083333333333333,
+        "causes": {
+          "Bomb": 114,
+          "Stall": 53,
+          "Timeout": 20
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0372,
+        "train_time_s": 30.5,
+        "completion_rate": 0.221,
+        "mean_completion_time": 22.7,
+        "completion_time_stddev": 3.7,
+        "progress_at_death": 0.468,
+        "deaths_per_run": 7.79,
+        "death_hist": [
+          8,
+          9,
+          6,
+          31,
+          8,
+          109,
+          2,
+          3,
+          11,
+          0
+        ],
+        "death_cluster_entropy": 0.617,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.6,
+        "curve": [
+          [
+            578.5,
+            210.6
+          ],
+          [
+            578.5,
+            326.3
+          ],
+          [
+            578.5,
+            427.2
+          ],
+          [
+            578.5,
+            362.8
+          ],
+          [
+            578.5,
+            445.2
+          ],
+          [
+            578.5,
+            531.8
+          ],
+          [
+            578.5,
+            418.4
+          ],
+          [
+            578.5,
+            514.7
+          ],
+          [
+            578.5,
+            544.3
+          ],
+          [
+            1011.9,
+            538.1
+          ],
+          [
+            1011.9,
+            610.7
+          ],
+          [
+            1011.9,
+            591.3
+          ],
+          [
+            1011.9,
+            602.4
+          ],
+          [
+            6160.0,
+            1197.4
+          ],
+          [
+            6160.0,
+            1231.0
+          ],
+          [
+            6160.0,
+            2390.7
+          ],
+          [
+            6160.0,
+            3455.9
+          ],
+          [
+            6160.0,
+            5043.7
+          ],
+          [
+            6160.0,
+            4485.6
+          ],
+          [
+            6160.0,
+            3363.3
+          ],
+          [
+            6160.0,
+            3927.4
+          ],
+          [
+            6160.0,
+            3927.4
+          ],
+          [
+            6160.0,
+            3927.4
+          ],
+          [
+            6160.0,
+            3412.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 31,
+        "win_rate": 0.0,
+        "best": 826.7,
+        "best_x": 666.7,
+        "stuck_frac": 0.2275,
+        "causes": {
+          "Stall": 91,
+          "Bomb": 301,
+          "Timeout": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0889,
+        "train_time_s": 31.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.502,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          15,
+          21,
+          19,
+          26,
+          13,
+          149,
+          157,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.628,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            152.7
+          ],
+          [
+            518.5,
+            249.0
+          ],
+          [
+            518.5,
+            352.7
+          ],
+          [
+            766.7,
+            435.4
+          ],
+          [
+            789.6,
+            553.7
+          ],
+          [
+            789.6,
+            549.8
+          ],
+          [
+            789.6,
+            584.5
+          ],
+          [
+            789.6,
+            612.7
+          ],
+          [
+            789.6,
+            557.2
+          ],
+          [
+            789.6,
+            669.8
+          ],
+          [
+            789.6,
+            642.1
+          ],
+          [
+            789.6,
+            663.3
+          ],
+          [
+            789.6,
+            593.1
+          ],
+          [
+            789.6,
+            629.3
+          ],
+          [
+            789.6,
+            627.3
+          ],
+          [
+            789.6,
+            574.6
+          ],
+          [
+            789.6,
+            547.6
+          ],
+          [
+            789.6,
+            587.1
+          ],
+          [
+            789.6,
+            613.9
+          ],
+          [
+            789.6,
+            573.2
+          ],
+          [
+            789.6,
+            631.3
+          ],
+          [
+            789.6,
+            601.4
+          ],
+          [
+            789.6,
+            639.0
+          ],
+          [
+            789.6,
+            651.0
+          ],
+          [
+            789.6,
+            610.2
+          ],
+          [
+            789.6,
+            625.0
+          ],
+          [
+            789.6,
+            586.0
+          ],
+          [
+            789.6,
+            576.9
+          ],
+          [
+            789.6,
+            638.7
+          ],
+          [
+            789.6,
+            616.2
+          ],
+          [
+            826.7,
+            709.2
+          ],
+          [
+            826.7,
+            582.9
+          ],
+          [
+            826.7,
+            641.0
+          ],
+          [
+            826.7,
+            615.1
+          ],
+          [
+            826.7,
+            590.6
+          ],
+          [
+            826.7,
+            680.7
+          ],
+          [
+            826.7,
+            665.6
+          ],
+          [
+            826.7,
+            701.5
+          ],
+          [
+            826.7,
+            644.7
+          ],
+          [
+            826.7,
+            648.1
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/1_31337"
+      }
+    ],
+    "2": [
+      {
+        "level": "2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 21,
+        "first_win_gen": 11,
+        "best_gen": 11,
+        "win_rate": 0.3,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.28095238095238095,
+        "causes": {
+          "Timeout": 6,
+          "Stall": 59,
+          "Bomb": 114
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0202,
+        "train_time_s": 20.4,
+        "completion_rate": 0.148,
+        "mean_completion_time": 17.8,
+        "completion_time_stddev": 1.0,
+        "progress_at_death": 0.645,
+        "deaths_per_run": 8.52,
+        "death_hist": [
+          14,
+          10,
+          1,
+          28,
+          3,
+          13,
+          8,
+          21,
+          19,
+          62
+        ],
+        "death_cluster_entropy": 0.84,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.314,
+        "curve": [
+          [
+            800.7,
+            235.1
+          ],
+          [
+            800.7,
+            361.9
+          ],
+          [
+            988.9,
+            400.1
+          ],
+          [
+            988.9,
+            559.4
+          ],
+          [
+            1025.9,
+            756.6
+          ],
+          [
+            1025.9,
+            697.6
+          ],
+          [
+            1025.9,
+            790.5
+          ],
+          [
+            1025.9,
+            814.7
+          ],
+          [
+            1048.9,
+            909.1
+          ],
+          [
+            1048.9,
+            1005.7
+          ],
+          [
+            6160.0,
+            1282.6
+          ],
+          [
+            6160.0,
+            1800.8
+          ],
+          [
+            6160.0,
+            2418.5
+          ],
+          [
+            6160.0,
+            2411.1
+          ],
+          [
+            6160.0,
+            2355.6
+          ],
+          [
+            6160.0,
+            2447.6
+          ],
+          [
+            6160.0,
+            2486.4
+          ],
+          [
+            6160.0,
+            2413.1
+          ],
+          [
+            6160.0,
+            2435.9
+          ],
+          [
+            6160.0,
+            2351.3
+          ],
+          [
+            6160.0,
+            2977.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/2_1234"
+      },
+      {
+        "level": "2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 4,
+        "win_rate": 0.33,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.09285714285714286,
+        "causes": {
+          "Bomb": 85,
+          "Stall": 13,
+          "Timeout": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1,
+        "train_time_s": 14.8,
+        "completion_rate": 0.243,
+        "mean_completion_time": 14.8,
+        "completion_time_stddev": 2.8,
+        "progress_at_death": 0.628,
+        "deaths_per_run": 7.57,
+        "death_hist": [
+          7,
+          4,
+          2,
+          17,
+          7,
+          7,
+          11,
+          12,
+          4,
+          35
+        ],
+        "death_cluster_entropy": 0.869,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.6,
+        "curve": [
+          [
+            726.7,
+            258.7
+          ],
+          [
+            726.7,
+            359.6
+          ],
+          [
+            726.7,
+            461.4
+          ],
+          [
+            6160.0,
+            1127.0
+          ],
+          [
+            6160.0,
+            1250.1
+          ],
+          [
+            6160.0,
+            1418.2
+          ],
+          [
+            6160.0,
+            1340.1
+          ],
+          [
+            6160.0,
+            1336.7
+          ],
+          [
+            6160.0,
+            1463.3
+          ],
+          [
+            6160.0,
+            2519.7
+          ],
+          [
+            6160.0,
+            3576.4
+          ],
+          [
+            6160.0,
+            4582.4
+          ],
+          [
+            6160.0,
+            4059.9
+          ],
+          [
+            6160.0,
+            4595.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/2_2025"
+      },
+      {
+        "level": "2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 4,
+        "win_rate": 0.0,
+        "best": 1025.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.1375,
+        "causes": {
+          "Stall": 55,
+          "Bomb": 343,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1741,
+        "train_time_s": 33.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.797,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          15,
+          5,
+          6,
+          25,
+          9,
+          7,
+          14,
+          30,
+          3,
+          286
+        ],
+        "death_cluster_entropy": 0.503,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            165.3
+          ],
+          [
+            430.4,
+            226.8
+          ],
+          [
+            504.4,
+            284.7
+          ],
+          [
+            1025.9,
+            459.4
+          ],
+          [
+            1025.9,
+            650.9
+          ],
+          [
+            1025.9,
+            887.7
+          ],
+          [
+            1025.9,
+            884.0
+          ],
+          [
+            1025.9,
+            936.4
+          ],
+          [
+            1025.9,
+            879.7
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            902.2
+          ],
+          [
+            1025.9,
+            967.5
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            921.6
+          ],
+          [
+            1025.9,
+            940.1
+          ],
+          [
+            1025.9,
+            940.1
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            943.6
+          ],
+          [
+            1025.9,
+            904.5
+          ],
+          [
+            1025.9,
+            997.4
+          ],
+          [
+            1025.9,
+            997.4
+          ],
+          [
+            1025.9,
+            797.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            997.4
+          ],
+          [
+            1025.9,
+            867.2
+          ],
+          [
+            1025.9,
+            974.9
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            868.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            997.4
+          ],
+          [
+            1025.9,
+            984.9
+          ],
+          [
+            1025.9,
+            973.5
+          ],
+          [
+            1025.9,
+            800.5
+          ],
+          [
+            1025.9,
+            891.4
+          ],
+          [
+            1025.9,
+            1022.2
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/2_31337"
+      }
+    ],
+    "3": [
+      {
+        "level": "3",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 27,
+        "win_rate": 0.0,
+        "best": 840.7,
+        "best_x": 740.7,
+        "stuck_frac": 0.0925,
+        "causes": {
+          "Bomb": 362,
+          "Stall": 37,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0123,
+        "train_time_s": 25.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.455,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          30,
+          31,
+          18,
+          62,
+          20,
+          161,
+          41,
+          37,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.778,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            172.1
+          ],
+          [
+            470.4,
+            295.9
+          ],
+          [
+            470.4,
+            411.3
+          ],
+          [
+            470.4,
+            364.6
+          ],
+          [
+            618.5,
+            358.9
+          ],
+          [
+            618.5,
+            466.9
+          ],
+          [
+            618.5,
+            478.3
+          ],
+          [
+            618.5,
+            533.9
+          ],
+          [
+            618.5,
+            555.0
+          ],
+          [
+            618.5,
+            569.8
+          ],
+          [
+            618.5,
+            526.4
+          ],
+          [
+            618.5,
+            569.8
+          ],
+          [
+            618.5,
+            498.2
+          ],
+          [
+            692.6,
+            611.1
+          ],
+          [
+            692.6,
+            588.3
+          ],
+          [
+            692.6,
+            536.1
+          ],
+          [
+            692.6,
+            588.6
+          ],
+          [
+            692.6,
+            507.3
+          ],
+          [
+            692.6,
+            610.8
+          ],
+          [
+            766.7,
+            610.8
+          ],
+          [
+            766.7,
+            580.9
+          ],
+          [
+            766.7,
+            552.1
+          ],
+          [
+            766.7,
+            464.6
+          ],
+          [
+            766.7,
+            565.8
+          ],
+          [
+            766.7,
+            474.0
+          ],
+          [
+            766.7,
+            449.5
+          ],
+          [
+            840.7,
+            507.3
+          ],
+          [
+            840.7,
+            518.1
+          ],
+          [
+            840.7,
+            531.6
+          ],
+          [
+            840.7,
+            680.9
+          ],
+          [
+            840.7,
+            578.0
+          ],
+          [
+            840.7,
+            587.1
+          ],
+          [
+            840.7,
+            580.0
+          ],
+          [
+            840.7,
+            578.0
+          ],
+          [
+            840.7,
+            600.2
+          ],
+          [
+            840.7,
+            631.9
+          ],
+          [
+            840.7,
+            560.9
+          ],
+          [
+            840.7,
+            695.4
+          ],
+          [
+            840.7,
+            702.5
+          ],
+          [
+            840.7,
+            706.8
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/3_1234"
+      },
+      {
+        "level": "3",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 31,
+        "first_win_gen": 21,
+        "best_gen": 25,
+        "win_rate": 0.6,
+        "best": 6460.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.11290322580645161,
+        "causes": {
+          "Bomb": 185,
+          "Stall": 35,
+          "Timeout": 29
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0219,
+        "train_time_s": 37.1,
+        "completion_rate": 0.197,
+        "mean_completion_time": 21.9,
+        "completion_time_stddev": 6.4,
+        "progress_at_death": 0.569,
+        "deaths_per_run": 8.03,
+        "death_hist": [
+          10,
+          8,
+          4,
+          34,
+          25,
+          55,
+          21,
+          59,
+          9,
+          24
+        ],
+        "death_cluster_entropy": 0.885,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.6,
+        "curve": [
+          [
+            604.4,
+            243.1
+          ],
+          [
+            618.5,
+            403.9
+          ],
+          [
+            618.5,
+            505.6
+          ],
+          [
+            840.7,
+            614.2
+          ],
+          [
+            840.7,
+            562.4
+          ],
+          [
+            840.7,
+            629.0
+          ],
+          [
+            840.7,
+            615.0
+          ],
+          [
+            840.7,
+            603.9
+          ],
+          [
+            863.7,
+            675.5
+          ],
+          [
+            863.7,
+            618.1
+          ],
+          [
+            863.7,
+            719.0
+          ],
+          [
+            963.7,
+            728.5
+          ],
+          [
+            1085.9,
+            798.7
+          ],
+          [
+            1085.9,
+            792.7
+          ],
+          [
+            1085.9,
+            665.3
+          ],
+          [
+            1085.9,
+            747.2
+          ],
+          [
+            1223.0,
+            868.0
+          ],
+          [
+            1223.0,
+            878.0
+          ],
+          [
+            1223.0,
+            786.7
+          ],
+          [
+            1223.0,
+            842.1
+          ],
+          [
+            6160.0,
+            1312.7
+          ],
+          [
+            6160.0,
+            1914.7
+          ],
+          [
+            6160.0,
+            1952.4
+          ],
+          [
+            6160.0,
+            3019.9
+          ],
+          [
+            6460.0,
+            3479.1
+          ],
+          [
+            6460.0,
+            3531.1
+          ],
+          [
+            6460.0,
+            4609.6
+          ],
+          [
+            6460.0,
+            5813.3
+          ],
+          [
+            6460.0,
+            5823.3
+          ],
+          [
+            6460.0,
+            5264.1
+          ],
+          [
+            6460.0,
+            5924.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/3_2025"
+      },
+      {
+        "level": "3",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 19,
+        "first_win_gen": 9,
+        "best_gen": 9,
+        "win_rate": 0.31,
+        "best": 6260.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.20526315789473684,
+        "causes": {
+          "Stall": 39,
+          "Bomb": 107,
+          "Timeout": 12
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0605,
+        "train_time_s": 22.0,
+        "completion_rate": 0.168,
+        "mean_completion_time": 32.2,
+        "completion_time_stddev": 1.7,
+        "progress_at_death": 0.431,
+        "deaths_per_run": 8.32,
+        "death_hist": [
+          13,
+          12,
+          0,
+          47,
+          31,
+          33,
+          1,
+          20,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.753,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.433,
+        "curve": [
+          [
+            470.4,
+            149.3
+          ],
+          [
+            470.4,
+            276.4
+          ],
+          [
+            615.6,
+            381.6
+          ],
+          [
+            615.6,
+            459.5
+          ],
+          [
+            615.6,
+            419.3
+          ],
+          [
+            615.6,
+            499.0
+          ],
+          [
+            615.6,
+            429.5
+          ],
+          [
+            840.7,
+            539.8
+          ],
+          [
+            6260.0,
+            1162.7
+          ],
+          [
+            6260.0,
+            1121.6
+          ],
+          [
+            6260.0,
+            1201.4
+          ],
+          [
+            6260.0,
+            1202.0
+          ],
+          [
+            6260.0,
+            1834.6
+          ],
+          [
+            6260.0,
+            2288.4
+          ],
+          [
+            6260.0,
+            2871.7
+          ],
+          [
+            6260.0,
+            3348.0
+          ],
+          [
+            6260.0,
+            2830.9
+          ],
+          [
+            6260.0,
+            3448.1
+          ],
+          [
+            6260.0,
+            3427.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/3_31337"
+      }
+    ],
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 7,
+        "win_rate": 0.65,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.18666666666666668,
+        "causes": {
+          "Bomb": 51,
+          "Stall": 28,
+          "Timeout": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0273,
+        "train_time_s": 10.3,
+        "completion_rate": 0.44,
+        "mean_completion_time": 7.6,
+        "completion_time_stddev": 2.9,
+        "progress_at_death": 0.49,
+        "deaths_per_run": 5.6,
+        "death_hist": [
+          23,
+          7,
+          1,
+          1,
+          0,
+          18,
+          0,
+          6,
+          13,
+          15
+        ],
+        "death_cluster_entropy": 0.774,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.74,
+        "curve": [
+          [
+            923.6,
+            205.3
+          ],
+          [
+            923.6,
+            265.8
+          ],
+          [
+            923.6,
+            452.2
+          ],
+          [
+            923.6,
+            519.3
+          ],
+          [
+            6060.0,
+            1170.7
+          ],
+          [
+            6060.0,
+            1359.5
+          ],
+          [
+            6160.0,
+            2959.1
+          ],
+          [
+            6160.0,
+            5570.9
+          ],
+          [
+            6160.0,
+            3908.2
+          ],
+          [
+            6160.0,
+            4520.0
+          ],
+          [
+            6160.0,
+            4985.8
+          ],
+          [
+            6160.0,
+            3353.5
+          ],
+          [
+            6160.0,
+            4957.1
+          ],
+          [
+            6160.0,
+            4560.9
+          ],
+          [
+            6160.0,
+            6114.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 5,
+        "win_rate": 0.0,
+        "best": 705.5,
+        "best_x": 590.9,
+        "stuck_frac": 0.45,
+        "causes": {
+          "Bomb": 220,
+          "Stall": 180
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0136,
+        "train_time_s": 23.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.488,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          30,
+          16,
+          1,
+          5,
+          5,
+          343,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.252,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            605.5,
+            203.8
+          ],
+          [
+            605.5,
+            423.5
+          ],
+          [
+            605.5,
+            485.8
+          ],
+          [
+            650.9,
+            517.6
+          ],
+          [
+            705.5,
+            417.1
+          ],
+          [
+            705.5,
+            452.0
+          ],
+          [
+            705.5,
+            492.9
+          ],
+          [
+            705.5,
+            577.1
+          ],
+          [
+            705.5,
+            492.4
+          ],
+          [
+            705.5,
+            527.5
+          ],
+          [
+            705.5,
+            561.5
+          ],
+          [
+            705.5,
+            643.5
+          ],
+          [
+            705.5,
+            623.1
+          ],
+          [
+            705.5,
+            652.7
+          ],
+          [
+            705.5,
+            631.5
+          ],
+          [
+            705.5,
+            606.5
+          ],
+          [
+            705.5,
+            609.5
+          ],
+          [
+            705.5,
+            685.5
+          ],
+          [
+            705.5,
+            611.1
+          ],
+          [
+            705.5,
+            669.5
+          ],
+          [
+            705.5,
+            623.1
+          ],
+          [
+            705.5,
+            552.9
+          ],
+          [
+            705.5,
+            588.9
+          ],
+          [
+            705.5,
+            587.5
+          ],
+          [
+            705.5,
+            572.9
+          ],
+          [
+            705.5,
+            569.3
+          ],
+          [
+            705.5,
+            616.5
+          ],
+          [
+            705.5,
+            643.5
+          ],
+          [
+            705.5,
+            653.5
+          ],
+          [
+            705.5,
+            582.9
+          ],
+          [
+            705.5,
+            659.5
+          ],
+          [
+            705.5,
+            663.5
+          ],
+          [
+            705.5,
+            689.5
+          ],
+          [
+            705.5,
+            637.5
+          ],
+          [
+            705.5,
+            520.9
+          ],
+          [
+            705.5,
+            572.9
+          ],
+          [
+            705.5,
+            675.5
+          ],
+          [
+            705.5,
+            613.5
+          ],
+          [
+            705.5,
+            637.5
+          ],
+          [
+            705.5,
+            670.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 12,
+        "win_rate": 0.0,
+        "best": 805.5,
+        "best_x": 590.9,
+        "stuck_frac": 0.3275,
+        "causes": {
+          "Stall": 131,
+          "Bomb": 261,
+          "Timeout": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0013,
+        "train_time_s": 35.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.401,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          70,
+          41,
+          11,
+          15,
+          5,
+          258,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.477,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            605.5,
+            178.7
+          ],
+          [
+            705.5,
+            290.2
+          ],
+          [
+            705.5,
+            353.1
+          ],
+          [
+            705.5,
+            395.5
+          ],
+          [
+            705.5,
+            494.9
+          ],
+          [
+            705.5,
+            513.1
+          ],
+          [
+            705.5,
+            497.1
+          ],
+          [
+            705.5,
+            435.1
+          ],
+          [
+            705.5,
+            557.1
+          ],
+          [
+            705.5,
+            517.1
+          ],
+          [
+            705.5,
+            588.9
+          ],
+          [
+            805.5,
+            575.8
+          ],
+          [
+            805.5,
+            506.5
+          ],
+          [
+            805.5,
+            581.5
+          ],
+          [
+            805.5,
+            497.5
+          ],
+          [
+            805.5,
+            552.0
+          ],
+          [
+            805.5,
+            512.5
+          ],
+          [
+            805.5,
+            511.6
+          ],
+          [
+            805.5,
+            550.7
+          ],
+          [
+            805.5,
+            549.5
+          ],
+          [
+            805.5,
+            616.7
+          ],
+          [
+            805.5,
+            550.7
+          ],
+          [
+            805.5,
+            570.5
+          ],
+          [
+            805.5,
+            528.0
+          ],
+          [
+            805.5,
+            541.6
+          ],
+          [
+            805.5,
+            456.5
+          ],
+          [
+            805.5,
+            593.1
+          ],
+          [
+            805.5,
+            463.6
+          ],
+          [
+            805.5,
+            534.9
+          ],
+          [
+            805.5,
+            450.2
+          ],
+          [
+            805.5,
+            553.1
+          ],
+          [
+            805.5,
+            554.4
+          ],
+          [
+            805.5,
+            438.4
+          ],
+          [
+            805.5,
+            498.4
+          ],
+          [
+            805.5,
+            607.5
+          ],
+          [
+            805.5,
+            564.9
+          ],
+          [
+            805.5,
+            555.3
+          ],
+          [
+            805.5,
+            506.0
+          ],
+          [
+            805.5,
+            577.5
+          ],
+          [
+            805.5,
+            533.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/4_31337"
+      }
+    ],
+    "5": [
+      {
+        "level": "5",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 23,
+        "win_rate": 0.0,
+        "best": 1160.0,
+        "best_x": 900.0,
+        "stuck_frac": 0.32,
+        "causes": {
+          "Bomb": 269,
+          "Stall": 128,
+          "Timeout": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0461,
+        "train_time_s": 29.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.663,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          40,
+          11,
+          2,
+          13,
+          6,
+          56,
+          25,
+          31,
+          68,
+          148
+        ],
+        "death_cluster_entropy": 0.802,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            500.0,
+            199.0
+          ],
+          [
+            560.0,
+            315.0
+          ],
+          [
+            560.0,
+            366.0
+          ],
+          [
+            660.0,
+            494.0
+          ],
+          [
+            660.0,
+            499.0
+          ],
+          [
+            760.0,
+            574.0
+          ],
+          [
+            760.0,
+            620.0
+          ],
+          [
+            860.0,
+            589.0
+          ],
+          [
+            860.0,
+            740.0
+          ],
+          [
+            1000.0,
+            794.0
+          ],
+          [
+            1000.0,
+            838.0
+          ],
+          [
+            1000.0,
+            930.0
+          ],
+          [
+            1010.0,
+            927.0
+          ],
+          [
+            1010.0,
+            887.0
+          ],
+          [
+            1010.0,
+            719.0
+          ],
+          [
+            1060.0,
+            837.0
+          ],
+          [
+            1060.0,
+            700.0
+          ],
+          [
+            1060.0,
+            529.0
+          ],
+          [
+            1060.0,
+            824.0
+          ],
+          [
+            1060.0,
+            759.0
+          ],
+          [
+            1060.0,
+            819.0
+          ],
+          [
+            1060.0,
+            703.0
+          ],
+          [
+            1160.0,
+            629.0
+          ],
+          [
+            1160.0,
+            881.0
+          ],
+          [
+            1160.0,
+            977.0
+          ],
+          [
+            1160.0,
+            925.0
+          ],
+          [
+            1160.0,
+            933.0
+          ],
+          [
+            1160.0,
+            816.0
+          ],
+          [
+            1160.0,
+            852.0
+          ],
+          [
+            1160.0,
+            962.0
+          ],
+          [
+            1160.0,
+            972.0
+          ],
+          [
+            1160.0,
+            756.0
+          ],
+          [
+            1160.0,
+            717.0
+          ],
+          [
+            1160.0,
+            807.0
+          ],
+          [
+            1160.0,
+            1014.0
+          ],
+          [
+            1160.0,
+            992.0
+          ],
+          [
+            1160.0,
+            947.0
+          ],
+          [
+            1160.0,
+            887.0
+          ],
+          [
+            1160.0,
+            872.0
+          ],
+          [
+            1160.0,
+            988.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/5_1234"
+      },
+      {
+        "level": "5",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 35,
+        "best_gen": 36,
+        "win_rate": 0.28,
+        "best": 6360.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1725,
+        "causes": {
+          "Bomb": 301,
+          "Stall": 69,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0022,
+        "train_time_s": 32.6,
+        "completion_rate": 0.07,
+        "mean_completion_time": 20.6,
+        "completion_time_stddev": 1.0,
+        "progress_at_death": 0.741,
+        "deaths_per_run": 9.3,
+        "death_hist": [
+          12,
+          11,
+          5,
+          9,
+          9,
+          22,
+          6,
+          67,
+          71,
+          160
+        ],
+        "death_cluster_entropy": 0.727,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.215,
+        "curve": [
+          [
+            910.0,
+            318.0
+          ],
+          [
+            910.0,
+            454.0
+          ],
+          [
+            910.0,
+            588.0
+          ],
+          [
+            910.0,
+            637.0
+          ],
+          [
+            1000.0,
+            702.0
+          ],
+          [
+            1000.0,
+            789.0
+          ],
+          [
+            1000.0,
+            776.0
+          ],
+          [
+            1100.0,
+            921.0
+          ],
+          [
+            1100.0,
+            916.0
+          ],
+          [
+            1100.0,
+            862.0
+          ],
+          [
+            1100.0,
+            832.0
+          ],
+          [
+            1100.0,
+            793.0
+          ],
+          [
+            1100.0,
+            780.0
+          ],
+          [
+            1100.0,
+            862.0
+          ],
+          [
+            1100.0,
+            765.0
+          ],
+          [
+            1100.0,
+            773.0
+          ],
+          [
+            1100.0,
+            965.0
+          ],
+          [
+            1100.0,
+            777.0
+          ],
+          [
+            1100.0,
+            883.0
+          ],
+          [
+            1100.0,
+            791.0
+          ],
+          [
+            1100.0,
+            926.0
+          ],
+          [
+            1100.0,
+            915.0
+          ],
+          [
+            1100.0,
+            971.0
+          ],
+          [
+            1100.0,
+            846.0
+          ],
+          [
+            1100.0,
+            966.0
+          ],
+          [
+            1100.0,
+            945.0
+          ],
+          [
+            1100.0,
+            1006.0
+          ],
+          [
+            1100.0,
+            1044.0
+          ],
+          [
+            1100.0,
+            955.0
+          ],
+          [
+            1110.0,
+            995.0
+          ],
+          [
+            1110.0,
+            962.0
+          ],
+          [
+            1110.0,
+            1014.0
+          ],
+          [
+            1110.0,
+            779.0
+          ],
+          [
+            1110.0,
+            932.0
+          ],
+          [
+            6260.0,
+            1474.0
+          ],
+          [
+            6360.0,
+            2081.0
+          ],
+          [
+            6360.0,
+            2638.0
+          ],
+          [
+            6360.0,
+            3719.0
+          ],
+          [
+            6360.0,
+            5815.0
+          ],
+          [
+            6360.0,
+            5320.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/5_2025"
+      },
+      {
+        "level": "5",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 1160.0,
+        "best_x": 950.0,
+        "stuck_frac": 0.1325,
+        "causes": {
+          "Stall": 53,
+          "Bomb": 347
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0176,
+        "train_time_s": 28.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.729,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          23,
+          3,
+          2,
+          18,
+          7,
+          34,
+          12,
+          70,
+          14,
+          217
+        ],
+        "death_cluster_entropy": 0.654,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            560.0,
+            207.0
+          ],
+          [
+            800.0,
+            357.0
+          ],
+          [
+            960.0,
+            548.0
+          ],
+          [
+            1100.0,
+            599.0
+          ],
+          [
+            1100.0,
+            753.0
+          ],
+          [
+            1100.0,
+            747.0
+          ],
+          [
+            1100.0,
+            836.0
+          ],
+          [
+            1100.0,
+            843.0
+          ],
+          [
+            1100.0,
+            893.0
+          ],
+          [
+            1100.0,
+            810.0
+          ],
+          [
+            1100.0,
+            810.0
+          ],
+          [
+            1100.0,
+            824.0
+          ],
+          [
+            1100.0,
+            893.0
+          ],
+          [
+            1100.0,
+            668.0
+          ],
+          [
+            1100.0,
+            859.0
+          ],
+          [
+            1100.0,
+            791.0
+          ],
+          [
+            1100.0,
+            770.0
+          ],
+          [
+            1100.0,
+            713.0
+          ],
+          [
+            1100.0,
+            949.0
+          ],
+          [
+            1100.0,
+            923.0
+          ],
+          [
+            1100.0,
+            859.0
+          ],
+          [
+            1100.0,
+            944.0
+          ],
+          [
+            1100.0,
+            1036.0
+          ],
+          [
+            1100.0,
+            978.0
+          ],
+          [
+            1100.0,
+            983.0
+          ],
+          [
+            1100.0,
+            804.0
+          ],
+          [
+            1100.0,
+            916.0
+          ],
+          [
+            1100.0,
+            923.0
+          ],
+          [
+            1100.0,
+            983.0
+          ],
+          [
+            1100.0,
+            856.0
+          ],
+          [
+            1100.0,
+            968.0
+          ],
+          [
+            1100.0,
+            909.0
+          ],
+          [
+            1100.0,
+            972.0
+          ],
+          [
+            1100.0,
+            958.0
+          ],
+          [
+            1100.0,
+            853.0
+          ],
+          [
+            1100.0,
+            969.0
+          ],
+          [
+            1100.0,
+            899.0
+          ],
+          [
+            1100.0,
+            825.0
+          ],
+          [
+            1100.0,
+            983.0
+          ],
+          [
+            1160.0,
+            923.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/5_31337"
+      }
+    ],
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.81,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1076923076923077,
+        "causes": {
+          "Timeout": 5,
+          "Stall": 14,
+          "Bomb": 26,
+          "Enemy": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0357,
+        "train_time_s": 8.2,
+        "completion_rate": 0.631,
+        "mean_completion_time": 7.2,
+        "completion_time_stddev": 3.9,
+        "progress_at_death": 0.472,
+        "deaths_per_run": 3.69,
+        "death_hist": [
+          9,
+          0,
+          9,
+          0,
+          5,
+          10,
+          1,
+          3,
+          6,
+          5
+        ],
+        "death_cluster_entropy": 0.842,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.75,
+        "curve": [
+          [
+            1324.3,
+            420.9
+          ],
+          [
+            1324.3,
+            633.6
+          ],
+          [
+            6120.0,
+            1535.7
+          ],
+          [
+            6120.0,
+            2945.6
+          ],
+          [
+            6120.0,
+            4538.1
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5160.9
+          ],
+          [
+            6120.0,
+            5636.9
+          ],
+          [
+            6120.0,
+            5135.9
+          ],
+          [
+            6120.0,
+            5636.9
+          ],
+          [
+            6120.0,
+            5530.7
+          ],
+          [
+            6120.0,
+            5032.0
+          ],
+          [
+            6120.0,
+            5626.1
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.7,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.19166666666666668,
+        "causes": {
+          "Enemy": 10,
+          "Stall": 23,
+          "Bomb": 16
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 4.7,
+        "completion_rate": 0.592,
+        "mean_completion_time": 4.5,
+        "completion_time_stddev": 1.1,
+        "progress_at_death": 0.615,
+        "deaths_per_run": 4.08,
+        "death_hist": [
+          4,
+          3,
+          7,
+          1,
+          0,
+          14,
+          1,
+          0,
+          0,
+          19
+        ],
+        "death_cluster_entropy": 0.668,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.7,
+        "curve": [
+          [
+            1145.7,
+            306.4
+          ],
+          [
+            6120.0,
+            970.9
+          ],
+          [
+            6120.0,
+            1669.6
+          ],
+          [
+            6120.0,
+            2896.6
+          ],
+          [
+            6120.0,
+            5570.0
+          ],
+          [
+            6120.0,
+            3366.0
+          ],
+          [
+            6120.0,
+            4624.0
+          ],
+          [
+            6120.0,
+            5028.4
+          ],
+          [
+            6120.0,
+            4519.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5046.3
+          ],
+          [
+            6120.0,
+            6120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 18,
+        "first_win_gen": 8,
+        "best_gen": 8,
+        "win_rate": 0.8,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.2111111111111111,
+        "causes": {
+          "Enemy": 20,
+          "Stall": 38,
+          "Bomb": 41
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0434,
+        "train_time_s": 8.5,
+        "completion_rate": 0.45,
+        "mean_completion_time": 5.5,
+        "completion_time_stddev": 1.7,
+        "progress_at_death": 0.535,
+        "deaths_per_run": 5.5,
+        "death_hist": [
+          13,
+          2,
+          16,
+          2,
+          8,
+          18,
+          1,
+          17,
+          10,
+          12
+        ],
+        "death_cluster_entropy": 0.898,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.933,
+        "curve": [
+          [
+            1145.7,
+            209.4
+          ],
+          [
+            1145.7,
+            510.7
+          ],
+          [
+            1145.7,
+            573.6
+          ],
+          [
+            1145.7,
+            726.1
+          ],
+          [
+            1288.6,
+            850.3
+          ],
+          [
+            1288.6,
+            995.1
+          ],
+          [
+            1324.3,
+            706.9
+          ],
+          [
+            6120.0,
+            1506.9
+          ],
+          [
+            6120.0,
+            2627.0
+          ],
+          [
+            6120.0,
+            4681.3
+          ],
+          [
+            6120.0,
+            4670.6
+          ],
+          [
+            6120.0,
+            4674.1
+          ],
+          [
+            6120.0,
+            5633.3
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5160.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5636.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/6_31337"
+      }
+    ],
+    "7": [
+      {
+        "level": "7",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 24,
+        "first_win_gen": 14,
+        "best_gen": 18,
+        "win_rate": 0.69,
+        "best": 6180.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07083333333333333,
+        "causes": {
+          "Bomb": 132,
+          "Enemy": 21,
+          "Stall": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1682,
+        "train_time_s": 26.6,
+        "completion_rate": 0.292,
+        "mean_completion_time": 14.4,
+        "completion_time_stddev": 2.5,
+        "progress_at_death": 0.58,
+        "deaths_per_run": 7.08,
+        "death_hist": [
+          11,
+          16,
+          3,
+          8,
+          25,
+          18,
+          11,
+          31,
+          22,
+          25
+        ],
+        "death_cluster_entropy": 0.942,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            287.3,
+            120.1
+          ],
+          [
+            1253.6,
+            302.3
+          ],
+          [
+            1253.6,
+            433.1
+          ],
+          [
+            1253.6,
+            562.9
+          ],
+          [
+            1253.6,
+            574.3
+          ],
+          [
+            1253.6,
+            689.0
+          ],
+          [
+            1253.6,
+            649.0
+          ],
+          [
+            1253.6,
+            652.7
+          ],
+          [
+            1299.1,
+            792.9
+          ],
+          [
+            1344.5,
+            999.3
+          ],
+          [
+            1344.5,
+            800.2
+          ],
+          [
+            1344.5,
+            770.8
+          ],
+          [
+            1344.5,
+            905.0
+          ],
+          [
+            6120.0,
+            1249.4
+          ],
+          [
+            6120.0,
+            2031.5
+          ],
+          [
+            6120.0,
+            2489.5
+          ],
+          [
+            6120.0,
+            3165.5
+          ],
+          [
+            6180.0,
+            4494.6
+          ],
+          [
+            6180.0,
+            5585.0
+          ],
+          [
+            6180.0,
+            4976.8
+          ],
+          [
+            6180.0,
+            5561.5
+          ],
+          [
+            6180.0,
+            5547.8
+          ],
+          [
+            6180.0,
+            5595.5
+          ],
+          [
+            6180.0,
+            5549.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/7_1234"
+      },
+      {
+        "level": "7",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 39,
+        "best_gen": 39,
+        "win_rate": 0.03,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.4175,
+        "causes": {
+          "Bomb": 220,
+          "Enemy": 9,
+          "Stall": 167,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0909,
+        "train_time_s": 38.4,
+        "completion_rate": 0.007,
+        "mean_completion_time": 8.2,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.819,
+        "deaths_per_run": 9.93,
+        "death_hist": [
+          15,
+          4,
+          2,
+          3,
+          24,
+          4,
+          18,
+          95,
+          25,
+          207
+        ],
+        "death_cluster_entropy": 0.628,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.023,
+        "curve": [
+          [
+            514.5,
+            195.3
+          ],
+          [
+            560.0,
+            384.5
+          ],
+          [
+            560.0,
+            438.0
+          ],
+          [
+            560.0,
+            532.0
+          ],
+          [
+            560.0,
+            508.5
+          ],
+          [
+            560.0,
+            553.2
+          ],
+          [
+            560.0,
+            515.4
+          ],
+          [
+            590.0,
+            549.4
+          ],
+          [
+            620.0,
+            557.6
+          ],
+          [
+            620.0,
+            491.0
+          ],
+          [
+            620.0,
+            482.5
+          ],
+          [
+            1223.6,
+            540.5
+          ],
+          [
+            1223.6,
+            545.7
+          ],
+          [
+            1223.6,
+            546.5
+          ],
+          [
+            1223.6,
+            648.7
+          ],
+          [
+            1223.6,
+            573.8
+          ],
+          [
+            1223.6,
+            626.8
+          ],
+          [
+            1223.6,
+            587.3
+          ],
+          [
+            1223.6,
+            507.9
+          ],
+          [
+            1223.6,
+            524.6
+          ],
+          [
+            1223.6,
+            585.2
+          ],
+          [
+            1246.4,
+            677.4
+          ],
+          [
+            1246.4,
+            692.5
+          ],
+          [
+            1246.4,
+            591.8
+          ],
+          [
+            1246.4,
+            588.7
+          ],
+          [
+            1246.4,
+            620.5
+          ],
+          [
+            1246.4,
+            672.8
+          ],
+          [
+            1246.4,
+            687.8
+          ],
+          [
+            1246.4,
+            694.0
+          ],
+          [
+            1246.4,
+            694.7
+          ],
+          [
+            1246.4,
+            616.0
+          ],
+          [
+            1246.4,
+            636.4
+          ],
+          [
+            1246.4,
+            579.7
+          ],
+          [
+            1246.4,
+            700.7
+          ],
+          [
+            1246.4,
+            677.2
+          ],
+          [
+            1246.4,
+            696.2
+          ],
+          [
+            1276.4,
+            719.5
+          ],
+          [
+            1276.4,
+            789.0
+          ],
+          [
+            6120.0,
+            1308.6
+          ],
+          [
+            6120.0,
+            1923.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/7_2025"
+      },
+      {
+        "level": "7",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 29,
+        "first_win_gen": 19,
+        "best_gen": 28,
+        "win_rate": 0.59,
+        "best": 6180.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1206896551724138,
+        "causes": {
+          "Enemy": 16,
+          "Stall": 35,
+          "Bomb": 177,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1363,
+        "train_time_s": 30.4,
+        "completion_rate": 0.207,
+        "mean_completion_time": 13.1,
+        "completion_time_stddev": 3.1,
+        "progress_at_death": 0.717,
+        "deaths_per_run": 7.93,
+        "death_hist": [
+          16,
+          2,
+          2,
+          9,
+          20,
+          30,
+          21,
+          23,
+          7,
+          100
+        ],
+        "death_cluster_entropy": 0.777,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.644,
+        "curve": [
+          [
+            482.7,
+            124.7
+          ],
+          [
+            482.7,
+            188.3
+          ],
+          [
+            482.7,
+            208.6
+          ],
+          [
+            560.0,
+            333.4
+          ],
+          [
+            560.0,
+            416.7
+          ],
+          [
+            560.0,
+            483.5
+          ],
+          [
+            560.0,
+            523.6
+          ],
+          [
+            560.0,
+            509.1
+          ],
+          [
+            560.0,
+            510.8
+          ],
+          [
+            560.0,
+            525.9
+          ],
+          [
+            620.0,
+            526.5
+          ],
+          [
+            620.0,
+            516.8
+          ],
+          [
+            1132.7,
+            587.7
+          ],
+          [
+            1132.7,
+            568.5
+          ],
+          [
+            1208.2,
+            678.6
+          ],
+          [
+            1208.2,
+            625.5
+          ],
+          [
+            1208.2,
+            806.5
+          ],
+          [
+            1253.6,
+            827.2
+          ],
+          [
+            6120.0,
+            1381.7
+          ],
+          [
+            6120.0,
+            1600.6
+          ],
+          [
+            6120.0,
+            2572.5
+          ],
+          [
+            6120.0,
+            2318.9
+          ],
+          [
+            6120.0,
+            4535.6
+          ],
+          [
+            6120.0,
+            3875.5
+          ],
+          [
+            6120.0,
+            3328.5
+          ],
+          [
+            6120.0,
+            5014.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6180.0,
+            6126.0
+          ],
+          [
+            6180.0,
+            3854.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/7_31337"
+      }
+    ],
+    "8": [
+      {
+        "level": "8",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.41,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.125,
+        "causes": {
+          "Bomb": 76,
+          "Stall": 20,
+          "Enemy": 22
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.6111,
+        "train_time_s": 10.3,
+        "completion_rate": 0.263,
+        "mean_completion_time": 8.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.758,
+        "deaths_per_run": 7.38,
+        "death_hist": [
+          10,
+          6,
+          4,
+          11,
+          1,
+          2,
+          5,
+          0,
+          1,
+          78
+        ],
+        "death_cluster_entropy": 0.545,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.7,
+        "curve": [
+          [
+            254.4,
+            70.8
+          ],
+          [
+            560.0,
+            186.0
+          ],
+          [
+            620.0,
+            331.8
+          ],
+          [
+            620.0,
+            346.2
+          ],
+          [
+            710.0,
+            497.0
+          ],
+          [
+            6120.0,
+            1105.0
+          ],
+          [
+            6120.0,
+            1107.1
+          ],
+          [
+            6120.0,
+            1206.0
+          ],
+          [
+            6120.0,
+            1186.3
+          ],
+          [
+            6120.0,
+            1338.0
+          ],
+          [
+            6120.0,
+            2023.0
+          ],
+          [
+            6120.0,
+            4276.0
+          ],
+          [
+            6120.0,
+            4525.0
+          ],
+          [
+            6120.0,
+            4507.4
+          ],
+          [
+            6120.0,
+            4620.0
+          ],
+          [
+            6120.0,
+            4991.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/8_1234"
+      },
+      {
+        "level": "8",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 17,
+        "first_win_gen": 7,
+        "best_gen": 7,
+        "win_rate": 0.69,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07647058823529412,
+        "causes": {
+          "Enemy": 23,
+          "Bomb": 58,
+          "Stall": 13,
+          "Timeout": 6
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1111,
+        "train_time_s": 14.6,
+        "completion_rate": 0.412,
+        "mean_completion_time": 8.8,
+        "completion_time_stddev": 1.2,
+        "progress_at_death": 0.63,
+        "deaths_per_run": 5.88,
+        "death_hist": [
+          9,
+          9,
+          1,
+          7,
+          3,
+          6,
+          20,
+          11,
+          6,
+          28
+        ],
+        "death_cluster_entropy": 0.881,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.86,
+        "curve": [
+          [
+            333.3,
+            151.8
+          ],
+          [
+            333.3,
+            176.3
+          ],
+          [
+            508.9,
+            249.9
+          ],
+          [
+            1510.0,
+            451.6
+          ],
+          [
+            1510.0,
+            473.4
+          ],
+          [
+            1510.0,
+            546.8
+          ],
+          [
+            6120.0,
+            1157.3
+          ],
+          [
+            6120.0,
+            1214.8
+          ],
+          [
+            6120.0,
+            2059.8
+          ],
+          [
+            6120.0,
+            3614.3
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5106.4
+          ],
+          [
+            6120.0,
+            5653.4
+          ],
+          [
+            6120.0,
+            4525.4
+          ],
+          [
+            6120.0,
+            5069.4
+          ],
+          [
+            6120.0,
+            5570.2
+          ],
+          [
+            6120.0,
+            6120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/8_2025"
+      },
+      {
+        "level": "8",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 19,
+        "first_win_gen": 9,
+        "best_gen": 9,
+        "win_rate": 0.44,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.11578947368421053,
+        "causes": {
+          "Stall": 22,
+          "Bomb": 91,
+          "Enemy": 32
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1444,
+        "train_time_s": 13.6,
+        "completion_rate": 0.237,
+        "mean_completion_time": 8.2,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.73,
+        "deaths_per_run": 7.63,
+        "death_hist": [
+          8,
+          9,
+          6,
+          12,
+          0,
+          9,
+          6,
+          10,
+          9,
+          76
+        ],
+        "death_cluster_entropy": 0.725,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.533,
+        "curve": [
+          [
+            250.0,
+            98.6
+          ],
+          [
+            310.0,
+            162.9
+          ],
+          [
+            538.9,
+            262.1
+          ],
+          [
+            1422.2,
+            410.3
+          ],
+          [
+            1422.2,
+            553.3
+          ],
+          [
+            1422.2,
+            585.9
+          ],
+          [
+            1540.0,
+            719.8
+          ],
+          [
+            1540.0,
+            799.1
+          ],
+          [
+            6120.0,
+            1301.4
+          ],
+          [
+            6120.0,
+            2001.8
+          ],
+          [
+            6120.0,
+            1932.2
+          ],
+          [
+            6120.0,
+            2983.9
+          ],
+          [
+            6120.0,
+            2737.2
+          ],
+          [
+            6120.0,
+            3451.8
+          ],
+          [
+            6120.0,
+            3428.0
+          ],
+          [
+            6120.0,
+            3917.0
+          ],
+          [
+            6120.0,
+            2898.1
+          ],
+          [
+            6120.0,
+            4074.4
+          ],
+          [
+            6120.0,
+            4006.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/8_31337"
+      }
+    ],
+    "9": [
+      {
+        "level": "9",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 1159.6,
+        "best_x": 703.7,
+        "stuck_frac": 0.075,
+        "causes": {
+          "Bomb": 368,
+          "Stall": 30,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0246,
+        "train_time_s": 45.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.48,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          36,
+          18,
+          31,
+          25,
+          75,
+          51,
+          116,
+          48,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.833,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            541.5,
+            168.4
+          ],
+          [
+            541.5,
+            232.6
+          ],
+          [
+            541.5,
+            359.6
+          ],
+          [
+            578.5,
+            386.4
+          ],
+          [
+            986.7,
+            553.0
+          ],
+          [
+            986.7,
+            531.6
+          ],
+          [
+            986.7,
+            510.0
+          ],
+          [
+            986.7,
+            533.0
+          ],
+          [
+            1086.7,
+            592.7
+          ],
+          [
+            1086.7,
+            576.3
+          ],
+          [
+            1086.7,
+            541.3
+          ],
+          [
+            1086.7,
+            630.0
+          ],
+          [
+            1086.7,
+            596.6
+          ],
+          [
+            1086.7,
+            728.9
+          ],
+          [
+            1086.7,
+            692.4
+          ],
+          [
+            1086.7,
+            766.2
+          ],
+          [
+            1086.7,
+            688.7
+          ],
+          [
+            1086.7,
+            717.1
+          ],
+          [
+            1133.7,
+            781.2
+          ],
+          [
+            1159.6,
+            801.7
+          ],
+          [
+            1159.6,
+            747.7
+          ],
+          [
+            1159.6,
+            682.1
+          ],
+          [
+            1159.6,
+            830.9
+          ],
+          [
+            1159.6,
+            811.1
+          ],
+          [
+            1159.6,
+            845.3
+          ],
+          [
+            1159.6,
+            860.8
+          ],
+          [
+            1159.6,
+            732.1
+          ],
+          [
+            1159.6,
+            780.0
+          ],
+          [
+            1159.6,
+            783.9
+          ],
+          [
+            1159.6,
+            732.6
+          ],
+          [
+            1159.6,
+            861.3
+          ],
+          [
+            1159.6,
+            770.6
+          ],
+          [
+            1159.6,
+            796.0
+          ],
+          [
+            1159.6,
+            866.6
+          ],
+          [
+            1159.6,
+            868.3
+          ],
+          [
+            1159.6,
+            808.4
+          ],
+          [
+            1159.6,
+            807.0
+          ],
+          [
+            1159.6,
+            827.1
+          ],
+          [
+            1159.6,
+            651.3
+          ],
+          [
+            1159.6,
+            780.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/9_1234"
+      },
+      {
+        "level": "9",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 20,
+        "first_win_gen": 10,
+        "best_gen": 10,
+        "win_rate": 0.21,
+        "best": 6360.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07,
+        "causes": {
+          "Bomb": 158,
+          "Stall": 14,
+          "Enemy": 6
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0242,
+        "train_time_s": 23.4,
+        "completion_rate": 0.11,
+        "mean_completion_time": 26.6,
+        "completion_time_stddev": 1.4,
+        "progress_at_death": 0.504,
+        "deaths_per_run": 8.9,
+        "death_hist": [
+          7,
+          11,
+          11,
+          13,
+          33,
+          26,
+          60,
+          16,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.811,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.283,
+        "curve": [
+          [
+            856.7,
+            266.6
+          ],
+          [
+            856.7,
+            428.2
+          ],
+          [
+            856.7,
+            501.7
+          ],
+          [
+            896.7,
+            539.1
+          ],
+          [
+            996.7,
+            591.0
+          ],
+          [
+            1156.7,
+            712.5
+          ],
+          [
+            1156.7,
+            731.4
+          ],
+          [
+            1156.7,
+            883.8
+          ],
+          [
+            1156.7,
+            717.7
+          ],
+          [
+            6360.0,
+            1352.5
+          ],
+          [
+            6360.0,
+            1315.7
+          ],
+          [
+            6360.0,
+            1477.3
+          ],
+          [
+            6360.0,
+            1367.1
+          ],
+          [
+            6360.0,
+            1288.7
+          ],
+          [
+            6360.0,
+            1427.1
+          ],
+          [
+            6360.0,
+            1436.7
+          ],
+          [
+            6360.0,
+            1941.3
+          ],
+          [
+            6360.0,
+            1948.6
+          ],
+          [
+            6360.0,
+            3016.3
+          ],
+          [
+            6360.0,
+            4730.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/9_2025"
+      },
+      {
+        "level": "9",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 23,
+        "first_win_gen": 13,
+        "best_gen": 17,
+        "win_rate": 0.55,
+        "best": 6260.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1,
+        "causes": {
+          "Stall": 23,
+          "Bomb": 138,
+          "Enemy": 13
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0171,
+        "train_time_s": 25.1,
+        "completion_rate": 0.243,
+        "mean_completion_time": 24.8,
+        "completion_time_stddev": 2.3,
+        "progress_at_death": 0.48,
+        "deaths_per_run": 7.57,
+        "death_hist": [
+          24,
+          6,
+          4,
+          13,
+          37,
+          18,
+          45,
+          19,
+          8,
+          0
+        ],
+        "death_cluster_entropy": 0.854,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.557,
+        "curve": [
+          [
+            803.7,
+            197.5
+          ],
+          [
+            803.7,
+            285.3
+          ],
+          [
+            803.7,
+            380.4
+          ],
+          [
+            803.7,
+            374.0
+          ],
+          [
+            803.7,
+            545.8
+          ],
+          [
+            803.7,
+            625.2
+          ],
+          [
+            803.7,
+            659.3
+          ],
+          [
+            1026.7,
+            749.4
+          ],
+          [
+            1026.7,
+            670.0
+          ],
+          [
+            1074.8,
+            819.1
+          ],
+          [
+            1074.8,
+            757.1
+          ],
+          [
+            1074.8,
+            821.2
+          ],
+          [
+            6160.0,
+            1313.6
+          ],
+          [
+            6160.0,
+            2568.6
+          ],
+          [
+            6160.0,
+            3519.6
+          ],
+          [
+            6160.0,
+            5067.1
+          ],
+          [
+            6260.0,
+            4502.1
+          ],
+          [
+            6260.0,
+            3284.4
+          ],
+          [
+            6260.0,
+            4480.0
+          ],
+          [
+            6260.0,
+            2859.2
+          ],
+          [
+            6260.0,
+            2863.4
+          ],
+          [
+            6260.0,
+            4640.2
+          ],
+          [
+            6260.0,
+            3281.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/9_31337"
+      }
+    ],
+    "10": [
+      {
+        "level": "10",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 35,
+        "win_rate": 0.0,
+        "best": 1090.8,
+        "best_x": 769.2,
+        "stuck_frac": 0.09,
+        "causes": {
+          "Bomb": 260,
+          "Stall": 36,
+          "Enemy": 99,
+          "Timeout": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0615,
+        "train_time_s": 35.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.424,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          51,
+          69,
+          6,
+          60,
+          48,
+          40,
+          47,
+          79,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.856,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            521.5,
+            162.8
+          ],
+          [
+            521.5,
+            170.3
+          ],
+          [
+            521.5,
+            322.5
+          ],
+          [
+            521.5,
+            380.2
+          ],
+          [
+            1069.2,
+            476.8
+          ],
+          [
+            1069.2,
+            391.8
+          ],
+          [
+            1069.2,
+            524.0
+          ],
+          [
+            1069.2,
+            556.8
+          ],
+          [
+            1069.2,
+            430.3
+          ],
+          [
+            1069.2,
+            497.2
+          ],
+          [
+            1069.2,
+            503.2
+          ],
+          [
+            1069.2,
+            562.0
+          ],
+          [
+            1069.2,
+            536.3
+          ],
+          [
+            1069.2,
+            554.9
+          ],
+          [
+            1069.2,
+            592.4
+          ],
+          [
+            1069.2,
+            656.3
+          ],
+          [
+            1069.2,
+            693.2
+          ],
+          [
+            1069.2,
+            608.0
+          ],
+          [
+            1069.2,
+            716.2
+          ],
+          [
+            1069.2,
+            675.5
+          ],
+          [
+            1069.2,
+            652.0
+          ],
+          [
+            1069.2,
+            664.8
+          ],
+          [
+            1069.2,
+            730.0
+          ],
+          [
+            1069.2,
+            683.8
+          ],
+          [
+            1069.2,
+            671.4
+          ],
+          [
+            1069.2,
+            662.3
+          ],
+          [
+            1069.2,
+            587.5
+          ],
+          [
+            1069.2,
+            655.2
+          ],
+          [
+            1069.2,
+            659.8
+          ],
+          [
+            1069.2,
+            609.4
+          ],
+          [
+            1069.2,
+            652.1
+          ],
+          [
+            1069.2,
+            670.1
+          ],
+          [
+            1069.2,
+            702.0
+          ],
+          [
+            1069.2,
+            580.7
+          ],
+          [
+            1090.8,
+            676.9
+          ],
+          [
+            1090.8,
+            630.6
+          ],
+          [
+            1090.8,
+            755.2
+          ],
+          [
+            1090.8,
+            723.4
+          ],
+          [
+            1090.8,
+            595.4
+          ],
+          [
+            1090.8,
+            568.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/10_1234"
+      },
+      {
+        "level": "10",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 1751.5,
+        "best_x": 961.5,
+        "stuck_frac": 0.43,
+        "causes": {
+          "Stall": 172,
+          "Bomb": 179,
+          "Timeout": 2,
+          "Enemy": 47
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0236,
+        "train_time_s": 36.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.396,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          104,
+          26,
+          13,
+          77,
+          50,
+          16,
+          48,
+          9,
+          13,
+          44
+        ],
+        "death_cluster_entropy": 0.886,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            444.6,
+            158.3
+          ],
+          [
+            444.6,
+            278.0
+          ],
+          [
+            444.6,
+            343.8
+          ],
+          [
+            561.5,
+            388.9
+          ],
+          [
+            561.5,
+            313.7
+          ],
+          [
+            561.5,
+            371.4
+          ],
+          [
+            561.5,
+            340.8
+          ],
+          [
+            561.5,
+            375.2
+          ],
+          [
+            561.5,
+            406.0
+          ],
+          [
+            905.4,
+            514.2
+          ],
+          [
+            905.4,
+            488.2
+          ],
+          [
+            905.4,
+            426.8
+          ],
+          [
+            905.4,
+            486.0
+          ],
+          [
+            905.4,
+            366.5
+          ],
+          [
+            905.4,
+            366.5
+          ],
+          [
+            943.8,
+            475.5
+          ],
+          [
+            943.8,
+            557.5
+          ],
+          [
+            1751.5,
+            732.7
+          ],
+          [
+            1751.5,
+            551.1
+          ],
+          [
+            1751.5,
+            641.4
+          ],
+          [
+            1751.5,
+            577.6
+          ],
+          [
+            1751.5,
+            658.8
+          ],
+          [
+            1751.5,
+            614.4
+          ],
+          [
+            1751.5,
+            691.2
+          ],
+          [
+            1751.5,
+            587.5
+          ],
+          [
+            1751.5,
+            618.2
+          ],
+          [
+            1751.5,
+            745.1
+          ],
+          [
+            1751.5,
+            732.7
+          ],
+          [
+            1751.5,
+            708.2
+          ],
+          [
+            1751.5,
+            640.7
+          ],
+          [
+            1751.5,
+            764.0
+          ],
+          [
+            1751.5,
+            692.4
+          ],
+          [
+            1751.5,
+            889.7
+          ],
+          [
+            1751.5,
+            729.2
+          ],
+          [
+            1751.5,
+            661.8
+          ],
+          [
+            1751.5,
+            671.6
+          ],
+          [
+            1751.5,
+            883.4
+          ],
+          [
+            1751.5,
+            792.3
+          ],
+          [
+            1751.5,
+            618.1
+          ],
+          [
+            1751.5,
+            724.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/10_2025"
+      },
+      {
+        "level": "10",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 1030.8,
+        "best_x": 730.8,
+        "stuck_frac": 0.3525,
+        "causes": {
+          "Stall": 141,
+          "Bomb": 259
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0703,
+        "train_time_s": 30.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.42,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          91,
+          53,
+          8,
+          38,
+          13,
+          22,
+          21,
+          154,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.738,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            483.1,
+            154.3
+          ],
+          [
+            483.1,
+            177.5
+          ],
+          [
+            483.1,
+            212.8
+          ],
+          [
+            713.8,
+            342.6
+          ],
+          [
+            713.8,
+            291.7
+          ],
+          [
+            1030.8,
+            402.3
+          ],
+          [
+            1030.8,
+            518.2
+          ],
+          [
+            1030.8,
+            523.4
+          ],
+          [
+            1030.8,
+            526.5
+          ],
+          [
+            1030.8,
+            650.3
+          ],
+          [
+            1030.8,
+            638.2
+          ],
+          [
+            1030.8,
+            472.5
+          ],
+          [
+            1030.8,
+            472.9
+          ],
+          [
+            1030.8,
+            680.5
+          ],
+          [
+            1030.8,
+            570.8
+          ],
+          [
+            1030.8,
+            692.1
+          ],
+          [
+            1030.8,
+            575.8
+          ],
+          [
+            1030.8,
+            450.1
+          ],
+          [
+            1030.8,
+            512.2
+          ],
+          [
+            1030.8,
+            796.6
+          ],
+          [
+            1030.8,
+            474.2
+          ],
+          [
+            1030.8,
+            582.9
+          ],
+          [
+            1030.8,
+            617.7
+          ],
+          [
+            1030.8,
+            730.0
+          ],
+          [
+            1030.8,
+            544.2
+          ],
+          [
+            1030.8,
+            586.9
+          ],
+          [
+            1030.8,
+            679.1
+          ],
+          [
+            1030.8,
+            552.2
+          ],
+          [
+            1030.8,
+            640.8
+          ],
+          [
+            1030.8,
+            797.2
+          ],
+          [
+            1030.8,
+            745.2
+          ],
+          [
+            1030.8,
+            649.8
+          ],
+          [
+            1030.8,
+            588.5
+          ],
+          [
+            1030.8,
+            493.8
+          ],
+          [
+            1030.8,
+            695.4
+          ],
+          [
+            1030.8,
+            700.6
+          ],
+          [
+            1030.8,
+            576.6
+          ],
+          [
+            1030.8,
+            711.5
+          ],
+          [
+            1030.8,
+            673.7
+          ],
+          [
+            1030.8,
+            614.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/10_31337"
+      }
+    ],
+    "11": [
+      {
+        "level": "11",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 26,
+        "win_rate": 0.0,
+        "best": 1187.5,
+        "best_x": 531.2,
+        "stuck_frac": 0.1175,
+        "causes": {
+          "Bomb": 243,
+          "Stall": 47,
+          "Enemy": 79,
+          "Timeout": 31
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0018,
+        "train_time_s": 50.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.289,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          46,
+          76,
+          55,
+          130,
+          68,
+          25,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.728,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            796.2,
+            168.6
+          ],
+          [
+            796.2,
+            307.6
+          ],
+          [
+            796.2,
+            498.5
+          ],
+          [
+            796.2,
+            493.2
+          ],
+          [
+            796.2,
+            609.8
+          ],
+          [
+            796.2,
+            550.5
+          ],
+          [
+            796.2,
+            538.4
+          ],
+          [
+            796.2,
+            527.2
+          ],
+          [
+            813.8,
+            622.4
+          ],
+          [
+            813.8,
+            458.4
+          ],
+          [
+            813.8,
+            534.5
+          ],
+          [
+            813.8,
+            596.5
+          ],
+          [
+            931.2,
+            632.8
+          ],
+          [
+            931.2,
+            531.6
+          ],
+          [
+            931.2,
+            478.4
+          ],
+          [
+            931.2,
+            634.0
+          ],
+          [
+            931.2,
+            621.9
+          ],
+          [
+            931.2,
+            683.9
+          ],
+          [
+            931.2,
+            683.5
+          ],
+          [
+            1001.2,
+            629.6
+          ],
+          [
+            1001.2,
+            599.6
+          ],
+          [
+            1001.2,
+            713.4
+          ],
+          [
+            1001.2,
+            709.4
+          ],
+          [
+            1001.2,
+            644.1
+          ],
+          [
+            1001.2,
+            659.0
+          ],
+          [
+            1187.5,
+            740.4
+          ],
+          [
+            1187.5,
+            666.6
+          ],
+          [
+            1187.5,
+            691.0
+          ],
+          [
+            1187.5,
+            692.6
+          ],
+          [
+            1187.5,
+            699.9
+          ],
+          [
+            1187.5,
+            744.1
+          ],
+          [
+            1187.5,
+            729.5
+          ],
+          [
+            1187.5,
+            757.6
+          ],
+          [
+            1187.5,
+            749.2
+          ],
+          [
+            1187.5,
+            859.6
+          ],
+          [
+            1187.5,
+            692.0
+          ],
+          [
+            1187.5,
+            787.4
+          ],
+          [
+            1187.5,
+            794.9
+          ],
+          [
+            1187.5,
+            755.0
+          ],
+          [
+            1187.5,
+            805.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/11_1234"
+      },
+      {
+        "level": "11",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 1538.8,
+        "best_x": 968.8,
+        "stuck_frac": 0.1025,
+        "causes": {
+          "Stall": 41,
+          "Enemy": 41,
+          "Bomb": 318
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0104,
+        "train_time_s": 28.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.287,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          69,
+          28,
+          49,
+          167,
+          71,
+          2,
+          8,
+          5,
+          0,
+          1
+        ],
+        "death_cluster_entropy": 0.692,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            443.8,
+            125.6
+          ],
+          [
+            593.8,
+            244.6
+          ],
+          [
+            593.8,
+            316.5
+          ],
+          [
+            740.0,
+            411.6
+          ],
+          [
+            842.5,
+            442.9
+          ],
+          [
+            842.5,
+            467.8
+          ],
+          [
+            842.5,
+            502.4
+          ],
+          [
+            842.5,
+            476.2
+          ],
+          [
+            842.5,
+            455.0
+          ],
+          [
+            842.5,
+            435.8
+          ],
+          [
+            842.5,
+            627.2
+          ],
+          [
+            876.2,
+            542.4
+          ],
+          [
+            1053.8,
+            649.8
+          ],
+          [
+            1053.8,
+            644.9
+          ],
+          [
+            1053.8,
+            635.4
+          ],
+          [
+            1053.8,
+            741.8
+          ],
+          [
+            1053.8,
+            700.8
+          ],
+          [
+            1053.8,
+            659.6
+          ],
+          [
+            1053.8,
+            643.2
+          ],
+          [
+            1053.8,
+            594.5
+          ],
+          [
+            1053.8,
+            643.5
+          ],
+          [
+            1053.8,
+            509.0
+          ],
+          [
+            1053.8,
+            751.4
+          ],
+          [
+            1053.8,
+            605.2
+          ],
+          [
+            1053.8,
+            668.9
+          ],
+          [
+            1053.8,
+            549.8
+          ],
+          [
+            1053.8,
+            741.2
+          ],
+          [
+            1053.8,
+            680.8
+          ],
+          [
+            1053.8,
+            664.5
+          ],
+          [
+            1053.8,
+            724.9
+          ],
+          [
+            1147.5,
+            706.6
+          ],
+          [
+            1147.5,
+            650.8
+          ],
+          [
+            1147.5,
+            766.5
+          ],
+          [
+            1147.5,
+            637.5
+          ],
+          [
+            1147.5,
+            728.9
+          ],
+          [
+            1351.2,
+            808.4
+          ],
+          [
+            1351.2,
+            716.4
+          ],
+          [
+            1351.2,
+            748.8
+          ],
+          [
+            1351.2,
+            842.8
+          ],
+          [
+            1538.8,
+            970.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/11_2025"
+      },
+      {
+        "level": "11",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 11,
+        "win_rate": 0.0,
+        "best": 873.8,
+        "best_x": 406.2,
+        "stuck_frac": 0.0075,
+        "causes": {
+          "Stall": 3,
+          "Enemy": 31,
+          "Bomb": 366
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0125,
+        "train_time_s": 29.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.274,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          82,
+          21,
+          30,
+          188,
+          79,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.586,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            593.8,
+            230.6
+          ],
+          [
+            593.8,
+            358.2
+          ],
+          [
+            593.8,
+            326.8
+          ],
+          [
+            593.8,
+            431.5
+          ],
+          [
+            856.2,
+            506.5
+          ],
+          [
+            856.2,
+            590.0
+          ],
+          [
+            856.2,
+            482.2
+          ],
+          [
+            856.2,
+            470.4
+          ],
+          [
+            856.2,
+            534.6
+          ],
+          [
+            856.2,
+            521.6
+          ],
+          [
+            873.8,
+            680.5
+          ],
+          [
+            873.8,
+            598.6
+          ],
+          [
+            873.8,
+            571.1
+          ],
+          [
+            873.8,
+            519.4
+          ],
+          [
+            873.8,
+            620.5
+          ],
+          [
+            873.8,
+            615.5
+          ],
+          [
+            873.8,
+            579.9
+          ],
+          [
+            873.8,
+            604.6
+          ],
+          [
+            873.8,
+            584.4
+          ],
+          [
+            873.8,
+            657.0
+          ],
+          [
+            873.8,
+            531.8
+          ],
+          [
+            873.8,
+            645.8
+          ],
+          [
+            873.8,
+            630.1
+          ],
+          [
+            873.8,
+            522.0
+          ],
+          [
+            873.8,
+            585.6
+          ],
+          [
+            873.8,
+            510.2
+          ],
+          [
+            873.8,
+            511.9
+          ],
+          [
+            873.8,
+            572.1
+          ],
+          [
+            873.8,
+            617.0
+          ],
+          [
+            873.8,
+            560.8
+          ],
+          [
+            873.8,
+            579.2
+          ],
+          [
+            873.8,
+            592.8
+          ],
+          [
+            873.8,
+            717.2
+          ],
+          [
+            873.8,
+            669.1
+          ],
+          [
+            873.8,
+            587.9
+          ],
+          [
+            873.8,
+            595.4
+          ],
+          [
+            873.8,
+            647.0
+          ],
+          [
+            873.8,
+            613.5
+          ],
+          [
+            873.8,
+            700.6
+          ],
+          [
+            873.8,
+            592.2
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/experienced/p10g40_b8cc78_mutation_sigma-0.5/11_31337"
+      }
+    ]
+  }
+}

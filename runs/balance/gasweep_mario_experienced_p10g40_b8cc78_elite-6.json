@@ -1,0 +1,1147 @@
+{
+  "game": "mario",
+  "persona": "experienced",
+  "tag": "p10g40_b8cc78_elite-6",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 691.7,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 6,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 3.5,
+      "first_win_ci": 6.4,
+      "best_gen_mean": 11.0,
+      "best_gen_ci": 16.3,
+      "win_rate_mean": 0.43,
+      "win_rate_ci": 0.939,
+      "dominant_cause": "Enemy",
+      "dominant_cause_frac": 0.47,
+      "causes": {
+        "Enemy": 253,
+        "Stall": 83,
+        "OOB": 95,
+        "Pit": 108
+      },
+      "best_x_mean": 5273.4,
+      "stuck_frac_mean": 0.105,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0907,
+      "train_time_s": 161.5,
+      "completion_rate_mean": 0.323,
+      "mean_completion_time": 26.5,
+      "completion_time_stddev": 1.9,
+      "progress_at_death_mean": 0.11,
+      "deaths_per_run_mean": 6.77,
+      "death_hist": [
+        383,
+        22,
+        100,
+        29,
+        0,
+        3,
+        2,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.346,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.525
+    },
+    {
+      "level": "Mario1-2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 5.7,
+      "best_gen_ci": 10.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.95,
+      "causes": {
+        "Stall": 1135,
+        "Enemy": 55,
+        "Pit": 10
+      },
+      "best_x_mean": 4299.5,
+      "stuck_frac_mean": 0.946,
+      "trends": [
+        "FLAT",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0415,
+      "train_time_s": 530.2,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.711,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        76,
+        14,
+        19,
+        344,
+        0,
+        0,
+        0,
+        0,
+        1,
+        746
+      ],
+      "death_cluster_entropy_mean": 0.179,
+      "coin_collection_rate_mean": 0.063,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "Mario1-1": [
+      {
+        "level": "Mario1-1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 10,
+        "win_rate": 0.58,
+        "best": 11213.5,
+        "best_x": 6213.5,
+        "stuck_frac": 0.007692307692307693,
+        "causes": {
+          "Enemy": 58,
+          "Stall": 1,
+          "OOB": 7,
+          "Pit": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0706,
+        "train_time_s": 36.4,
+        "completion_rate": 0.454,
+        "mean_completion_time": 24.9,
+        "completion_time_stddev": 0.2,
+        "progress_at_death": 0.07,
+        "deaths_per_run": 5.46,
+        "death_hist": [
+          66,
+          0,
+          3,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.131,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.775,
+        "curve": [
+          [
+            437.4,
+            142.7
+          ],
+          [
+            437.4,
+            229.1
+          ],
+          [
+            11209.1,
+            1442.3
+          ],
+          [
+            11209.1,
+            1514.5
+          ],
+          [
+            11209.1,
+            1514.5
+          ],
+          [
+            11209.5,
+            2762.5
+          ],
+          [
+            11209.5,
+            5994.1
+          ],
+          [
+            11209.5,
+            8148.5
+          ],
+          [
+            11209.5,
+            10125.2
+          ],
+          [
+            11213.5,
+            9495.0
+          ],
+          [
+            11213.5,
+            9055.5
+          ],
+          [
+            11213.5,
+            8394.5
+          ],
+          [
+            11213.5,
+            11210.3
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-1_1234"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 3360.0,
+        "best_x": 3360.0,
+        "stuck_frac": 0.15,
+        "causes": {
+          "Enemy": 182,
+          "Pit": 78,
+          "OOB": 80,
+          "Stall": 60
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0115,
+        "train_time_s": 66.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.102,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          285,
+          12,
+          76,
+          27,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.367,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            437.4,
+            245.5
+          ],
+          [
+            437.4,
+            368.9
+          ],
+          [
+            437.4,
+            437.4
+          ],
+          [
+            437.4,
+            403.2
+          ],
+          [
+            437.4,
+            437.4
+          ],
+          [
+            437.4,
+            437.4
+          ],
+          [
+            437.4,
+            387.3
+          ],
+          [
+            608.0,
+            454.4
+          ],
+          [
+            608.0,
+            455.3
+          ],
+          [
+            608.0,
+            403.3
+          ],
+          [
+            608.0,
+            403.1
+          ],
+          [
+            608.0,
+            437.5
+          ],
+          [
+            1125.3,
+            472.9
+          ],
+          [
+            1125.3,
+            404.6
+          ],
+          [
+            1125.3,
+            494.3
+          ],
+          [
+            1125.3,
+            462.5
+          ],
+          [
+            1125.3,
+            438.1
+          ],
+          [
+            3360.0,
+            898.9
+          ],
+          [
+            3360.0,
+            1000.0
+          ],
+          [
+            3360.0,
+            971.5
+          ],
+          [
+            3360.0,
+            1020.8
+          ],
+          [
+            3360.0,
+            1394.1
+          ],
+          [
+            3360.0,
+            1318.4
+          ],
+          [
+            3360.0,
+            1390.9
+          ],
+          [
+            3360.0,
+            1452.5
+          ],
+          [
+            3360.0,
+            1431.5
+          ],
+          [
+            3360.0,
+            1334.8
+          ],
+          [
+            3360.0,
+            1385.5
+          ],
+          [
+            3360.0,
+            1503.6
+          ],
+          [
+            3360.0,
+            1394.6
+          ],
+          [
+            3360.0,
+            1535.3
+          ],
+          [
+            3360.0,
+            1438.8
+          ],
+          [
+            3360.0,
+            1415.7
+          ],
+          [
+            3360.0,
+            1807.1
+          ],
+          [
+            3360.0,
+            1756.9
+          ],
+          [
+            3360.0,
+            1573.3
+          ],
+          [
+            3360.0,
+            1797.6
+          ],
+          [
+            3360.0,
+            1643.6
+          ],
+          [
+            3360.0,
+            1644.0
+          ],
+          [
+            3360.0,
+            1644.3
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-1_2025"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 5,
+        "win_rate": 0.71,
+        "best": 11246.6,
+        "best_x": 6246.6,
+        "stuck_frac": 0.15714285714285714,
+        "causes": {
+          "OOB": 8,
+          "Enemy": 13,
+          "Stall": 22,
+          "Pit": 25
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1899,
+        "train_time_s": 58.3,
+        "completion_rate": 0.514,
+        "mean_completion_time": 28.1,
+        "completion_time_stddev": 3.6,
+        "progress_at_death": 0.159,
+        "deaths_per_run": 4.86,
+        "death_hist": [
+          32,
+          10,
+          21,
+          2,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.539,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            742.8,
+            213.4
+          ],
+          [
+            2144.0,
+            533.3
+          ],
+          [
+            2144.0,
+            724.2
+          ],
+          [
+            11210.3,
+            2139.2
+          ],
+          [
+            11246.6,
+            3340.6
+          ],
+          [
+            11246.6,
+            5735.1
+          ],
+          [
+            11246.6,
+            8722.6
+          ],
+          [
+            11246.6,
+            10318.8
+          ],
+          [
+            11246.6,
+            8507.5
+          ],
+          [
+            11246.6,
+            10378.0
+          ],
+          [
+            11246.6,
+            10321.6
+          ],
+          [
+            11246.6,
+            8730.1
+          ],
+          [
+            11246.6,
+            9414.3
+          ],
+          [
+            11246.6,
+            10394.7
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-1_31337"
+      }
+    ],
+    "Mario1-2": [
+      {
+        "level": "Mario1-2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 7,
+        "win_rate": 0.0,
+        "best": 5472.9,
+        "best_x": 5472.9,
+        "stuck_frac": 0.97,
+        "causes": {
+          "Stall": 388,
+          "Enemy": 8,
+          "Pit": 4
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 204.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.913,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          17,
+          0,
+          4,
+          5,
+          0,
+          0,
+          0,
+          0,
+          1,
+          373
+        ],
+        "death_cluster_entropy": 0.137,
+        "coin_collection_rate": 0.002,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            5472.8,
+            676.4
+          ],
+          [
+            5472.8,
+            2258.9
+          ],
+          [
+            5472.8,
+            4402.1
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5095.1
+          ],
+          [
+            5472.9,
+            5081.3
+          ],
+          [
+            5472.9,
+            5101.5
+          ],
+          [
+            5472.9,
+            5120.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5434.6
+          ],
+          [
+            5472.9,
+            5120.8
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5418.4
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5085.9
+          ],
+          [
+            5472.9,
+            5472.9
+          ],
+          [
+            5472.9,
+            5043.3
+          ],
+          [
+            5472.9,
+            5120.9
+          ],
+          [
+            5472.9,
+            5085.9
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-2_1234"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 5472.8,
+        "best_x": 5472.8,
+        "stuck_frac": 0.9475,
+        "causes": {
+          "Enemy": 15,
+          "Stall": 379,
+          "Pit": 6
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 204.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.918,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          9,
+          0,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          373
+        ],
+        "death_cluster_entropy": 0.14,
+        "coin_collection_rate": 0.006,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            5472.8,
+            1542.7
+          ],
+          [
+            5472.8,
+            2342.6
+          ],
+          [
+            5472.8,
+            3915.2
+          ],
+          [
+            5472.8,
+            5437.6
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5120.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5435.5
+          ],
+          [
+            5472.8,
+            5120.8
+          ],
+          [
+            5472.8,
+            5435.8
+          ],
+          [
+            5472.8,
+            4768.8
+          ],
+          [
+            5472.8,
+            4768.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5120.8
+          ],
+          [
+            5472.8,
+            5120.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ],
+          [
+            5472.8,
+            5472.8
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-2_2025"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 9,
+        "win_rate": 0.0,
+        "best": 1952.9,
+        "best_x": 1952.9,
+        "stuck_frac": 0.92,
+        "causes": {
+          "Stall": 368,
+          "Enemy": 32
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1244,
+        "train_time_s": 121.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.303,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          50,
+          14,
+          6,
+          330,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.26,
+        "coin_collection_rate": 0.181,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            544.0,
+            218.0
+          ],
+          [
+            736.8,
+            350.4
+          ],
+          [
+            1952.9,
+            646.1
+          ],
+          [
+            1952.9,
+            705.3
+          ],
+          [
+            1952.9,
+            1318.4
+          ],
+          [
+            1952.9,
+            1733.1
+          ],
+          [
+            1952.9,
+            1796.9
+          ],
+          [
+            1952.9,
+            1803.3
+          ],
+          [
+            1952.9,
+            1450.3
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1854.2
+          ],
+          [
+            1952.9,
+            1858.9
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1721.0
+          ],
+          [
+            1952.9,
+            1647.6
+          ],
+          [
+            1952.9,
+            1797.0
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1802.8
+          ],
+          [
+            1952.9,
+            1883.8
+          ],
+          [
+            1952.9,
+            1824.9
+          ],
+          [
+            1952.9,
+            1777.6
+          ],
+          [
+            1952.9,
+            1797.0
+          ],
+          [
+            1952.9,
+            1927.3
+          ],
+          [
+            1952.9,
+            1797.2
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1754.3
+          ],
+          [
+            1952.9,
+            1797.1
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1806.1
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1935.1
+          ],
+          [
+            1952.9,
+            1901.7
+          ],
+          [
+            1952.9,
+            1936.4
+          ],
+          [
+            1952.9,
+            1927.3
+          ],
+          [
+            1952.9,
+            1789.5
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1952.9
+          ],
+          [
+            1952.9,
+            1904.5
+          ]
+        ],
+        "dir": "runs/gasweep/mario/experienced/p10g40_b8cc78_elite-6/Mario1-2_31337"
+      }
+    ]
+  }
+}

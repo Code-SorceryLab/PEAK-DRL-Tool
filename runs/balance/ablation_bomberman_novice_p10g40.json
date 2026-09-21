@@ -1,0 +1,6826 @@
+{
+  "game": "bomberman",
+  "persona": "novice",
+  "tag": "p10g40",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 781.2,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 5.7,
+      "first_win_ci": 9.4,
+      "best_gen_mean": 6.3,
+      "best_gen_ci": 8.7,
+      "win_rate_mean": 0.863,
+      "win_rate_ci": 0.014,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.72,
+      "causes": {
+        "Bomb": 149,
+        "Stall": 46,
+        "Timeout": 11
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.102,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1008,
+      "train_time_s": 27.4,
+      "completion_rate_mean": 0.582,
+      "mean_completion_time": 11.0,
+      "completion_time_stddev": 2.7,
+      "progress_at_death_mean": 0.534,
+      "deaths_per_run_mean": 4.18,
+      "death_hist": [
+        32,
+        4,
+        2,
+        10,
+        12,
+        43,
+        18,
+        11,
+        54,
+        20
+      ],
+      "death_cluster_entropy_mean": 0.769,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.861
+    },
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 20.5,
+      "first_win_ci": 19.1,
+      "best_gen_mean": 14.3,
+      "best_gen_ci": 26.8,
+      "win_rate_mean": 0.277,
+      "win_rate_ci": 0.596,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.76,
+      "causes": {
+        "Stall": 109,
+        "Bomb": 702,
+        "Timeout": 114
+      },
+      "best_x_mean": 839.5,
+      "stuck_frac_mean": 0.107,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0682,
+      "train_time_s": 84.8,
+      "completion_rate_mean": 0.093,
+      "mean_completion_time": 26.4,
+      "completion_time_stddev": 6.5,
+      "progress_at_death_mean": 0.54,
+      "deaths_per_run_mean": 9.07,
+      "death_hist": [
+        32,
+        40,
+        11,
+        52,
+        50,
+        524,
+        50,
+        67,
+        19,
+        80
+      ],
+      "death_cluster_entropy_mean": 0.631,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.288
+    },
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 12.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 7.0,
+      "best_gen_ci": 11.4,
+      "win_rate_mean": 0.237,
+      "win_rate_ci": 1.018,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.91,
+      "causes": {
+        "Bomb": 867,
+        "Stall": 71,
+        "Timeout": 10
+      },
+      "best_x_mean": 950.6,
+      "stuck_frac_mean": 0.068,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1177,
+      "train_time_s": 67.6,
+      "completion_rate_mean": 0.109,
+      "mean_completion_time": 16.7,
+      "completion_time_stddev": 2.8,
+      "progress_at_death_mean": 0.716,
+      "deaths_per_run_mean": 8.91,
+      "death_hist": [
+        30,
+        16,
+        14,
+        71,
+        20,
+        64,
+        60,
+        86,
+        25,
+        562
+      ],
+      "death_cluster_entropy_mean": 0.631,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.257
+    },
+    {
+      "level": "3",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 38.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 21.0,
+      "best_gen_ci": 42.2,
+      "win_rate_mean": 0.023,
+      "win_rate_ci": 0.1,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.74,
+      "causes": {
+        "Bomb": 885,
+        "Stall": 67,
+        "Timeout": 241
+      },
+      "best_x_mean": 802.5,
+      "stuck_frac_mean": 0.056,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0448,
+      "train_time_s": 113.8,
+      "completion_rate_mean": 0.006,
+      "mean_completion_time": 26.9,
+      "completion_time_stddev": 1.8,
+      "progress_at_death_mean": 0.595,
+      "deaths_per_run_mean": 9.94,
+      "death_hist": [
+        48,
+        40,
+        24,
+        93,
+        98,
+        367,
+        71,
+        243,
+        27,
+        182
+      ],
+      "death_cluster_entropy_mean": 0.623,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.018
+    },
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 8.0,
+      "first_win_ci": 50.8,
+      "best_gen_mean": 17.7,
+      "best_gen_ci": 42.8,
+      "win_rate_mean": 0.533,
+      "win_rate_ci": 1.148,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.7,
+      "causes": {
+        "Bomb": 416,
+        "Stall": 156,
+        "Timeout": 26
+      },
+      "best_x_mean": 878.8,
+      "stuck_frac_mean": 0.217,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0649,
+      "train_time_s": 34.0,
+      "completion_rate_mean": 0.315,
+      "mean_completion_time": 6.6,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.499,
+      "deaths_per_run_mean": 6.85,
+      "death_hist": [
+        51,
+        37,
+        1,
+        4,
+        8,
+        436,
+        28,
+        13,
+        17,
+        3
+      ],
+      "death_cluster_entropy_mean": 0.531,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.599
+    },
+    {
+      "level": "5",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 15.0,
+      "best_gen_ci": 26.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.63,
+      "causes": {
+        "Bomb": 757,
+        "Stall": 365,
+        "Timeout": 78
+      },
+      "best_x_mean": 950.0,
+      "stuck_frac_mean": 0.304,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0108,
+      "train_time_s": 96.0,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.76,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        48,
+        8,
+        2,
+        47,
+        6,
+        64,
+        30,
+        241,
+        224,
+        530
+      ],
+      "death_cluster_entropy_mean": 0.618,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 4.0,
+      "first_win_ci": 2.5,
+      "best_gen_mean": 4.0,
+      "best_gen_ci": 2.5,
+      "win_rate_mean": 0.737,
+      "win_rate_ci": 0.063,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.59,
+      "causes": {
+        "Timeout": 8,
+        "Stall": 52,
+        "Bomb": 115,
+        "Enemy": 21
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.121,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0786,
+      "train_time_s": 17.5,
+      "completion_rate_mean": 0.534,
+      "mean_completion_time": 6.7,
+      "completion_time_stddev": 1.9,
+      "progress_at_death_mean": 0.55,
+      "deaths_per_run_mean": 4.66,
+      "death_hist": [
+        24,
+        5,
+        35,
+        1,
+        8,
+        40,
+        8,
+        16,
+        7,
+        52
+      ],
+      "death_cluster_entropy_mean": 0.686,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.842
+    },
+    {
+      "level": "7",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 15.0,
+      "first_win_ci": 50.8,
+      "best_gen_mean": 10.7,
+      "best_gen_ci": 21.1,
+      "win_rate_mean": 0.293,
+      "win_rate_ci": 0.643,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.73,
+      "causes": {
+        "Bomb": 588,
+        "Enemy": 32,
+        "Stall": 187,
+        "Timeout": 3
+      },
+      "best_x_mean": 939.4,
+      "stuck_frac_mean": 0.21,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1218,
+      "train_time_s": 64.1,
+      "completion_rate_mean": 0.121,
+      "mean_completion_time": 13.5,
+      "completion_time_stddev": 2.0,
+      "progress_at_death_mean": 0.662,
+      "deaths_per_run_mean": 8.79,
+      "death_hist": [
+        90,
+        12,
+        15,
+        16,
+        60,
+        295,
+        30,
+        15,
+        28,
+        249
+      ],
+      "death_cluster_entropy_mean": 0.561,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.349
+    },
+    {
+      "level": "8",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 23.5,
+      "first_win_ci": 146.1,
+      "best_gen_mean": 26.0,
+      "best_gen_ci": 30.5,
+      "win_rate_mean": 0.3,
+      "win_rate_ci": 0.745,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.42,
+      "causes": {
+        "Bomb": 341,
+        "Stall": 392,
+        "Enemy": 162,
+        "Timeout": 34
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.338,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.324,
+      "train_time_s": 70.4,
+      "completion_rate_mean": 0.117,
+      "mean_completion_time": 8.1,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.753,
+      "deaths_per_run_mean": 8.83,
+      "death_hist": [
+        37,
+        83,
+        19,
+        50,
+        1,
+        29,
+        36,
+        53,
+        124,
+        497
+      ],
+      "death_cluster_entropy_mean": 0.591,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.301
+    },
+    {
+      "level": "9",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 29.0,
+      "best_gen_ci": 20.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.74,
+      "causes": {
+        "Bomb": 894,
+        "Stall": 49,
+        "Enemy": 244,
+        "Timeout": 13
+      },
+      "best_x_mean": 802.5,
+      "stuck_frac_mean": 0.041,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0048,
+      "train_time_s": 91.8,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.574,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        64,
+        29,
+        74,
+        49,
+        199,
+        135,
+        262,
+        190,
+        177,
+        21
+      ],
+      "death_cluster_entropy_mean": 0.754,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "10",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 17.3,
+      "best_gen_ci": 37.7,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.82,
+      "causes": {
+        "Bomb": 989,
+        "Stall": 210,
+        "Timeout": 1
+      },
+      "best_x_mean": 538.5,
+      "stuck_frac_mean": 0.175,
+      "trends": [
+        "FLAT",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0123,
+      "train_time_s": 59.1,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.416,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        97,
+        82,
+        11,
+        451,
+        309,
+        54,
+        0,
+        196,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.421,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "11",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 17.7,
+      "best_gen_ci": 20.1,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.93,
+      "causes": {
+        "Bomb": 1119,
+        "Stall": 29,
+        "Enemy": 35,
+        "Timeout": 17
+      },
+      "best_x_mean": 385.4,
+      "stuck_frac_mean": 0.024,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0208,
+      "train_time_s": 54.7,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.314,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        127,
+        66,
+        109,
+        481,
+        417,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.452,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 20,
+        "first_win_gen": 10,
+        "best_gen": 10,
+        "win_rate": 0.87,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07,
+        "causes": {
+          "Bomb": 87,
+          "Stall": 14,
+          "Timeout": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0207,
+        "train_time_s": 18.8,
+        "completion_rate": 0.44,
+        "mean_completion_time": 20.5,
+        "completion_time_stddev": 3.0,
+        "progress_at_death": 0.625,
+        "deaths_per_run": 5.6,
+        "death_hist": [
+          14,
+          3,
+          0,
+          5,
+          7,
+          9,
+          9,
+          11,
+          42,
+          12
+        ],
+        "death_cluster_entropy": 0.829,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.933,
+        "curve": [
+          [
+            878.2,
+            251.3
+          ],
+          [
+            878.2,
+            525.3
+          ],
+          [
+            878.2,
+            605.6
+          ],
+          [
+            878.2,
+            629.8
+          ],
+          [
+            878.2,
+            625.3
+          ],
+          [
+            969.1,
+            740.4
+          ],
+          [
+            969.1,
+            832.7
+          ],
+          [
+            969.1,
+            810.0
+          ],
+          [
+            1014.5,
+            698.0
+          ],
+          [
+            6060.0,
+            1346.4
+          ],
+          [
+            6060.0,
+            2973.6
+          ],
+          [
+            6060.0,
+            5532.7
+          ],
+          [
+            6060.0,
+            5532.7
+          ],
+          [
+            6060.0,
+            5532.7
+          ],
+          [
+            6060.0,
+            5514.5
+          ],
+          [
+            6060.0,
+            5532.7
+          ],
+          [
+            6060.0,
+            5032.7
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 6,
+        "win_rate": 0.86,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.12142857142857143,
+        "causes": {
+          "Bomb": 36,
+          "Stall": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0545,
+        "train_time_s": 4.0,
+        "completion_rate": 0.621,
+        "mean_completion_time": 4.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.56,
+        "deaths_per_run": 3.79,
+        "death_hist": [
+          8,
+          0,
+          1,
+          4,
+          2,
+          14,
+          6,
+          0,
+          11,
+          7
+        ],
+        "death_cluster_entropy": 0.813,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.95,
+        "curve": [
+          [
+            878.2,
+            340.7
+          ],
+          [
+            878.2,
+            498.2
+          ],
+          [
+            878.2,
+            607.1
+          ],
+          [
+            6000.0,
+            1335.8
+          ],
+          [
+            6000.0,
+            1842.0
+          ],
+          [
+            6060.0,
+            3367.8
+          ],
+          [
+            6060.0,
+            6024.0
+          ],
+          [
+            6060.0,
+            6036.0
+          ],
+          [
+            6060.0,
+            6042.0
+          ],
+          [
+            6060.0,
+            6042.0
+          ],
+          [
+            6060.0,
+            5458.5
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.86,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.11538461538461539,
+        "causes": {
+          "Stall": 15,
+          "Bomb": 26
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2273,
+        "train_time_s": 4.6,
+        "completion_rate": 0.685,
+        "mean_completion_time": 7.7,
+        "completion_time_stddev": 5.1,
+        "progress_at_death": 0.416,
+        "deaths_per_run": 3.15,
+        "death_hist": [
+          10,
+          1,
+          1,
+          1,
+          3,
+          20,
+          3,
+          0,
+          1,
+          1
+        ],
+        "death_cluster_entropy": 0.664,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.7,
+        "curve": [
+          [
+            605.5,
+            228.7
+          ],
+          [
+            696.4,
+            483.1
+          ],
+          [
+            6060.0,
+            2204.0
+          ],
+          [
+            6060.0,
+            3766.2
+          ],
+          [
+            6060.0,
+            5519.1
+          ],
+          [
+            6060.0,
+            4960.0
+          ],
+          [
+            6060.0,
+            4944.9
+          ],
+          [
+            6060.0,
+            5514.5
+          ],
+          [
+            6060.0,
+            5510.0
+          ],
+          [
+            6060.0,
+            4969.1
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/0_31337"
+      }
+    ],
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 32,
+        "first_win_gen": 22,
+        "best_gen": 22,
+        "win_rate": 0.43,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.18125,
+        "causes": {
+          "Stall": 58,
+          "Bomb": 157,
+          "Timeout": 61
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0289,
+        "train_time_s": 38.0,
+        "completion_rate": 0.138,
+        "mean_completion_time": 34.8,
+        "completion_time_stddev": 11.1,
+        "progress_at_death": 0.555,
+        "deaths_per_run": 8.62,
+        "death_hist": [
+          12,
+          23,
+          3,
+          21,
+          38,
+          58,
+          25,
+          52,
+          3,
+          41
+        ],
+        "death_cluster_entropy": 0.892,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.43,
+        "curve": [
+          [
+            467.4,
+            168.4
+          ],
+          [
+            467.4,
+            301.3
+          ],
+          [
+            467.4,
+            340.6
+          ],
+          [
+            467.4,
+            297.6
+          ],
+          [
+            863.7,
+            407.3
+          ],
+          [
+            863.7,
+            515.0
+          ],
+          [
+            863.7,
+            597.7
+          ],
+          [
+            863.7,
+            684.4
+          ],
+          [
+            1123.0,
+            668.4
+          ],
+          [
+            1123.0,
+            735.9
+          ],
+          [
+            1123.0,
+            748.5
+          ],
+          [
+            1123.0,
+            738.8
+          ],
+          [
+            1123.0,
+            732.5
+          ],
+          [
+            1123.0,
+            775.6
+          ],
+          [
+            1123.0,
+            747.0
+          ],
+          [
+            1123.0,
+            724.8
+          ],
+          [
+            1123.0,
+            765.9
+          ],
+          [
+            1123.0,
+            791.5
+          ],
+          [
+            1123.0,
+            751.9
+          ],
+          [
+            1123.0,
+            808.9
+          ],
+          [
+            1123.0,
+            733.3
+          ],
+          [
+            6160.0,
+            1395.6
+          ],
+          [
+            6160.0,
+            1951.1
+          ],
+          [
+            6160.0,
+            2371.9
+          ],
+          [
+            6160.0,
+            3482.1
+          ],
+          [
+            6160.0,
+            3447.4
+          ],
+          [
+            6160.0,
+            3394.1
+          ],
+          [
+            6160.0,
+            2868.1
+          ],
+          [
+            6160.0,
+            3999.3
+          ],
+          [
+            6160.0,
+            2894.1
+          ],
+          [
+            6160.0,
+            3456.5
+          ],
+          [
+            6160.0,
+            2860.7
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 29,
+        "first_win_gen": 19,
+        "best_gen": 19,
+        "win_rate": 0.4,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.04827586206896552,
+        "causes": {
+          "Bomb": 182,
+          "Stall": 14,
+          "Timeout": 53
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0276,
+        "train_time_s": 31.1,
+        "completion_rate": 0.141,
+        "mean_completion_time": 18.0,
+        "completion_time_stddev": 1.8,
+        "progress_at_death": 0.576,
+        "deaths_per_run": 8.59,
+        "death_hist": [
+          9,
+          7,
+          6,
+          21,
+          8,
+          103,
+          25,
+          15,
+          16,
+          39
+        ],
+        "death_cluster_entropy": 0.808,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.433,
+        "curve": [
+          [
+            578.5,
+            210.6
+          ],
+          [
+            578.5,
+            352.2
+          ],
+          [
+            578.5,
+            448.0
+          ],
+          [
+            789.6,
+            584.8
+          ],
+          [
+            789.6,
+            549.2
+          ],
+          [
+            863.7,
+            602.5
+          ],
+          [
+            863.7,
+            579.2
+          ],
+          [
+            863.7,
+            586.6
+          ],
+          [
+            1085.9,
+            654.4
+          ],
+          [
+            1085.9,
+            696.6
+          ],
+          [
+            1085.9,
+            653.3
+          ],
+          [
+            1085.9,
+            696.6
+          ],
+          [
+            1085.9,
+            674.4
+          ],
+          [
+            1085.9,
+            780.7
+          ],
+          [
+            1085.9,
+            835.1
+          ],
+          [
+            1085.9,
+            744.7
+          ],
+          [
+            1085.9,
+            787.8
+          ],
+          [
+            1085.9,
+            836.2
+          ],
+          [
+            6160.0,
+            1324.8
+          ],
+          [
+            6160.0,
+            1281.5
+          ],
+          [
+            6160.0,
+            1871.9
+          ],
+          [
+            6160.0,
+            1941.1
+          ],
+          [
+            6160.0,
+            1933.7
+          ],
+          [
+            6160.0,
+            2448.5
+          ],
+          [
+            6160.0,
+            2963.3
+          ],
+          [
+            6160.0,
+            3369.3
+          ],
+          [
+            6160.0,
+            5601.9
+          ],
+          [
+            6160.0,
+            3927.4
+          ],
+          [
+            6160.0,
+            3948.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 578.5,
+        "best_x": 518.5,
+        "stuck_frac": 0.0925,
+        "causes": {
+          "Stall": 37,
+          "Bomb": 363
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1481,
+        "train_time_s": 15.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.49,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          11,
+          10,
+          2,
+          10,
+          4,
+          363,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.193,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            146.7
+          ],
+          [
+            578.5,
+            316.6
+          ],
+          [
+            578.5,
+            459.6
+          ],
+          [
+            578.5,
+            566.5
+          ],
+          [
+            578.5,
+            571.1
+          ],
+          [
+            578.5,
+            505.9
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            481.3
+          ],
+          [
+            578.5,
+            497.0
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            556.3
+          ],
+          [
+            578.5,
+            535.5
+          ],
+          [
+            578.5,
+            541.5
+          ],
+          [
+            578.5,
+            535.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            574.8
+          ],
+          [
+            578.5,
+            541.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            552.6
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ],
+          [
+            578.5,
+            578.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/1_31337"
+      }
+    ],
+    "2": [
+      {
+        "level": "2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 22,
+        "first_win_gen": 12,
+        "best_gen": 12,
+        "win_rate": 0.71,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.05909090909090909,
+        "causes": {
+          "Bomb": 127,
+          "Stall": 13,
+          "Timeout": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.03,
+        "train_time_s": 17.7,
+        "completion_rate": 0.327,
+        "mean_completion_time": 16.7,
+        "completion_time_stddev": 2.8,
+        "progress_at_death": 0.542,
+        "deaths_per_run": 6.73,
+        "death_hist": [
+          9,
+          6,
+          6,
+          16,
+          10,
+          41,
+          37,
+          7,
+          9,
+          7
+        ],
+        "death_cluster_entropy": 0.875,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.771,
+        "curve": [
+          [
+            652.6,
+            194.4
+          ],
+          [
+            652.6,
+            392.4
+          ],
+          [
+            652.6,
+            420.7
+          ],
+          [
+            652.6,
+            430.9
+          ],
+          [
+            652.6,
+            491.0
+          ],
+          [
+            726.7,
+            608.1
+          ],
+          [
+            726.7,
+            576.2
+          ],
+          [
+            726.7,
+            630.4
+          ],
+          [
+            726.7,
+            585.9
+          ],
+          [
+            726.7,
+            682.2
+          ],
+          [
+            1025.9,
+            741.8
+          ],
+          [
+            6160.0,
+            1326.1
+          ],
+          [
+            6160.0,
+            2471.6
+          ],
+          [
+            6160.0,
+            3546.5
+          ],
+          [
+            6160.0,
+            5594.4
+          ],
+          [
+            6160.0,
+            4562.2
+          ],
+          [
+            6160.0,
+            5094.4
+          ],
+          [
+            6160.0,
+            5652.6
+          ],
+          [
+            6160.0,
+            5073.3
+          ],
+          [
+            6160.0,
+            4022.6
+          ],
+          [
+            6160.0,
+            4569.6
+          ],
+          [
+            6160.0,
+            5620.4
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/2_1234"
+      },
+      {
+        "level": "2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 1025.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.0875,
+        "causes": {
+          "Bomb": 363,
+          "Stall": 35,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0455,
+        "train_time_s": 20.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.796,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          9,
+          7,
+          5,
+          24,
+          2,
+          14,
+          15,
+          60,
+          3,
+          261
+        ],
+        "death_cluster_entropy": 0.541,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            726.7,
+            258.7
+          ],
+          [
+            726.7,
+            384.1
+          ],
+          [
+            726.7,
+            459.1
+          ],
+          [
+            800.7,
+            674.8
+          ],
+          [
+            800.7,
+            622.1
+          ],
+          [
+            1025.9,
+            691.3
+          ],
+          [
+            1025.9,
+            683.9
+          ],
+          [
+            1025.9,
+            648.3
+          ],
+          [
+            1025.9,
+            768.0
+          ],
+          [
+            1025.9,
+            790.5
+          ],
+          [
+            1025.9,
+            757.2
+          ],
+          [
+            1025.9,
+            865.8
+          ],
+          [
+            1025.9,
+            934.4
+          ],
+          [
+            1025.9,
+            958.4
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            917.9
+          ],
+          [
+            1025.9,
+            849.0
+          ],
+          [
+            1025.9,
+            958.4
+          ],
+          [
+            1025.9,
+            880.6
+          ],
+          [
+            1025.9,
+            943.6
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            999.7
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            999.7
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            996.0
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            980.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/2_2025"
+      },
+      {
+        "level": "2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 3,
+        "win_rate": 0.0,
+        "best": 1025.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.0575,
+        "causes": {
+          "Stall": 23,
+          "Bomb": 377
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2777,
+        "train_time_s": 29.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.811,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          12,
+          3,
+          3,
+          31,
+          8,
+          9,
+          8,
+          19,
+          13,
+          294
+        ],
+        "death_cluster_entropy": 0.478,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            165.3
+          ],
+          [
+            578.5,
+            320.3
+          ],
+          [
+            1025.9,
+            524.7
+          ],
+          [
+            1025.9,
+            678.8
+          ],
+          [
+            1025.9,
+            794.8
+          ],
+          [
+            1025.9,
+            858.4
+          ],
+          [
+            1025.9,
+            884.3
+          ],
+          [
+            1025.9,
+            714.7
+          ],
+          [
+            1025.9,
+            917.6
+          ],
+          [
+            1025.9,
+            996.0
+          ],
+          [
+            1025.9,
+            889.7
+          ],
+          [
+            1025.9,
+            1025.9
+          ],
+          [
+            1025.9,
+            888.0
+          ],
+          [
+            1025.9,
+            917.9
+          ],
+          [
+            1025.9,
+            910.5
+          ],
+          [
+            1025.9,
+            947.9
+          ],
+          [
+            1025.9,
+            966.4
+          ],
+          [
+            1025.9,
+            869.5
+          ],
+          [
+            1025.9,
+            929.0
+          ],
+          [
+            1025.9,
+            943.9
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            886.0
+          ],
+          [
+            1025.9,
+            973.8
+          ],
+          [
+            1025.9,
+            943.9
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            943.9
+          ],
+          [
+            1025.9,
+            999.7
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            917.6
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            999.7
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1003.4
+          ],
+          [
+            1025.9,
+            1014.8
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            1022.2
+          ],
+          [
+            1025.9,
+            954.7
+          ],
+          [
+            1025.9,
+            1025.9
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/2_31337"
+      }
+    ],
+    "3": [
+      {
+        "level": "3",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 21,
+        "win_rate": 0.0,
+        "best": 766.7,
+        "best_x": 666.7,
+        "stuck_frac": 0.05,
+        "causes": {
+          "Bomb": 380,
+          "Stall": 20
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0112,
+        "train_time_s": 19.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.465,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          19,
+          29,
+          17,
+          59,
+          30,
+          184,
+          62,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.691,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            157.3
+          ],
+          [
+            470.4,
+            312.7
+          ],
+          [
+            470.4,
+            435.3
+          ],
+          [
+            581.5,
+            430.4
+          ],
+          [
+            581.5,
+            459.0
+          ],
+          [
+            618.5,
+            436.1
+          ],
+          [
+            618.5,
+            585.2
+          ],
+          [
+            618.5,
+            603.7
+          ],
+          [
+            618.5,
+            502.2
+          ],
+          [
+            692.6,
+            599.7
+          ],
+          [
+            692.6,
+            563.8
+          ],
+          [
+            692.6,
+            569.8
+          ],
+          [
+            692.6,
+            547.3
+          ],
+          [
+            692.6,
+            503.9
+          ],
+          [
+            692.6,
+            529.9
+          ],
+          [
+            692.6,
+            577.2
+          ],
+          [
+            692.6,
+            592.0
+          ],
+          [
+            692.6,
+            451.2
+          ],
+          [
+            692.6,
+            655.6
+          ],
+          [
+            692.6,
+            490.5
+          ],
+          [
+            766.7,
+            655.6
+          ],
+          [
+            766.7,
+            607.1
+          ],
+          [
+            766.7,
+            584.3
+          ],
+          [
+            766.7,
+            584.6
+          ],
+          [
+            766.7,
+            517.6
+          ],
+          [
+            766.7,
+            569.2
+          ],
+          [
+            766.7,
+            558.4
+          ],
+          [
+            766.7,
+            580.6
+          ],
+          [
+            766.7,
+            539.3
+          ],
+          [
+            766.7,
+            658.4
+          ],
+          [
+            766.7,
+            563.2
+          ],
+          [
+            766.7,
+            636.1
+          ],
+          [
+            766.7,
+            707.4
+          ],
+          [
+            766.7,
+            554.4
+          ],
+          [
+            766.7,
+            621.3
+          ],
+          [
+            766.7,
+            623.0
+          ],
+          [
+            766.7,
+            647.3
+          ],
+          [
+            766.7,
+            576.9
+          ],
+          [
+            766.7,
+            555.5
+          ],
+          [
+            766.7,
+            647.3
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/3_1234"
+      },
+      {
+        "level": "3",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 38,
+        "best_gen": 38,
+        "win_rate": 0.07,
+        "best": 6460.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.025,
+        "causes": {
+          "Bomb": 142,
+          "Stall": 10,
+          "Timeout": 241
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0046,
+        "train_time_s": 76.6,
+        "completion_rate": 0.018,
+        "mean_completion_time": 26.9,
+        "completion_time_stddev": 1.8,
+        "progress_at_death": 0.719,
+        "deaths_per_run": 9.82,
+        "death_hist": [
+          4,
+          2,
+          1,
+          10,
+          39,
+          123,
+          3,
+          2,
+          27,
+          182
+        ],
+        "death_cluster_entropy": 0.599,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.054,
+        "curve": [
+          [
+            604.4,
+            243.1
+          ],
+          [
+            618.5,
+            493.9
+          ],
+          [
+            778.5,
+            580.1
+          ],
+          [
+            1211.9,
+            704.7
+          ],
+          [
+            1485.9,
+            808.4
+          ],
+          [
+            1485.9,
+            871.9
+          ],
+          [
+            1485.9,
+            984.4
+          ],
+          [
+            1485.9,
+            968.7
+          ],
+          [
+            1485.9,
+            1099.9
+          ],
+          [
+            1485.9,
+            1066.5
+          ],
+          [
+            1485.9,
+            1181.7
+          ],
+          [
+            1485.9,
+            1067.9
+          ],
+          [
+            1485.9,
+            1068.8
+          ],
+          [
+            1485.9,
+            1188.9
+          ],
+          [
+            1485.9,
+            1246.2
+          ],
+          [
+            1485.9,
+            1197.7
+          ],
+          [
+            1485.9,
+            1076.2
+          ],
+          [
+            1485.9,
+            1143.5
+          ],
+          [
+            1485.9,
+            1170.7
+          ],
+          [
+            1485.9,
+            1123.6
+          ],
+          [
+            1485.9,
+            1077.9
+          ],
+          [
+            1485.9,
+            1194.3
+          ],
+          [
+            1485.9,
+            1123.6
+          ],
+          [
+            1485.9,
+            1267.3
+          ],
+          [
+            1485.9,
+            1065.4
+          ],
+          [
+            1485.9,
+            1145.9
+          ],
+          [
+            1485.9,
+            1330.7
+          ],
+          [
+            1485.9,
+            1097.9
+          ],
+          [
+            1485.9,
+            1165.9
+          ],
+          [
+            1485.9,
+            1242.6
+          ],
+          [
+            1485.9,
+            1263.7
+          ],
+          [
+            1485.9,
+            1271.4
+          ],
+          [
+            1485.9,
+            1111.6
+          ],
+          [
+            1485.9,
+            1071.4
+          ],
+          [
+            1485.9,
+            1174.7
+          ],
+          [
+            1485.9,
+            1141.0
+          ],
+          [
+            1485.9,
+            1261.4
+          ],
+          [
+            6460.0,
+            1666.1
+          ],
+          [
+            6460.0,
+            2431.1
+          ],
+          [
+            6460.0,
+            3341.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/3_2025"
+      },
+      {
+        "level": "3",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 4,
+        "win_rate": 0.0,
+        "best": 840.7,
+        "best_x": 740.7,
+        "stuck_frac": 0.0925,
+        "causes": {
+          "Stall": 37,
+          "Bomb": 363
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1185,
+        "train_time_s": 17.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.602,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          25,
+          9,
+          6,
+          24,
+          29,
+          60,
+          6,
+          241,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.579,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            470.4,
+            149.3
+          ],
+          [
+            541.5,
+            349.4
+          ],
+          [
+            615.6,
+            468.3
+          ],
+          [
+            840.7,
+            543.0
+          ],
+          [
+            840.7,
+            522.7
+          ],
+          [
+            840.7,
+            540.4
+          ],
+          [
+            840.7,
+            584.8
+          ],
+          [
+            840.7,
+            499.3
+          ],
+          [
+            840.7,
+            672.6
+          ],
+          [
+            840.7,
+            732.4
+          ],
+          [
+            840.7,
+            626.4
+          ],
+          [
+            840.7,
+            788.6
+          ],
+          [
+            840.7,
+            777.2
+          ],
+          [
+            840.7,
+            685.7
+          ],
+          [
+            840.7,
+            762.1
+          ],
+          [
+            840.7,
+            711.6
+          ],
+          [
+            840.7,
+            678.3
+          ],
+          [
+            840.7,
+            622.7
+          ],
+          [
+            840.7,
+            803.4
+          ],
+          [
+            840.7,
+            699.1
+          ],
+          [
+            840.7,
+            730.7
+          ],
+          [
+            840.7,
+            758.4
+          ],
+          [
+            840.7,
+            726.7
+          ],
+          [
+            840.7,
+            725.0
+          ],
+          [
+            840.7,
+            807.1
+          ],
+          [
+            840.7,
+            781.2
+          ],
+          [
+            840.7,
+            795.7
+          ],
+          [
+            840.7,
+            807.1
+          ],
+          [
+            840.7,
+            747.3
+          ],
+          [
+            840.7,
+            755.0
+          ],
+          [
+            840.7,
+            758.4
+          ],
+          [
+            840.7,
+            803.4
+          ],
+          [
+            840.7,
+            728.4
+          ],
+          [
+            840.7,
+            665.2
+          ],
+          [
+            840.7,
+            709.9
+          ],
+          [
+            840.7,
+            747.3
+          ],
+          [
+            840.7,
+            795.7
+          ],
+          [
+            840.7,
+            810.8
+          ],
+          [
+            840.7,
+            792.0
+          ],
+          [
+            840.7,
+            747.9
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/3_31337"
+      }
+    ],
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 37,
+        "win_rate": 0.0,
+        "best": 696.4,
+        "best_x": 636.4,
+        "stuck_frac": 0.1575,
+        "causes": {
+          "Bomb": 336,
+          "Stall": 63,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0019,
+        "train_time_s": 15.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.524,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          25,
+          14,
+          1,
+          0,
+          2,
+          354,
+          4,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.211,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            545.5,
+            118.9
+          ],
+          [
+            545.5,
+            215.6
+          ],
+          [
+            545.5,
+            267.5
+          ],
+          [
+            605.5,
+            425.1
+          ],
+          [
+            605.5,
+            342.4
+          ],
+          [
+            605.5,
+            424.0
+          ],
+          [
+            605.5,
+            466.4
+          ],
+          [
+            605.5,
+            605.5
+          ],
+          [
+            605.5,
+            583.6
+          ],
+          [
+            605.5,
+            600.9
+          ],
+          [
+            605.5,
+            585.8
+          ],
+          [
+            605.5,
+            605.5
+          ],
+          [
+            605.5,
+            605.5
+          ],
+          [
+            650.9,
+            493.5
+          ],
+          [
+            650.9,
+            614.5
+          ],
+          [
+            650.9,
+            619.1
+          ],
+          [
+            650.9,
+            637.3
+          ],
+          [
+            650.9,
+            641.8
+          ],
+          [
+            650.9,
+            637.3
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            641.8
+          ],
+          [
+            650.9,
+            637.3
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            637.3
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            650.9,
+            646.4
+          ],
+          [
+            650.9,
+            637.3
+          ],
+          [
+            650.9,
+            650.9
+          ],
+          [
+            696.4,
+            655.5
+          ],
+          [
+            696.4,
+            655.5
+          ],
+          [
+            696.4,
+            650.9
+          ],
+          [
+            696.4,
+            650.9
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 4,
+        "win_rate": 0.79,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.19285714285714287,
+        "causes": {
+          "Bomb": 33,
+          "Stall": 27
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1636,
+        "train_time_s": 4.7,
+        "completion_rate": 0.571,
+        "mean_completion_time": 6.4,
+        "completion_time_stddev": 0.3,
+        "progress_at_death": 0.483,
+        "deaths_per_run": 4.29,
+        "death_hist": [
+          8,
+          7,
+          0,
+          4,
+          0,
+          27,
+          0,
+          1,
+          13,
+          0
+        ],
+        "death_cluster_entropy": 0.634,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.925,
+        "curve": [
+          [
+            605.5,
+            197.8
+          ],
+          [
+            705.5,
+            432.0
+          ],
+          [
+            878.2,
+            609.8
+          ],
+          [
+            6060.0,
+            1146.2
+          ],
+          [
+            6060.0,
+            1230.4
+          ],
+          [
+            6060.0,
+            2391.8
+          ],
+          [
+            6060.0,
+            4450.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5472.2
+          ],
+          [
+            6060.0,
+            5496.4
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 22,
+        "first_win_gen": 12,
+        "best_gen": 12,
+        "win_rate": 0.81,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.3,
+        "causes": {
+          "Stall": 66,
+          "Bomb": 47,
+          "Timeout": 25
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0292,
+        "train_time_s": 13.8,
+        "completion_rate": 0.373,
+        "mean_completion_time": 6.8,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.491,
+        "deaths_per_run": 6.27,
+        "death_hist": [
+          18,
+          16,
+          0,
+          0,
+          6,
+          55,
+          24,
+          12,
+          4,
+          3
+        ],
+        "death_cluster_entropy": 0.747,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.871,
+        "curve": [
+          [
+            605.5,
+            178.7
+          ],
+          [
+            650.9,
+            372.0
+          ],
+          [
+            650.9,
+            517.1
+          ],
+          [
+            741.8,
+            618.5
+          ],
+          [
+            741.8,
+            522.2
+          ],
+          [
+            787.3,
+            652.5
+          ],
+          [
+            787.3,
+            615.5
+          ],
+          [
+            787.3,
+            678.5
+          ],
+          [
+            787.3,
+            558.0
+          ],
+          [
+            787.3,
+            587.3
+          ],
+          [
+            878.2,
+            642.7
+          ],
+          [
+            6060.0,
+            1204.0
+          ],
+          [
+            6060.0,
+            2195.8
+          ],
+          [
+            6060.0,
+            4378.2
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5041.8
+          ],
+          [
+            6060.0,
+            4896.4
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5478.2
+          ],
+          [
+            6060.0,
+            4923.6
+          ],
+          [
+            6060.0,
+            5537.3
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/4_31337"
+      }
+    ],
+    "5": [
+      {
+        "level": "5",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 27,
+        "win_rate": 0.0,
+        "best": 1250.0,
+        "best_x": 950.0,
+        "stuck_frac": 0.5175,
+        "causes": {
+          "Bomb": 162,
+          "Stall": 207,
+          "Timeout": 31
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0121,
+        "train_time_s": 40.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.769,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          8,
+          3,
+          0,
+          26,
+          1,
+          9,
+          3,
+          93,
+          132,
+          125
+        ],
+        "death_cluster_entropy": 0.651,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            810.0,
+            234.0
+          ],
+          [
+            860.0,
+            528.0
+          ],
+          [
+            860.0,
+            583.0
+          ],
+          [
+            860.0,
+            603.0
+          ],
+          [
+            860.0,
+            775.0
+          ],
+          [
+            860.0,
+            654.0
+          ],
+          [
+            910.0,
+            759.0
+          ],
+          [
+            1010.0,
+            890.0
+          ],
+          [
+            1010.0,
+            920.0
+          ],
+          [
+            1010.0,
+            920.0
+          ],
+          [
+            1010.0,
+            675.0
+          ],
+          [
+            1010.0,
+            945.0
+          ],
+          [
+            1010.0,
+            840.0
+          ],
+          [
+            1010.0,
+            950.0
+          ],
+          [
+            1110.0,
+            970.0
+          ],
+          [
+            1110.0,
+            955.0
+          ],
+          [
+            1210.0,
+            1015.0
+          ],
+          [
+            1210.0,
+            933.0
+          ],
+          [
+            1210.0,
+            1030.0
+          ],
+          [
+            1210.0,
+            967.0
+          ],
+          [
+            1210.0,
+            1013.0
+          ],
+          [
+            1210.0,
+            963.0
+          ],
+          [
+            1210.0,
+            983.0
+          ],
+          [
+            1210.0,
+            1012.0
+          ],
+          [
+            1210.0,
+            1017.0
+          ],
+          [
+            1210.0,
+            1044.0
+          ],
+          [
+            1250.0,
+            977.0
+          ],
+          [
+            1250.0,
+            981.0
+          ],
+          [
+            1250.0,
+            1012.0
+          ],
+          [
+            1250.0,
+            1017.0
+          ],
+          [
+            1250.0,
+            1081.0
+          ],
+          [
+            1250.0,
+            901.0
+          ],
+          [
+            1250.0,
+            961.0
+          ],
+          [
+            1250.0,
+            886.0
+          ],
+          [
+            1250.0,
+            1091.0
+          ],
+          [
+            1250.0,
+            994.0
+          ],
+          [
+            1250.0,
+            1043.0
+          ],
+          [
+            1250.0,
+            987.0
+          ],
+          [
+            1250.0,
+            1075.0
+          ],
+          [
+            1250.0,
+            1013.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/5_1234"
+      },
+      {
+        "level": "5",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 11,
+        "win_rate": 0.0,
+        "best": 1110.0,
+        "best_x": 950.0,
+        "stuck_frac": 0.25,
+        "causes": {
+          "Bomb": 253,
+          "Stall": 100,
+          "Timeout": 47
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0173,
+        "train_time_s": 32.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.79,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          6,
+          2,
+          0,
+          4,
+          0,
+          16,
+          5,
+          124,
+          84,
+          159
+        ],
+        "death_cluster_entropy": 0.598,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            850.0,
+            312.0
+          ],
+          [
+            900.0,
+            467.0
+          ],
+          [
+            900.0,
+            645.0
+          ],
+          [
+            900.0,
+            810.0
+          ],
+          [
+            910.0,
+            817.0
+          ],
+          [
+            910.0,
+            840.0
+          ],
+          [
+            960.0,
+            826.0
+          ],
+          [
+            1060.0,
+            866.0
+          ],
+          [
+            1060.0,
+            882.0
+          ],
+          [
+            1060.0,
+            882.0
+          ],
+          [
+            1110.0,
+            980.0
+          ],
+          [
+            1110.0,
+            871.0
+          ],
+          [
+            1110.0,
+            880.0
+          ],
+          [
+            1110.0,
+            932.0
+          ],
+          [
+            1110.0,
+            959.0
+          ],
+          [
+            1110.0,
+            943.0
+          ],
+          [
+            1110.0,
+            983.0
+          ],
+          [
+            1110.0,
+            920.0
+          ],
+          [
+            1110.0,
+            906.0
+          ],
+          [
+            1110.0,
+            1009.0
+          ],
+          [
+            1110.0,
+            942.0
+          ],
+          [
+            1110.0,
+            968.0
+          ],
+          [
+            1110.0,
+            950.0
+          ],
+          [
+            1110.0,
+            894.0
+          ],
+          [
+            1110.0,
+            920.0
+          ],
+          [
+            1110.0,
+            935.0
+          ],
+          [
+            1110.0,
+            995.0
+          ],
+          [
+            1110.0,
+            950.0
+          ],
+          [
+            1110.0,
+            859.0
+          ],
+          [
+            1110.0,
+            962.0
+          ],
+          [
+            1110.0,
+            941.0
+          ],
+          [
+            1110.0,
+            909.0
+          ],
+          [
+            1110.0,
+            809.0
+          ],
+          [
+            1110.0,
+            1004.0
+          ],
+          [
+            1110.0,
+            943.0
+          ],
+          [
+            1110.0,
+            957.0
+          ],
+          [
+            1110.0,
+            941.0
+          ],
+          [
+            1110.0,
+            1039.0
+          ],
+          [
+            1110.0,
+            976.0
+          ],
+          [
+            1110.0,
+            986.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/5_2025"
+      },
+      {
+        "level": "5",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 7,
+        "win_rate": 0.0,
+        "best": 1100.0,
+        "best_x": 950.0,
+        "stuck_frac": 0.145,
+        "causes": {
+          "Stall": 58,
+          "Bomb": 342
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0031,
+        "train_time_s": 23.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.721,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          34,
+          3,
+          2,
+          17,
+          5,
+          39,
+          22,
+          24,
+          8,
+          246
+        ],
+        "death_cluster_entropy": 0.606,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            560.0,
+            207.0
+          ],
+          [
+            860.0,
+            459.0
+          ],
+          [
+            1000.0,
+            643.0
+          ],
+          [
+            1000.0,
+            606.0
+          ],
+          [
+            1000.0,
+            695.0
+          ],
+          [
+            1000.0,
+            745.0
+          ],
+          [
+            1100.0,
+            1010.0
+          ],
+          [
+            1100.0,
+            972.0
+          ],
+          [
+            1100.0,
+            898.0
+          ],
+          [
+            1100.0,
+            832.0
+          ],
+          [
+            1100.0,
+            693.0
+          ],
+          [
+            1100.0,
+            808.0
+          ],
+          [
+            1100.0,
+            712.0
+          ],
+          [
+            1100.0,
+            806.0
+          ],
+          [
+            1100.0,
+            815.0
+          ],
+          [
+            1100.0,
+            863.0
+          ],
+          [
+            1100.0,
+            852.0
+          ],
+          [
+            1100.0,
+            807.0
+          ],
+          [
+            1100.0,
+            910.0
+          ],
+          [
+            1100.0,
+            852.0
+          ],
+          [
+            1100.0,
+            897.0
+          ],
+          [
+            1100.0,
+            848.0
+          ],
+          [
+            1100.0,
+            662.0
+          ],
+          [
+            1100.0,
+            1026.0
+          ],
+          [
+            1100.0,
+            828.0
+          ],
+          [
+            1100.0,
+            931.0
+          ],
+          [
+            1100.0,
+            833.0
+          ],
+          [
+            1100.0,
+            1026.0
+          ],
+          [
+            1100.0,
+            928.0
+          ],
+          [
+            1100.0,
+            945.0
+          ],
+          [
+            1100.0,
+            997.0
+          ],
+          [
+            1100.0,
+            924.0
+          ],
+          [
+            1100.0,
+            1013.0
+          ],
+          [
+            1100.0,
+            849.0
+          ],
+          [
+            1100.0,
+            862.0
+          ],
+          [
+            1100.0,
+            879.0
+          ],
+          [
+            1100.0,
+            760.0
+          ],
+          [
+            1100.0,
+            983.0
+          ],
+          [
+            1100.0,
+            929.0
+          ],
+          [
+            1100.0,
+            889.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/5_31337"
+      }
+    ],
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 4,
+        "win_rate": 0.74,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.11428571428571428,
+        "causes": {
+          "Timeout": 8,
+          "Stall": 16,
+          "Bomb": 39,
+          "Enemy": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0214,
+        "train_time_s": 8.7,
+        "completion_rate": 0.536,
+        "mean_completion_time": 10.9,
+        "completion_time_stddev": 4.6,
+        "progress_at_death": 0.442,
+        "deaths_per_run": 4.64,
+        "death_hist": [
+          10,
+          0,
+          21,
+          0,
+          4,
+          8,
+          8,
+          1,
+          5,
+          8
+        ],
+        "death_cluster_entropy": 0.808,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            1324.3,
+            435.1
+          ],
+          [
+            1324.3,
+            719.6
+          ],
+          [
+            1324.3,
+            1041.9
+          ],
+          [
+            6120.0,
+            1293.4
+          ],
+          [
+            6120.0,
+            2573.4
+          ],
+          [
+            6120.0,
+            3579.3
+          ],
+          [
+            6120.0,
+            4602.7
+          ],
+          [
+            6120.0,
+            5604.7
+          ],
+          [
+            6120.0,
+            5089.4
+          ],
+          [
+            6120.0,
+            5604.7
+          ],
+          [
+            6120.0,
+            5110.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5157.3
+          ],
+          [
+            6120.0,
+            4606.3
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.76,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.18666666666666668,
+        "causes": {
+          "Enemy": 7,
+          "Stall": 28,
+          "Bomb": 38
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 5.2,
+        "completion_rate": 0.513,
+        "mean_completion_time": 4.9,
+        "completion_time_stddev": 0.9,
+        "progress_at_death": 0.774,
+        "deaths_per_run": 4.87,
+        "death_hist": [
+          3,
+          3,
+          4,
+          0,
+          2,
+          15,
+          0,
+          0,
+          2,
+          44
+        ],
+        "death_cluster_entropy": 0.542,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            1145.7,
+            306.4
+          ],
+          [
+            1145.7,
+            619.1
+          ],
+          [
+            1390.0,
+            1026.1
+          ],
+          [
+            1390.0,
+            975.3
+          ],
+          [
+            6120.0,
+            1482.3
+          ],
+          [
+            6120.0,
+            2123.0
+          ],
+          [
+            6120.0,
+            4693.9
+          ],
+          [
+            6120.0,
+            4625.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5579.0
+          ],
+          [
+            6120.0,
+            5088.0
+          ],
+          [
+            6120.0,
+            5579.0
+          ],
+          [
+            6120.0,
+            4473.0
+          ],
+          [
+            6120.0,
+            5579.0
+          ],
+          [
+            6120.0,
+            5094.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.71,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.06153846153846154,
+        "causes": {
+          "Enemy": 12,
+          "Stall": 8,
+          "Bomb": 38
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2143,
+        "train_time_s": 3.6,
+        "completion_rate": 0.554,
+        "mean_completion_time": 4.3,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.435,
+        "deaths_per_run": 4.46,
+        "death_hist": [
+          11,
+          2,
+          10,
+          1,
+          2,
+          17,
+          0,
+          15,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.708,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.925,
+        "curve": [
+          [
+            1145.7,
+            230.4
+          ],
+          [
+            1145.7,
+            373.0
+          ],
+          [
+            6120.0,
+            1178.9
+          ],
+          [
+            6120.0,
+            1471.1
+          ],
+          [
+            6120.0,
+            1471.1
+          ],
+          [
+            6120.0,
+            3070.9
+          ],
+          [
+            6120.0,
+            5024.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5024.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5622.6
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/6_31337"
+      }
+    ],
+    "7": [
+      {
+        "level": "7",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 21,
+        "first_win_gen": 11,
+        "best_gen": 11,
+        "win_rate": 0.39,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.23333333333333334,
+        "causes": {
+          "Bomb": 105,
+          "Enemy": 16,
+          "Stall": 49
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2727,
+        "train_time_s": 14.7,
+        "completion_rate": 0.19,
+        "mean_completion_time": 17.9,
+        "completion_time_stddev": 3.9,
+        "progress_at_death": 0.648,
+        "deaths_per_run": 8.1,
+        "death_hist": [
+          6,
+          10,
+          10,
+          3,
+          28,
+          30,
+          5,
+          4,
+          11,
+          63
+        ],
+        "death_cluster_entropy": 0.809,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.514,
+        "curve": [
+          [
+            287.3,
+            114.1
+          ],
+          [
+            310.0,
+            237.3
+          ],
+          [
+            560.0,
+            344.7
+          ],
+          [
+            560.0,
+            304.0
+          ],
+          [
+            1125.5,
+            487.0
+          ],
+          [
+            1125.5,
+            496.3
+          ],
+          [
+            1125.5,
+            484.6
+          ],
+          [
+            1125.5,
+            566.5
+          ],
+          [
+            1125.5,
+            527.1
+          ],
+          [
+            1125.5,
+            606.6
+          ],
+          [
+            6120.0,
+            1144.5
+          ],
+          [
+            6120.0,
+            1228.6
+          ],
+          [
+            6120.0,
+            1334.5
+          ],
+          [
+            6120.0,
+            1445.1
+          ],
+          [
+            6120.0,
+            2490.1
+          ],
+          [
+            6120.0,
+            2518.7
+          ],
+          [
+            6120.0,
+            3159.5
+          ],
+          [
+            6120.0,
+            4038.2
+          ],
+          [
+            6120.0,
+            4612.4
+          ],
+          [
+            6120.0,
+            4651.0
+          ],
+          [
+            6120.0,
+            3958.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/7_1234"
+      },
+      {
+        "level": "7",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 29,
+        "first_win_gen": 19,
+        "best_gen": 19,
+        "win_rate": 0.49,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1896551724137931,
+        "causes": {
+          "Bomb": 178,
+          "Enemy": 5,
+          "Stall": 55,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0909,
+        "train_time_s": 19.1,
+        "completion_rate": 0.172,
+        "mean_completion_time": 9.2,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.856,
+        "deaths_per_run": 8.28,
+        "death_hist": [
+          24,
+          0,
+          0,
+          0,
+          10,
+          1,
+          0,
+          5,
+          14,
+          186
+        ],
+        "death_cluster_entropy": 0.36,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.533,
+        "curve": [
+          [
+            514.5,
+            197.5
+          ],
+          [
+            560.0,
+            383.7
+          ],
+          [
+            560.0,
+            525.9
+          ],
+          [
+            620.0,
+            552.4
+          ],
+          [
+            620.0,
+            556.9
+          ],
+          [
+            620.0,
+            553.1
+          ],
+          [
+            620.0,
+            573.5
+          ],
+          [
+            620.0,
+            581.5
+          ],
+          [
+            620.0,
+            598.9
+          ],
+          [
+            620.0,
+            592.9
+          ],
+          [
+            620.0,
+            583.8
+          ],
+          [
+            620.0,
+            573.9
+          ],
+          [
+            620.0,
+            596.0
+          ],
+          [
+            620.0,
+            551.2
+          ],
+          [
+            620.0,
+            554.3
+          ],
+          [
+            620.0,
+            524.7
+          ],
+          [
+            620.0,
+            592.7
+          ],
+          [
+            620.0,
+            545.2
+          ],
+          [
+            6120.0,
+            1165.5
+          ],
+          [
+            6120.0,
+            931.1
+          ],
+          [
+            6120.0,
+            1660.3
+          ],
+          [
+            6120.0,
+            2210.3
+          ],
+          [
+            6120.0,
+            2153.5
+          ],
+          [
+            6120.0,
+            3809.5
+          ],
+          [
+            6120.0,
+            4290.8
+          ],
+          [
+            6120.0,
+            3800.5
+          ],
+          [
+            6120.0,
+            5510.3
+          ],
+          [
+            6120.0,
+            4479.0
+          ],
+          [
+            6120.0,
+            3322.3
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/7_2025"
+      },
+      {
+        "level": "7",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 1185.5,
+        "best_x": 818.2,
+        "stuck_frac": 0.2075,
+        "causes": {
+          "Enemy": 11,
+          "Stall": 83,
+          "Bomb": 305,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0017,
+        "train_time_s": 30.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.482,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          60,
+          2,
+          5,
+          13,
+          22,
+          264,
+          25,
+          6,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.514,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            1162.7,
+            195.0
+          ],
+          [
+            1185.5,
+            400.5
+          ],
+          [
+            1185.5,
+            460.1
+          ],
+          [
+            1185.5,
+            598.8
+          ],
+          [
+            1185.5,
+            624.5
+          ],
+          [
+            1185.5,
+            587.6
+          ],
+          [
+            1185.5,
+            762.0
+          ],
+          [
+            1185.5,
+            781.6
+          ],
+          [
+            1185.5,
+            706.8
+          ],
+          [
+            1185.5,
+            600.4
+          ],
+          [
+            1185.5,
+            683.6
+          ],
+          [
+            1185.5,
+            623.9
+          ],
+          [
+            1185.5,
+            626.1
+          ],
+          [
+            1185.5,
+            651.1
+          ],
+          [
+            1185.5,
+            724.2
+          ],
+          [
+            1185.5,
+            732.5
+          ],
+          [
+            1185.5,
+            594.2
+          ],
+          [
+            1185.5,
+            719.6
+          ],
+          [
+            1185.5,
+            714.5
+          ],
+          [
+            1185.5,
+            607.3
+          ],
+          [
+            1185.5,
+            598.9
+          ],
+          [
+            1185.5,
+            746.0
+          ],
+          [
+            1185.5,
+            765.0
+          ],
+          [
+            1185.5,
+            896.4
+          ],
+          [
+            1185.5,
+            676.7
+          ],
+          [
+            1185.5,
+            736.2
+          ],
+          [
+            1185.5,
+            743.9
+          ],
+          [
+            1185.5,
+            628.3
+          ],
+          [
+            1185.5,
+            649.5
+          ],
+          [
+            1185.5,
+            684.9
+          ],
+          [
+            1185.5,
+            667.6
+          ],
+          [
+            1185.5,
+            765.7
+          ],
+          [
+            1185.5,
+            797.4
+          ],
+          [
+            1185.5,
+            694.8
+          ],
+          [
+            1185.5,
+            623.1
+          ],
+          [
+            1185.5,
+            595.0
+          ],
+          [
+            1185.5,
+            651.7
+          ],
+          [
+            1185.5,
+            758.1
+          ],
+          [
+            1185.5,
+            629.9
+          ],
+          [
+            1185.5,
+            755.9
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/7_31337"
+      }
+    ],
+    "8": [
+      {
+        "level": "8",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 31,
+        "win_rate": 0.0,
+        "best": 560.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.835,
+        "causes": {
+          "Bomb": 40,
+          "Stall": 334,
+          "Enemy": 26
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3055,
+        "train_time_s": 18.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.876,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          11,
+          22,
+          2,
+          19,
+          0,
+          6,
+          5,
+          2,
+          4,
+          329
+        ],
+        "death_cluster_entropy": 0.339,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            254.4,
+            70.8
+          ],
+          [
+            254.4,
+            144.3
+          ],
+          [
+            500.0,
+            247.6
+          ],
+          [
+            500.0,
+            282.6
+          ],
+          [
+            500.0,
+            397.9
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            461.6
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            477.8
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            458.8
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            455.6
+          ],
+          [
+            500.0,
+            384.7
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            455.6
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            455.6
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            378.7
+          ],
+          [
+            500.0,
+            463.9
+          ],
+          [
+            500.0,
+            475.0
+          ],
+          [
+            500.0,
+            500.0
+          ],
+          [
+            500.0,
+            491.7
+          ],
+          [
+            560.0,
+            462.0
+          ],
+          [
+            560.0,
+            515.7
+          ],
+          [
+            560.0,
+            530.0
+          ],
+          [
+            560.0,
+            436.9
+          ],
+          [
+            560.0,
+            510.0
+          ],
+          [
+            560.0,
+            456.8
+          ],
+          [
+            560.0,
+            554.0
+          ],
+          [
+            560.0,
+            515.6
+          ],
+          [
+            560.0,
+            560.0
+          ],
+          [
+            560.0,
+            509.6
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/8_1234"
+      },
+      {
+        "level": "8",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 22,
+        "first_win_gen": 12,
+        "best_gen": 12,
+        "win_rate": 0.6,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07727272727272727,
+        "causes": {
+          "Enemy": 24,
+          "Bomb": 118,
+          "Stall": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1666,
+        "train_time_s": 14.1,
+        "completion_rate": 0.277,
+        "mean_completion_time": 8.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.694,
+        "deaths_per_run": 7.23,
+        "death_hist": [
+          11,
+          22,
+          2,
+          11,
+          0,
+          11,
+          12,
+          0,
+          0,
+          90
+        ],
+        "death_cluster_entropy": 0.608,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.671,
+        "curve": [
+          [
+            365.6,
+            137.4
+          ],
+          [
+            365.6,
+            171.2
+          ],
+          [
+            1080.0,
+            314.9
+          ],
+          [
+            1080.0,
+            290.3
+          ],
+          [
+            1080.0,
+            450.1
+          ],
+          [
+            1080.0,
+            513.2
+          ],
+          [
+            1080.0,
+            612.7
+          ],
+          [
+            1080.0,
+            709.1
+          ],
+          [
+            1080.0,
+            708.9
+          ],
+          [
+            1080.0,
+            812.9
+          ],
+          [
+            1080.0,
+            596.2
+          ],
+          [
+            6120.0,
+            1285.6
+          ],
+          [
+            6120.0,
+            1846.0
+          ],
+          [
+            6120.0,
+            2958.2
+          ],
+          [
+            6120.0,
+            4476.0
+          ],
+          [
+            6120.0,
+            4470.0
+          ],
+          [
+            6120.0,
+            3938.0
+          ],
+          [
+            6120.0,
+            4470.0
+          ],
+          [
+            6120.0,
+            3428.0
+          ],
+          [
+            6120.0,
+            5570.0
+          ],
+          [
+            6120.0,
+            2802.1
+          ],
+          [
+            6120.0,
+            5570.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/8_2025"
+      },
+      {
+        "level": "8",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 35,
+        "best_gen": 35,
+        "win_rate": 0.3,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1025,
+        "causes": {
+          "Stall": 41,
+          "Bomb": 183,
+          "Enemy": 112,
+          "Timeout": 34
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.5,
+        "train_time_s": 37.8,
+        "completion_rate": 0.075,
+        "mean_completion_time": 8.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.688,
+        "deaths_per_run": 9.25,
+        "death_hist": [
+          15,
+          39,
+          15,
+          20,
+          1,
+          12,
+          19,
+          51,
+          120,
+          78
+        ],
+        "death_cluster_entropy": 0.826,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.231,
+        "curve": [
+          [
+            250.0,
+            92.6
+          ],
+          [
+            590.0,
+            213.6
+          ],
+          [
+            590.0,
+            300.8
+          ],
+          [
+            1572.2,
+            458.9
+          ],
+          [
+            1572.2,
+            451.8
+          ],
+          [
+            1572.2,
+            526.0
+          ],
+          [
+            1572.2,
+            563.7
+          ],
+          [
+            1572.2,
+            539.1
+          ],
+          [
+            1572.2,
+            538.4
+          ],
+          [
+            1572.2,
+            656.7
+          ],
+          [
+            1572.2,
+            586.3
+          ],
+          [
+            1572.2,
+            588.9
+          ],
+          [
+            1572.2,
+            598.1
+          ],
+          [
+            1572.2,
+            654.8
+          ],
+          [
+            1572.2,
+            649.0
+          ],
+          [
+            1572.2,
+            671.2
+          ],
+          [
+            1572.2,
+            623.8
+          ],
+          [
+            1572.2,
+            628.6
+          ],
+          [
+            1572.2,
+            633.2
+          ],
+          [
+            1572.2,
+            641.6
+          ],
+          [
+            1572.2,
+            571.7
+          ],
+          [
+            1572.2,
+            732.0
+          ],
+          [
+            1572.2,
+            623.4
+          ],
+          [
+            1572.2,
+            664.0
+          ],
+          [
+            1572.2,
+            736.3
+          ],
+          [
+            1572.2,
+            638.8
+          ],
+          [
+            1572.2,
+            798.6
+          ],
+          [
+            1572.2,
+            665.6
+          ],
+          [
+            1572.2,
+            606.1
+          ],
+          [
+            1572.2,
+            690.8
+          ],
+          [
+            1572.2,
+            745.1
+          ],
+          [
+            1572.2,
+            745.1
+          ],
+          [
+            1572.2,
+            668.1
+          ],
+          [
+            1572.2,
+            705.3
+          ],
+          [
+            6120.0,
+            1230.8
+          ],
+          [
+            6120.0,
+            2588.9
+          ],
+          [
+            6120.0,
+            3993.0
+          ],
+          [
+            6120.0,
+            5064.1
+          ],
+          [
+            6120.0,
+            3956.0
+          ],
+          [
+            6120.0,
+            4076.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/8_31337"
+      }
+    ],
+    "9": [
+      {
+        "level": "9",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 36,
+        "win_rate": 0.0,
+        "best": 1156.7,
+        "best_x": 666.7,
+        "stuck_frac": 0.0275,
+        "causes": {
+          "Bomb": 389,
+          "Stall": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0045,
+        "train_time_s": 26.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.473,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          25,
+          11,
+          26,
+          24,
+          145,
+          65,
+          104,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.709,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            541.5,
+            172.1
+          ],
+          [
+            541.5,
+            338.3
+          ],
+          [
+            541.5,
+            439.2
+          ],
+          [
+            541.5,
+            523.0
+          ],
+          [
+            541.5,
+            487.3
+          ],
+          [
+            541.5,
+            442.9
+          ],
+          [
+            541.5,
+            491.0
+          ],
+          [
+            578.5,
+            461.4
+          ],
+          [
+            578.5,
+            505.9
+          ],
+          [
+            578.5,
+            513.3
+          ],
+          [
+            641.5,
+            476.5
+          ],
+          [
+            641.5,
+            519.6
+          ],
+          [
+            641.5,
+            453.2
+          ],
+          [
+            641.5,
+            502.5
+          ],
+          [
+            641.5,
+            535.9
+          ],
+          [
+            641.5,
+            464.7
+          ],
+          [
+            641.5,
+            459.9
+          ],
+          [
+            641.5,
+            455.7
+          ],
+          [
+            945.6,
+            598.0
+          ],
+          [
+            945.6,
+            500.4
+          ],
+          [
+            945.6,
+            660.4
+          ],
+          [
+            996.7,
+            607.3
+          ],
+          [
+            996.7,
+            743.3
+          ],
+          [
+            996.7,
+            869.9
+          ],
+          [
+            996.7,
+            796.4
+          ],
+          [
+            996.7,
+            756.7
+          ],
+          [
+            996.7,
+            860.6
+          ],
+          [
+            996.7,
+            704.9
+          ],
+          [
+            996.7,
+            834.5
+          ],
+          [
+            996.7,
+            826.7
+          ],
+          [
+            996.7,
+            868.0
+          ],
+          [
+            996.7,
+            817.0
+          ],
+          [
+            996.7,
+            848.0
+          ],
+          [
+            996.7,
+            696.0
+          ],
+          [
+            996.7,
+            784.3
+          ],
+          [
+            1156.7,
+            879.5
+          ],
+          [
+            1156.7,
+            893.0
+          ],
+          [
+            1156.7,
+            843.1
+          ],
+          [
+            1156.7,
+            892.7
+          ],
+          [
+            1156.7,
+            842.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/9_1234"
+      },
+      {
+        "level": "9",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 1587.8,
+        "best_x": 814.8,
+        "stuck_frac": 0.035,
+        "causes": {
+          "Bomb": 344,
+          "Stall": 14,
+          "Enemy": 29,
+          "Timeout": 13
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0047,
+        "train_time_s": 40.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.536,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          21,
+          14,
+          48,
+          22,
+          43,
+          42,
+          69,
+          130,
+          11,
+          0
+        ],
+        "death_cluster_entropy": 0.838,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            856.7,
+            266.6
+          ],
+          [
+            856.7,
+            424.5
+          ],
+          [
+            856.7,
+            498.0
+          ],
+          [
+            945.6,
+            614.8
+          ],
+          [
+            945.6,
+            650.4
+          ],
+          [
+            1056.7,
+            728.2
+          ],
+          [
+            1056.7,
+            833.0
+          ],
+          [
+            1056.7,
+            839.1
+          ],
+          [
+            1189.6,
+            939.8
+          ],
+          [
+            1189.6,
+            704.9
+          ],
+          [
+            1293.7,
+            861.0
+          ],
+          [
+            1293.7,
+            1026.9
+          ],
+          [
+            1293.7,
+            985.6
+          ],
+          [
+            1319.6,
+            878.9
+          ],
+          [
+            1319.6,
+            781.1
+          ],
+          [
+            1319.6,
+            859.4
+          ],
+          [
+            1319.6,
+            1036.7
+          ],
+          [
+            1547.8,
+            1144.6
+          ],
+          [
+            1547.8,
+            1106.0
+          ],
+          [
+            1587.8,
+            898.3
+          ],
+          [
+            1587.8,
+            840.2
+          ],
+          [
+            1587.8,
+            868.5
+          ],
+          [
+            1587.8,
+            843.2
+          ],
+          [
+            1587.8,
+            931.9
+          ],
+          [
+            1587.8,
+            981.9
+          ],
+          [
+            1587.8,
+            855.0
+          ],
+          [
+            1587.8,
+            844.1
+          ],
+          [
+            1587.8,
+            1007.4
+          ],
+          [
+            1587.8,
+            849.8
+          ],
+          [
+            1587.8,
+            941.1
+          ],
+          [
+            1587.8,
+            888.8
+          ],
+          [
+            1587.8,
+            888.8
+          ],
+          [
+            1587.8,
+            1036.7
+          ],
+          [
+            1587.8,
+            974.3
+          ],
+          [
+            1587.8,
+            907.3
+          ],
+          [
+            1587.8,
+            986.4
+          ],
+          [
+            1587.8,
+            940.9
+          ],
+          [
+            1587.8,
+            899.2
+          ],
+          [
+            1587.8,
+            957.8
+          ],
+          [
+            1587.8,
+            1031.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/9_2025"
+      },
+      {
+        "level": "9",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 31,
+        "win_rate": 0.0,
+        "best": 1085.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.06,
+        "causes": {
+          "Stall": 24,
+          "Bomb": 161,
+          "Enemy": 215
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0052,
+        "train_time_s": 25.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.714,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          18,
+          4,
+          0,
+          3,
+          11,
+          28,
+          89,
+          60,
+          166,
+          21
+        ],
+        "death_cluster_entropy": 0.715,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            803.7,
+            191.5
+          ],
+          [
+            886.7,
+            399.6
+          ],
+          [
+            937.8,
+            696.9
+          ],
+          [
+            974.8,
+            729.4
+          ],
+          [
+            974.8,
+            705.2
+          ],
+          [
+            974.8,
+            773.1
+          ],
+          [
+            974.8,
+            773.9
+          ],
+          [
+            974.8,
+            831.7
+          ],
+          [
+            974.8,
+            820.9
+          ],
+          [
+            974.8,
+            810.6
+          ],
+          [
+            974.8,
+            837.4
+          ],
+          [
+            974.8,
+            799.4
+          ],
+          [
+            974.8,
+            748.2
+          ],
+          [
+            1011.9,
+            918.0
+          ],
+          [
+            1011.9,
+            944.3
+          ],
+          [
+            1011.9,
+            936.9
+          ],
+          [
+            1011.9,
+            937.6
+          ],
+          [
+            1011.9,
+            913.3
+          ],
+          [
+            1011.9,
+            857.6
+          ],
+          [
+            1048.9,
+            946.6
+          ],
+          [
+            1048.9,
+            936.2
+          ],
+          [
+            1048.9,
+            904.3
+          ],
+          [
+            1048.9,
+            872.9
+          ],
+          [
+            1048.9,
+            945.7
+          ],
+          [
+            1048.9,
+            923.0
+          ],
+          [
+            1048.9,
+            931.8
+          ],
+          [
+            1048.9,
+            903.3
+          ],
+          [
+            1048.9,
+            953.3
+          ],
+          [
+            1048.9,
+            919.5
+          ],
+          [
+            1048.9,
+            908.7
+          ],
+          [
+            1085.9,
+            953.1
+          ],
+          [
+            1085.9,
+            893.6
+          ],
+          [
+            1085.9,
+            875.4
+          ],
+          [
+            1085.9,
+            882.1
+          ],
+          [
+            1085.9,
+            924.9
+          ],
+          [
+            1085.9,
+            889.9
+          ],
+          [
+            1085.9,
+            944.0
+          ],
+          [
+            1085.9,
+            939.2
+          ],
+          [
+            1085.9,
+            989.6
+          ],
+          [
+            1085.9,
+            890.7
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/9_31337"
+      }
+    ],
+    "10": [
+      {
+        "level": "10",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 31,
+        "win_rate": 0.0,
+        "best": 661.5,
+        "best_x": 500.0,
+        "stuck_frac": 0.1425,
+        "causes": {
+          "Bomb": 343,
+          "Stall": 57
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0077,
+        "train_time_s": 20.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.354,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          47,
+          65,
+          0,
+          8,
+          239,
+          41,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.507,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            521.5,
+            155.1
+          ],
+          [
+            521.5,
+            263.2
+          ],
+          [
+            521.5,
+            496.3
+          ],
+          [
+            621.5,
+            520.0
+          ],
+          [
+            621.5,
+            379.7
+          ],
+          [
+            621.5,
+            381.4
+          ],
+          [
+            621.5,
+            468.9
+          ],
+          [
+            621.5,
+            517.1
+          ],
+          [
+            621.5,
+            529.4
+          ],
+          [
+            621.5,
+            547.2
+          ],
+          [
+            621.5,
+            409.7
+          ],
+          [
+            623.1,
+            584.0
+          ],
+          [
+            660.0,
+            522.2
+          ],
+          [
+            660.0,
+            458.2
+          ],
+          [
+            660.0,
+            502.9
+          ],
+          [
+            660.0,
+            433.5
+          ],
+          [
+            660.0,
+            545.1
+          ],
+          [
+            660.0,
+            469.7
+          ],
+          [
+            660.0,
+            525.5
+          ],
+          [
+            660.0,
+            455.4
+          ],
+          [
+            660.0,
+            524.5
+          ],
+          [
+            660.0,
+            443.1
+          ],
+          [
+            660.0,
+            551.2
+          ],
+          [
+            660.0,
+            510.4
+          ],
+          [
+            660.0,
+            446.6
+          ],
+          [
+            660.0,
+            485.4
+          ],
+          [
+            660.0,
+            423.7
+          ],
+          [
+            660.0,
+            442.9
+          ],
+          [
+            660.0,
+            504.6
+          ],
+          [
+            660.0,
+            429.2
+          ],
+          [
+            661.5,
+            486.3
+          ],
+          [
+            661.5,
+            526.3
+          ],
+          [
+            661.5,
+            427.7
+          ],
+          [
+            661.5,
+            491.8
+          ],
+          [
+            661.5,
+            486.8
+          ],
+          [
+            661.5,
+            447.5
+          ],
+          [
+            661.5,
+            480.9
+          ],
+          [
+            661.5,
+            495.5
+          ],
+          [
+            661.5,
+            561.2
+          ],
+          [
+            661.5,
+            421.8
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/10_1234"
+      },
+      {
+        "level": "10",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 444.6,
+        "best_x": 384.6,
+        "stuck_frac": 0.0675,
+        "causes": {
+          "Stall": 27,
+          "Bomb": 373
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 17.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.364,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          16,
+          8,
+          1,
+          375,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.123,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            444.6,
+            158.3
+          ],
+          [
+            444.6,
+            281.8
+          ],
+          [
+            444.6,
+            318.6
+          ],
+          [
+            444.6,
+            394.2
+          ],
+          [
+            444.6,
+            269.2
+          ],
+          [
+            444.6,
+            377.2
+          ],
+          [
+            444.6,
+            432.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            434.8
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            426.6
+          ],
+          [
+            444.6,
+            438.6
+          ],
+          [
+            444.6,
+            432.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            444.6
+          ],
+          [
+            444.6,
+            377.2
+          ],
+          [
+            444.6,
+            444.6
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/10_2025"
+      },
+      {
+        "level": "10",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 1060.8,
+        "best_x": 730.8,
+        "stuck_frac": 0.315,
+        "causes": {
+          "Stall": 126,
+          "Bomb": 273,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0293,
+        "train_time_s": 20.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.529,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          34,
+          9,
+          10,
+          68,
+          70,
+          13,
+          0,
+          196,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.632,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            483.1,
+            154.3
+          ],
+          [
+            503.1,
+            247.7
+          ],
+          [
+            503.1,
+            232.0
+          ],
+          [
+            541.5,
+            322.5
+          ],
+          [
+            541.5,
+            355.5
+          ],
+          [
+            541.5,
+            390.3
+          ],
+          [
+            541.5,
+            270.5
+          ],
+          [
+            970.8,
+            475.8
+          ],
+          [
+            970.8,
+            433.8
+          ],
+          [
+            970.8,
+            651.6
+          ],
+          [
+            970.8,
+            713.6
+          ],
+          [
+            970.8,
+            779.2
+          ],
+          [
+            970.8,
+            697.2
+          ],
+          [
+            970.8,
+            752.8
+          ],
+          [
+            970.8,
+            767.4
+          ],
+          [
+            970.8,
+            716.9
+          ],
+          [
+            970.8,
+            818.2
+          ],
+          [
+            970.8,
+            802.6
+          ],
+          [
+            970.8,
+            707.2
+          ],
+          [
+            1060.8,
+            855.2
+          ],
+          [
+            1060.8,
+            674.8
+          ],
+          [
+            1060.8,
+            744.6
+          ],
+          [
+            1060.8,
+            688.0
+          ],
+          [
+            1060.8,
+            773.4
+          ],
+          [
+            1060.8,
+            669.1
+          ],
+          [
+            1060.8,
+            777.5
+          ],
+          [
+            1060.8,
+            794.7
+          ],
+          [
+            1060.8,
+            836.6
+          ],
+          [
+            1060.8,
+            737.5
+          ],
+          [
+            1060.8,
+            823.6
+          ],
+          [
+            1060.8,
+            919.2
+          ],
+          [
+            1060.8,
+            800.1
+          ],
+          [
+            1060.8,
+            776.0
+          ],
+          [
+            1060.8,
+            716.8
+          ],
+          [
+            1060.8,
+            778.2
+          ],
+          [
+            1060.8,
+            882.5
+          ],
+          [
+            1060.8,
+            828.6
+          ],
+          [
+            1060.8,
+            711.4
+          ],
+          [
+            1060.8,
+            797.4
+          ],
+          [
+            1060.8,
+            849.2
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/10_31337"
+      }
+    ],
+    "11": [
+      {
+        "level": "11",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 9,
+        "win_rate": 0.0,
+        "best": 856.2,
+        "best_x": 406.2,
+        "stuck_frac": 0.0375,
+        "causes": {
+          "Bomb": 355,
+          "Stall": 15,
+          "Enemy": 13,
+          "Timeout": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0312,
+        "train_time_s": 24.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.32,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          40,
+          32,
+          27,
+          124,
+          177,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.581,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            593.8,
+            148.4
+          ],
+          [
+            593.8,
+            281.8
+          ],
+          [
+            796.2,
+            528.8
+          ],
+          [
+            796.2,
+            631.1
+          ],
+          [
+            796.2,
+            541.0
+          ],
+          [
+            796.2,
+            560.4
+          ],
+          [
+            796.2,
+            598.8
+          ],
+          [
+            796.2,
+            575.2
+          ],
+          [
+            856.2,
+            631.6
+          ],
+          [
+            856.2,
+            706.5
+          ],
+          [
+            856.2,
+            666.6
+          ],
+          [
+            856.2,
+            661.5
+          ],
+          [
+            856.2,
+            636.8
+          ],
+          [
+            856.2,
+            683.2
+          ],
+          [
+            856.2,
+            653.9
+          ],
+          [
+            856.2,
+            722.5
+          ],
+          [
+            856.2,
+            647.8
+          ],
+          [
+            856.2,
+            713.9
+          ],
+          [
+            856.2,
+            634.0
+          ],
+          [
+            856.2,
+            727.2
+          ],
+          [
+            856.2,
+            690.1
+          ],
+          [
+            856.2,
+            740.5
+          ],
+          [
+            856.2,
+            724.9
+          ],
+          [
+            856.2,
+            610.2
+          ],
+          [
+            856.2,
+            710.0
+          ],
+          [
+            856.2,
+            692.1
+          ],
+          [
+            856.2,
+            716.6
+          ],
+          [
+            856.2,
+            719.0
+          ],
+          [
+            856.2,
+            726.2
+          ],
+          [
+            856.2,
+            717.5
+          ],
+          [
+            856.2,
+            725.0
+          ],
+          [
+            856.2,
+            604.2
+          ],
+          [
+            856.2,
+            641.6
+          ],
+          [
+            856.2,
+            706.4
+          ],
+          [
+            856.2,
+            626.9
+          ],
+          [
+            856.2,
+            721.6
+          ],
+          [
+            856.2,
+            705.4
+          ],
+          [
+            856.2,
+            755.0
+          ],
+          [
+            856.2,
+            676.6
+          ],
+          [
+            856.2,
+            688.0
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/11_1234"
+      },
+      {
+        "level": "11",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 19,
+        "win_rate": 0.0,
+        "best": 796.2,
+        "best_x": 406.2,
+        "stuck_frac": 0.0225,
+        "causes": {
+          "Stall": 9,
+          "Enemy": 13,
+          "Bomb": 378
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0312,
+        "train_time_s": 15.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.328,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          28,
+          24,
+          76,
+          32,
+          240,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.512,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            443.8,
+            116.2
+          ],
+          [
+            478.8,
+            236.6
+          ],
+          [
+            546.2,
+            291.2
+          ],
+          [
+            696.2,
+            475.5
+          ],
+          [
+            696.2,
+            489.2
+          ],
+          [
+            696.2,
+            536.0
+          ],
+          [
+            696.2,
+            604.5
+          ],
+          [
+            696.2,
+            574.1
+          ],
+          [
+            696.2,
+            554.8
+          ],
+          [
+            696.2,
+            551.8
+          ],
+          [
+            696.2,
+            599.4
+          ],
+          [
+            696.2,
+            603.5
+          ],
+          [
+            696.2,
+            585.6
+          ],
+          [
+            696.2,
+            591.6
+          ],
+          [
+            696.2,
+            652.9
+          ],
+          [
+            696.2,
+            620.6
+          ],
+          [
+            696.2,
+            612.6
+          ],
+          [
+            696.2,
+            589.1
+          ],
+          [
+            796.2,
+            706.2
+          ],
+          [
+            796.2,
+            609.8
+          ],
+          [
+            796.2,
+            629.1
+          ],
+          [
+            796.2,
+            616.6
+          ],
+          [
+            796.2,
+            595.1
+          ],
+          [
+            796.2,
+            611.8
+          ],
+          [
+            796.2,
+            635.2
+          ],
+          [
+            796.2,
+            572.5
+          ],
+          [
+            796.2,
+            602.1
+          ],
+          [
+            796.2,
+            625.5
+          ],
+          [
+            796.2,
+            625.1
+          ],
+          [
+            796.2,
+            625.1
+          ],
+          [
+            796.2,
+            650.0
+          ],
+          [
+            796.2,
+            649.0
+          ],
+          [
+            796.2,
+            583.1
+          ],
+          [
+            796.2,
+            665.5
+          ],
+          [
+            796.2,
+            649.6
+          ],
+          [
+            796.2,
+            576.6
+          ],
+          [
+            796.2,
+            617.4
+          ],
+          [
+            796.2,
+            527.8
+          ],
+          [
+            796.2,
+            649.1
+          ],
+          [
+            796.2,
+            657.2
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/11_2025"
+      },
+      {
+        "level": "11",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 25,
+        "win_rate": 0.0,
+        "best": 653.8,
+        "best_x": 343.8,
+        "stuck_frac": 0.0125,
+        "causes": {
+          "Stall": 5,
+          "Enemy": 9,
+          "Bomb": 386
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 14.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.294,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          59,
+          10,
+          6,
+          325,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.263,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            593.8,
+            233.6
+          ],
+          [
+            593.8,
+            361.5
+          ],
+          [
+            593.8,
+            389.1
+          ],
+          [
+            593.8,
+            487.4
+          ],
+          [
+            593.8,
+            502.5
+          ],
+          [
+            593.8,
+            563.8
+          ],
+          [
+            593.8,
+            475.5
+          ],
+          [
+            593.8,
+            467.1
+          ],
+          [
+            593.8,
+            561.6
+          ],
+          [
+            593.8,
+            440.1
+          ],
+          [
+            593.8,
+            534.6
+          ],
+          [
+            593.8,
+            458.2
+          ],
+          [
+            593.8,
+            529.1
+          ],
+          [
+            593.8,
+            517.5
+          ],
+          [
+            593.8,
+            563.8
+          ],
+          [
+            593.8,
+            574.1
+          ],
+          [
+            593.8,
+            534.4
+          ],
+          [
+            593.8,
+            563.8
+          ],
+          [
+            593.8,
+            548.8
+          ],
+          [
+            593.8,
+            548.8
+          ],
+          [
+            593.8,
+            475.5
+          ],
+          [
+            593.8,
+            563.8
+          ],
+          [
+            593.8,
+            472.4
+          ],
+          [
+            593.8,
+            593.8
+          ],
+          [
+            653.8,
+            540.6
+          ],
+          [
+            653.8,
+            540.6
+          ],
+          [
+            653.8,
+            573.6
+          ],
+          [
+            653.8,
+            432.1
+          ],
+          [
+            653.8,
+            553.5
+          ],
+          [
+            653.8,
+            471.0
+          ],
+          [
+            653.8,
+            594.5
+          ],
+          [
+            653.8,
+            500.1
+          ],
+          [
+            653.8,
+            550.4
+          ],
+          [
+            653.8,
+            609.6
+          ],
+          [
+            653.8,
+            615.6
+          ],
+          [
+            653.8,
+            647.8
+          ],
+          [
+            653.8,
+            597.4
+          ],
+          [
+            653.8,
+            653.8
+          ],
+          [
+            653.8,
+            596.0
+          ],
+          [
+            653.8,
+            577.5
+          ]
+        ],
+        "dir": "runs/ablation/bomberman/novice/p10g40/11_31337"
+      }
+    ]
+  }
+}
