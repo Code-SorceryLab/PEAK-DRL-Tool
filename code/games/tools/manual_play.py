@@ -21,6 +21,10 @@ parser.add_argument("--fps", type=int, default=30, help="target FPS")
 parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. Mario1-2; meatboy: level index)")
 parser.add_argument("--file", default=None, help="Absolute path to a .txt level file (unlisted)")
 parser.add_argument("--random", action="store_true", help="random actions instead of keyboard")
+parser.add_argument("--metrics", action="store_true",
+                    help="measure balance metrics: every attempt is one life, logged to "
+                         "runs/manual/<game>/<level>/episodes.csv, summarized when you quit")
+parser.add_argument("--persona", default="human", help="persona label written with the metrics")
 args = parser.parse_args()
 
 # Level ID priority: CLI arg > env var > default
@@ -216,10 +220,59 @@ if level_file:
     core_game.load_level()
     print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
+# ── balance metrics (--metrics) ──────────────────────────────
+stats = None
+if args.metrics:
+    import time as _time
+    from code.stats import episode_log
+    from code.stats.episode_stats import make_stats, stats_class
+    from code.stats.summarize import summarize_file
+    STATS_GAME = "mario" if args.game == "platformer" else args.game
+    _end_status = stats_class(STATS_GAME).end_status
+    _jump_idx = stats_class(STATS_GAME).JUMP_INDEX
+    _session = _time.strftime("%Y%m%d-%H%M%S")
+    _level_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in (level_id or ("editor" if level_file else "auto")))
+    METRICS_CSV = os.path.join("runs", "manual", STATS_GAME, _level_key, "episodes.csv")
+    _attempt = 0
+
+    def _one_life():
+        """Each attempt is one life, as for the agents: a lost life ends the attempt."""
+        if hasattr(core_game, "max_lives"):
+            core_game.max_lives = 1
+            core_game.lives = 1
+
+    def _level_now() -> str:
+        if level_id:
+            return str(level_id)
+        if args.game in INDEXED_GAMES:
+            return str(getattr(core_game, "_level_idx", "0"))
+        return str(getattr(core_game, "world", "auto"))
+
+    def _new_stats():
+        global _attempt
+        _attempt += 1
+        return make_stats(STATS_GAME, core_game, level=_level_now(), persona=args.persona, source="manual",
+                          agent="human", gen=_attempt, session=_session)
+
+    def _jump_pressed(action, keys) -> bool:
+        if args.game == "meatboy" and not args.random:  # MeatboyPlayer reads the keyboard itself
+            return bool(keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP])
+        try:
+            return bool(action[_jump_idx])
+        except (IndexError, TypeError):
+            return False
+
+    _one_life()
+    print(f"[Play] Measuring balance metrics — one life per attempt, logging to {METRICS_CSV}")
+
 core_game.reset()
+if stats is None and args.metrics:
+    _one_life()
+    stats = _new_stats()
 running = True
 random_action = _random_action()
 frame = 0
+terminated = truncated = False
 
 while running:
     clock.tick(args.fps)
@@ -248,6 +301,10 @@ while running:
     for _ in range(substeps):
         _, _, terminated, truncated, info = core_game.step(action)
         done = terminated or truncated
+        if stats is not None:
+            stats.on_step(_jump_pressed(action, keys))
+            if info.get("won"):  # Sonic's goal reloads the level instead of terminating
+                done = True
         if done:
             break
 
@@ -255,6 +312,12 @@ while running:
     pygame.display.flip()
 
     if info.get("episode_end", False) or done:
+        if stats is not None:
+            stats.finish(_end_status(core_game, terminated, truncated, info))
+            row = stats.to_dict()
+            episode_log.append(METRICS_CSV, [row])
+            print(f"[Play] attempt {row['gen']}: {row['status']}"
+                  + (f" ({row['cause']})" if row["cause"] else "") + f" after {row['time_s']:.1f}s")
         if args.game in INDEXED_GAMES and level_id:
             core_game.won = False          # reset() would otherwise advance to the next level
             core_game._level_idx = int(level_id)
@@ -268,5 +331,11 @@ while running:
                     core_game.locked_level = active_id.lower()
                 if hasattr(core_game, 'load_level'):
                     core_game.load_level()
+        if stats is not None:
+            _one_life()
+            stats = _new_stats()
 
 pygame.quit()
+if args.metrics:  # an attempt still running when you quit is not counted
+    if summarize_file(METRICS_CSV) is None:
+        print("[Play] no finished attempts — nothing to summarize")

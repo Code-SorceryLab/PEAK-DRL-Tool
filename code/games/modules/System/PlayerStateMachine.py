@@ -108,6 +108,7 @@ class PlayerStateMachine:
         # Timers
         self._star_timer:    float = 0.0   # > 0 while star is active
         self._iframes_timer: float = 0.0   # > 0 during post-hit i-frame window
+        self.powerups_lost:  int   = 0     # hits that cost a power tier (balance metric)
 
     # ── Read ─────────────────────────────────────────────────────────────────
 
@@ -208,6 +209,7 @@ class PlayerStateMachine:
         # 3. Have a power tier to lose
         if self.state != PowerState.SMALL:
             self._pop()
+            self.powerups_lost += 1
             self._iframes_timer = self._hit_iframes
             return True
 
@@ -283,6 +285,7 @@ class PlayerStateMachine:
         self._stack         = [PowerState.SMALL]
         self._star_timer    = 0.0
         self._iframes_timer = 0.0
+        self.powerups_lost  = 0
 
     # ── Internal ────────────────────────────────────────────────────────────
 

@@ -6,6 +6,10 @@ population and measure how learnable the level is. Difficulty is read the same w
 paper read it — win rate, generations-to-first-win, and the death-cause mix that names
 WHY a level is hard (Enemy pressure vs Pit gaps vs Spike density vs Stall dead-ends).
 
+Two kinds of numbers per level: the GA's own (first win, win rate, curves — from the
+population history in state.json) and the balance metrics (code/stats/registry.py — from the
+episode log, episodes.csv). A level's balance metrics pool every seed's episodes.
+
 Run:  python -m code.neuro.balance --game mario [--levels L1 L2 ...]
       [--seeds 1234 2025 31337] [--gens 25] [--out runs/balance]
       python -m code.neuro.balance --rebuild      # regenerate report JSONs from runs/probes
@@ -33,6 +37,7 @@ import time
 from .evolution import GAConfig
 from .personas import PERSONAS, Persona, get_persona
 from .sensors import SENSOR_MODES
+from code.stats import episode_log, registry
 
 PROBES_ROOT = os.path.join("runs", "probes")
 ABLATION_ROOT = os.path.join("runs", "ablation")  # sensor-ablation probes never mix with the real sweeps
@@ -71,7 +76,7 @@ def probe(game: str, level: str, seed: int, gens: int, persona: Persona | None =
     persona = persona or PERSONAS["experienced"]
     cfg = GAConfig(seed=seed, sensors=sensors, **(overrides or {}))
     run_dir = run_dir or probe_dir(game, persona.name, config_tag(cfg.pop_size, gens, sensors), level, seed)
-    trainer = Trainer(game, level, cfg, run_dir=run_dir, persona=persona)
+    trainer = Trainer(game, level, cfg, run_dir=run_dir, persona=persona, metrics=True, source="probe")
     pop = trainer.pop
 
     first_win: int | None = None
@@ -82,7 +87,8 @@ def probe(game: str, level: str, seed: int, gens: int, persona: Persona | None =
             first_win = row["gen"]
         if first_win is not None and pop.generation >= first_win + WIN_WINDOW:
             break
-    return summarize(pop.history, cfg.pop_size, level, seed, pop.best_fitness, pop.best_gen)
+    return summarize(pop.history, cfg.pop_size, level, seed, pop.best_fitness, pop.best_gen,
+                     episodes=episode_log.read(trainer.episodes_path), game=game)
 
 
 def _improvement_rate(hist: list[dict], level_len: float) -> float | None:
@@ -99,58 +105,22 @@ def _improvement_rate(hist: list[dict], level_len: float) -> float | None:
 
 
 def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
-              best_fitness: float, best_gen: int) -> dict:
-    """Fold one probe's per-generation history into a cell (pure; also used by --rebuild)."""
+              best_fitness: float, best_gen: int, episodes: list[dict] | None = None,
+              game: str | None = None) -> dict:
+    """Fold one probe into a cell (pure; also used by --rebuild): the GA numbers from the
+    per-generation history, the balance metrics from this seed's episode log."""
     first_win = next((r["gen"] for r in hist if r["wins"] > 0), None)
     tail = hist[-WIN_WINDOW:]
-    episodes = len(tail) * pop_size
-    causes: dict[str, int] = {}
-    stuck = 0
-
-    # Amr's balance-metric table: completion, punishment severity, triangularity
-    all_eps = [e for r in hist for e in r["envs"]]
-    total_eps = len(all_eps)
-    won_eps = [e for e in all_eps if e["status"] == "WON"]
-    dead_eps = [e for e in all_eps if e["status"] in ("DEAD", "STUCK")]
-    level_len = max((e.get("level_len") or 0.0) for e in all_eps) or 1.0
-    win_times = [e["frames"] / 60.0 for e in won_eps]
-    death_hist = [0] * 10  # death-location heatmap, 10 bins across the level
-    progress_at_death = []
-    for e in dead_eps:
-        p = min(max((e.get("end_x") or 0.0) / level_len, 0.0), 1.0)
-        progress_at_death.append(p)
-        death_hist[min(int(p * 10), 9)] += 1
-    total_deaths = sum(death_hist)
-    entropy = 0.0
-    if total_deaths:
-        for n in death_hist:
-            if n:
-                q = n / total_deaths
-                entropy -= q * math.log(q)
-        entropy /= math.log(len(death_hist))  # normalized 0 (one hotspot) .. 1 (uniform)
-    level_coins = max((e.get("level_coins") or 0) for e in all_eps)
-    coin_rate = (statistics.fmean(min(e["coins"] / level_coins, 1.0) for e in all_eps)
-                 if level_coins else 1.0)  # "automatic 1 if there are 0 bandages"
+    episodes_n = len(tail) * pop_size
+    stuck = sum(r["stuck"] for r in hist)
+    all_envs = [e for r in hist for e in r["envs"]]
+    level_len = max((e.get("level_len") or 0.0) for e in all_envs) if all_envs else 0.0
     third = max(1, len(hist) // 3)
-    novice_wr = sum(r["wins"] for r in hist[:third]) / (third * pop_size)
-    expert_wr = sum(r["wins"] for r in hist[-third:]) / (third * pop_size)
-
-    # Failure causes: a stall (STUCK) is a cause like any death — "Stall dead-ends" name
-    # why a level is hard just as much as enemies or pits do.
-    for r in hist:
-        stuck += r["stuck"]
-        for e in r["envs"]:
-            if e["status"] == "STUCK":
-                causes["Stall"] = causes.get("Stall", 0) + 1
-            elif e["status"] == "DEAD":
-                c = e.get("cause") or "?"
-                causes[c] = causes.get(c, 0) + 1
-
     early = statistics.fmean(r["avg"] for r in hist[:third])
     late = statistics.fmean(r["avg"] for r in hist[-third:])
     trend = "IMPROVING" if late > early * 1.15 else ("DECLINING" if late < early * 0.85 else "FLAT")
-    rate = _improvement_rate(hist, level_len)
-
+    rate = _improvement_rate(hist, level_len or 1.0)
+    metrics = registry.compute_level(episodes, game) if episodes and game else {}
     return {
         "level": level,
         "seed": seed,
@@ -158,26 +128,31 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
         "gens_run": len(hist),
         "first_win_gen": first_win,
         "best_gen": best_gen or None,
-        "win_rate": sum(r["wins"] for r in tail) / episodes if episodes else 0.0,
+        "win_rate": sum(r["wins"] for r in tail) / episodes_n if episodes_n else 0.0,
         "best": round(best_fitness, 1),
         "best_x": max(r["best_x"] for r in hist),
         "stuck_frac": stuck / (len(hist) * pop_size),
-        "causes": causes,
+        "causes": metrics.get("death_cause_distribution") or _env_causes(hist),
         "trend": trend,
         "improvement_rate": round(rate, 4) if rate is not None else None,
         "train_time_s": round(sum(r.get("duration") or 0.0 for r in hist), 1),
-        # Amr's table
-        "completion_rate": round(len(won_eps) / total_eps, 3) if total_eps else 0.0,
-        "mean_completion_time": round(statistics.fmean(win_times), 1) if win_times else None,
-        "completion_time_stddev": round(statistics.stdev(win_times), 1) if len(win_times) > 1 else 0.0,
-        "progress_at_death": round(statistics.fmean(progress_at_death), 3) if progress_at_death else None,
-        "deaths_per_run": round(len(dead_eps) / max(len(hist), 1), 2),
-        "death_hist": death_hist,
-        "death_cluster_entropy": round(entropy, 3),
-        "coin_collection_rate": round(coin_rate, 3),
-        "novice_expert_gap": round(expert_wr - novice_wr, 3),
         "curve": [[round(r["best"], 1), round(r["avg"], 1)] for r in hist],
+        "metrics": metrics,
     }
+
+
+def _env_causes(hist: list[dict]) -> dict[str, int]:
+    """Failure causes from the generation history (probes without an episode log).
+    A stall (STUCK) is a cause like any death — "Stall dead-ends" name why a level is hard."""
+    causes: dict[str, int] = {}
+    for r in hist:
+        for e in r["envs"]:
+            if e["status"] == "STUCK":
+                causes["Stall"] = causes.get("Stall", 0) + 1
+            elif e["status"] == "DEAD":
+                c = e.get("cause") or "?"
+                causes[c] = causes.get(c, 0) + 1
+    return causes
 
 
 def _pool_init() -> None:
@@ -211,24 +186,23 @@ def run_jobs(jobs: list[tuple], workers: int, label=None) -> None:
                 _record(i, job, cell)
 
 
-def aggregate(cells: list[dict]) -> dict:
-    """Fold one level's per-seed cells into a paper-style row (mean +- 95% CI)."""
+def aggregate(cells: list[dict], episodes: list[dict] | None = None, game: str | None = None) -> dict:
+    """Fold one level's per-seed cells into a paper-style row (mean +- 95% CI). The balance
+    metrics are computed on every seed's episodes pooled, not averaged per seed."""
     n = len(cells)
     solved = [c for c in cells if c["first_win_gen"] is not None]
     wr_m, wr_ci = mean_ci([c["win_rate"] for c in cells])
     fw_m, fw_ci = mean_ci([float(c["first_win_gen"]) for c in solved])
     bg = [float(c["best_gen"]) for c in cells if c.get("best_gen")]
     bg_m, bg_ci = mean_ci(bg)
-    causes: dict[str, int] = {}
-    for c in cells:
-        for k, v in c["causes"].items():
-            causes[k] = causes.get(k, 0) + v
+    metrics = registry.compute_level(episodes, game) if episodes and game else {}
+    causes: dict[str, int] = dict(metrics.get("death_cause_distribution") or {})
+    if not metrics:
+        for c in cells:
+            for k, v in c["causes"].items():
+                causes[k] = causes.get(k, 0) + v
     total_deaths = sum(causes.values()) or 1
     dom = max(causes.items(), key=lambda kv: kv[1]) if causes else ("-", 0)
-    death_hist = [sum(c["death_hist"][i] for c in cells) for i in range(10)]
-    comp_times = [c["mean_completion_time"] for c in cells if c["mean_completion_time"] is not None]
-    comp_sd = [c["completion_time_stddev"] for c in cells if c["mean_completion_time"] is not None]
-    pad = [c["progress_at_death"] for c in cells if c["progress_at_death"] is not None]
     rates = [c["improvement_rate"] for c in cells if c.get("improvement_rate") is not None]
     return {
         "level": cells[0]["level"],
@@ -249,16 +223,8 @@ def aggregate(cells: list[dict]) -> dict:
         "trends": [c["trend"] for c in cells],
         "improvement_rate_mean": round(statistics.fmean(rates), 4) if rates else None,
         "train_time_s": round(sum(c.get("train_time_s") or 0.0 for c in cells), 1),
-        # Amr's table, aggregated
-        "completion_rate_mean": round(statistics.fmean(c["completion_rate"] for c in cells), 3),
-        "mean_completion_time": round(statistics.fmean(comp_times), 1) if comp_times else None,
-        "completion_time_stddev": round(statistics.fmean(comp_sd), 1) if comp_sd else None,
-        "progress_at_death_mean": round(statistics.fmean(pad), 3) if pad else None,
-        "deaths_per_run_mean": round(statistics.fmean(c["deaths_per_run"] for c in cells), 2),
-        "death_hist": death_hist,
-        "death_cluster_entropy_mean": round(statistics.fmean(c["death_cluster_entropy"] for c in cells), 3),
-        "coin_collection_rate_mean": round(statistics.fmean(c["coin_collection_rate"] for c in cells), 3),
-        "novice_expert_gap_mean": round(statistics.fmean(c["novice_expert_gap"] for c in cells), 3),
+        "episodes": len(episodes or []),
+        "metrics": metrics,
     }
 
 
@@ -346,7 +312,8 @@ def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR, pref
 
 def load_probe_cells(game: str, persona: str, tag: str,
                      root: str = PROBES_ROOT) -> dict[str, list[dict]]:
-    """Re-summarize every probe dir under one (game, persona, tag) from its state.json."""
+    """Re-summarize every probe dir under one (game, persona, tag) from its state.json and
+    episodes.csv. Each cell carries its episodes under "_episodes" until write_report pools them."""
     cells: dict[str, list[dict]] = {}
     for sp in sorted(glob.glob(os.path.join(root, game, persona, tag, "*", "state.json"))):
         try:
@@ -358,10 +325,13 @@ def load_probe_cells(game: str, persona: str, tag: str,
         if not hist:
             continue
         cfg = st.get("config", {})
+        eps = [e for e in episode_log.read(os.path.join(os.path.dirname(sp), "episodes.csv"))
+               if (e.get("gen") or 0) <= len(hist)]  # rows past the last saved generation: an interrupted run
         cell = summarize(hist, int(cfg.get("pop_size", 10)), str(hist[-1].get("level")),
                          int(cfg.get("seed", 0)), float(st.get("best_fitness", 0.0)),
-                         int(st.get("best_gen", 0)))
+                         int(st.get("best_gen", 0)), episodes=eps, game=game)
         cell["dir"] = os.path.dirname(sp)
+        cell["_episodes"] = eps
         # The trainer anneals mutation in place after a level's first win and saves that;
         # report the values the sweep was configured with.
         cfg = dict(cfg)
@@ -385,10 +355,12 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
     parsed = _parse_tag(tag) or (next(iter(cells.values()))[0]["pop_size"], 0)
     seeds = sorted({c["seed"] for lst in cells.values() for c in lst})
     ga_config = next(iter(cells.values()))[0].get("_config")  # same GA settings for every cell
+    rows = []
     for lst in cells.values():
+        pooled = [e for c in lst for e in c.pop("_episodes", [])]
         for c in lst:
             c.pop("_config", None)
-    rows = [aggregate(c) for c in cells.values()]
+        rows.append(aggregate(lst, pooled, game))
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{tag}.json")
     with open(out_path, "w", encoding="utf-8") as f:

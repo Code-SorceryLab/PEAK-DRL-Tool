@@ -2,9 +2,10 @@
 
 Merges the balance report and the stats dashboard: per-game sections with an
 Overview (all personas side by side) and persona tabs whose level cards expand
-in place — metrics with hover explanations, B1/B2/B3 verdicts, death maps,
-cause bars, learning curves, and agent routes drawn over the level geometry.
-Also lists every training run found under runs/. A separate instructions page
+in place — metrics grouped by balance dimension with hover explanations, per-dimension
+verdicts, death maps, cause bars, learning curves, and agent routes drawn over the level
+geometry. The balance metrics themselves are defined in code/stats/registry.py. Also lists
+every training run and manual-play session found under runs/. A separate instructions page
 is generated alongside.
 
 Run:  python -m code.neuro.report [--dir runs/balance] [--open]
@@ -26,11 +27,11 @@ from datetime import datetime
 
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
-THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .adapters import INDEXED_GAMES
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
+from code.stats import registry
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -41,7 +42,8 @@ GLYPH_NAME = {"#": "solid", "=": "one-way platform", "?": "question block", "^":
               "E": "enemy", "C": "coin / ring", "G": "goal", "S": "spring", "H": "ladder",
               "P": "player start", "D": "door"}
 
-# hover blurbs for every metric (the little info bubbles)
+# hover blurbs for the GA / probe numbers (the little info bubbles); the balance metrics'
+# blurbs come from code/stats/registry.py (TIPS_ALL below)
 TIPS = {
     "Status": "solved = every seed's population won at least once · partial (n/N seeds) = only some "
               "seeds cracked it · unsolved = no seed ever won. On the Overview it is the best across personas.",
@@ -50,41 +52,18 @@ TIPS = {
                 "Green means the population beats the level more often than not.",
     "First win": "How many generations evolution needed to solve the level once — "
                  "the primary difficulty signal. Lower = easier.",
-    "Completion": "Wins divided by every episode of the whole probe, including early chaotic generations.",
-    "Mean win time": "Average in-game time of the winning runs only, ± the standard deviation "
-                     "of those win times (averaged across seeds).",
     "Best gen": "Generation at which the all-time best genome was found (mean ± 95% CI across seeds). "
                 "Close to First win = the population peaks as soon as it solves the level.",
     "Improvement": "Rate of improvement: slope of best progress per generation, as a share of the level, "
                    "measured from gen 1 to the generation the peak was first reached.",
     "Train time": "Wall-clock time spent evolving on this level, summed over all seeds.",
-    "Progress at death": "How far through the level failing agents get on average (0% = start, 100% = goal).",
-    "Deaths per gen": "Average deaths per generation (one attempt per population member).",
-    "Death spread": "Entropy of death locations: 0 = everyone dies at one learnable chokepoint, "
-                    "1 = deaths scattered everywhere (feels random).",
     "Dominant cause": "The single failure mode that kills most agents: Enemy, Pit, Saw, Spike, Stall, OOB.",
-    "Coin rate": "Coins collected / coins available (100% when the level has none).",
-    "Skill gap": "Win rate in the last third of generations minus the first third — how much the population learned.",
     "Stuck rate": "Episodes ended by the stall detector (no forward progress for 5 seconds).",
-    "Strategies": "Distinct route clusters among winning runs (needs 2+ wins with logged routes).",
-    "Dominant path": "Share of winning runs that follow the most common route. Near 100% = one true path.",
-    "B1": "Challenge calibration: completion rate and win time vs the target band in "
-          "code/stats/MarioThresholds.yaml. Bands are designer-set, not human-calibrated yet.",
-    "B2": "Punishment severity: deaths per run and death spread vs their target bands.",
-    "B3": "Strategy diversity: route-cluster count and dominant-path share vs their target bands.",
 }
+TIPS_ALL = {**TIPS, **{m.label: m.tip for m in registry.METRICS}}
 
 
 # ── data loading ─────────────────────────────────────────────────────────────
-
-def _load_thresholds() -> dict:
-    try:
-        import yaml
-        with open(THRESHOLDS_PATH, encoding="utf-8") as f:
-            return (yaml.safe_load(f) or {}).get("metrics", {})
-    except Exception:
-        return {}
-
 
 def _level_file(game: str, level: str) -> str | None:
     import yaml
@@ -232,7 +211,7 @@ def _config_html(sections: list[tuple[str, dict]]) -> str:
 
 def _collect_routes(game: str, persona: str, level: str, tag: str | None,
                     max_routes: int = 22) -> list[dict]:
-    """Route traces for one (game, persona, level) from the probe episode CSVs."""
+    """Route traces for one (game, persona, level) from the probe episode logs."""
     won_raw, lost_raw = [], []
     sub = (game, persona, tag) if tag else (game,)  # legacy reports pre-date the tagged layout
     pattern = os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_"), "episodes.csv")
@@ -240,18 +219,20 @@ def _collect_routes(game: str, persona: str, level: str, tag: str | None,
         try:
             with open(path, encoding="utf-8", newline="") as f:
                 for row in csv.DictReader(f):
-                    if str(row.get("world")) != str(level) or row.get("persona") != persona:
+                    if str(row.get("level")) != str(level) or row.get("persona") != persona:
                         continue
-                    (won_raw if (row.get("cause_of_death") or "").lower() == "success"
-                     else lost_raw).append(row.get("route") or "[]")
+                    (won_raw if row.get("status") == "WON" else lost_raw).append(row.get("route") or "[]")
         except OSError:
             continue
 
-    def parse(raw: str) -> list | None:  # only the kept rows are parsed — the CSVs run to 10^5+ rows
+    def parse(raw: str) -> list | None:  # only the kept rows are parsed — the logs run to 10^5+ rows
         try:
-            pts = ast.literal_eval(raw)
-        except (ValueError, SyntaxError):
-            return None
+            pts = json.loads(raw)
+        except ValueError:
+            try:
+                pts = ast.literal_eval(raw)
+            except (ValueError, SyntaxError):
+                return None
         if len(pts) < 2:
             return None
         step = max(1, len(pts) // 60)  # ≤60 points per embedded route
@@ -260,49 +241,6 @@ def _collect_routes(game: str, persona: str, level: str, tag: str | None,
     won = [p for p in map(parse, won_raw[:10]) if p]
     lost = [p for p in map(parse, lost_raw[-(max_routes - len(won)):]) if p]
     return [{"p": p, "w": 1} for p in won] + [{"p": p, "w": 0} for p in lost]
-
-
-def _cluster_strategies(won_routes: list[list[list[float]]]) -> tuple[int, float] | None:
-    """Amr's B3: 50-bin height profiles, greedy centroid clustering (threshold 96px)."""
-    try:
-        import numpy as np
-    except ImportError:
-        return None
-    if len(won_routes) < 2:
-        return None
-    xs_all = [p[0] for r in won_routes for p in r]
-    x_min, x_max = min(xs_all), max(xs_all)
-    if x_max - x_min < 1:
-        return None
-    profiles = []
-    for r in won_routes:
-        xs = np.array([p[0] for p in r], float)
-        ys = np.array([p[1] for p in r], float)
-        edges = np.linspace(x_min, x_max, 51)
-        prof = np.full(50, np.nan)
-        for i in range(50):
-            m = (xs >= edges[i]) & (xs < edges[i + 1])
-            if m.any():
-                prof[i] = ys[m].mean()
-        valid = ~np.isnan(prof)
-        if valid.sum() < 2:
-            continue
-        prof = np.interp(np.arange(50), np.where(valid)[0], prof[valid])
-        profiles.append(prof)
-    if len(profiles) < 2:
-        return None
-    clusters, cents = [[0]], [profiles[0].copy()]
-    for i in range(1, len(profiles)):
-        d = [float(np.mean(np.abs(profiles[i] - c))) for c in cents]
-        best = int(np.argmin(d))
-        if d[best] <= 96:
-            clusters[best].append(i)
-            cents[best] = np.mean([profiles[j] for j in clusters[best]], axis=0)
-        else:
-            clusters.append([i])
-            cents.append(profiles[i].copy())
-    dominant = max(len(c) for c in clusters) / len(profiles)
-    return len(clusters), dominant
 
 
 def _logo_b64() -> str | None:
@@ -369,51 +307,36 @@ def _game_icon(game: str) -> str:
     return f'<span class="gicon gletter">{game[:1].upper()}</span>'
 
 
-# ── verdicts (B1/B2/B3 vs threshold bands) ──────────────────────────────────
+# ── verdicts (per balance dimension, vs threshold bands) ─────────────────────
 
-def _in_band(value, target, warn) -> bool:
-    return value is not None and abs(value - target) <= warn
-
-
-def _verdicts(row: dict, strat: tuple[int, float] | None, th: dict) -> str:
-    out = []
-    b1 = (th.get("B1_challenge_calibration") or {}).get("thresholds", {})
-    cr_ok = _in_band(row.get("completion_rate_mean"), b1.get("target_completion_rate", 0.7),
-                     b1.get("warning_completion_rate_difference", 0.2))
-    t_ok = _in_band(row.get("mean_completion_time"), b1.get("target_mean_completion_time", 20),
-                    b1.get("warning_mean_completion_time_difference", 4))
-    out.append(("B1 challenge", cr_ok and t_ok, cr_ok or t_ok, TIPS["B1"]))
-    b2 = (th.get("B2_punishment_severity") or {}).get("thresholds", {})
-    d_ok = _in_band(row.get("deaths_per_run_mean"), b2.get("target_deaths_per_run", 2),
-                    b2.get("warning_deaths_per_run", 1))
-    e_ok = _in_band(row.get("death_cluster_entropy_mean"), b2.get("target_death_cluster_entropy", 0.4),
-                    b2.get("warning_death_cluster_entropy", 0.1))
-    out.append(("B2 punishment", d_ok and e_ok, d_ok or e_ok, TIPS["B2"]))
-    if strat is not None:
-        b3 = (th.get("B3_strategy_diversity") or {}).get("thresholds", {})
-        s_ok = _in_band(strat[0], b3.get("target_strategy_count", 2), b3.get("warning_strategy_count", 1))
-        p_ok = _in_band(strat[1], b3.get("target_dominant_path_share", 0.5),
-                        b3.get("warning_dominant_path_share", 0.1))
-        out.append(("B3 diversity", s_ok and p_ok, s_ok or p_ok, TIPS["B3"]))
+def _verdicts(metrics: dict, game: str, th: dict) -> str:
     pills = []
-    for label, ok, partial, tip in out:
-        cls = "pill-ok" if ok else ("pill-warn" if partial else "pill-bad")
-        word = "in band" if ok else ("partial" if partial else "off band")
-        pills.append(f'<span class="pill {cls} tip" data-tip="{tip}" tabindex="0">{label}: {word}</span>')
+    for dim, state in registry.verdicts(metrics, game, th):
+        keys = [k for k in registry.VERDICT_METRICS[dim] if k in th["bands"]]
+        bands = "; ".join(f"{registry.BY_KEY[k].label} {th['bands'][k]['target']} ± {th['bands'][k]['warning']}"
+                          for k in keys)
+        tip = (f"{registry.DIMENSIONS[dim]}: {bands}. Bands from code/stats/thresholds/default.yaml "
+               f"(overridden by {game}.yaml). Designer-set, not human-calibrated yet.")
+        cls = {"ok": "pill-ok", "partial": "pill-warn", "bad": "pill-bad"}[state]
+        word = {"ok": "in band", "partial": "partial", "bad": "off band"}[state]
+        pills.append(f'<span class="pill {cls} tip" data-tip="{tip}" tabindex="0">'
+                     f'{dim} {registry.DIMENSIONS[dim].split(" (")[0].lower()}: {word}</span>')
     return " ".join(pills)
 
 
-def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, str, str]:
+def _verdict_sentence(row: dict) -> tuple[str, str, str]:
     """(word, colour, one plain-English sentence) a designer can act on without reading the tiles."""
+    m = row.get("metrics") or {}
     wr, solved, seeds = row["win_rate_mean"], row["solved_by"], row["seeds"]
-    hist = row.get("death_hist") or []
+    hist = m.get("death_progress_hist") or []
     peak = max(range(len(hist)), key=lambda i: hist[i]) if hist and max(hist) else None
     cause = _cause_name(row["dominant_cause"])
     frac = row["dominant_cause_frac"]
     where = f"in the {peak * 10}–{peak * 10 + 10} % stretch" if peak is not None else "with no single hotspot"
+    strat = m.get("strategy_count")
     if solved == 0:
         word, color = "too hard", "var(--red)"
-        pad = row.get("progress_at_death_mean")
+        pad = m.get("progress_at_death")
         sent = (f"No seed ever reached the goal — the best agents die at {pad:.0%} of the level, "
                 f"<b>{cause}</b> accounts for {frac:.0%} of deaths {where}. "
                 "Ease that stretch or give the player a tool for it.") if pad is not None else \
@@ -426,7 +349,7 @@ def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, 
         word, color = "learnable", "var(--green)"
         sent = (f"Every seed wins and keeps winning ({wr:.0%} after the first win). "
                 f"<b>{cause}</b> is still the main killer ({frac:.0%}, {where})"
-                + (f"; {strat[0]} distinct winning routes." if strat else "."))
+                + (f"; {strat} distinct winning routes." if strat else "."))
     else:
         word, color = "inconsistent", "var(--yellow)"
         sent = (f"Every seed wins at least once, but only {wr:.0%} of the time afterwards — "
@@ -793,6 +716,9 @@ CSS = """
   html.file .served-only,html:not(.file) .file-only{display:none}
   .cmdrow code.cmd{flex:1;min-width:260px;margin:6px 0}
   canvas.routes{display:block;border-radius:4px;margin:0 auto}
+  .dimh{font:600 .72rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+    margin:14px 0 6px}
+  .dimnote{font-size:.78rem;color:var(--faint);margin-top:4px}
 
   .tbltitle{font:600 .78rem var(--ui);letter-spacing:.1em;text-transform:uppercase;
     color:var(--dim);margin:20px 0 8px}
@@ -895,7 +821,7 @@ def _causebar(causes: dict[str, int]) -> str:
 
 
 def _stat(label: str, value: str, sub: str = "") -> str:
-    tip = TIPS.get(label, "")
+    tip = TIPS_ALL.get(label, "")
     return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}" tabindex="0" aria-label="{label}: {tip}">{label} ⓘ</div>'
             f'<div class="val">{value}</div>'
             + (f'<div class="sub">{sub}</div>' if sub else "") + "</div>")
@@ -940,32 +866,55 @@ def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> tuple[
             f'from the repo root (or menu 6 → pick this probe).</span>{note}</div></div>', href)
 
 
-def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None) -> str:
+def _dimension_blocks(game: str, m: dict, cross: dict) -> str:
+    """Every balance metric that applies to this game, grouped by the eight dimensions."""
+    blocks = []
+    level_ms = registry.metrics_for(game, include_hidden=False)
+    cross_ms = registry.metrics_for(game, "persona")
+    for dim, name in registry.DIMENSIONS.items():
+        stats = [_stat(x.label, registry.fmt(x.key, m.get(x.key)))
+                 for x in level_ms if x.dims and x.dims[0] == dim and x.fmt not in ("grid",)]
+        stats += [_stat(x.label, registry.fmt(x.key, cross.get(x.key)),
+                        "personas of this config" if x.fmt == "tiers" else "novice vs speedrunner, same config")
+                  for x in cross_ms if x.dims[0] == dim]
+        also = [x.label for x in level_ms if len(x.dims) > 1 and dim in x.dims[1:]]
+        if not stats and not also:
+            continue
+        note = f'<div class="dimnote">also: {", ".join(also)} (listed above)</div>' if also else ""
+        blocks.append(f'<div class="dimh">{dim} · {name}</div><div class="stats">{"".join(stats)}</div>{note}')
+    return "".join(blocks)
+
+
+def _map_viz(title: str, grid: list[str], heat: dict | None, caption: str) -> str:
+    if not grid or not heat:
+        return ""
+    payload = json.dumps({"grid": grid, "ts": 32, "routes": [], "heat": heat})
+    return f"""
+        <div class="viz"><div class="vt">{title}
+            <button class="fsbtn" type="button">⛶ full screen</button></div>
+          <div class="routewrap"><canvas class="routes" width="1100" height="200" data-routes='{payload}' role="img"
+            aria-label="{title}"></canvas></div>
+          <div class="caption">{caption}</div></div>"""
+
+
+def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None,
+          cross: dict | None = None) -> str:
+    m = row.get("metrics") or {}
+    cross = cross or {}
     wr = row["win_rate_mean"]
     fw = (f"first win gen {row['first_win_mean']}" if row["first_win_mean"] is not None
-          else f"best progress {row.get('progress_at_death_mean') or 0:.0%}")
+          else f"progress at death {registry.fmt('progress_at_death', m.get('progress_at_death'))}")
     color = _wr_var(row)
-    mct = (f"{row['mean_completion_time']}s" if row.get("mean_completion_time") is not None else "—")
-    pad = (f"{row['progress_at_death_mean']:.0%}" if row.get("progress_at_death_mean") is not None else "—")
-    gap = row.get("novice_expert_gap_mean", 0.0)
     fw_full = (f"gen {row['first_win_mean']} ± {row['first_win_ci']}"
                if row["first_win_mean"] is not None else "never")
     bg_full = (f"gen {row['best_gen_mean']} ± {row['best_gen_ci']}"
                if row.get("best_gen_mean") is not None else "—")
-    sd = row.get("completion_time_stddev")
-    if sd is None and cells:  # legacy rows: derive from the per-seed cells
-        sds = [c["completion_time_stddev"] for c in cells if c.get("mean_completion_time") is not None]
-        sd = round(sum(sds) / len(sds), 1) if sds else None
-    if mct != "—" and sd is not None:
-        mct += f" ± {sd}s"
     rate = row.get("improvement_rate_mean")
-    pop = row.get("pop_size") or (cells[0].get("pop_size") if cells else None)  # legacy: unknown
     ttime = row.get("train_time_s")
     if ttime is None:
         ttime = sum(c.get("train_time_s") or 0 for c in cells)
 
     routes = _collect_routes(game, persona, row["level"], tag)
-    strat = _cluster_strategies([r["p"] for r in routes if r["w"]])
     grid = _level_grid(game, row["level"])
     cfg_html = _config_html(_level_config(game, row["level"], grid))
 
@@ -974,25 +923,17 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved"),
         _stat("Dominant cause", _cause_name(row["dominant_cause"]),
               f"{row['dominant_cause_frac']:.0%} of deaths"),
-        _stat("Death spread", f"{row.get('death_cluster_entropy_mean', 0):.2f}",
+        _stat("Death spread", registry.fmt("death_cluster_entropy", m.get("death_cluster_entropy")),
               "0 = one hotspot · 1 = everywhere"),
     ]
-    stats = [
+    ga_stats = [
         _stat("Best gen", bg_full, "where the record genome appeared"),
         _stat("Improvement", f"{rate:+.1%}/gen" if rate is not None else "—", "of the level per generation"),
-        _stat("Completion", f"{row.get('completion_rate_mean', 0):.0%}", "wins / all episodes"),
-        _stat("Mean win time", mct, "mean ± std of winning runs"),
-        _stat("Progress at death", pad, "how far failers get"),
-        _stat("Deaths per gen", f"{row.get('deaths_per_run_mean', 0)}", f"of {pop} attempts" if pop else "per generation"),
-        _stat("Coin rate", f"{row.get('coin_collection_rate_mean', 1):.0%}", "collected / available"),
-        _stat("Skill gap", f"{gap:+.0%}", "late-gen wins − early-gen wins"),
+        _stat("Learning gain", registry.fmt("learning_gain", m.get("learning_gain")), "late-gen wins − early-gen wins"),
         _stat("Stuck rate", f"{row['stuck_frac_mean']:.0%}", "episodes ending in a stall"),
         _stat("Train time", fmt_hms(ttime), f"all {row['seeds']} seeds, wall-clock"),
     ]
-    if strat is not None:
-        stats.append(_stat("Strategies", str(strat[0]), "distinct winning routes"))
-        stats.append(_stat("Dominant path", f"{strat[1]:.0%}", "share on the top route"))
-    vword, vcolor, vsent = _verdict_sentence(row, strat)
+    vword, vcolor, vsent = _verdict_sentence(row)
     watch_html, watch_href = _watch_cmd(game, persona, row["level"], cells)
     did = "d_" + "".join(ch if ch.isalnum() else "_" for ch in f"{game}_{persona}_{tag or 'legacy'}_{row['level']}")
 
@@ -1017,6 +958,11 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
           <div class="caption">Level geometry and entities with sampled agent traces: green = winning
           runs, red = failed runs (drawn faint). Where red lines stop is where agents die.
           {'' if routes else 'No route traces logged for this level yet.'}</div></div>"""
+    death_map = _map_viz("Death map — where on the level agents die", grid, m.get("death_location_heatmap"),
+                         "Each yellow tile is a place agents died; brighter = more deaths. "
+                         + ("On Bomberman's grid a tile is one arena cell." if game == "bomberman" else ""))
+    bomb_map = _map_viz("Bomb map — where agents place bombs", grid, m.get("bomb_locations"),
+                        "Yellow tiles: where bombs were placed; brighter = more bombs.") if game == "bomberman" else ""
 
     foot = (f'<div class="cardfoot"><a class="watchbtn" href="{watch_href}" target="_blank" rel="noopener" '
             f'aria-label="Watch the best {row["level"]} agent">▶ watch</a>'
@@ -1039,19 +985,23 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         <div class="dverdict" style="--c:{vcolor}">
           <span class="verdict">{vword}</span>
           <p class="vsent">{vsent}</p>
-          <div class="verdicts">{_verdicts(row, strat, th)}</div>
+          <div class="verdicts">{_verdicts(m, game, th)}</div>
         </div>
         <div class="stats headline">{''.join(headline)}</div>
         {route_viz}
+        {death_map}
         <div class="viz"><div class="vt">Where agents die (start → goal)</div>
-          {_heat(row.get('death_hist') or [0] * 10)}
-          <div class="caption">Each bin is 10% of the level. One bright bin = a single learnable
-          chokepoint; many lit bins = difficulty spread across the level.</div></div>
+          {_heat(m.get('death_progress_hist') or [0] * 10)}
+          <div class="caption">Each bin is 10% of the way from start to goal. One bright bin = a single
+          learnable chokepoint; many lit bins = difficulty spread across the level.</div></div>
         <div class="viz"><div class="vt">What kills them</div>
           {_causebar(row.get('causes') or {})}</div>
+        {bomb_map}
         {watch_html}
-        <details class="more"><summary>All {len(stats) + 4} metrics</summary>
-          <div class="stats">{''.join(stats)}</div></details>
+        <details class="more" open><summary>Balance metrics by dimension ({row.get('episodes', 0):,} episodes)</summary>
+          {_dimension_blocks(game, m, cross)}</details>
+        <details class="more"><summary>Evolution metrics</summary>
+          <div class="stats">{''.join(ga_stats)}</div></details>
         {cfg_html}
         <div class="viz"><div class="vt">Learning curves — fitness per generation, one color per seed</div>
           <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
@@ -1062,54 +1012,63 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     </div>"""
 
 
-def _metric_table(rows: list[dict]) -> str:
+def _table_metrics(game: str) -> list:
+    return [x for x in registry.metrics_for(game, include_hidden=False)
+            if x.fmt not in ("grid", "dist", "tiers") and x.dims]
+
+
+def _metric_table(rows: list[dict], game: str) -> str:
+    cols = _table_metrics(game)
     trs = []
     for r in rows:
+        m = r.get("metrics") or {}
         wr = f"{r['win_rate_mean']:.0%} ±{_ci(r):.0%}"
         fw = (f"{r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None else "—")
         solved_cls = ("wr-good" if r["solved_by"] == r["seeds"] else
                       ("wr-mid" if r["solved_by"] else "wr-bad"))
-        mct = f"{r['mean_completion_time']}s" if r.get("mean_completion_time") is not None else "—"
-        if mct != "—" and r.get("completion_time_stddev") is not None:
-            mct += f" ±{r['completion_time_stddev']}"
         bg = (f"{r['best_gen_mean']}±{r['best_gen_ci']}" if r.get("best_gen_mean") is not None else "—")
         rate = (f"{r['improvement_rate_mean']:+.1%}" if r.get("improvement_rate_mean") is not None else "—")
-        pad = f"{r['progress_at_death_mean']:.0%}" if r.get("progress_at_death_mean") is not None else "—"
+        tds = "".join(f"<td>{registry.fmt(x.key, m.get(x.key))}</td>" for x in cols)
         trs.append(
             f"<tr data-level=\"{r['level']}\" tabindex=\"0\" title=\"Open {r['level']}\"><td>{r['level']}</td>"
             f"<td class='{solved_cls}'>{r['solved_by']}/{r['seeds']}</td>"
-            f"<td>{fw}</td><td>{bg}</td><td>{rate}</td><td>{wr}</td>"
-            f"<td>{r.get('completion_rate_mean', 0):.0%}</td><td>{mct}</td>"
-            f"<td>{pad}</td><td>{r.get('deaths_per_run_mean', 0)}</td>"
-            f"<td>{r.get('death_cluster_entropy_mean', 0):.2f}</td>"
-            f"<td>{r.get('coin_collection_rate_mean', 1):.0%}</td>"
-            f"<td>{r.get('novice_expert_gap_mean', 0.0):+.0%}</td>"
+            f"<td>{fw}</td><td>{bg}</td><td>{rate}</td><td>{wr}</td>{tds}"
             f"<td>{_cause_name(r['dominant_cause'])} ({r['dominant_cause_frac']:.0%})</td>"
             f"<td>{r['stuck_frac_mean']:.0%}</td>"
             f"<td>{fmt_hms(r.get('train_time_s') or 0)}</td></tr>")
-    tip = lambda k: f'scope="col" data-sort class="tip" data-tip="{TIPS[k]}" tabindex="0"'  # noqa: E731
+    tip = lambda k: f'scope="col" data-sort class="tip" data-tip="{TIPS_ALL.get(k, "")}" tabindex="0"'  # noqa: E731
+    ths = "".join(f"<th {tip(x.label)}>{x.label}</th>" for x in cols)
     return f"""
     <div class="ovwrap"><table class="metrics">
       <thead><tr><th scope="col" data-sort>Level</th><th {tip("Solved")}>Solved</th><th {tip("First win")}>First win</th>
         <th {tip("Best gen")}>Best gen</th><th {tip("Improvement")}>Rate/gen</th>
-        <th {tip("Win rate")}>Win rate ±CI</th><th {tip("Completion")}>Completion</th>
-        <th {tip("Mean win time")}>Mean time</th><th {tip("Progress at death")}>Progress@death</th>
-        <th {tip("Deaths per gen")}>Deaths/gen</th><th {tip("Death spread")}>Death spread</th>
-        <th {tip("Coin rate")}>Coin rate</th><th {tip("Skill gap")}>Skill gap</th>
+        <th {tip("Win rate")}>Win rate ±CI</th>{ths}
         <th {tip("Dominant cause")}>Dominant cause</th><th {tip("Stuck rate")}>Stuck</th>
         <th {tip("Train time")}>Train time</th></tr></thead>
       <tbody>{''.join(trs)}</tbody>
     </table></div>
-    <div class="ovnote">Click a column to sort, a row to open that level.</div>"""
+    <div class="ovnote">Click a column to sort, a row to open that level. N/A = the metric applies to
+    this game but had no data (no wins yet, nothing to collect in the level).</div>"""
 
 
-def _overview(personas: dict[str, dict]) -> str:
+def _cross_by_level(game: str, personas: dict[str, dict]) -> dict[str, dict]:
+    """Skill-tier metrics per level, from the persona reports that share this config."""
+    by_level: dict[str, dict[str, dict]] = {}
+    for pname, data in personas.items():
+        for r in data["levels"]:
+            by_level.setdefault(r["level"], {})[pname] = r.get("metrics") or {}
+    return {lvl: registry.compute_cross(bp, game) for lvl, bp in by_level.items()}
+
+
+def _overview(personas: dict[str, dict], cross: dict[str, dict] | None = None) -> str:
     order: list[str] = []
     for data in personas.values():
         for r in data["levels"]:
             if r["level"] not in order:
                 order.append(r["level"])
     pnames = list(personas)
+    cross_ths = "".join(f"<th scope='col' class='tip' data-tip='{registry.BY_KEY[k].tip}' tabindex='0'>"
+                        f"{registry.BY_KEY[k].label} ⓘ</th>" for k in _CROSS_COLS)
     ths = "".join(f"<th scope='col' style='color:{PERSONA_COLOR.get(p, 'var(--dim)')}'>{p}<br>"
                   f"<span style='letter-spacing:0;font-weight:400;color:var(--dim)'>win rate · first win</span></th>"
                   for p in pnames)
@@ -1130,16 +1089,21 @@ def _overview(personas: dict[str, dict]) -> str:
             elif row["solved_by"] and "pill-ok" not in best_pill:
                 best_pill = '<span class="pill pill-warn">partial</span>'
         tds.insert(1, f"<td>{best_pill}</td>")
+        c = (cross or {}).get(lvl, {})
+        tds += [f"<td>{registry.fmt(k, c.get(k))}</td>" for k in _CROSS_COLS]
         trs.append("<tr>" + "".join(tds) + "</tr>")
     return f"""
       <div class="ovwrap"><table>
-        <thead><tr><th scope="col">Level</th><th scope="col" class="tip" data-tip="{TIPS['Status']}" tabindex="0">Status ⓘ</th>{ths}</tr></thead>
+        <thead><tr><th scope="col">Level</th><th scope="col" class="tip" data-tip="{TIPS['Status']}" tabindex="0">Status ⓘ</th>{ths}{cross_ths}</tr></thead>
         <tbody>{''.join(trs)}</tbody>
       </table></div>
-    <div class="ovnote">Status = best across personas. Select a persona tab for the full
-    per-level breakdown — click a card for its window with routes, death maps, causes, and curves.</div>"""
+    <div class="ovnote">Status = best across personas. Skill tiers: novice = novice, mid = experienced,
+    expert = speedrunner; the tier columns need those persona sweeps on the same config. Select a persona
+    tab for the full per-level breakdown — click a card for its window with routes, death maps, causes,
+    and curves.</div>"""
 
 
+_CROSS_COLS = ["novice_expert_gap", "novice_expert_time_gap", "completion_rate_per_skill"]
 CONFIG_COLORS = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316", "#14b8a6", "#ec4899"]
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
 PERSONA_COLOR = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#22c55e"}
@@ -1360,7 +1324,8 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
     </dialog>"""
 
 
-def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | None = None) -> str:
+def _game_section(game: str, by_tag: dict, idx: int, ga_anchor: str | None = None) -> str:
+    th = registry.load_thresholds(game)
     ga_link = (f'<a class="navbtn tip" href="gasweep.html#{ga_anchor}" '
                f'data-tip="GA hyperparameter sweep for {game}: which knobs matter, recommended config">'
                f'{_DIAL_SVG} GA sweep</a>' if ga_anchor else "")
@@ -1378,19 +1343,20 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
                     f'<small>{_tag_label(tag, data)} · {len(data["seeds"])} seeds</small></button>')
         tabs = [f'<button class="tab t-overview active" role="tab" aria-selected="true" aria-controls="{cid}_ov" '
                 f'data-view="{cid}_ov" type="button">Overview</button>']
-        pviews = [f'<div class="view active" role="tabpanel" id="{cid}_ov">{_overview(personas)}</div>']
+        cross = _cross_by_level(game, personas)
+        pviews = [f'<div class="view active" role="tabpanel" id="{cid}_ov">{_overview(personas, cross)}</div>']
         for pi, (pname, pdata) in enumerate(personas.items()):
             vid = f"{cid}_{pi}"
             tabs.append(f'<button class="tab" role="tab" aria-selected="false" aria-controls="{vid}" data-view="{vid}" '
                         f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--red)")}">{pname}</button>')
             cell_map = pdata.get("cells", {})
-            cards = "".join(_card(game, pname, r, cell_map.get(r["level"], []), th, tag)
+            cards = "".join(_card(game, pname, r, cell_map.get(r["level"], []), th, tag, cross.get(r["level"]))
                             for r in pdata["levels"])
             pviews.append(f"""
             <div class="view" role="tabpanel" id="{vid}">
               <div class="lvlgrid">{cards}</div>
               <div class="tbltitle">Full metric table — {pname}</div>
-              {_metric_table(pdata["levels"])}
+              {_metric_table(pdata["levels"], game)}
             </div>""")
         views.append(f"""
         <div class="cfgview{" active" if ti == 0 else ""}" id="{cid}">
@@ -1431,12 +1397,46 @@ def _section_id(game: str, tag: str | None) -> str:
     return f"{game}_{tag}" if tag else game
 
 
+def _metrics_rows(path: str) -> list[tuple[str, str, str, dict]]:
+    """(game, level, persona, metrics) rows from a metrics.json written by code/stats/summarize.py."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [(g, lvl, p, m) for g, levels in (data.get("games") or {}).items()
+            for lvl, by_p in levels.items() for p, m in by_p.items() if not p.startswith("_")]
+
+
+_SUMMARY_COLS = ["completion_rate", "mean_completion_time", "progress_at_death", "deaths_per_run",
+                 "death_cluster_entropy"]
+
+
+def _summary_cells(game: str, m: dict) -> str:
+    cells = [f"<td>{m.get('_episodes', 0):,}</td>"]
+    for k in _SUMMARY_COLS:
+        v = registry.fmt(k, m.get(k)) if game in registry.BY_KEY[k].games else "—"
+        cells.append(f"<td>{v}</td>")
+    causes = m.get("death_cause_distribution") or {}
+    top = next(iter(causes.items()), None)
+    cells.append(f"<td>{_cause_name(top[0]) if top else '—'}</td>")
+    return "".join(cells)
+
+
+def _summary_ths() -> str:
+    return ("<th scope='col'>Episodes</th>"
+            + "".join(f"<th scope='col' class='tip' data-tip='{registry.BY_KEY[k].tip}' tabindex='0'>"
+                      f"{registry.BY_KEY[k].label} ⓘ</th>" for k in _SUMMARY_COLS)
+            + "<th scope='col'>Top cause</th>")
+
+
 def _runs_section() -> str:
-    """Every training run under runs/ (probes and balance output excluded)."""
-    rows = []
+    """Every training run under runs/ (probes and balance output excluded), with its balance
+    metrics when it was trained with metrics on."""
+    rows, mrows = [], []
     for sp in sorted(glob.glob(os.path.join("runs", "*", "state.json"))):
         name = os.path.basename(os.path.dirname(sp))
-        if name in ("balance", "probes", "gasweep", "_replay"):
+        if name in ("balance", "probes", "gasweep", "_replay", "manual", "ablation"):
             continue
         try:
             with open(sp, encoding="utf-8") as f:
@@ -1452,8 +1452,16 @@ def _runs_section() -> str:
                     f"<td>{s.get('best_level') or '—'}</td>"
                     f"<td class='{'wr-good' if wins else 'wr-na'}'>{wins}</td>"
                     f"<td>{tsec // 3600}:{tsec % 3600 // 60:02d}:{tsec % 60:02d}</td></tr>")
+        for game, lvl, persona, m in _metrics_rows(os.path.join(os.path.dirname(sp), "metrics.json")):
+            mrows.append(f"<tr><td>{name}</td><td>{lvl}</td>{_summary_cells(game, m)}</tr>")
     if not rows:
         return ""
+    metrics_html = "" if not mrows else f"""
+    <div class="tbltitle">Balance metrics of runs trained with metrics on
+      (<code>runs/&lt;name&gt;/metrics.json</code>)</div>
+    <div class="ovwrap"><table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Level</th>{_summary_ths()}</tr></thead>
+      <tbody>{''.join(mrows)}</tbody></table></div>"""
     return f"""
   <section class="game" id="g_runs" aria-labelledby="g_runs_t">
     <div class="gamehead">
@@ -1464,6 +1472,28 @@ def _runs_section() -> str:
     <div class="body"><div class="ovwrap"><table>
       <thead><tr><th scope="col">Run</th><th scope="col">Persona</th><th scope="col">Gens</th><th scope="col">Best fitness</th>
         <th scope="col">Best level</th><th scope="col">Total wins</th><th scope="col">Train time</th></tr></thead>
+      <tbody>{''.join(rows)}</tbody>
+    </table></div>{metrics_html}</div>
+  </section>"""
+
+
+def _manual_section() -> str:
+    """Manual-play sessions recorded with metrics on (runs/manual/<game>/<level>/)."""
+    rows = []
+    for path in sorted(glob.glob(os.path.join("runs", "manual", "*", "*", "metrics.json"))):
+        for game, lvl, persona, m in _metrics_rows(path):
+            rows.append(f"<tr><td>{game}</td><td>{lvl}</td>{_summary_cells(game, m)}</tr>")
+    if not rows:
+        return ""
+    return f"""
+  <section class="game" id="g_manual" aria-labelledby="g_manual_t">
+    <div class="gamehead">
+      <button class="chev" type="button" aria-expanded="true" aria-label="Collapse manual play">▾</button>
+      <h2 class="gametag" id="g_manual_t" style="background:#3b2a5f">Manual play</h2>
+      <span class="gamemeta">human sessions recorded with metrics on · every attempt is one life ·
+      full metrics in runs/manual/&lt;game&gt;/&lt;level&gt;/metrics.json</span></div>
+    <div class="body"><div class="ovwrap"><table>
+      <thead><tr><th scope="col">Game</th><th scope="col">Level</th>{_summary_ths()}</tr></thead>
       <tbody>{''.join(rows)}</tbody>
     </table></div></div>
   </section>"""
@@ -1876,6 +1906,13 @@ function drawRoutes(cv, maxW, maxH){
     ctx.stroke();
     ctx.globalAlpha = 1;
   };
+  if (d.heat){  // death map / bomb map: tiles tinted by count
+    const mx = Math.max(1, ...d.heat.cells.map(c => c[2])), hc = d.heat.tile * scale;
+    for (const [tx, ty, n] of d.heat.cells){
+      ctx.fillStyle = `rgba(250,204,21,${(0.35 + 0.65 * n / mx).toFixed(2)})`;  // yellow: red is hazards + enemies
+      ctx.fillRect(tx * hc, ty * hc, hc + 0.5, hc + 0.5);
+    }
+  }
   const lw = Math.max(1, scale * d.ts / 7);
   for (const r of d.routes) if (!r.w) draw(r, '#ef4444', lw, 0.30);
   for (const r of d.routes) if (r.w) draw(r, '#22c55e', lw * 1.6, 0.85);
@@ -1922,12 +1959,14 @@ GLOSSARY = """
   </details>"""
 
 
-def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") -> str:
+def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report", has_manual: bool = False) -> str:
     img = f'<img src="data:image/png;base64,{logo}" alt="">' if logo else ""
     links = "" if page != "report" else "".join(
         f'<a href="report.html#g_{g}">{_game_icon(g)}{g}</a>' for g in games)
     if has_runs and page == "report":
         links += '<a href="report.html#g_runs">runs</a>'
+    if has_manual and page == "report":
+        links += '<a href="report.html#g_manual">manual</a>'
     if page != "report":
         links += '<a class="doc" href="report.html">← Balance report</a>'
     links += ('<a class="doc" href="ablation.html"' + (' aria-current="page"' if page == "ablation" else "")
@@ -1947,6 +1986,14 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
 
 def _instructions_page(games: list[str], logo: str | None) -> str:
     tips = "".join(f"<li><b>{k}</b> — {v}</li>" for k, v in TIPS.items())
+    dims = ""
+    for dim, name in registry.DIMENSIONS.items():
+        items = []
+        for x in registry.METRICS:
+            if dim in x.dims and not x.hidden:
+                games = "all games" if x.games == registry.ALL_GAMES else ", ".join(sorted(x.games))
+                items.append(f"<li><b>{x.label}</b> <code>{x.key}</code> ({games}) — {x.tip}</li>")
+        dims += f"<h3>{dim} · {name}</h3><ul>{''.join(items)}</ul>"
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Balance Command — Instructions</title><style>{CSS}</style></head><body>
@@ -2017,27 +2064,24 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
     <li><b>Win rate</b> — WON episodes ÷ all episodes in the 10 generations after the first win
     (a probe stops 10 generations after its first win, or at the budget). Levels that were never won
     score 0.</li>
-    <li><b>Completion</b> — WON ÷ all episodes of the whole probe, early chaos included.</li>
-    <li><b>Mean win time ± std</b> — in-game seconds (frames ÷ 60) of WON episodes: mean, and the
-    standard deviation of win times averaged across seeds.</li>
     <li><b>Improvement</b> — least-squares slope of the per-generation best x, from gen 1 to the
     generation the peak was first reached, divided by the level length (share of level per gen).</li>
-    <li><b>Progress at death</b> — mean of end x ÷ level length over DEAD + STUCK episodes.</li>
-    <li><b>Deaths per gen</b> — (DEAD + STUCK episodes) ÷ generations; one attempt per population member.</li>
-    <li><b>Death spread</b> — entropy of the death-position histogram (10 bins), normalized to 0..1.</li>
     <li><b>Dominant cause</b> — most frequent failure cause over DEAD + STUCK episodes, with its share.</li>
     <li><b>Stuck rate</b> — STUCK episodes ÷ all episodes.</li>
-    <li><b>Skill gap</b> — win rate of the last third of generations minus the first third.</li>
-    <li><b>Coin rate</b> — mean over episodes of coins collected ÷ coins in the level (1 if none).</li>
-    <li><b>Strategies / Dominant path</b> — winning routes clustered by shape; cluster count and the
-    share on the biggest cluster (needs ≥2 logged wins).</li>
     <li><b>Train time</b> — wall-clock seconds the trainer spent per generation, summed.</li>
-    <li><b>B1 / B2 / B3</b> — each metric compared with the target ± warning bands in
-    <code>code/stats/MarioThresholds.yaml</code>.</li>
+    <li><b>Balance metrics</b> — pooled over every seed's episodes of the level (each episode is one
+    genome's one life, logged to <code>episodes.csv</code>). Defined once in
+    <code>code/stats/registry.py</code>, grouped by the eight balance dimensions below.</li>
+    <li><b>Verdict pills</b> — a dimension's banded metrics against target ± warning in
+    <code>code/stats/thresholds/default.yaml</code>, overridden per game by <code>&lt;game&gt;.yaml</code>:
+    all in band = in band, some = partial, none = off band.</li>
   </ul>
 
-  <h2>Every metric</h2>
+  <h2>Evolution metrics</h2>
   <ul>{tips}</ul>
+
+  <h2>Balance metrics by dimension</h2>
+  {dims}
 
   <h2>Reproducibility</h2>
   <p>Everything is deterministic under a seed. Default probe seeds are
@@ -2731,11 +2775,10 @@ def build(balance_dir: str) -> dict[str, str]:
     games: dict[str, dict] = {}  # game -> tag -> persona -> data (tagged configs first, legacy last)
     for (g, t), personas in sorted(flat.items(), key=lambda kv: (kv[0][0], kv[0][1] is None, kv[0][1] or "")):
         games.setdefault(g, {})[t] = personas
-    th = _load_thresholds()
     logo = _logo_b64()
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    sections = [_game_section(g, by_tag, i, th, ga_anchor.get(g)) for i, (g, by_tag) in enumerate(games.items())]
-    runs_html = _runs_section()
+    sections = [_game_section(g, by_tag, i, ga_anchor.get(g)) for i, (g, by_tag) in enumerate(games.items())]
+    runs_html = _runs_section() + _manual_section()
     total = sum(_train_time(d) for by_tag in games.values() for p in by_tag.values() for d in p.values())
     body = "".join(sections) + runs_html if sections or runs_html else \
         "<p style='color:var(--dim)'>No balance data yet — run a Full Sweep (menu 13) or Sensor Ablation (menu 14) first.</p>"
@@ -2743,7 +2786,7 @@ def build(balance_dir: str) -> dict[str, str]:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23070708'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Balance Command</title><style>{CSS}</style></head><body>
-{_nav(list(games), bool(runs_html), logo)}
+{_nav(list(games), 'id="g_runs"' in runs_html, logo, has_manual='id="g_manual"' in runs_html)}
 <main id="main">
   <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
     multi-seed neuroevolution probes · generated {stamp} · total probe train time {fmt_hms(total)}</div>

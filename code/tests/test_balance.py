@@ -155,3 +155,18 @@ def test_gaconfig_for_game_lets_explicit_args_win(tmp_path):
         assert GAConfig.for_game("sonic").memory == GAConfig().memory
     finally:
         gs.BEST_PATH = old
+
+
+def test_balance_metrics_come_from_the_episode_log_pooled_across_seeds():
+    hist = [_row(1, ["DEAD", "WON"], 500.0)]
+    ep = lambda s: {"status": s, "cause": "" if s == "WON" else "Pit", "time_s": 5.0,  # noqa: E731
+                    "progress": 1.0 if s == "WON" else 0.25}
+    seed1 = [ep("WON"), ep("DEAD")]
+    seed2 = [ep("DEAD"), ep("DEAD")]
+    c1 = summarize(hist, 2, "L", 1, 5500.0, 1, episodes=seed1, game="mario")
+    c2 = summarize(hist, 2, "L", 2, 500.0, 1, episodes=seed2, game="mario")
+    assert c1["metrics"]["completion_rate"] == 0.5 and c1["causes"] == {"Pit": 1}
+    row = aggregate([c1, c2], seed1 + seed2, "mario")
+    assert row["metrics"]["completion_rate"] == 0.25      # pooled: 1 win in 4 episodes
+    assert row["metrics"]["deaths_per_run"] == 3.0        # pooled: 3 deaths per 1 win (per-seed mean would be 1.5)
+    assert row["dominant_cause"] == "Pit" and row["episodes"] == 4

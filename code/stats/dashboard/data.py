@@ -10,10 +10,12 @@ import pandas as pd
 import numpy as np
 import yaml
 
+from code.stats import episode_log, registry
+
 
 # Path constants
 
-CONFIG_PATH = "code/stats/MarioThresholds.yaml"
+CONFIG_PATH = os.path.join(registry.THRESHOLDS_DIR, "default.yaml")
 GAME_CONFIG_PATH = "code/games/game_config.yaml"
 MEATBOY_CONFIG_PATH = "code/games/meatboy_config.yaml"
 LEVELS_ROOT = "code/games/levels"
@@ -83,50 +85,47 @@ def load_level_grid(level_file_path):
     return grid, len(rows_raw), max_cols
 
 
-def parse_route(route_str):
-    """Parse a route string like '[(x,y), ...]' into a list of (x,y) floats."""
-    if not isinstance(route_str, str) or not route_str.strip():
+def parse_route(route):
+    """A route as a list of (x, y): episode logs already hold lists; older CSVs held strings."""
+    if isinstance(route, list):
+        return route
+    if not isinstance(route, str) or not route.strip():
         return []
     try:
-        return ast.literal_eval(route_str.strip())
+        return ast.literal_eval(route.strip())
     except Exception:
         return []
 
 
 @st.cache_data
-def load_all_csvs(data_path):
-    """Read all CSVs (recursively) from one path or a list of paths."""
-    paths = data_path if isinstance(data_path, list) else [data_path]
-    files = []
-    for p in paths:
-        files += glob.glob(os.path.join(p, "**", "*.csv"), recursive=True)
-    if not files:
+def load_all_csvs(patterns):
+    """Every episode log matching the glob patterns (thresholds default.yaml: dashboard_paths)."""
+    patterns = patterns if isinstance(patterns, list) else [patterns]
+    files = sorted({f for p in patterns for f in glob.glob(p, recursive=True)})
+    rows = [r for fp in files for r in episode_log.read(fp)]
+    if not rows:
         return pd.DataFrame()
-    dfs = []
-    for fp in files:
-        try:
-            df = pd.read_csv(fp)
-            dfs.append(df)
-        except Exception:
-            continue
-    if not dfs:
-        return pd.DataFrame()
-    df = pd.concat(dfs, ignore_index=True)
-    # meatboy worlds are numeric strings ("0".."10") — pandas infers int per-file,
-    # mario infers str, and sorted() on the mix crashes. Normalize once here.
-    for col in ("world", "persona", "game"):
+    df = pd.DataFrame(rows)
+    # level ids are text ("0".."14" for the indexed games); "world" is the dashboard's name for it
+    for col in ("level", "persona", "game", "source"):
         if col in df.columns:
             df[col] = df[col].astype(str)
+    df["world"] = df["level"]
     return df
+
+
+def episodes(df, game, world, persona=None):
+    """Episode rows (dicts, as the registry takes them) for one game + level [+ persona]."""
+    sub = df[(df["game"] == game) & (df["world"] == world)]
+    if persona is not None:
+        sub = sub[sub["persona"] == persona]
+    return [{k: v for k, v in r.items() if not (isinstance(v, float) and np.isnan(v))}
+            for r in sub.to_dict("records")]
 
 
 # Helpers
 
-def win_rate(df, world, persona):
-    """Win rate = fraction of runs where cause_of_death == 'Success'."""
-    sub = df[(df["world"] == world) & (df["persona"] == persona)]
-    if len(sub) == 0:
-        return None
-    successes = sub["cause_of_death"].str.lower()
-    wins = (successes == "success").sum()
-    return wins / len(sub)
+def win_rate(df, game, world, persona):
+    """Completion rate of one persona on one level (the registry's completion_rate)."""
+    eps = episodes(df, game, world, persona)
+    return registry.completion_rate(eps, None) if eps else None

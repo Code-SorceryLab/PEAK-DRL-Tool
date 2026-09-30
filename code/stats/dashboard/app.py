@@ -6,9 +6,11 @@ Run with:  streamlit run code/stats/dashboard/app.py
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))  # repo root
 
 import streamlit as st
 
+from code.stats import registry
 from data import CONFIG_PATH, load_config, load_all_csvs, win_rate
 from metrics import compute_world_metrics
 from components import PERSONA_COLORS, card_html
@@ -140,28 +142,41 @@ except FileNotFoundError:
     st.error(f"Config file not found: {CONFIG_PATH}")
     st.stop()
 
-data_path = config.get("path", "code/stats/results/")
-metrics_cfg = config.get("metrics", {})
+data_path = config.get("dashboard_paths", ["runs/probes/**/episodes.csv"])
 
 df_all = load_all_csvs(data_path)
 
 if df_all.empty:
-    st.warning(f"No CSV data found in `{data_path}`. Make sure the path is correct and CSVs exist.")
+    st.warning(f"No episode logs found in `{data_path}`. Run a Full Sweep, or train / play with metrics on.")
+    st.stop()
+
+# ── Game / source filters ───────────────────────────────────────────────────
+games = sorted(df_all["game"].unique().tolist())
+fc1, fc2 = st.columns([1, 2])
+with fc1:
+    game = st.selectbox("game", games, key="game")
+with fc2:
+    sources = sorted(df_all["source"].unique().tolist())
+    picked = st.multiselect("data source (probe = Full Sweep, train = training runs, manual = your play)",
+                            sources, default=sources, key="sources")
+df_all = df_all[(df_all["game"] == game) & (df_all["source"].isin(picked or sources))]
+if df_all.empty:
+    st.warning("No episodes for this game and source selection.")
     st.stop()
 
 worlds = sorted(df_all["world"].unique().tolist())
 
 # ── Session state ───────────────────────────────────────────────────────────
 if "selected_metric" not in st.session_state:
-    st.session_state.selected_metric = list(metrics_cfg.keys())[0] if metrics_cfg else "B1_challenge_calibration"
-if "selected_world" not in st.session_state:
+    st.session_state.selected_metric = "B1_challenge_calibration"
+if st.session_state.get("selected_world") not in worlds:
     st.session_state.selected_world = worlds[0] if worlds else None
 
 
 # ── Per-world metric computation ────────────────────────────────────────────
 
 world = st.session_state.selected_world
-world_metrics = compute_world_metrics(world, metrics_cfg, df_all)
+world_metrics, all_metrics = compute_world_metrics(game, world, df_all)
 
 total_score = sum(
     m.get("score_pt", 0) for m in world_metrics.values() if "error" not in m
@@ -204,7 +219,7 @@ personas_in_world = sorted(df_all[df_all["world"] == world]["persona"].unique().
 cards_html = '<div class="persona-row">'
 for i, persona in enumerate(personas_in_world):
     color = PERSONA_COLORS[i % len(PERSONA_COLORS)]
-    wr = win_rate(df_all, world, persona)
+    wr = win_rate(df_all, game, world, persona)
     if wr is None:
         pct_display, bar_w = "N/A", 0
     else:
@@ -331,6 +346,18 @@ else:
         render_b2_detail(m)
     elif m["type"] == "B3":
         render_b3_detail(m)
+
+# ── Every balance metric for this level, by dimension ───────────────────────
+
+with st.expander(f"All balance metrics for {game} · {world} (every persona pooled)", expanded=False):
+    lines = []
+    for dim, name in registry.DIMENSIONS.items():
+        ms = [x for x in registry.metrics_for(game, include_hidden=False)
+              if x.dims and x.dims[0] == dim and x.fmt != "grid"]
+        if ms:
+            lines.append(f"**{dim} · {name}**  \n" + "  \n".join(
+                f"{x.label}: `{registry.fmt(x.key, all_metrics.get(x.key))}` — {x.tip}" for x in ms))
+    st.markdown("\n\n".join(lines) or "No metrics.")
 
 # ── Route visualization ─────────────────────────────────────────────────────
 

@@ -44,40 +44,49 @@ probes.*
 
 ## The metric table
 
-### Challenge Calibration
-| Metric | Definition | Status |
-|---|---|---|
-| `completion_rate` | wins / all episodes across the probe (0–1) | ✅ table + JSON |
-| `mean_completion_time` | avg time (s) of winning episodes | ✅ |
-| `completion_time_stddev` | σ of completion time | ✅ (JSON) |
-| `progress_at_death` | end-x / level length for dying episodes (0 = start, 1 = goal) | ✅ |
-| generations-to-first-win ± CI | GA-native difficulty: how long evolution needs | ✅ (new) |
+Every balance metric is defined once in `code/stats/registry.py` and computed from the episode
+log (`episodes.csv`, one row per episode, written by the game's `EpisodeStats` class in
+`code/stats/episode_stats.py`). The probe report, training-run and manual-play summaries
+(`metrics.json`), the Balance Command page and the Streamlit dashboard all call the same
+functions. A metric that doesn't apply to a game isn't computed for it; one that applies but
+has no data (no wins yet, nothing to collect in the level) is `N/A`.
 
-### Punishment Severity
-| Metric | Definition | Status |
-|---|---|---|
-| `deaths_per_run` | deaths per generation of 10 attempts | ✅ |
-| `death_location_heatmap` | deaths binned across the level (10 bins, start → goal) | ✅ report heatmap strip |
-| `death_cluster_entropy` | 0 = one hotspot, 1 = deaths spread evenly | ✅ |
-| failure-mode mix | Enemy / Pit / Spike / Saw / OOB / Stall shares (paper taxonomy) | ✅ stacked bars |
+Every episode is one life. Personas stand in for skill tiers: novice = `novice`,
+mid = `experienced`, expert = `speedrunner`.
 
-### Triangularity (Risk/Reward)
-| Metric | Definition | Status |
-|---|---|---|
-| `coin_collection_rate` | collected / available coins ("bandages"); 1.0 when a level has none | ✅ |
-| `bandage_time_cost`, `bandage_death_premium` | need forced-collector agents | ⏳ future (needs coin term in fitness) |
+| # | Dimension | All games | Mario | Meat Boy | Bomberman |
+|---|---|---|---|---|---|
+| 1 | Challenge calibration | `completion_rate`, `mean_completion_time`, `completion_time_stddev` | `progress_at_death` (death point between start and goal, horizontally) | `progress_at_death` (share of the BFS shortest path covered) | `exit_found_ratio` (hidden exit bombed open, or visible exit reached), `enemies_killed_ratio` (failed runs) |
+| 2 | Punishment severity | `deaths_per_run` (failed attempts per win), `death_cause_distribution`, `death_location_heatmap` (per tile), `death_cluster_entropy` (normalized, 10 progress bins) | `powerup_loss_rate` | — | — |
+| 3 | Triangularity | — | `coin_time_cost`, `coin_death_premium` (direct run = 0 coins), `coin_collection_rate` | `bandage_*` — N/A: the levels have no bandages yet | `bomb_kill_rate` |
+| 4 | Path / strategy diversity | — | `strategy_count`, `dominant_path_share`, `path_diversity_index` (bits), `safe_vs_fast_path_ratio` — height profiles of winning routes | the same four — routes resampled by arc length (mazes) | `bombs_placed` (+ bomb map), `time_to_first_kill`, `blocks_destroyed_before_finding_exit` |
+| 5 | Skill expression | `novice_expert_gap`, `novice_expert_time_gap` (novice − expert mean win time) | | | |
+| 6 | Progression fit | `completion_rate_per_skill` | | | |
+| 7 | Emergent complexity | — | `strategy_count`, `death_cluster_entropy` | the same + `wall_jump_utilization_rate` | `chain_reaction_rate` |
+| 8 | Reward density | — | `coin_collection_rate` | `bandage_collection_rate` (N/A) | `powerup_collection_rate` |
 
-### Skill Expression / Progression Fit
-| Metric | Definition | Status |
-|---|---|---|
-| `novice_expert_gap` | win rate of last third of generations − first third (GA reading of novice vs expert) | ✅ |
-| `completion_rate_per_skill` | per-budget completion | ⏳ run probes at different `--gens` |
+Mega Man and Sonic get the shared metrics plus side-scroller `progress_at_death`.
+Dimensions 5 and 6 compare personas, so they exist only in the sweep report, for levels probed
+with the novice and speedrunner personas on the same config.
 
-### Path / Strategy Diversity & Emergent Complexity
-`strategy_count`, `dominant_path_share`, `path_diversity_index`, `safe_vs_fast_path_ratio`,
-`wall_jump_utilization_rate` — ⏳ future work: these need per-episode trajectory logging
-(x,y polylines). The hooks exist (adapters already record end positions); the next step is
-sampling positions every N frames into the env rows.
+A probe level's balance metrics pool every seed's episodes. The GA's own numbers
+(generations-to-first-win ± CI, win rate after the first win, improvement rate, stuck rate) and
+`learning_gain` (last third of generations minus the first third — formerly "novice_expert_gap")
+come from the population history.
+
+**Bands and verdicts:** `code/stats/thresholds/default.yaml` holds target ± warning per metric,
+and `<game>.yaml` next to it overrides any of them. Dimensions 1 (completion rate, mean win
+time), 2 (deaths per win, death spread) and 4 (strategy count, dominant path share) get a
+verdict pill: all in band, partial, or off band.
+
+**Adding a metric:** record its raw input in the game's `EpisodeStats.to_dict()`
+(`code/stats/episode_stats.py`), then add one `Metric(...)` entry to `code/stats/registry.py`.
+The report, the dashboard and every `metrics.json` pick it up.
+
+**Measuring outside sweeps:** Train Single / All / Full Grid and Play Manually ask whether to
+measure. Training writes `runs/<run>/episodes.csv` and, when it stops, `metrics.json`. Manual
+play runs each attempt with one life, logs to `runs/manual/<game>/<level>/`, and prints the
+summary when you quit. `python -m code.stats.summarize <dir>` recomputes either.
 
 ## Levels
 
@@ -290,18 +299,17 @@ probe is what makes the CI economics work.
 diffable report saying which balance dimensions moved out of intent — no scheduled human
 playtest, no GPU.
 
-## Episode CSVs & the stats dashboard
+## Episode logs & the stats dashboard
 
-Every training run and balance probe now appends one row per finished episode to
-`<run_dir>/episodes.csv` in the stats-dashboard schema (`persona, game, world,
-cause_of_death, jump_count, coins_collected, avg_vx, progress_ratio, route,
-enemies_killed, elapsed_time` — `route` is a sampled `(x, y)` trace, ~7.5 points/s).
-Amr's Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer line)
-reads those CSVs recursively from `runs/` (configured in
-`code/stats/MarioThresholds.yaml`) and computes B1 challenge calibration, B2 punishment
-severity, and B3 strategy diversity (route clustering) with per-level target bands and a
-route-overlay view on the level grid. Launch: `streamlit run code/stats/dashboard/app.py`
-(not in the menu).
+Every balance probe, and every training run or manual-play session with metrics on, writes one
+row per finished episode to `episodes.csv` (the game's `EpisodeStats.to_dict()`: status, cause,
+time, progress, end position, the route as a sampled `(x, y)` trace at ~7.5 points/s, and the
+game's own counters). A fresh population starts a fresh log. Amr's Streamlit dashboard
+(`code/stats/dashboard/`) reads the logs matched by `dashboard_paths` in
+`code/stats/thresholds/default.yaml` (probes, training runs, manual play; filter by game and
+source) and shows the same registry metrics as the report, with the B1/B2/B3 cards and a
+route overlay. Launch: `streamlit run code/stats/dashboard/app.py` from the repo root (not in
+the menu).
 
 Speed: `balance.py --workers N` runs probes in parallel processes (default cores-1;
 each (level x seed) cell is independent, so wall clock divides by the worker count).

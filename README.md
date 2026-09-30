@@ -47,8 +47,8 @@ same run — bit for bit.
       <sub><b>Balance Command center</b> (menu 12). Every probe on disk: win rate per level per persona, one HTML file.</sub>
     </td>
     <td align="center">
-      <img src="docs/img/cc_level.png" alt="Level dialog: 16 balance metrics, B1/B2/B3 bands, replay command, agent routes drawn on the level" width="100%"><br>
-      <sub><b>Level dialog.</b> 16 metrics with B1/B2/B3 bands, death heatmap, agent routes on the level, and a ▶ Watch button that replays the best genome.</sub>
+      <img src="docs/img/cc_level.png" alt="Level dialog: balance metrics by dimension with verdict bands, replay command, agent routes drawn on the level" width="100%"><br>
+      <sub><b>Level dialog.</b> balance metrics grouped by the eight dimensions, verdict bands, death maps, agent routes on the level, and a ▶ Watch button that replays the best genome.</sub>
     </td>
   </tr>
   <tr>
@@ -154,10 +154,12 @@ python -m code.neuro.balance --game mario --gens 40 --best
 # Report
 python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
 python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
-streamlit run code/stats/dashboard/app.py                              # B1/B2/B3 stats dashboard
+streamlit run code/stats/dashboard/app.py                              # stats dashboard (probes, training, manual)
+python -m code.stats.summarize runs/<run dir>                         # balance metrics for any episode log
 
 # Play
 python -m code.games.tools.manual_play --game platformer --level Mario1-2
+python -m code.games.tools.manual_play --game platformer --level Mario1-2 --metrics   # one life per attempt, measured
 python -m code.games.tools.manual_play --game meatboy --level 3        # Meat Boy levels are indices
 ```
 
@@ -256,7 +258,8 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 | Levels | `code/games/levels/<game>/*.txt` + `game_config.yaml` / `meatboy_config.yaml` | ASCII tilemaps; enable/disable per level; the trainer re-reads the list every generation |
 | Game feel | per-game blocks in `game_config.yaml`, `meatboy_config.yaml` | gravity, jump velocity, run speed, coyote frames, wall-jump forces, per-level `time_limit` |
 | Balance probes | `code/neuro/balance.py` | seeds 1234 / 2025 / 31337 (keep for comparability), gens budget, `--workers` |
-| Stats bands | `code/stats/MarioThresholds.yaml` | B1 / B2 / B3 target bands and warning margins |
+| Balance metrics | `code/stats/registry.py`, `code/stats/episode_stats.py` | every metric, defined once; what each game records per episode |
+| Metric bands | `code/stats/thresholds/default.yaml` (+ `<game>.yaml` overrides) | target ± warning per metric, route-cluster threshold, dashboard data paths |
 | Dashboard | `--port` (HTTP 8000), websocket 8765 | thumbnails 5 fps (1 in Turbo), watched env 20 fps |
 
 Deep dives: [`docs/GUIDE.md`](docs/GUIDE.md) (how the system works) and

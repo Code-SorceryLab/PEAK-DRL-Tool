@@ -1,0 +1,29 @@
+# Balance threshold bands, shared by every game. A game can override any band (or add one) in
+# code/stats/thresholds/<game>.yaml — only the keys it lists change.
+#
+# A metric is "in band" when |value - target| <= warning. The verdict pills group the banded
+# metrics by dimension (code/stats/registry.py VERDICT_METRICS): all in band = ok, some = partial.
+# Bands are designer-set, not human-calibrated yet.
+
+bands:
+  # 1 — challenge calibration
+  completion_rate:        {target: 0.7, warning: 0.2}
+  mean_completion_time:   {target: 20,  warning: 4}     # seconds
+  # 2 — punishment severity
+  deaths_per_run:         {target: 2,   warning: 1}     # failed attempts per win
+  death_cluster_entropy:  {target: 0.4, warning: 0.1}   # normalized, 0..1
+  # 4 — strategy diversity
+  strategy_count:         {target: 2,   warning: 1}
+  dominant_path_share:    {target: 0.5, warning: 0.1}
+  safe_vs_fast_path_ratio: {target: 1.3, warning: 0.3}
+
+# Two winning routes belong to the same strategy when their profiles differ by at most this
+# many pixels on average.
+route_cluster_threshold: 96
+
+# Where the Streamlit dashboard looks for episode logs (glob patterns). runs/gasweep is left
+# out on purpose: its cells use deliberately non-default GA configs.
+dashboard_paths:
+  - runs/probes/**/episodes.csv     # Full Sweep probes
+  - runs/*/episodes.csv             # training runs (menu 2-4, with metrics on)
+  - runs/manual/**/episodes.csv     # manual play sessions (with metrics on)

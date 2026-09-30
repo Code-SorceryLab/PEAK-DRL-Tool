@@ -93,7 +93,7 @@ def render_b1_detail(m):
     t = m["thresholds"]
     target_cr      = t.get("target_completion_rate", 0.7)
     warn_cr_diff   = t.get("warning_completion_rate_difference", 0.2)
-    target_time    = t.get("target_mean_completion_time", 15)
+    target_time    = t.get("target_mean_completion_time", 20)
     warn_time_diff = t.get("warning_mean_completion_time_difference", 4)
 
     cr_low  = max(target_cr - warn_cr_diff, 0.0)
@@ -170,8 +170,8 @@ def render_b2_detail(m):
     t = m["thresholds"]
     target_dpr     = t.get("target_deaths_per_run", 2)
     warn_dpr       = t.get("warning_deaths_per_run", 1)
-    target_entropy = t.get("target_death_cluster_entropy", 5)
-    warn_entropy   = t.get("warning_death_cluster_entropy", 2)
+    target_entropy = t.get("target_death_cluster_entropy", 0.4)
+    warn_entropy   = t.get("warning_death_cluster_entropy", 0.1)
 
     dpr_lo = max(target_dpr - warn_dpr, 0)
     dpr_hi = target_dpr + warn_dpr
@@ -236,10 +236,10 @@ def render_b3_detail(m):
     svf = m["safe_vs_fast_ratio"]
     b3_color = m["b3_color"]
     t = m["thresholds"]
-    tgt_sc   = t.get("target_strategy_count", 3)
+    tgt_sc   = t.get("target_strategy_count", 2)
     warn_sc  = t.get("warning_strategy_count", 1)
     tgt_ds   = t.get("target_dominant_path_share", 0.5)
-    warn_ds  = t.get("warning_dominant_path_share", 0.15)
+    warn_ds  = t.get("warning_dominant_path_share", 0.1)
 
     sc_lo = max(tgt_sc - warn_sc, 0)
     sc_hi = tgt_sc + warn_sc
@@ -288,7 +288,7 @@ def render_b3_detail(m):
         st.markdown(_stat_card(
             "Dominant path share",
             '<span style="color:#3b82f6;">%.1f%%</span>' % ds_pct,
-            "%d of %d runs" % (max(m["cluster_sizes"]), m["total_successful"]),
+            "%d of %d winning runs" % (m["dominant_runs"], m["total_successful"]),
         ), unsafe_allow_html=True)
     with c3:
         st.markdown(_stat_card(
@@ -328,7 +328,7 @@ def render_route_viz(world, df_all):
         return
 
     world_df = df_all[df_all["world"] == world].copy()
-    world_df = world_df[world_df["route"].notna() & (world_df["route"].str.strip() != "")]
+    world_df = world_df[world_df["route"].map(lambda r: len(parse_route(r)) >= 2)]
     world_df = world_df.reset_index(drop=True)
 
     if world_df.empty:
@@ -340,9 +340,9 @@ def render_route_viz(world, df_all):
 
     run_labels = []
     for idx, row in world_df.iterrows():
-        death = row.get("cause_of_death", "?")
+        death = "Success" if row.get("status") == "WON" else (row.get("cause") or "?")
         try:
-            prog = float(row.get("progress_ratio", 0))
+            prog = float(row.get("progress") or 0)
         except (ValueError, TypeError):
             prog = 0.0
         player_name = row.get("player", row.get("persona", "?"))

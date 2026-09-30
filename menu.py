@@ -483,6 +483,18 @@ def _prompt_persona_sensors_tag():
     return persona, sensors, tag
 
 
+def _ask_metrics(default: bool, note: str) -> bool:
+    """Balance metrics on/off for one run (sweeps always measure — the report is their output)."""
+    hint = "Y/n" if default else "y/N"
+    print(_DIM(f"\n    {note}"))
+    raw = input(_DIM(f"    Measure balance metrics? [{hint}]: ")).strip().lower()
+    return default if not raw else raw.startswith("y")
+
+
+_TRAIN_METRICS_NOTE = ("Balance metrics: every episode is logged to <run dir>/episodes.csv and the per-level\n"
+                       "    metrics are written to <run dir>/metrics.json when training stops (Ctrl+C included).")
+
+
 def _run_dir(game, level, persona, sensors, tag) -> Path:
     """runs/<game>[_<level>][_<persona>][_<sensors>][_<tag>] — every config gets its own population."""
     name = game if not level else f"{game}_{level}"
@@ -533,18 +545,21 @@ def run_training():
     if gens == "invalid":
         return
     turbo = input(_DIM("    Start in turbo? [y/N]: ")).strip().lower().startswith("y")
+    metrics = _ask_metrics(True, _TRAIN_METRICS_NOTE)
 
     run_dir = _run_dir(game, level, persona, sensors, tag)
     if not _print_run_summary(Game=game, Level=level or "auto", Persona=persona, Sensors=sensors,
                               Tag=tag or "-", Generations=gens or "until stopped",
-                              Mode="turbo" if turbo else "real-time", **{"Run dir": run_dir}):
+                              Mode="turbo" if turbo else "real-time", Metrics="on" if metrics else "off",
+                              **{"Run dir": run_dir}):
         return
 
     print()
     print(f"    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print()
     ok = execute_training_run(_trainer_cmd(game, level, gens, turbo, run_dir=run_dir,
-                                           extra=("--persona", persona, "--sensors", sensors)))
+                                           extra=("--persona", persona, "--sensors", sensors,
+                                                  "--metrics" if metrics else "--no-metrics")))
     print_training_summary(1, int(ok), int(not ok))
     if ok:
         play_chime()
@@ -589,8 +604,10 @@ def _train_batch(jobs, **summary):
         if gens is None:
             print(_RED("  A generation count is required for batch runs."))
         return
+    metrics = _ask_metrics(True, _TRAIN_METRICS_NOTE)
     if not _print_run_summary(**summary, Persona=persona, Sensors=sensors, Tag=tag or "-",
-                              Generations=f"{gens} per run", **{"Total runs": len(jobs)}):
+                              Generations=f"{gens} per run", Metrics="on" if metrics else "off",
+                              **{"Total runs": len(jobs)}):
         return
 
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
@@ -599,7 +616,8 @@ def _train_batch(jobs, **summary):
         print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(level or 'auto')}")
         ok = execute_training_run(
             _trainer_cmd(game, level, gens, turbo=True, run_dir=_run_dir(game, level, persona, sensors, tag),
-                         extra=("--persona", persona, "--sensors", sensors)))
+                         extra=("--persona", persona, "--sensors", sensors,
+                                "--metrics" if metrics else "--no-metrics")))
         successful += int(ok)
 
     print_training_summary(len(jobs), successful, len(jobs) - successful)
@@ -643,11 +661,14 @@ def run_manual_play():
             return
         if level.startswith("auto"):
             level = None
+    metrics = _ask_metrics(False, "Balance metrics: each attempt is played with ONE life, logged to\n"
+                                  "    runs/manual/<game>/<level>/episodes.csv, and summarized when you quit (ESC).")
 
     W = 50
     print()
     print(_DIM("    " + "─" * W))
-    print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
+    print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}"
+          + (f"  ·  {_YEL('measuring metrics')}" if metrics else ""))
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
     if game not in INDEXED_GAMES:  # meatboy / bomberman have no debug manager
@@ -665,6 +686,8 @@ def run_manual_play():
            "--game", CONFIG_KEY.get(game, game), "--fps", "30"]
     if level:
         cmd += ["--level", level]
+    if metrics:
+        cmd += ["--metrics"]
     print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
     subprocess.run(cmd, env=proc_env)
 

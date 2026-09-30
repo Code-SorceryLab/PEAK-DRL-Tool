@@ -11,7 +11,6 @@ thread only ever sees encoded frame bytes.
 from __future__ import annotations
 
 import argparse
-import csv
 import io
 import json
 import os
@@ -27,6 +26,8 @@ from .evolution import GAConfig, Population
 from .personas import PERSONAS, Persona, get_persona
 from .net import NeuralNet, make_net
 from .sensors import N_BODY, SENSOR_MODES, read_sensors
+from code.stats import episode_log
+from code.stats.episode_stats import make_stats
 
 THUMB_SCALE = 0.35          # thumbnail downscale factor
 THUMB_INTERVAL = 0.20       # s between thumbnail encodes (real-time mode)
@@ -93,11 +94,7 @@ class EnvSlot:
         self.last_rays: list = []
         self.last_tiles: list = []
         self.last_sensors: np.ndarray = np.zeros(net.n_inputs, dtype=np.float32)
-        # per-episode telemetry for the balance CSV (Amr's stats schema)
-        self.route: list[tuple[float, float]] = []
-        self.jump_count = 0
-        self.prev_jump = False
-        self.vx_sum = 0.0
+        self.stats = None  # this episode's EpisodeStats (code/stats/episode_stats.py)
 
 
 def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
@@ -115,17 +112,24 @@ def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
 class Trainer:
     def __init__(self, game: str, level: str | None, cfg: GAConfig, run_dir: str,
                  state: SharedState | None = None, population: Population | None = None,
-                 persona: Persona | None = None) -> None:
+                 persona: Persona | None = None, metrics: bool = True, source: str = "train") -> None:
         self.game = game
         self.cfg = cfg
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
+        # Balance metrics: every episode goes to <run_dir>/episodes.csv; a training run also
+        # writes the per-level metrics to <run_dir>/metrics.json when it stops.
+        self.metrics = metrics
+        self.source = source  # "train" (menu 2-4) | "probe" (balance sweeps, summarized by balance.py)
+        self.episodes_path = os.path.join(run_dir, "episodes.csv")
         cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))  # top-down games steer on two axes
         if cfg.sensors == "rays":
             cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)  # a game owning sense() owns its vector length
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
+        if metrics and self.pop.generation == 0:
+            episode_log.reset(self.episodes_path)  # a fresh population never inherits an old log
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.game = game  # tags embedded in best.npz
 
@@ -260,27 +264,6 @@ class Trainer:
             envs.append(entry)
         self.state.publish(envs=envs)
 
-    def _append_episode_csv(self, env_rows: list[dict]) -> None:
-        """One row per finished episode, in the stats dashboard's CSV schema."""
-        path = os.path.join(self.run_dir, "episodes.csv")
-        os.makedirs(self.run_dir, exist_ok=True)
-        new = not os.path.exists(path)
-        with open(path, "a", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            if new:
-                w.writerow(["persona", "game", "world", "cause_of_death", "jump_count",
-                            "coins_collected", "avg_vx", "progress_ratio", "route",
-                            "enemies_killed", "bricks_destroyed", "elapsed_time"])
-            for slot, rec in zip(self.slots, env_rows):
-                cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
-                level_len = rec.get("level_len") or 1.0
-                progress = min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)
-                w.writerow([self.persona.name, self.game, self.level or "auto", cause,
-                            slot.jump_count, rec.get("coins", 0),
-                            round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
-                            repr(slot.route), rec.get("kills", 0), rec.get("bricks", 0),
-                            round(slot.frames / 60.0, 2)])
-
     def _steps_per_sec(self) -> float:
         now = time.time()
         self._steps_window.append((now, self._step_accum))
@@ -299,10 +282,9 @@ class Trainer:
             slot.frames = 0
             slot.stuck_anchor_x = 0.0
             slot.stuck_frames = 0
-            slot.route = [(round(slot.adapter.x, 1), round(slot.adapter.y, 1))]
-            slot.jump_count = 0
-            slot.prev_jump = False
-            slot.vx_sum = 0.0
+            slot.stats = make_stats(self.game, slot.adapter.core, level=self.level or "auto",  # type: ignore[attr-defined]
+                                    persona=self.persona.name, source=self.source, agent=i,
+                                    gen=self.pop.generation + 1)
 
         clock = pygame.time.Clock()
         last_thumb = last_watch = last_stats = 0.0
@@ -329,12 +311,7 @@ class Trainer:
                 slot.adapter.step(move_x, jump, move_y)
                 slot.frames += 1
                 self._step_accum += 1
-                if jump and not slot.prev_jump:
-                    slot.jump_count += 1
-                slot.prev_jump = bool(jump)
-                slot.vx_sum += slot.adapter.vx
-                if slot.frames % 8 == 0:  # ~7.5 route samples/s, matches Amr's density
-                    slot.route.append((round(slot.adapter.x, 1), round(slot.adapter.y, 1)))
+                slot.stats.on_step(jump)
                 # trainer-side stuck kill (faster than the core's 20s stall watchdog)
                 fit = slot.adapter.fitness()
                 if fit > slot.stuck_anchor_x + 1.0:
@@ -348,6 +325,8 @@ class Trainer:
                         slot.adapter.alive = False
                         slot.adapter.status = "STUCK"
                         slot.adapter._end_xy = (slot.adapter.x, slot.adapter.y)  # type: ignore[attr-defined]
+                if not slot.adapter.alive:
+                    slot.stats.finish(slot.adapter.status)
 
             if self.state is not None:
                 now = time.time()
@@ -373,6 +352,18 @@ class Trainer:
         return [s.adapter.fitness() for s in self.slots]
 
     def run(self, max_gens: int | None = None, verbose: bool = True) -> None:
+        try:
+            self._run(max_gens, verbose)
+        finally:  # Ctrl+C is the normal way to stop a training run — summarize what it played
+            if self.metrics and self.source == "train":
+                self.write_metrics(verbose)
+
+    def write_metrics(self, verbose: bool = True) -> str | None:
+        """Per-level balance metrics from this run's episodes.csv -> <run_dir>/metrics.json."""
+        from code.stats.summarize import summarize_file
+        return summarize_file(self.episodes_path, verbose=verbose)
+
+    def _run(self, max_gens: int | None, verbose: bool) -> None:
         while max_gens is None or self.pop.generation < max_gens:
             t0 = time.time()
             fitnesses = self.run_generation()
@@ -383,7 +374,10 @@ class Trainer:
                 rec.update({"env": i, "fit": round(fitnesses[i], 1),
                             "status": statuses[i], "frames": slot.frames})
                 env_rows.append(rec)
-            self._append_episode_csv(env_rows)
+                if not slot.stats.finished:
+                    slot.stats.finish(slot.adapter.status)
+            if self.metrics:
+                episode_log.append(self.episodes_path, [slot.stats.to_dict() for slot in self.slots])
             # Post-first-win annealing: once this level is solved, drop mutation so the
             # population exploits the winning lineage instead of re-exploring forever.
             if (statuses.count("WON") > 0 and not self.pop.annealed
@@ -508,7 +502,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
                            sprint=persona.sprint, time_rate=persona.time_rate)
     clock = pygame.time.Clock()
-    trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state)
+    trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state, metrics=False)
     trainer.slots[0].adapter = adapter
     trainer.slots[0].net = net
     all_levels = list_levels(game)
@@ -560,6 +554,9 @@ def main() -> None:
     ap.add_argument("--best", action="store_true",
                     help="start from this game's GA-sweep winners (code/neuro/ga_best.yaml); "
                          "flags you pass explicitly still win")
+    ap.add_argument("--metrics", action=argparse.BooleanOptionalAction, default=True,
+                    help="log every episode to <run-dir>/episodes.csv and write the balance metrics "
+                         "to <run-dir>/metrics.json when training stops (default: on)")
     args = ap.parse_args()
 
     if args.results:
@@ -605,7 +602,7 @@ def main() -> None:
         from .adapters import validate_level
         validate_level(args.game, args.level)
     trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
-                      persona=get_persona(args.persona))
+                      persona=get_persona(args.persona), metrics=args.metrics)
     trainer.run(args.gens)
 
 

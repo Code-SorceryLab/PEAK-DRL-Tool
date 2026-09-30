@@ -10,6 +10,9 @@ from typing import Protocol
 
 import pygame
 
+from code.stats.episode_stats import (BombermanStats, MarioStats, MeatboyStats, MegamanStats,
+                                      SonicStats)
+
 
 class GameAdapter(Protocol):
     alive: bool
@@ -99,13 +102,9 @@ def _win_time_bonus(adapter) -> float:
     return adapter.time_rate * max(float(getattr(adapter.core, "timer", 0.0) or 0.0), 0.0)
 
 
-def _count_coins(core) -> int:
-    ld = getattr(core, "level_data", None)  # megaman builds level_data on first reset
-    return len(ld.coins) if ld is not None else 0
-
-
 def _episode_stats(adapter, x: float) -> dict:
-    """Game metrics shared by every core, read defensively (not every core has every field)."""
+    """Live-dashboard / generation-history fields, read defensively (not every core has every
+    field). The balance metrics come from code/stats/episode_stats.py, not from here."""
     core = adapter.core
     return {
         "x": round(float(x), 1),
@@ -114,11 +113,7 @@ def _episode_stats(adapter, x: float) -> dict:
         "kills": int(getattr(core, "kills_total", 0) or 0),
         "time_left": round(float(getattr(core, "timer", 0.0) or 0.0), 1),
         "cause": str(getattr(core, "death_cause", "") or getattr(core, "last_cause", "") or ""),
-        # balance-metric fields (Amr's table): where the episode ended, level extents, loot pool
-        "end_x": round(float(adapter._end_xy[0]), 1) if adapter._end_xy else None,
-        "end_y": round(float(adapter._end_xy[1]), 1) if adapter._end_xy else None,
         "level_len": round(float(getattr(getattr(core, "level_data", None), "width", 0.0) or 0.0), 1),
-        "level_coins": adapter._level_coins,
     }
 
 
@@ -161,7 +156,6 @@ class MarioAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     # ── state ────────────────────────────────────────────────────────────
 
@@ -208,22 +202,16 @@ class MarioAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
+        _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
         if terminated or truncated:
             self.alive = False
             self._end_xy = (self.x, self.y)
-            self.won = bool(self.core.reached_goal)
-            if self.won:
-                self.status = "WON"
-            elif self.core.death_cause == "Stall":
-                self.status = "STUCK"
-            else:
-                self.status = "DEAD"
+            self.status = MarioStats.end_status(self.core, terminated, truncated, info)
+            self.won = self.status == "WON"
 
     def render(self, surface: pygame.Surface) -> None:
         self.core.render(surface)
@@ -296,7 +284,6 @@ class MegamanAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     @property
     def x(self) -> float:
@@ -335,17 +322,16 @@ class MegamanAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), 0, int(jump), 0])
+        _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), 0, int(jump), 0])
         if terminated or truncated:
             self.alive = False
             self._end_xy = (self.x, self.y)
-            self.won = bool(self.core.reached_goal)
-            self.status = "WON" if self.won else ("STUCK" if truncated else "DEAD")
+            self.status = MegamanStats.end_status(self.core, terminated, truncated, info)
+            self.won = self.status == "WON"
 
     def render(self, surface: pygame.Surface) -> None:
         self.core.render(surface, blit_only=True)
@@ -412,7 +398,6 @@ class SonicAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     @property
     def x(self) -> float:
@@ -452,23 +437,16 @@ class SonicAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
-        won = bool(info.get("won"))  # core.reached_goal is wiped by the mid-step level reload
-        if won or terminated or truncated:
+        if info.get("won") or terminated or truncated:  # the goal doesn't terminate SonicCore
             self.alive = False
             self._end_xy = (self.x, self.y)
-            self.won = won
-            if won:
-                self.status = "WON"
-            elif self.core.death_cause == "Stall" or (truncated and not terminated):
-                self.status = "STUCK"
-            else:
-                self.status = "DEAD"
+            self.status = SonicStats.end_status(self.core, terminated, truncated, info)
+            self.won = self.status == "WON"
 
     def render(self, surface: pygame.Surface) -> None:
         # Headless SonicCore never updates its camera — mirror the human-mode logic here.
@@ -535,7 +513,6 @@ class MeatboyAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
         self.reset()
 
@@ -578,7 +555,6 @@ class MeatboyAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
         self._best_bfs = 1.0
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
@@ -592,8 +568,8 @@ class MeatboyAdapter:
         if terminated or truncated:
             self.alive = False
             self._end_xy = (self.x, self.y)
-            self.won = bool(self.core.won)
-            self.status = "WON" if self.won else ("STUCK" if truncated else "DEAD")
+            self.status = MeatboyStats.end_status(self.core, terminated, truncated, info)
+            self.won = self.status == "WON"
 
     def render(self, surface: pygame.Surface) -> None:
         self.core.render(surface)
@@ -720,20 +696,19 @@ class BombermanAdapter:
         self.won = False
         self.status = "RUNNING"
         self._end_xy = None
-        self._level_coins = sum(row.count("C") + row.count("F") + row.count("S") for row in self.core.level_data.grid)
         self._start_cost = max(self.core.start_cost(), 1.0)
         self._best_cost = self._start_cost
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _info = self.core.step((move_x, move_y, int(jump)))
+        _, _, terminated, truncated, info = self.core.step((move_x, move_y, int(jump)))
         self._best_cost = min(self._best_cost, self.core.goal_cost())
         if terminated or truncated:
             self.alive = False
             self._end_xy = (self.x, self.y)
-            self.won = bool(self.core.won)
-            self.status = "WON" if self.won else "DEAD"
+            self.status = BombermanStats.end_status(self.core, terminated, truncated, info)
+            self.won = self.status == "WON"
 
     def render(self, surface: pygame.Surface) -> None:
         self.core.render(surface)
@@ -834,10 +809,8 @@ class BombermanAdapter:
 
     def episode_stats(self) -> dict:
         st = _episode_stats(self, self.progress() * self._FIT_SCALE)
-        st["level_len"] = self._FIT_SCALE            # reach % = exit-cost progress, not pixels
-        st["end_x"] = self.progress() * self._FIT_SCALE if self._end_xy else None
+        st["level_len"] = self._FIT_SCALE            # the live progress bar: exit-cost progress, not pixels
         st["bricks"] = self.core.bricks_destroyed
-        st["level_coins"] = self._level_coins
         return st
 
     def set_level(self, level: str) -> None:
