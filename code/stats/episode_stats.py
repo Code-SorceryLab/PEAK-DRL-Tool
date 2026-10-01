@@ -47,6 +47,8 @@ class EpisodeStats:
         self.meta = {"persona": persona, "game": game, "level": str(level) if level is not None else "auto",
                      "source": source, "session": session, "gen": gen, "agent": agent}
         self.frames = 0
+        self.time_s = 0.0   # game time: the core's own dt summed (real frame time in manual play)
+        self.kills = 0      # summed from core.kills_step, for cores without a kills_total
         self.jumps = 0
         self._prev_jump = False
         self.speed_sum = 0.0
@@ -56,6 +58,8 @@ class EpisodeStats:
         self._dead_hooks: set[str] = set()
         self.route: list[tuple[float, float]] = []
         self._safe("begin", self._begin)
+        # Snapshot now: a win can load the next level before finish() runs (Sonic).
+        self._dims = self._safe("level_dims", self.level_dims) or {}
         x, y = self._safe("pos", self.pos) or (0.0, 0.0)
         self.route.append((round(float(x), 1), round(float(y), 1)))
 
@@ -105,6 +109,11 @@ class EpisodeStats:
         if self.status != "RUNNING":
             return
         self.frames += 1
+        # Headless cores step a fixed 1/60 s; human-mode Mario/Sonic step the real frame time
+        # (manual play runs at 30 FPS), so frames / 60 would halve a human's times.
+        dt = getattr(self.core, "dt", None)
+        self.time_s += dt if isinstance(dt, (int, float)) and 0 < dt <= 0.25 else 1.0 / FPS
+        self.kills += int(getattr(self.core, "kills_step", 0) or 0)
         if jump and not self._prev_jump:
             self.jumps += 1
         self._prev_jump = bool(jump)
@@ -152,13 +161,13 @@ class EpisodeStats:
             "status": self.status,
             "cause": self.cause,
             "frames": self.frames,
-            "time_s": round(self.frames / FPS, 2),
+            "time_s": round(self.time_s, 2),
             "jumps": self.jumps,
             "avg_speed": round(self.speed_sum / max(self.frames, 1), 2),
             "end_x": round(self.end_xy[0], 1) if self.end_xy else None,
             "end_y": round(self.end_xy[1], 1) if self.end_xy else None,
         })
-        row.update(self._safe("level_dims", self.level_dims) or {})
+        row.update(self._dims)
         row.update(self._final)
         row["route"] = [list(p) for p in self.route]
         return row
@@ -185,7 +194,9 @@ class _ScrollerStats(EpisodeStats):
             self._goal_x = min(ahead) if ahead else goals[0]  # the nearest goal in front of the spawn
         else:
             self._goal_x = float(getattr(ld, "width", 0) or 0)
-        self._level_coins = len(getattr(ld, "coins", None) or [])
+        # free coins plus the ones inside ? blocks (Mario 1-1 has only the latter)
+        self._level_coins = len(getattr(ld, "coins", None) or []) + sum(
+            1 for q in (getattr(ld, "qblocks", None) or []) if getattr(q, "contains", None) == "coin")
 
     def progress(self) -> float | None:
         if not self.end_xy:
@@ -198,8 +209,9 @@ class _ScrollerStats(EpisodeStats):
 
     def extra(self) -> dict:
         core = self.core
+        kills = getattr(core, "kills_total", None)  # Mario / Sonic only count kills per step
         return {"coins": int(getattr(core, "coins_total", 0) or 0), "level_coins": self._level_coins,
-                "kills": int(getattr(core, "kills_total", 0) or 0)}
+                "kills": int(kills) if kills is not None else self.kills}
 
 
 class MarioStats(_ScrollerStats):

@@ -631,11 +631,11 @@ def _train_batch(jobs, **summary):
 
 # Keys exactly as code/games/tools/manual_play.py (and MeatboyPlayer) read them.
 _PLAY_CONTROLS = {
-    "mario":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+    "mario":   [("A / D  ← / →", "Move"), ("SHIFT / J", "Run"), ("SPACE / W / ↑", "Jump"),
                 ("Z", "Fire (with fire flower)")],
     "megaman": [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE", "Jump"),
                 ("W / S", "Climb ladder"), ("Z", "Fire")],
-    "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
+    "sonic":   [("A / D  ← / →", "Move"), ("SHIFT / J", "Run"), ("SPACE / W / ↑", "Jump"),
                 ("S", "Crouch / spin dash")],
     "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
     "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],

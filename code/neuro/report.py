@@ -28,10 +28,11 @@ from datetime import datetime
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 from .adapters import INDEXED_GAMES
-from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
+from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, aggregate, fmt_hms, mean_ci, rebuild
+from .balance import summarize as summarize_cell
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
-from code.stats import registry
+from code.stats import episode_log, registry
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -65,14 +66,24 @@ TIPS_ALL = {**TIPS, **{m.label: m.tip for m in registry.METRICS}}
 
 # ── data loading ─────────────────────────────────────────────────────────────
 
+def _indexed_entry(game: str, level: str) -> dict | None:
+    """One level of an indexed game (meatboy / bomberman) as a dict: an entry is either a bare
+    path or {file: ..., <per-level overrides>} (bomberman levels 6+)."""
+    import yaml
+    with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
+        lv = (yaml.safe_load(f) or {}).get("levels", [])
+    i = int(level)
+    if not 0 <= i < len(lv):
+        return None
+    return dict(lv[i]) if isinstance(lv[i], dict) else {"file": lv[i]}
+
+
 def _level_file(game: str, level: str) -> str | None:
     import yaml
     try:
         if game in INDEXED_GAMES:
-            with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
-                lv = (yaml.safe_load(f) or {}).get("levels", [])
-            i = int(level)
-            return os.path.join(GAMES_DIR, "levels", lv[i]) if 0 <= i < len(lv) else None
+            entry = _indexed_entry(game, level)
+            return os.path.join(GAMES_DIR, "levels", entry["file"]) if entry else None
         with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
         section = {"mario": cfg, "megaman": cfg.get("megaman", {}), "sonic": cfg.get("sonic", {})}.get(game, {})
@@ -129,8 +140,8 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
     try:
         if game in INDEXED_GAMES:
             with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
-                g = yaml.safe_load(f) or {}
-            entry = {"file": (g.get("levels") or [None] * (int(level) + 1))[int(level)]}
+                g = yaml.safe_load(f) or {}  # the game-wide player / bomb / enemy settings below
+            entry = _indexed_entry(game, level) or {}
         else:
             with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
@@ -210,12 +221,14 @@ def _config_html(sections: list[tuple[str, dict]]) -> str:
 
 
 def _collect_routes(game: str, persona: str, level: str, tag: str | None,
-                    max_routes: int = 22) -> list[dict]:
-    """Route traces for one (game, persona, level) from the probe episode logs."""
+                    max_routes: int = 22, paths: list[str] | None = None) -> list[dict]:
+    """Route traces for one (game, persona, level) from the probe episode logs (or the given
+    episodes.csv files — a training run's or a manual session's)."""
     won_raw, lost_raw = [], []
-    sub = (game, persona, tag) if tag else (game,)  # legacy reports pre-date the tagged layout
-    pattern = os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_"), "episodes.csv")
-    for path in sorted(glob.glob(pattern)):
+    if paths is None:
+        sub = (game, persona, tag) if tag else (game,)  # legacy reports pre-date the tagged layout
+        paths = sorted(glob.glob(os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_"), "episodes.csv")))
+    for path in paths:
         try:
             with open(path, encoding="utf-8", newline="") as f:
                 for row in csv.DictReader(f):
@@ -324,8 +337,11 @@ def _verdicts(metrics: dict, game: str, th: dict) -> str:
     return " ".join(pills)
 
 
-def _verdict_sentence(row: dict) -> tuple[str, str, str]:
-    """(word, colour, one plain-English sentence) a designer can act on without reading the tiles."""
+def _verdict_sentence(row: dict, kind: str = "probe") -> tuple[str, str, str]:
+    """(word, colour, one plain-English sentence) a designer can act on without reading the tiles.
+    kind: "probe" (multi-seed sweep), "train" (one training run), "manual" (human attempts)."""
+    if kind != "probe":
+        return _single_verdict(row, kind)
     m = row.get("metrics") or {}
     wr, solved, seeds = row["win_rate_mean"], row["solved_by"], row["seeds"]
     hist = m.get("death_progress_hist") or []
@@ -355,6 +371,37 @@ def _verdict_sentence(row: dict) -> tuple[str, str, str]:
         sent = (f"Every seed wins at least once, but only {wr:.0%} of the time afterwards — "
                 f"<b>{cause}</b> ({frac:.0%} of deaths, {where}) keeps catching agents that already know the way. "
                 "That is a precision demand, not a discovery problem.")
+    return word, color, sent
+
+
+def _single_verdict(row: dict, kind: str) -> tuple[str, str, str]:
+    """_verdict_sentence for one training run or a set of manual attempts: no seeds to compare,
+    so the verdict reads the run's (or the player's) own win rate."""
+    m = row.get("metrics") or {}
+    wr = row["win_rate_mean"]
+    hist = m.get("death_progress_hist") or []
+    peak = max(range(len(hist)), key=lambda i: hist[i]) if hist and max(hist) else None
+    cause = _cause_name(row["dominant_cause"])
+    frac = row["dominant_cause_frac"]
+    where = f"in the {peak * 10}–{peak * 10 + 10} % stretch" if peak is not None else "with no single hotspot"
+    strat = m.get("strategy_count")
+    pad = m.get("progress_at_death")
+    who, span = (("the agents", "over the run's last 10 generations") if kind == "train"
+                 else ("you", f"across {row.get('episodes', 0)} attempts"))
+    if row["solved_by"] == 0:
+        word, color = "too hard", "var(--red)"
+        sent = (f"{'The run never' if kind == 'train' else 'No attempt'} reached the goal"
+                + (f" — {who} die at {pad:.0%} of the level on average" if pad is not None else "")
+                + f"; <b>{cause}</b> accounts for {frac:.0%} of deaths {where}.")
+    elif wr >= 0.5:
+        word, color = "learnable" if kind == "train" else "beatable", "var(--green)"
+        sent = (f"Won {wr:.0%} of the time {span}. <b>{cause}</b> is still the main killer "
+                f"({frac:.0%}, {where})" + (f"; {strat} distinct winning routes." if strat else "."))
+    else:
+        word, color = "inconsistent", "var(--yellow)"
+        sent = (f"The goal is reachable, but {who} win only {wr:.0%} of the time {span} — "
+                f"<b>{cause}</b> ({frac:.0%} of deaths, {where}) keeps catching {'agents' if kind == 'train' else 'you'}"
+                " once the way is known.")
     return word, color, sent
 
 
@@ -546,6 +593,12 @@ CSS = """
   .tip:hover::after,.tip:focus-visible::after,.tip.open::after{content:attr(data-tip);position:absolute;left:0;
     bottom:calc(100% + 8px);z-index:60;width:min(300px,70vw);background:#1b1b1f;color:var(--txt);
     border:1px solid #2d3f5c;border-radius:6px;padding:9px 12px;
+    font:400 .74rem/1.5 var(--ui);letter-spacing:0;text-transform:none;white-space:normal;
+    text-align:left;box-shadow:0 10px 28px -6px rgba(0,0,0,.7)}
+  /* inside a scrolling table the ::after bubble is clipped — those use one fixed-position bubble (JS) */
+  .ovwrap .tip:hover::after,.ovwrap .tip:focus-visible::after,.ovwrap .tip.open::after{display:none}
+  #tipfloat{position:fixed;z-index:1000;display:none;pointer-events:none;width:min(300px,70vw);
+    background:#1b1b1f;color:var(--txt);border:1px solid #2d3f5c;border-radius:6px;padding:9px 12px;
     font:400 .74rem/1.5 var(--ui);letter-spacing:0;text-transform:none;white-space:normal;
     text-align:left;box-shadow:0 10px 28px -6px rgba(0,0,0,.7)}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -771,7 +824,10 @@ CAUSE_COLORS = {"Enemy": "#ef4444", "Pit": "#4a9eff", "OOB": "#eab308", "Spike":
                 "Saw": "#a855f7", "Stall": "#eab308", "Timeout": "#9a9aa0", "?": "#606066"}
 
 
-def _pill(row: dict) -> str:
+def _pill(row: dict, kind: str = "probe") -> str:
+    if kind == "manual":
+        return ('<span class="pill pill-ok">beaten</span>' if row["solved_by"]
+                else '<span class="pill pill-bad">unbeaten</span>')
     if row["solved_by"] == row["seeds"]:
         return '<span class="pill pill-ok">solved</span>'
     if row["solved_by"]:
@@ -898,14 +954,19 @@ def _map_viz(title: str, grid: list[str], heat: dict | None, caption: str) -> st
 
 
 def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None,
-          cross: dict | None = None) -> str:
+          cross: dict | None = None, kind: str = "probe", csv_paths: list[str] | None = None) -> str:
+    """One level card + its detail window. kind: "probe" (a Full Sweep level, several seeds),
+    "train" (one training run on one level), "manual" (human attempts); csv_paths = the
+    episode logs its routes come from (default: the probe dirs)."""
     m = row.get("metrics") or {}
     cross = cross or {}
     wr = row["win_rate_mean"]
-    fw = (f"first win gen {row['first_win_mean']}" if row["first_win_mean"] is not None
+    label = row.get("label") or row["level"]
+    unit = "attempt" if kind == "manual" else "gen"
+    fw = (f"first win {unit} {row['first_win_mean']}" if row["first_win_mean"] is not None
           else f"progress at death {registry.fmt('progress_at_death', m.get('progress_at_death'))}")
     color = _wr_var(row)
-    fw_full = (f"gen {row['first_win_mean']} ± {row['first_win_ci']}"
+    fw_full = (f"{unit} {row['first_win_mean']}" + (f" ± {row['first_win_ci']}" if row["seeds"] > 1 else "")
                if row["first_win_mean"] is not None else "never")
     bg_full = (f"gen {row['best_gen_mean']} ± {row['best_gen_ci']}"
                if row.get("best_gen_mean") is not None else "—")
@@ -914,13 +975,18 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     if ttime is None:
         ttime = sum(c.get("train_time_s") or 0 for c in cells)
 
-    routes = _collect_routes(game, persona, row["level"], tag)
+    routes = _collect_routes(game, persona, row["level"], tag, paths=csv_paths)
     grid = _level_grid(game, row["level"])
     cfg_html = _config_html(_level_config(game, row["level"], grid))
 
+    wr_sub, fw_sub = {
+        "probe": ("measured 10 gens after first win", f"{row['solved_by']}/{row['seeds']} seeds solved"),
+        "train": ("over the run's last 10 gens", f"of {row.get('gens_run', '?')} gens trained on this level"),
+        "manual": ("share of your attempts that won", f"of {row.get('episodes', 0)} attempts, one life each"),
+    }[kind]
     headline = [  # the four a designer reads first; the rest sit behind "all metrics"
-        _stat("Win rate", f"{wr:.0%} ± {_ci(row):.0%}", "measured 10 gens after first win"),
-        _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved"),
+        _stat("Win rate", f"{wr:.0%}" + (f" ± {_ci(row):.0%}" if row["seeds"] > 1 else ""), wr_sub),
+        _stat("First win", fw_full, fw_sub),
         _stat("Dominant cause", _cause_name(row["dominant_cause"]),
               f"{row['dominant_cause_frac']:.0%} of deaths"),
         _stat("Death spread", registry.fmt("death_cluster_entropy", m.get("death_cluster_entropy")),
@@ -931,10 +997,10 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         _stat("Improvement", f"{rate:+.1%}/gen" if rate is not None else "—", "of the level per generation"),
         _stat("Learning gain", registry.fmt("learning_gain", m.get("learning_gain")), "late-gen wins − early-gen wins"),
         _stat("Stuck rate", f"{row['stuck_frac_mean']:.0%}", "episodes ending in a stall"),
-        _stat("Train time", fmt_hms(ttime), f"all {row['seeds']} seeds, wall-clock"),
+        _stat("Train time", fmt_hms(ttime), f"all {row['seeds']} seeds, wall-clock" if kind == "probe" else "wall-clock"),
     ]
-    vword, vcolor, vsent = _verdict_sentence(row)
-    watch_html, watch_href = _watch_cmd(game, persona, row["level"], cells)
+    vword, vcolor, vsent = _verdict_sentence(row, kind)
+    watch_html, watch_href = _watch_cmd(game, persona, row["level"], cells) if kind != "manual" else ("", None)
     did = "d_" + "".join(ch if ch.isalnum() else "_" for ch in f"{game}_{persona}_{tag or 'legacy'}_{row['level']}")
 
     curves = json.dumps([c.get("curve", []) for c in cells])
@@ -965,12 +1031,22 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
                         "Yellow tiles: where bombs were placed; brighter = more bombs.") if game == "bomberman" else ""
 
     foot = (f'<div class="cardfoot"><a class="watchbtn" href="{watch_href}" target="_blank" rel="noopener" '
-            f'aria-label="Watch the best {row["level"]} agent">▶ watch</a>'
-            f'<small>best seed replay · dashboard</small></div>' if watch_href else "")
+            f'aria-label="Watch the best {label} agent">▶ watch</a>'
+            f'<small>{"best seed" if kind == "probe" else "best genome"} replay · dashboard</small></div>'
+            if watch_href else "")
+    ga_html = "" if kind == "manual" else f"""
+        <details class="more"><summary>Evolution metrics</summary>
+          <div class="stats">{''.join(ga_stats)}</div></details>"""
+    curve_html = "" if kind == "manual" else f"""
+        <div class="viz"><div class="vt">Learning curves — fitness per generation{", one color per seed" if kind == "probe" else ""}</div>
+          <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
+            aria-label="Fitness per generation for each seed on {row['level']}"></canvas>
+          <div class="caption">Solid line: the best genome each generation. Faint line: population
+          average. A jump above the dashed line means winning runs (win bonus). Flat = stuck.</div></div>"""
     return f"""
     <div class="lvlcard">
       <button class="cardhead" type="button" aria-haspopup="dialog" aria-controls="{did}" data-dialog="{did}">
-        <div class="lvlname">{row['level']} {_pill(row)}</div>
+        <div class="lvlname">{label} {_pill(row, kind)}</div>
         <div class="bignum" style="color:{color}">{wr:.0%}</div>
         <div class="lvlsub">win rate · {fw}</div>
         <div class="mini"><i style="width:{max(2, wr * 100):.0f}%;background:{color}"></i></div>
@@ -978,7 +1054,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
       {foot}
       <dialog class="detail" id="{did}" aria-labelledby="{did}_t">
         <div class="dhead">
-          <h3 class="lvlname" id="{did}_t">{game} · {persona} · {row['level']} {_pill(row)}</h3>
+          <h3 class="lvlname" id="{did}_t">{game} · {persona} · {label} {_pill(row, kind)}</h3>
           <div class="bignum" style="color:{color}">{wr:.0%}</div>
           <button class="close" type="button" aria-label="Close level details">✕</button>
         </div>
@@ -1000,14 +1076,9 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         {watch_html}
         <details class="more" open><summary>Balance metrics by dimension ({row.get('episodes', 0):,} episodes)</summary>
           {_dimension_blocks(game, m, cross)}</details>
-        <details class="more"><summary>Evolution metrics</summary>
-          <div class="stats">{''.join(ga_stats)}</div></details>
+        {ga_html}
         {cfg_html}
-        <div class="viz"><div class="vt">Learning curves — fitness per generation, one color per seed</div>
-          <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
-            aria-label="Fitness per generation for each seed on {row['level']}"></canvas>
-          <div class="caption">Solid line: the best genome each generation. Faint line: population
-          average. A jump above the dashed line means winning runs (win bonus). Flat = stuck.</div></div>
+        {curve_html}
       </dialog>
     </div>"""
 
@@ -1017,20 +1088,24 @@ def _table_metrics(game: str) -> list:
             if x.fmt not in ("grid", "dist", "tiers") and x.dims]
 
 
-def _metric_table(rows: list[dict], game: str) -> str:
+def _metric_table(rows: list[dict], game: str, first_col: str = "Level") -> str:
     cols = _table_metrics(game)
     trs = []
     for r in rows:
         m = r.get("metrics") or {}
-        wr = f"{r['win_rate_mean']:.0%} ±{_ci(r):.0%}"
-        fw = (f"{r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None else "—")
+        multi = r["seeds"] > 1
+        wr = f"{r['win_rate_mean']:.0%}" + (f" ±{_ci(r):.0%}" if multi else "")
+        fw = (f"{r['first_win_mean']}" + (f"±{r['first_win_ci']}" if multi else "")
+              if r["first_win_mean"] is not None else "—")
         solved_cls = ("wr-good" if r["solved_by"] == r["seeds"] else
                       ("wr-mid" if r["solved_by"] else "wr-bad"))
-        bg = (f"{r['best_gen_mean']}±{r['best_gen_ci']}" if r.get("best_gen_mean") is not None else "—")
+        bg = (f"{r['best_gen_mean']}" + (f"±{r['best_gen_ci']}" if multi else "")
+              if r.get("best_gen_mean") is not None else "—")
         rate = (f"{r['improvement_rate_mean']:+.1%}" if r.get("improvement_rate_mean") is not None else "—")
         tds = "".join(f"<td>{registry.fmt(x.key, m.get(x.key))}</td>" for x in cols)
         trs.append(
-            f"<tr data-level=\"{r['level']}\" tabindex=\"0\" title=\"Open {r['level']}\"><td>{r['level']}</td>"
+            f"<tr data-level=\"{r.get('label') or r['level']}\" tabindex=\"0\" "
+            f"title=\"Open {r.get('label') or r['level']}\"><td>{r.get('label') or r['level']}</td>"
             f"<td class='{solved_cls}'>{r['solved_by']}/{r['seeds']}</td>"
             f"<td>{fw}</td><td>{bg}</td><td>{rate}</td><td>{wr}</td>{tds}"
             f"<td>{_cause_name(r['dominant_cause'])} ({r['dominant_cause_frac']:.0%})</td>"
@@ -1040,7 +1115,7 @@ def _metric_table(rows: list[dict], game: str) -> str:
     ths = "".join(f"<th {tip(x.label)}>{x.label}</th>" for x in cols)
     return f"""
     <div class="ovwrap"><table class="metrics">
-      <thead><tr><th scope="col" data-sort>Level</th><th {tip("Solved")}>Solved</th><th {tip("First win")}>First win</th>
+      <thead><tr><th scope="col" data-sort>{first_col}</th><th {tip("Solved")}>Solved</th><th {tip("First win")}>First win</th>
         <th {tip("Best gen")}>Best gen</th><th {tip("Improvement")}>Rate/gen</th>
         <th {tip("Win rate")}>Win rate ±CI</th>{ths}
         <th {tip("Dominant cause")}>Dominant cause</th><th {tip("Stuck rate")}>Stuck</th>
@@ -1397,46 +1472,86 @@ def _section_id(game: str, tag: str | None) -> str:
     return f"{game}_{tag}" if tag else game
 
 
-def _metrics_rows(path: str) -> list[tuple[str, str, str, dict]]:
-    """(game, level, persona, metrics) rows from a metrics.json written by code/stats/summarize.py."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return []
-    return [(g, lvl, p, m) for g, levels in (data.get("games") or {}).items()
-            for lvl, by_p in levels.items() for p, m in by_p.items() if not p.startswith("_")]
+_NOT_TRAINING = ("balance", "probes", "gasweep", "_replay", "manual", "ablation")
 
 
-_SUMMARY_COLS = ["completion_rate", "mean_completion_time", "progress_at_death", "deaths_per_run",
-                 "death_cluster_entropy"]
+def _card_views(items: list[tuple], kind: str, first_col: str) -> str:
+    """Level cards + full metric table per game, laid out like a Full Sweep persona tab.
+    items: (game, persona, row, cells, tag, csv_paths) — one card each."""
+    by_game: dict[str, list[tuple]] = {}
+    for it in items:
+        by_game.setdefault(it[0], []).append(it)
+    out = []
+    for game, its in by_game.items():
+        th = registry.load_thresholds(game)
+        cards = "".join(_card(game, persona, row, cells, th, tag, kind=kind, csv_paths=paths)
+                        for _, persona, row, cells, tag, paths in its)
+        out.append(f"""
+      <div class="tbltitle">{_game_icon(game)}{game}</div>
+      <div class="view active">
+        <div class="lvlgrid">{cards}</div>
+        <div class="tbltitle">Full metric table — {game}</div>
+        {_metric_table([it[2] for it in its], game, first_col)}
+      </div>""")
+    return "".join(out)
 
 
-def _summary_cells(game: str, m: dict) -> str:
-    cells = [f"<td>{m.get('_episodes', 0):,}</td>"]
-    for k in _SUMMARY_COLS:
-        v = registry.fmt(k, m.get(k)) if game in registry.BY_KEY[k].games else "—"
-        cells.append(f"<td>{v}</td>")
-    causes = m.get("death_cause_distribution") or {}
-    top = next(iter(causes.items()), None)
-    cells.append(f"<td>{_cause_name(top[0]) if top else '—'}</td>")
-    return "".join(cells)
+def _train_items(run_dir: str, name: str, st: dict) -> list[tuple]:
+    """One card per level a training run played with metrics on: the GA numbers from its
+    state.json history, the balance metrics from its episodes.csv — the same fold as one
+    probe seed (balance.summarize + aggregate), so the card reads like a Full Sweep card."""
+    hist = st.get("history") or []
+    csv_path = os.path.join(run_dir, "episodes.csv")
+    eps_all = [e for e in episode_log.read(csv_path)
+               if (e.get("gen") or 0) <= len(hist)]  # rows past the last saved generation: an interrupted run
+    by_level: dict[tuple[str, str], list[dict]] = {}
+    for e in eps_all:
+        by_level.setdefault((e.get("game") or "?", str(e.get("level"))), []).append(e)
+    cfg = st.get("config", {})
+    items = []
+    for (game, level), eps in by_level.items():
+        h = [r for r in hist if str(r.get("level")) == level]
+        if not h:
+            continue
+        cell = summarize_cell(h, int(cfg.get("pop_size", 10)), level, int(cfg.get("seed", 0)),
+                              float(st.get("best_fitness", 0.0)), int(st.get("best_gen", 0)),
+                              episodes=eps, game=game)
+        cell["dir"] = run_dir
+        row = aggregate([cell], eps, game)
+        row["gens_run"] = len(h)
+        row["label"] = name if len(by_level) == 1 else f"{name} · {level}"
+        persona = st.get("persona") or eps[0].get("persona") or "experienced"
+        items.append((game, persona, row, [cell], name, [csv_path]))
+    return items
 
 
-def _summary_ths() -> str:
-    return ("<th scope='col'>Episodes</th>"
-            + "".join(f"<th scope='col' class='tip' data-tip='{registry.BY_KEY[k].tip}' tabindex='0'>"
-                      f"{registry.BY_KEY[k].label} ⓘ</th>" for k in _SUMMARY_COLS)
-            + "<th scope='col'>Top cause</th>")
+def _manual_row(level: str, eps: list[dict], game: str) -> dict:
+    """A Full-Sweep-shaped row from human attempts: every attempt is one life, so the win rate
+    is the share of attempts that won and "first win" is the attempt that first did."""
+    metrics = registry.compute_level(eps, game)
+    causes: dict[str, int] = dict(metrics.get("death_cause_distribution") or {})
+    dom = max(causes.items(), key=lambda kv: kv[1]) if causes else ("-", 0)
+    first = next((i for i, e in enumerate(eps, 1) if e.get("status") == "WON"), None)
+    return {
+        "level": level, "seeds": 1, "solved_by": int(first is not None),
+        "first_win_mean": first, "first_win_ci": None, "best_gen_mean": None, "best_gen_ci": None,
+        "win_rate_mean": round(sum(e.get("status") == "WON" for e in eps) / len(eps), 3), "win_rate_ci": 0.0,
+        "dominant_cause": dom[0], "dominant_cause_frac": round(dom[1] / (sum(causes.values()) or 1), 2),
+        "causes": causes,
+        "stuck_frac_mean": round(sum(e.get("status") == "STUCK" for e in eps) / len(eps), 3),
+        "improvement_rate_mean": None,
+        "train_time_s": round(sum(e.get("time_s") or 0.0 for e in eps), 1),
+        "episodes": len(eps), "metrics": metrics,
+    }
 
 
 def _runs_section() -> str:
-    """Every training run under runs/ (probes and balance output excluded), with its balance
-    metrics when it was trained with metrics on."""
-    rows, mrows = [], []
+    """Every training run under runs/ (probes and balance output excluded); runs trained with
+    metrics on also get Full-Sweep-style level cards from their episode log."""
+    rows, items = [], []
     for sp in sorted(glob.glob(os.path.join("runs", "*", "state.json"))):
         name = os.path.basename(os.path.dirname(sp))
-        if name in ("balance", "probes", "gasweep", "_replay", "manual", "ablation"):
+        if name in _NOT_TRAINING:
             continue
         try:
             with open(sp, encoding="utf-8") as f:
@@ -1452,16 +1567,13 @@ def _runs_section() -> str:
                     f"<td>{s.get('best_level') or '—'}</td>"
                     f"<td class='{'wr-good' if wins else 'wr-na'}'>{wins}</td>"
                     f"<td>{tsec // 3600}:{tsec % 3600 // 60:02d}:{tsec % 60:02d}</td></tr>")
-        for game, lvl, persona, m in _metrics_rows(os.path.join(os.path.dirname(sp), "metrics.json")):
-            mrows.append(f"<tr><td>{name}</td><td>{lvl}</td>{_summary_cells(game, m)}</tr>")
+        items += _train_items(os.path.dirname(sp), name, s)
     if not rows:
         return ""
-    metrics_html = "" if not mrows else f"""
+    metrics_html = "" if not items else f"""
     <div class="tbltitle">Balance metrics of runs trained with metrics on
-      (<code>runs/&lt;name&gt;/metrics.json</code>)</div>
-    <div class="ovwrap"><table>
-      <thead><tr><th scope="col">Run</th><th scope="col">Level</th>{_summary_ths()}</tr></thead>
-      <tbody>{''.join(mrows)}</tbody></table></div>"""
+      (from <code>runs/&lt;name&gt;/episodes.csv</code>) — click a card for its window</div>
+    {_card_views(items, "train", "Run")}"""
     return f"""
   <section class="game" id="g_runs" aria-labelledby="g_runs_t">
     <div class="gamehead">
@@ -1478,24 +1590,31 @@ def _runs_section() -> str:
 
 
 def _manual_section() -> str:
-    """Manual-play sessions recorded with metrics on (runs/manual/<game>/<level>/)."""
-    rows = []
-    for path in sorted(glob.glob(os.path.join("runs", "manual", "*", "*", "metrics.json"))):
-        for game, lvl, persona, m in _metrics_rows(path):
-            rows.append(f"<tr><td>{game}</td><td>{lvl}</td>{_summary_cells(game, m)}</tr>")
-    if not rows:
+    """Manual-play sessions recorded with metrics on (runs/manual/<game>/<level>/), one
+    Full-Sweep-style card per (game, level, persona), every session's attempts pooled."""
+    groups: dict[tuple[str, str, str], tuple[list[dict], list[str]]] = {}
+    for path in sorted(glob.glob(os.path.join("runs", "manual", "*", "*", "episodes.csv"))):
+        for e in episode_log.read(path):
+            key = (e.get("game") or "?", str(e.get("level")), e.get("persona") or "human")
+            eps, paths = groups.setdefault(key, ([], []))
+            eps.append(e)
+            if path not in paths:
+                paths.append(path)
+    if not groups:
         return ""
+    items = []
+    for (game, level, persona), (eps, paths) in sorted(groups.items()):
+        row = _manual_row(level, eps, game)
+        row["label"] = level if persona == "human" else f"{level} · {persona}"
+        items.append((game, persona, row, [], "manual", paths))
     return f"""
   <section class="game" id="g_manual" aria-labelledby="g_manual_t">
     <div class="gamehead">
       <button class="chev" type="button" aria-expanded="true" aria-label="Collapse manual play">▾</button>
       <h2 class="gametag" id="g_manual_t" style="background:#3b2a5f">Manual play</h2>
       <span class="gamemeta">human sessions recorded with metrics on · every attempt is one life ·
-      full metrics in runs/manual/&lt;game&gt;/&lt;level&gt;/metrics.json</span></div>
-    <div class="body"><div class="ovwrap"><table>
-      <thead><tr><th scope="col">Game</th><th scope="col">Level</th>{_summary_ths()}</tr></thead>
-      <tbody>{''.join(rows)}</tbody>
-    </table></div></div>
+      logs in runs/manual/&lt;game&gt;/&lt;level&gt;/episodes.csv</span></div>
+    <div class="body">{_card_views(items, "manual", "Level")}</div>
   </section>"""
 
 
@@ -1514,6 +1633,28 @@ for (const t of document.querySelectorAll('.tip[tabindex]')){
   t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); t.classList.toggle('open'); } if (e.key === 'Escape') t.classList.remove('open'); });
   t.addEventListener('blur', () => t.classList.remove('open'));
 }
+// table header bubbles: the scroll box would clip a CSS bubble, so place one fixed element
+// over the header instead (above it, or below when there's no room at the top)
+const tipEl = document.createElement('div');
+tipEl.id = 'tipfloat'; tipEl.setAttribute('role', 'tooltip');
+const showTip = t => {
+  (t.closest('dialog') || document.body).appendChild(tipEl);
+  tipEl.textContent = t.dataset.tip; tipEl.style.display = 'block';
+  const r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  const nav = document.querySelector('nav')?.getBoundingClientRect().bottom || 0;
+  let y = r.top - h - 8;
+  if (y < nav + 8) y = r.bottom + 8;
+  tipEl.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  tipEl.style.top = y + 'px';
+};
+const hideTip = () => { tipEl.style.display = 'none'; };
+for (const t of document.querySelectorAll('.ovwrap .tip')){
+  t.addEventListener('mouseenter', () => showTip(t));
+  t.addEventListener('mouseleave', hideTip);
+  t.addEventListener('focus', () => showTip(t));
+  t.addEventListener('blur', hideTip);
+}
+addEventListener('scroll', hideTip, true);
 // full metric tables: click a header to sort, a row to open that level's window
 const num = s => { const m = s.replace(/,/g, '').match(/-?\\d+(\\.\\d+)?/); return m ? +m[0] : -Infinity; };
 for (const table of document.querySelectorAll('table.metrics')){

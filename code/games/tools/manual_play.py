@@ -62,9 +62,11 @@ def _platformer_action(keys) -> list:
     """
     k = pygame.key.get_pressed()
 
-    left  = k[pygame.K_a]
-    right = k[pygame.K_d]
-    jump  = k[pygame.K_SPACE] or k[pygame.K_w]
+    # Same keys Player.handle_input reads, so the action (and the metrics' jump count) match
+    # what the player actually did — arrows included.
+    left  = k[pygame.K_a] or k[pygame.K_LEFT]
+    right = k[pygame.K_d] or k[pygame.K_RIGHT]
+    jump  = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
     run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
     fire  = k[pygame.K_z]
 
@@ -119,8 +121,8 @@ def _sonic_action(keys) -> list:
     """
     k = pygame.key.get_pressed()
 
-    left = k[pygame.K_a]
-    right = k[pygame.K_d]
+    left = k[pygame.K_a] or k[pygame.K_LEFT]    # SonicPlayer reads the arrows too
+    right = k[pygame.K_d] or k[pygame.K_RIGHT]
     jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
     run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
     down = k[pygame.K_s] or k[pygame.K_DOWN]
@@ -192,6 +194,10 @@ elif args.game == "sonic":
     env_kwargs['curriculum_enabled'] = False
 if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
+    if args.metrics:
+        # As for the agents: the goal ENDS the attempt. Otherwise the core loads the next
+        # level inside the winning step and the stats read the new level (a win logged as a death).
+        env_kwargs['terminate_on_goal'] = True
 
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
@@ -313,7 +319,7 @@ while running:
 
     if info.get("episode_end", False) or done:
         if stats is not None:
-            stats.finish(_end_status(core_game, terminated, truncated, info))
+            stats.finish("WON" if info.get("won") else _end_status(core_game, terminated, truncated, info))
             row = stats.to_dict()
             episode_log.append(METRICS_CSV, [row])
             print(f"[Play] attempt {row['gen']}: {row['status']}"

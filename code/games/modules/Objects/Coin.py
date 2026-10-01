@@ -33,8 +33,10 @@ class Coin():
             grav = context.GRAVITY if context else MP.GRAVITY
             
             self.gObj.y += self.vy * dt
-            self.vy += grav * dt 
+            self.vy += grav * dt
             self.life -= dt
+            if self.life <= 0:  # the pop animation is over (it used to fall forever)
+                self.gObj.active = False
         
         self.animation = (self.animation + 1) % 60
 

@@ -908,10 +908,15 @@ class PhysicsManager:
                 spawn_y = row * TILE_SIZE - 22
 
                 if block.contains == "coin":
+                    # A block coin is collected on the hit (as in SMB); the fly-up coin is
+                    # only the animation, so it can't be picked up a second time.
                     c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
-                             flyup=True, vy=-280.0, life=0.3, auto_collect=True)
+                             collected=True, flyup=True, vy=-280.0, life=0.3, auto_collect=True)
                     c.gObj.type_id = EntityType.COIN
                     core.level_data.coins.append(c)
+                    core.score += 10
+                    core.coins_step += 1
+                    core.coins_total += 1
 
                 elif block.contains == "mushroom":
                     p = Mushroom(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
