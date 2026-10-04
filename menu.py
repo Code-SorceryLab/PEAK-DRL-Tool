@@ -930,7 +930,9 @@ def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str 
                                            if g in ("mario", "meatboy", "bomberman")])
     if not games:
         return None
-    personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))
+    personas = toggle_select("PERSONAS", PERSONA_CHOICES,  # new personas opt-in: each one multiplies sweep cost
+                             default_indices=[i for i, n in enumerate(PERSONA_CHOICES)
+                                              if n in ("experienced", "novice", "speedrunner")])
     if not personas:
         return None
     gens_raw = input(_DIM(f"\n    Generation budget per probe [{default_gens}]: ")).strip()

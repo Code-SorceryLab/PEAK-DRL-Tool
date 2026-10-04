@@ -205,14 +205,21 @@ there). `--level` on the CLI locks a single level; menu Train Single prompts for
 ## Player personas
 
 Probes and training runs imitate a chosen player type (`--persona`, or the persona prompt
-in menu Train Single / Full Sweep). A persona is a *capability + objective* profile,
-not a reward function:
+in menu Train Single / Full Sweep). A persona is a *capability + objective* profile:
 
 | Persona | Capabilities | Objective |
 |---|---|---|
 | `novice` | walk speed only, fresh senses every **3rd** frame (reaction lag) | reach the goal |
+| `bad` | walk speed only, senses every **4th** frame, input slips (3 %/frame start, held 12 frames) | reach the goal |
 | `experienced` | walk speed, full reactions — the default | reach the goal |
+| `good` | **sprint unlocked**, full reactions, clean inputs | reach the goal |
+| `killer` | as `experienced` | goal **+ share of enemies killed** (all = one goal) |
+| `collector` | as `experienced` | goal **+ share of coins / power-ups picked up** (all = one goal) |
 | `speedrunner` | **sprint unlocked**, full reactions | goal **+ 25 fitness per second left on the clock** — finishing fast is selected for |
+
+Event weights follow the procedural-persona method (Holmgård et al.): fitness = progress fitness +
+progress scale × Σ weight × min(count / level total, 1). Details and measurements: README
+*Player personas*.
 
 The persona is stored with the run (`state.json`), shown on the dashboard's Run panel, and
 replay automatically uses the persona the genome was trained with. Balancing per persona is

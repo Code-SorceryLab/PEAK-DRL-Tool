@@ -109,6 +109,10 @@ def _run_ws(state: SharedState, port: int) -> None:
     asyncio.run(serve())
 
 
-def start_server(state: SharedState, http_port: int = 8000, ws_port: int = 8765) -> None:
+WS_OFFSET = 765  # websocket port = HTTP port + 765 (8000 -> 8765); the page derives it the same way
+
+
+def start_server(state: SharedState, http_port: int = 8000, ws_port: int | None = None) -> None:
+    ws_port = ws_port or http_port + WS_OFFSET
     threading.Thread(target=_run_http, args=(http_port,), daemon=True).start()
     threading.Thread(target=_run_ws, args=(state, ws_port), daemon=True).start()
