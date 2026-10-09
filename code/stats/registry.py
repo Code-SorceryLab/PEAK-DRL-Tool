@@ -34,7 +34,9 @@ DIMENSIONS = {
 
 # Skill tiers -> the persona that stands in for them. "expert" is the speedrunner: it sprints and
 # is paid for time left on the clock, the closest persona to expert play.
-TIERS = {"novice": "novice", "mid": "experienced", "expert": "speedrunner"}
+# skill tier -> persona. The novice–expert gaps compare novice with expert (= experienced); speedrunner
+# is its own tier, listed by "completion per skill" but not one end of a gap.
+TIERS = {"novice": "novice", "expert": "experienced", "speedrunner": "speedrunner"}
 
 SCROLLERS = frozenset({"mario", "megaman", "sonic"})
 ALL_GAMES = frozenset({"mario", "megaman", "sonic", "meatboy", "bomberman"})
@@ -404,11 +406,11 @@ METRICS: list[Metric] = [
            games=_BM, fmt="num", tip="Bricks destroyed before the exit was found, over runs that found it."),
     # 5, 6 — across skill tiers
     Metric("novice_expert_gap", "Novice–expert gap", (5,), novice_expert_gap, fmt="pct", scope="persona",
-           tip="Expert completion rate − novice completion rate (expert = speedrunner persona)."),
+           tip="Expert completion rate − novice completion rate (expert = experienced persona)."),
     Metric("novice_expert_time_gap", "Novice–expert time gap", (5,), novice_expert_time_gap, fmt="s",
-           scope="persona", tip="Novice mean win time − expert mean win time."),
+           scope="persona", tip="Novice mean win time − expert (experienced) mean win time."),
     Metric("completion_rate_per_skill", "Completion per skill", (6,), completion_rate_per_skill, fmt="tiers",
-           scope="persona", tip="Completion rate for each skill tier: novice, mid (experienced), expert (speedrunner)."),
+           scope="persona", tip="Completion rate for each skill tier: novice, expert (experienced), speedrunner."),
     # 7 — emergent complexity (strategy_count and death_cluster_entropy are listed above)
     Metric("wall_jump_utilization_rate", "Wall jumps", (7,), wall_jump_rate, games=_MB, fmt="num",
            tip="Wall jumps per run."),

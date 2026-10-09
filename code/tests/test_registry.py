@@ -63,10 +63,14 @@ def test_skill_tiers_map_to_personas():
                   "experienced": {"completion_rate": 0.5, "mean_completion_time": 25.0},
                   "speedrunner": {"completion_rate": 0.7, "mean_completion_time": 18.0}}
     c = registry.compute_cross(by_persona, "mario")
-    assert c["novice_expert_gap"] == 0.5
-    assert c["novice_expert_time_gap"] == 12.0
-    assert c["completion_rate_per_skill"] == {"novice": 0.2, "mid": 0.5, "expert": 0.7}
+    assert c["novice_expert_gap"] == 0.3                  # expert = experienced: 0.5 − 0.2
+    assert c["novice_expert_time_gap"] == 5.0             # 30 − 25
+    assert c["completion_rate_per_skill"] == {"novice": 0.2, "expert": 0.5, "speedrunner": 0.7}
     assert registry.compute_cross({"novice": by_persona["novice"]}, "mario")["novice_expert_gap"] is None
+    # novice + experienced alone is enough for both gaps — no speedrunner needed
+    two = registry.compute_cross({p: by_persona[p] for p in ("novice", "experienced")}, "mario")
+    assert two["novice_expert_gap"] == 0.3 and two["novice_expert_time_gap"] == 5.0
+    assert two["completion_rate_per_skill"] == {"novice": 0.2, "expert": 0.5}
 
 
 def test_verdicts_use_bands():

@@ -110,6 +110,8 @@ def load_all_csvs(patterns):
     for col in ("level", "persona", "game", "source"):
         if col in df.columns:
             df[col] = df[col].astype(str)
+    if "source" in df.columns:  # all your manual play together, apart from agents sharing a persona label
+        df.loc[df["source"] == "manual", "persona"] = "you"
     df["world"] = df["level"]
     return df
 

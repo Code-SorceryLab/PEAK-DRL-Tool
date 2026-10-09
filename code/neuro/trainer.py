@@ -592,10 +592,15 @@ def main() -> None:
         print("--metrics only applies to --replay: training never records balance metrics", flush=True)
 
     run_dir = args.run_dir or args.resume or os.path.join("runs", args.game)
+    # a flag the user actually typed beats a saved run / the sweep; an argparse default does not
+    typed = {a.lstrip("-").split("=")[0].replace("-", "_") for a in sys.argv if a.startswith("--")}
+    persona_name = args.persona
     if args.resume:
         pop = Population.load(args.resume)
         cfg = pop.cfg
-        print(f"resumed {args.resume} at gen {pop.generation}", flush=True)
+        if "persona" not in typed and pop.persona in PERSONAS:
+            persona_name = pop.persona  # the persona the run was trained as: its capabilities and fitness
+        print(f"resumed {args.resume} at gen {pop.generation} as [{persona_name}]", flush=True)
     else:
         pop = None
         given = {"seed": args.seed, "sensors": args.sensors, "hidden": args.hidden,
@@ -605,8 +610,6 @@ def main() -> None:
             from .gasweep import load_best
             fields = load_best(args.game)
             print(f"--best: {args.game} -> {fields or 'baseline (this game has no sweep yet)'}", flush=True)
-        # a flag the user actually typed beats the sweep; an argparse default does not
-        typed = {a.lstrip("-").split("=")[0].replace("-", "_") for a in sys.argv if a.startswith("--")}
         for k, v in given.items():
             if k not in fields or k in typed:
                 fields[k] = v
@@ -616,7 +619,7 @@ def main() -> None:
         from .adapters import validate_level
         validate_level(args.game, args.level)
     trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
-                      persona=get_persona(args.persona))
+                      persona=get_persona(persona_name))
     trainer.run(args.gens)
 
 

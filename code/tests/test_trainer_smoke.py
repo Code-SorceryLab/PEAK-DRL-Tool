@@ -27,3 +27,13 @@ def test_one_generation_with_feedback_and_memory(tmp_path):
     net = make_net(loaded.cfg)
     assert net.n_params == loaded.n_params == 8 * (14 + 2 + 2 + 1) + (8 + 1) * 5
     net.set_weights(np.load(tmp_path / "best.npz")["weights"])   # replay-style rebuild fits
+
+
+def test_checkpoint_keeps_the_training_persona(tmp_path):
+    """A resumed run must keep training as the persona it was started with (its sprint, reaction
+    time and fitness), not fall back to the default."""
+    from code.neuro.personas import PERSONAS
+    pygame.init()
+    cfg = GAConfig(pop_size=2, max_frames=60, seed=1)
+    Trainer("mario", "Mario1-1", cfg, run_dir=str(tmp_path), persona=PERSONAS["novice"]).run(max_gens=1, verbose=False)
+    assert Population.load(str(tmp_path)).persona == "novice"

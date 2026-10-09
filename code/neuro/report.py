@@ -687,6 +687,7 @@ CSS = """
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
   .stat .lbl{font:400 .66rem var(--ui);color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
   .stat .val{font:600 1.05rem var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .val.wrap{white-space:normal;overflow:visible;font-size:.95rem;line-height:1.4;overflow-wrap:anywhere}
   .stat .sub{font:400 .68rem var(--mono);color:var(--dim);margin-top:1px}
   details.more{margin:4px 0 10px}
   details.more summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:8px;
@@ -831,13 +832,15 @@ def _causebar(causes: dict[str, int]) -> str:
             f'<div class="causekey">{" · ".join(key)}</div>')
 
 
-def _stat(label: str, value: str, sub: str = "", key: str | None = None) -> str:
-    """One stat tile. `key` tags the value (and sub) so a play window's run picker can swap them."""
+def _stat(label: str, value: str, sub: str = "", key: str | None = None, wrap: bool = False) -> str:
+    """One stat tile. `key` tags the value (and sub) so a play window's run picker can swap them;
+    `wrap` lets a list-like value (per-tier rates, cause shares) run onto more lines instead of
+    being cut off with an ellipsis."""
     tip = TIPS_ALL.get(label, "")
     k = f' data-k="{key}"' if key else ""
     ks = f' data-k="{key}_sub"' if key else ""
     return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}" tabindex="0" aria-label="{label}: {tip}">{label} ⓘ</div>'
-            f'<div class="val"{k}>{value}</div>'
+            f'<div class="val{" wrap" if wrap else ""}"{k}>{value}</div>'
             + (f'<div class="sub"{ks}>{sub}</div>' if sub else "") + "</div>")
 
 
@@ -880,16 +883,26 @@ def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> tuple[
             f'from the repo root (or menu 6 → pick this probe).</span>{note}</div></div>', href)
 
 
-def _dimension_blocks(game: str, m: dict, cross: dict) -> str:
-    """Every balance metric that applies to this game, grouped by the eight dimensions."""
+_TIER_NOTE = {"you": ("your play, by the persona you labelled it with", "you as novice vs as experienced"),
+              "agents": ("watched agents, by persona", "novice vs experienced agents"),
+              None: ("needs persona-labelled play", "needs persona-labelled play")}
+
+
+_LIST_FMTS = ("tiers", "dist")  # registry formats whose value is a list ("novice 20% · expert 67%")
+
+
+def _dimension_blocks(game: str, m: dict, cross: dict, population: str | None = "agents") -> str:
+    """Every balance metric that applies to this game, grouped by the eight dimensions. The skill-tier
+    metrics compare one population: your labelled play, or the watched agents."""
+    tiers_note, gap_note = _TIER_NOTE[population]
     blocks = []
     level_ms = registry.metrics_for(game, include_hidden=False)
     cross_ms = registry.metrics_for(game, "persona")
     for dim, name in registry.DIMENSIONS.items():
-        stats = [_stat(x.label, registry.fmt(x.key, m.get(x.key)), key=x.key)
+        stats = [_stat(x.label, registry.fmt(x.key, m.get(x.key)), key=x.key, wrap=x.fmt in _LIST_FMTS)
                  for x in level_ms if x.dims and x.dims[0] == dim and x.fmt not in ("grid",)]
         stats += [_stat(x.label, registry.fmt(x.key, cross.get(x.key)),
-                        "players of this level" if x.fmt == "tiers" else "novice vs speedrunner agents")
+                        tiers_note if x.fmt == "tiers" else gap_note, wrap=x.fmt in _LIST_FMTS)
                   for x in cross_ms if x.dims[0] == dim]
         also = [x.label for x in level_ms if len(x.dims) > 1 and dim in x.dims[1:]]
         if not stats and not also:
@@ -1403,12 +1416,30 @@ def _runs_section() -> str:
 
 # ── play: manual play + watched agents (the only source of balance metrics) ──────────────────
 
+def _is_mine(e: dict) -> bool:
+    """A manual-play attempt (yours), whatever persona you labelled it with."""
+    return e.get("source") == "manual" or e.get("agent") == "human"
+
+
+def _persona_of(e: dict) -> str | None:
+    """The attempt's persona: the label you chose (None in your logs from before persona labels),
+    or the watched agent's persona ("random" for the random agent)."""
+    p = e.get("persona")
+    return p if p and p != "human" else None
+
+
+def _player_of(e: dict) -> str:
+    """Which group an attempt belongs to: "human" (all your manual play) or "agents" (every watched
+    agent — trained replays of any persona and the random agent). The two never pool."""
+    return "human" if _is_mine(e) else "agents"
+
+
 def _player_label(player: str) -> str:
-    return {"human": "you", "random": "random agent"}.get(player, f"{player} agents")
+    return {"human": "Manual play", "agents": "Agents"}.get(player, player)
 
 
 def _who(player: str) -> str:
-    return {"human": "you", "random": "the random agent"}.get(player, f"the {player} agents")
+    return {"human": "you", "agents": "the agents"}.get(player, player)
 
 
 def _when(session) -> str:
@@ -1425,7 +1456,7 @@ def _load_play() -> dict[tuple[str, str, str], tuple[list[dict], list[str]]]:
     for root in PLAY_ROOTS:
         for path in sorted(glob.glob(os.path.join(root, "*", "*", "episodes.csv"))):
             for e in episode_log.read(path):
-                key = (e.get("game") or "?", str(e.get("level")), e.get("persona") or "human")
+                key = (e.get("game") or "?", str(e.get("level")), _player_of(e))
                 eps, paths = groups.setdefault(key, ([], []))
                 eps.append(e)
                 if path not in paths:
@@ -1490,9 +1521,15 @@ def _run_view(game: str, e: dict, k: int) -> dict:
     t, prog = e.get("time_s"), e.get("progress")
     tt = f"{t:.1f} s" if isinstance(t, (int, float)) else "?"
     cause = _cause_name(e.get("cause") or "")
-    player = e.get("persona") or "human"
-    by = "you" if player == "human" else ("random agent" if player == "random" else
-                                          f"agent {e.get('agent') or player} ({player})")
+    player = _player_of(e)
+    persona = _persona_of(e)  # your chosen label, or the agent's persona ("random" for the random agent)
+    run = e.get("agent") if player == "agents" and e.get("agent") not in (None, "", persona) else None
+    if player == "human":
+        by = f"you (as {persona})" if persona else "you"
+    elif persona == "random":
+        by = "the random agent"
+    else:
+        by = f"agent {run or '?'} ({persona})"
     if status == "WON":
         what, word, color = f"reached the goal in {tt}", "won", "var(--green)"
     elif status == "STUCK":
@@ -1512,8 +1549,8 @@ def _run_view(game: str, e: dict, k: int) -> dict:
                  "_prog": f"{prog:.0%}" if prog is not None else "N/A",
                  "_cause": cause if status == "DEAD" else "—", "_jumps": str(e.get("jumps") or 0)})
     route = _thin(e.get("route"))
-    return {"label": f"#{k} · {_when(e.get('session'))} · {status} · {tt}"
-                     + (f" · {e.get('agent')}" if player not in ("human", "random") and e.get("agent") else ""),
+    return {"label": f"#{k}" + (f" · {persona}" if persona else "") + (f" · {run}" if run else "")
+                     + f" · {_when(e.get('session'))} · {status} · {tt}",
             "color": color, "sent": f"Attempt {k} · {_when(e.get('session'))} · {by}: {what}."
                                     + (f" {extra}." if extra else ""),
             "vals": vals, "routes": [{"p": route, "w": int(status == "WON")}] if route else [],
@@ -1535,7 +1572,8 @@ def _canvas_viz(title: str, grid: list[str], kind: str, routes: list, heat, capt
           {legend}<div class="caption">{caption}</div></div>"""
 
 
-def _play_card(game: str, player: str, row: dict, eps: list[dict], th: dict, cross: dict, did: str) -> str:
+def _play_card(game: str, player: str, row: dict, eps: list[dict], th: dict, cross: dict, did: str,
+               population: str | None = None) -> str:
     """One level card for one player's attempts + its window, with a run picker: all attempts
     pooled (default) or any single attempt — every metric, map and sentence follows the pick."""
     m = row["metrics"]
@@ -1607,7 +1645,7 @@ def _play_card(game: str, player: str, row: dict, eps: list[dict], th: dict, cro
           chokepoint; many lit bins = difficulty spread across the level.</div></div>
         <div class="viz"><div class="vt">What kills them</div><div data-h="causes">{pooled['causes']}</div></div>
         <details class="more" open><summary>Balance metrics by dimension (<span data-k="_n">{pooled['vals']['_n']}</span>)</summary>
-          {_dimension_blocks(game, m, cross)}</details>
+          {_dimension_blocks(game, m, cross, population)}</details>
         {_config_html(_level_config(game, row["level"], grid))}
         <script type="application/json" class="runviews">{data}</script>
       </dialog>
@@ -1638,12 +1676,14 @@ def _play_table(rows: list[dict], game: str) -> str:
     this game but had no data (no wins yet, nothing to collect in the level).</div>"""
 
 
-_PLAYER_ORDER = {"human": 0, "random": 2}  # you first, agents by persona, random last
+_GROUPS = ("human", "agents")  # each game shows manual play first, then agents
+_POPULATION = {"human": "you", "agents": "agents"}  # which skill-tier note a group's cards carry
 
 
 def _play_section(groups: dict) -> tuple[str, dict[tuple[str, str], str]]:
-    """Every level played with balance metrics on — by you (menu 5) or a watched agent (6, 8) —
-    pooled per (game, player, level). Returns (html, {(game, level): dialog id to link to})."""
+    """Every level played with balance metrics on, per game in two groups: manual play (you, menu 5)
+    and agents (every watched agent, menu 6 / 8), each pooled per level; an attempt's name says
+    which persona / agent played it. Returns (html, {(game, level): dialog id to link to})."""
     if not groups:
         return "", {}
     links: dict[tuple[str, str], str] = {}
@@ -1653,11 +1693,19 @@ def _play_section(groups: dict) -> tuple[str, dict[tuple[str, str], str]]:
     body = []
     for game in sorted(by_game):
         th = registry.load_thresholds(game)
-        players = sorted(by_game[game], key=lambda p: (_PLAYER_ORDER.get(p, 1), p))
+        players = [g for g in _GROUPS if g in by_game[game]]
         rows = {p: {lvl: _play_row(lvl, eps, game) for lvl, eps in by_game[game][p].items()} for p in players}
-        cross: dict[str, dict] = {}  # skill tiers per level, from the agent personas that played it
-        for lvl in {lvl for p in players for lvl in rows[p]}:
-            cross[lvl] = registry.compute_cross({p: rows[p][lvl]["metrics"] for p in players if lvl in rows[p]}, game)
+        # Skill tiers per (group, level): each group's attempts split by persona — your chosen labels,
+        # the agents' own personas. Never mixed: a novice-vs-expert gap compares like with like.
+        cross: dict[tuple[str, str], dict] = {}
+        for p in players:
+            for lvl, eps in by_game[game][p].items():
+                by_persona: dict[str, list[dict]] = {}
+                for e in eps:
+                    if _persona_of(e):
+                        by_persona.setdefault(_persona_of(e), []).append(e)
+                cross[(p, lvl)] = registry.compute_cross(
+                    {q: registry.compute_level(v, game) for q, v in by_persona.items()}, game)
         body.append(f'<div class="tbltitle">{_game_icon(game)}{game}</div>')
         for p in players:
             levels = sorted(rows[p], key=lambda s: [int(t) if t.isdigit() else t.lower()
@@ -1665,8 +1713,9 @@ def _play_section(groups: dict) -> tuple[str, dict[tuple[str, str], str]]:
             cards = []
             for lvl in levels:
                 did = "d_play_" + "".join(ch if ch.isalnum() else "_" for ch in f"{game}_{p}_{lvl}")
-                links.setdefault((game, lvl), did)  # players are ordered: your own play wins the link
-                cards.append(_play_card(game, p, rows[p][lvl], by_game[game][p][lvl], th, cross[lvl], did))
+                links.setdefault((game, lvl), did)  # manual play comes first: it wins the link
+                cards.append(_play_card(game, p, rows[p][lvl], by_game[game][p][lvl], th,
+                                        cross.get((p, lvl), {}), did, _POPULATION[p]))
             n = sum(r["episodes"] for r in rows[p].values())
             body.append(f"""
       <div class="playerh">{_player_label(p)} · {n} attempt{'s' if n != 1 else ''}</div>
@@ -3080,6 +3129,11 @@ def serve(balance_dir: str, port: int, open_browser: bool) -> None:
 
         def log_message(self, *a) -> None:  # quiet
             pass
+
+        def end_headers(self) -> None:
+            # The pages are rebuilt every time menu 12 runs: never let the browser show a cached copy.
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+            super().end_headers()
 
         def _page(self, status: int, title: str, body_html: str, script: str = "") -> None:
             body = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{title}</title>"

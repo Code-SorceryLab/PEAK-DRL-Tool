@@ -149,5 +149,6 @@ class Population:
         pop.best_level = state.get("best_level")
         pop.annealed = state.get("annealed", False)
         pop.history = state.get("history", [])
+        pop.persona = state.get("persona")  # a resumed run keeps training as the persona it was started with
         pop.rng.bit_generator.state = state["rng_state"]
         return pop

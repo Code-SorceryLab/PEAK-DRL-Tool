@@ -25,8 +25,11 @@ parser.add_argument("--metrics", action="store_true",
                     help="measure balance metrics: every attempt is one life, logged to "
                          "runs/manual/<game>/<level>/episodes.csv (runs/watch/... with --random), "
                          "summarized when you quit")
-parser.add_argument("--persona", default=None,
-                    help="player label written with the metrics (default: human, or random with --random)")
+from code.neuro.personas import DEFAULT_PERSONA, PERSONAS  # noqa: E402  (plain dataclasses, no pygame)
+parser.add_argument("--persona", default=DEFAULT_PERSONA, choices=sorted(PERSONAS),
+                    help="your persona for the metrics — just a label, it changes nothing in the game; it "
+                         "puts your attempts in a skill tier (code/stats/registry.py TIERS). Ignored with "
+                         f"--random (labelled 'random'). Default: {DEFAULT_PERSONA}")
 args = parser.parse_args()
 
 # Level ID priority: CLI arg > env var > default
@@ -240,7 +243,10 @@ if args.metrics:
     _session = _time.strftime("%Y%m%d-%H%M%S")
     _level_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in (level_id or ("editor" if level_file else "auto")))
     # A random agent is a watched agent (menu 8), not a human: its attempts sit with the replays.
-    _PLAYER = args.persona or ("random" if args.random else "human")
+    # persona = the skill-tier label (yours from --persona); agent = who played, so your attempts
+    # never pool with agents that share the persona name.
+    _PLAYER = "random" if args.random else args.persona
+    _AGENT = "random" if args.random else "human"
     _SOURCE = "watch" if args.random else "manual"
     METRICS_CSV = os.path.join("runs", _SOURCE, STATS_GAME, _level_key, "episodes.csv")
     _attempt = 0
@@ -262,7 +268,7 @@ if args.metrics:
         global _attempt
         _attempt += 1
         return make_stats(STATS_GAME, core_game, level=_level_now(), persona=_PLAYER, source=_SOURCE,
-                          agent=_PLAYER, gen=_attempt, session=_session)
+                          agent=_AGENT, gen=_attempt, session=_session)
 
     def _jump_pressed(action, keys) -> bool:
         if args.game == "meatboy" and not args.random:  # MeatboyPlayer reads the keyboard itself
@@ -273,7 +279,8 @@ if args.metrics:
             return False
 
     _one_life()
-    print(f"[Play] Measuring balance metrics — one life per attempt, logging to {METRICS_CSV}")
+    print(f"[Play] Measuring balance metrics — one life per attempt, logging to {METRICS_CSV}"
+          + (f" as persona '{_PLAYER}'" if not args.random else ""))
 
 core_game.reset()
 if stats is None and args.metrics:

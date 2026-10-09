@@ -387,7 +387,7 @@ or the fitness — not the GA.
 | How hard is each level, and for whom? | menu 13 (full sweep) | win rate ± CI and first-win per level × persona; unsolved-at-budget levels flag sealed goals and mechanic-gated paths |
 | *Why* is it hard? | any probe → level dialog | death causes (Pit / Stall / Enemy / OOB / Spike), 10-bin death heatmap, route overlay |
 | Did my edit help? | edit → menu 13 again | same seeds, same GA — the probe is frozen, so the diff is the level |
-| How much skill does the design reward? | menu 13, compare personas | novice vs speedrunner completion on the same level (`skill gap` tile) |
+| How much skill does the design reward? | play it as novice and as experienced (menu 5), or watch agents of both (menu 6) | novice vs experienced completion on the same level (`Novice–expert gap` tile) |
 | Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
 
 ---

@@ -472,7 +472,7 @@ def _prompt_gens(default_hint="Enter = train until Ctrl+C"):
 def _prompt_persona_sensors_tag():
     """Shared by every TRAIN entry: (persona, sensors, tag) or None on back."""
     persona = ask_index("\n  Player persona (who should the agents play like?):",
-                        PERSONA_CHOICES, default="experienced")
+                        PERSONA_CHOICES, default=PERSONA_CHOICES[0])
     if not persona:
         return None
     sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
@@ -499,7 +499,7 @@ _WATCH_METRICS_NOTE = ("Balance metrics: every attempt (one life, start to death
 def _run_dir(game, level, persona, sensors, tag) -> Path:
     """runs/<game>[_<level>][_<persona>][_<sensors>][_<tag>] — every config gets its own population."""
     name = game if not level else f"{game}_{level}"
-    if persona != "experienced":
+    if persona != PERSONA_CHOICES[0]:  # the default persona keeps the plain run name
         name += f"_{persona}"
     if sensors != "rays":  # a grid population has a different genome size — never share a run dir
         name += f"_{sensors}"
@@ -639,6 +639,12 @@ _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("
                ("F4", "Hitboxes"), ("F5", "Agent max view")]
 
 
+def _ask_play_persona() -> str | None:
+    """Your persona for manual play's balance metrics — just a label (nothing in the game changes);
+    every persona in the registry is offered. None = back."""
+    return ask_index("\n  Play as which persona?", PERSONA_CHOICES, default=PERSONA_CHOICES[0])
+
+
 def run_manual_play():
     """Play Manually — pick a game and level, drive it with the keyboard."""
     _refresh_screen()
@@ -658,12 +664,18 @@ def run_manual_play():
             level = None
     metrics = _ask_metrics(False, "Balance metrics: each attempt is played with ONE life, logged to\n"
                                   "    runs/manual/<game>/<level>/episodes.csv, and summarized when you quit (ESC).")
+    persona = None
+    if metrics:
+        persona = _ask_play_persona()
+        if persona is None:
+            return
 
     W = 50
     print()
     print(_DIM("    " + "─" * W))
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}"
-          + (f"  ·  {_YEL('measuring metrics')}" if metrics else ""))
+          + (f"  ·  {_YEL('measuring metrics')}" if metrics else "")
+          + (f"  ·  as {_YEL(persona)}" if persona else ""))
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
     if game not in INDEXED_GAMES:  # meatboy / bomberman have no debug manager
@@ -683,6 +695,8 @@ def run_manual_play():
         cmd += ["--level", level]
     if metrics:
         cmd += ["--metrics"]
+    if persona:
+        cmd += ["--persona", persona]
     print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
     subprocess.run(cmd, env=proc_env)
 
@@ -929,13 +943,10 @@ SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); gri
 
 
 def _persona_names() -> list[str]:
-    """Persona registry (code/neuro/personas.py) — read without importing numpy/pygame."""
-    try:
-        from code.neuro.personas import PERSONAS
-        names = list(PERSONAS)
-    except Exception:
-        names = ["experienced", "novice", "speedrunner"]
-    return ["experienced"] + sorted(n for n in names if n != "experienced")
+    """Every persona in the registry (code/neuro/personas.py — a plain-dataclass module, cheap to
+    import), the default first. A persona added there shows up in every persona choice."""
+    from code.neuro.personas import DEFAULT_PERSONA, PERSONAS
+    return [DEFAULT_PERSONA] + sorted(n for n in PERSONAS if n != DEFAULT_PERSONA)
 
 
 PERSONA_CHOICES = _persona_names()

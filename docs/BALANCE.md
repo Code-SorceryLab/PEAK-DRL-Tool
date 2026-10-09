@@ -48,6 +48,12 @@ Balance metrics are recorded **only during play, never during training** (Train 
 Full Grid, and the sweeps' probes, record none):
 
 - **Manual play** (menu 5) — your attempts, logged to `runs/manual/<game>/<level>/episodes.csv`.
+  With metrics on you pick a persona to play as (`manual_play --persona …`, default `experienced`):
+  every persona in `code/neuro/personas.py` is offered, so a new one shows up there on its own. It
+  is only a label (the game doesn't change); a persona mapped to a skill tier in
+  `code/stats/registry.py` `TIERS` puts your attempts in that tier so dimensions 5–6 can compare them.
+  All your attempts at a level share one card, whatever persona each was played as; each attempt's
+  name in the Run picker shows its persona (`#3 · novice · …`).
 - **Watching an agent** — menu 6 replays a trained run's best genome (`trainer --replay … --metrics`),
   menu 8 plays random actions (`manual_play --random --metrics`); both log to
   `runs/watch/<game>/<level>/episodes.csv`.
@@ -59,10 +65,14 @@ in `code/stats/registry.py`; the session summaries (`metrics.json`), the Balance
 the Streamlit dashboard all call the same functions. A metric that doesn't apply to a game isn't
 computed for it; one that applies but has no data (no wins yet, nothing to collect) is `N/A`.
 
-The Balance Command page aggregates each player's attempts per level — you, the random agent, or
-watched agents of a persona — into one card; a card's window has a **Run** picker to show all
-attempts pooled or any single attempt, with every metric, map and sentence following the pick.
-Personas stand in for skill tiers: novice = `novice`, mid = `experienced`, expert = `speedrunner`.
+The Balance Command page's **Play sessions** show each game in two groups: **Manual play** (all
+your attempts) and **Agents** (every watched agent — trained replays of any persona and the random
+agent). Each group pools its attempts per level into one card; an attempt's name says who played it
+(`#4 · novice · mario_novice · …`, `#2 · random · …`). A card's window has a **Run** picker to show all
+attempts pooled or any single attempt, with every metric, map and sentence following the pick. The
+skill-tier metrics split each group by persona and never mix your play with the agents'.
+Personas stand in for skill tiers: novice = `novice`, expert = `experienced`, and `speedrunner` is a
+tier of its own (listed in completion per skill, not one end of the novice–expert gaps).
 
 | # | Dimension | All games | Mario | Meat Boy | Bomberman |
 |---|---|---|---|---|---|
@@ -76,8 +86,9 @@ Personas stand in for skill tiers: novice = `novice`, mid = `experienced`, exper
 | 8 | Reward density | — | `coin_collection_rate` | `bandage_collection_rate` (N/A) | `powerup_collection_rate` |
 
 Mega Man and Sonic get the shared metrics plus side-scroller `progress_at_death`.
-Dimensions 5 and 6 compare personas: they fill in for a level once agents of the novice and
-speedrunner personas have been watched playing it with metrics on.
+Dimensions 5 and 6 compare personas: the gaps fill in for a level once it has been played as novice
+and as experienced — by you (persona labels in manual play) or by watched agents of those
+personas. The two populations are compared separately.
 
 The sweeps show only the GA's own numbers per level (generations-to-first-win ± CI, win rate after
 the first win, improvement rate, stuck rate, death causes), from the population history; each

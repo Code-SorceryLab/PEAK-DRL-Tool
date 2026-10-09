@@ -39,6 +39,9 @@ PERSONAS: dict[str, Persona] = {
 }
 
 
+DEFAULT_PERSONA = "experienced"  # what a choice defaults to (training, sweeps, manual play's label)
+
+
 def get_persona(name: str) -> Persona:
     try:
         return PERSONAS[name]
