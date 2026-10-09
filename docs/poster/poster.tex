@@ -1,0 +1,257 @@
+% PEAK poster -- CSER 2026 Fall (York University, 2026-11-09, co-located with CASCON)
+% Format: CSER uses the CASCON poster specification: portrait, at most 36 in wide x 48 in high
+% (92 cm x 122 cm). You print it and bring it; boards are supplied.
+% Compiles with pdfLaTeX (the Overleaf default) and XeLaTeX. Figures: docs/img (img/ on Overleaf).
+\documentclass[final,t]{beamer}
+
+% ---- FORMAT: the only line to change if the organizers announce another size (cm) ----
+\usepackage[orientation=portrait,size=custom,width=91.44,height=121.92,scale=1.12]{beamerposter}
+
+% ---- EDIT THESE ---------------------------------------------------------------------
+\newcommand{\PosterAuthors}{First Author \quad$\cdot$\quad Second Author \quad$\cdot$\quad Supervisor Name}
+\newcommand{\PosterAffil}{Ontario Tech University, Oshawa, ON, Canada}
+\newcommand{\PosterContact}{first.author@ontariotechu.net}
+\newcommand{\PosterRepo}{https://github.com/Code-SorceryLab/PEAK-DRL-Tool}
+% -------------------------------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx,booktabs,tabularx,qrcode,tikz,tcolorbox}
+\usetikzlibrary{arrows.meta,positioning}
+\tcbuselibrary{skins}
+\graphicspath{{img/}{../img/}}
+
+\definecolor{peakink}{HTML}{1F0205}   % the logo's background
+\definecolor{peakred}{HTML}{EF4444}
+\definecolor{peakrose}{HTML}{FDE3E3}
+\definecolor{paper}{HTML}{F4F1EE}
+\definecolor{figbg}{HTML}{050505}     % the figures' background
+\definecolor{body}{HTML}{1E1E22}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{background canvas}{bg=paper}
+\setbeamercolor{normal text}{fg=body}
+\setbeamertemplate{itemize item}{\color{peakred}\rule[0.2ex]{0.45em}{0.45em}}
+\setlength{\leftmargini}{1.3em}
+\newlength{\gutter}\setlength{\gutter}{2.2cm}
+\setbeamersize{text margin left=\gutter,text margin right=\gutter}
+
+% one block = one titled card
+\newtcolorbox{pblock}[1]{enhanced,sharp corners,width=\linewidth,boxrule=0pt,
+  colback=white,colframe=peakink,colbacktitle=peakink,coltitle=white,
+  fonttitle=\bfseries\large,title={#1},titlerule=1.6mm,titlerule style={peakred},
+  left=9mm,right=9mm,top=7mm,bottom=7mm,toptitle=4mm,bottomtitle=4mm,
+  before skip=0pt,after skip=1.3cm,parbox=false}
+% the figures are dark-themed: frame them as dark cards so they read as intended
+\newcommand{\fig}[2][\linewidth]{\begin{tcolorbox}[enhanced,width=#1,nobeforeafter,boxrule=0pt,
+  arc=3mm,colback=figbg,left=2mm,right=2mm,top=2mm,bottom=2mm]%
+  \includegraphics[width=\linewidth]{#2}\end{tcolorbox}}
+\newcommand{\capt}[1]{\par\vspace{2mm}{\small\color{body!75}#1\par}}
+\newcommand{\hi}[1]{\textbf{\color{peakred!85!black}#1}}
+\newcommand{\code}[1]{{\ttfamily\small #1}}
+
+\setbeamertemplate{headline}{%
+  \begin{tcolorbox}[enhanced,sharp corners,boxrule=0pt,colback=peakink,width=\paperwidth,
+    left=\gutter,right=\gutter,top=14mm,bottom=12mm,nobeforeafter,
+    borderline south={3mm}{0pt}{peakred}]
+    \begin{minipage}[c]{0.23\linewidth}\includegraphics[width=\linewidth]{PEAK_LOGO}\end{minipage}\hfill
+    \begin{minipage}[c]{0.74\linewidth}\color{white}\raggedright
+      {\veryHuge\bfseries Evolved Neural Agents as\\[2mm] Tireless Playtesters\par}\vspace{7mm}
+      {\Large\color{peakrose} A deterministic, laptop-scale probe that measures game balance
+        inside the level designer's edit loop\par}\vspace{9mm}
+      {\Large\bfseries \PosterAuthors\par}\vspace{3mm}
+      {\large \PosterAffil \quad$\cdot$\quad \texttt{\PosterContact}\par}
+    \end{minipage}
+  \end{tcolorbox}}
+
+\setbeamertemplate{footline}{%
+  \begin{tcolorbox}[enhanced,sharp corners,boxrule=0pt,colback=peakink,width=\paperwidth,
+    left=\gutter,right=\gutter,top=5mm,bottom=5mm,nobeforeafter,
+    borderline north={3mm}{0pt}{peakred}]
+    \begin{minipage}[c]{0.065\linewidth}
+      \begin{tcolorbox}[boxrule=0pt,sharp corners,colback=white,left=2mm,right=2mm,top=2mm,bottom=2mm,
+        width=\linewidth,nobeforeafter]\qrcode[height=\linewidth]{\PosterRepo}\end{tcolorbox}
+    \end{minipage}\hfill
+    \begin{minipage}[c]{0.62\linewidth}\color{white}\raggedright
+      {\large\bfseries Code, data, and every figure on this poster}\par\vspace{1mm}
+      {\large\ttfamily github.com/Code-SorceryLab/PEAK-DRL-Tool}\par\vspace{3mm}
+      {\small\color{peakrose} Python + Pygame + numpy, built from scratch. 76 tests. No GPU.
+        Stats-dashboard metrics designed with Amr Abdalla's statistics-observer work.\par}
+    \end{minipage}\hfill
+    \begin{minipage}[c]{0.28\linewidth}\color{white}\raggedleft
+      {\large\bfseries CSER 2026 Fall}\par\vspace{1mm}
+      {\normalsize\color{peakrose} York University, Toronto\\ 9 November 2026\par}
+    \end{minipage}
+  \end{tcolorbox}}
+
+\begin{document}
+\begin{frame}[t]
+\vspace{1.1cm}
+\begin{columns}[t,totalwidth=\textwidth]
+
+% =====================================================================================
+\begin{column}{0.485\textwidth}
+
+\begin{pblock}{Balance needs a thousand playthroughs. Humans give you ten.}
+  \begin{itemize}
+    \item Level balance is tuned by playtesting: slow, costly, and \hi{not repeatable}. Move one
+      saw, and last week's testers cannot be re-run.
+    \item Deep-RL test agents work in industry~[1], but they need GPUs, reward shaping and
+      per-game tuning: too expensive \emph{per level edit}.
+    \item Simple agents can map difficulty~[2], and GAs rival deep RL~[3]. Our GA probe reproduces
+      the failure-mode taxonomy of our earlier PPO version at about \hi{1/100 of the compute}.
+    \item \textbf{Our goal: a regression test for game feel.} A frozen, cheap, deterministic
+      playtester, so that a change in the metrics isolates the change in the level.
+  \end{itemize}
+\end{pblock}
+
+\begin{pblock}{One probe, many engines}
+  \begin{minipage}[c]{0.70\linewidth}\fig{engines}\end{minipage}\hfill
+  \begin{minipage}[c]{0.27\linewidth}\raggedright
+    The red fan is \textbf{all the agent sees}: six raycasts, a pit probe, an enemy corridor,
+    velocity and jump state.\par\vspace{4mm}
+    \hi{14 numbers into a 291-weight network.}\par\vspace{4mm}
+    {\small\color{body!75} Four of the five hand-written engines are shown. The active roster is
+      Mario-style, Meat Boy and a top-down Bomberman.\par}
+  \end{minipage}
+\end{pblock}
+
+\begin{pblock}{PEAK: play, measure, edit, repeat}
+  \centering
+  \begin{tikzpicture}[x=0.25\linewidth,y=1cm,
+      box/.style={draw=peakink,line width=1.2pt,rounded corners=2mm,fill=paper,align=center,
+        text width=0.19\linewidth,minimum height=3.1cm,font=\small},
+      outer/.style={box,fill=peakrose},
+      arr/.style={-{Latex[length=5mm,width=4mm]},line width=1.6pt,draw=peakink},
+      lab/.style={font=\footnotesize,text=body!80}]
+    \node[box]   (lvl) at (0.5,0) {\textbf{ASCII level}\\+ YAML config};
+    \node[box]   (eng) at (1.5,0) {\textbf{Game engine}\\deterministic};
+    \node[box]   (sen) at (2.5,0) {\textbf{Sensors}\\14 floats};
+    \node[box,draw=peakred,line width=2pt] (net) at (3.5,0) {\textbf{Neural net}\\14--16--3, tanh};
+    \node[outer] (rep) at (0.5,-7.3) {\textbf{Report}\\win rate, deaths, routes};
+    \node[outer] (prb) at (2.0,-7.3) {\textbf{Balance probe}\\levels $\times$ 3 seeds $\times$ 3 personas};
+    \node[outer] (ga)  at (3.5,-7.3) {\textbf{GA}\\pop 10, elite 4};
+    \draw[arr] (lvl)--(eng); \draw[arr] (eng)--(sen); \draw[arr] (sen)--(net);
+    \draw[arr] (net.north) to[out=150,in=30] node[lab,above]{move, jump} (eng.north);
+    \draw[arr] (eng.south) -- ++(0,-1.7) -| node[lab,pos=0.25,above]{fitness = progress + 5000 on a win}
+      ([xshift=-1.6cm]ga.north);
+    \draw[arr] ([xshift=1.6cm]ga.north) -- node[lab,right,pos=0.3]{next gen} ([xshift=1.6cm]net.south);
+    \draw[arr] (ga)--(prb); \draw[arr] (prb)--(rep);
+    \draw[arr,dashed,draw=peakred] (rep.north) -- node[lab,right]{edit, re-probe} (lvl.south);
+  \end{tikzpicture}
+  \vspace{3mm}
+  \begin{itemize}
+    \item \textbf{Agent:} fixed-topology MLP, 14\,$\to$\,16\,$\to$\,3 (\hi{291 weights}). No gradients, no
+      replay buffer, no reward shaping, no GPU.
+    \item \textbf{Evolution:} population 10, elite 4, tournament $k{=}5$, uniform crossover 0.7,
+      Gaussian mutation (rate 0.15, $\sigma$ 0.15), annealed $\times$0.5 after a level's first win.
+    \item \textbf{Probe:} a fresh population per level $\times$ seed; reports win rate $\pm$ 95\,\% CI,
+      generations-to-first-win, death causes, death heat-map and routes.
+    \item \textbf{One seed} drives initialisation, mutation and every game step: two runs are
+      \hi{bit-identical}.
+    \item \textbf{Cost:} 5,000+ steps per second on a laptop. A Mario probe (2 levels $\times$ 3 seeds
+      $\times$ 40 generations) takes about \hi{six CPU-minutes}.
+  \end{itemize}
+\end{pblock}
+
+\begin{pblock}{Personas: who is the level hard for?}
+  \begin{tabularx}{\linewidth}{@{}lXX@{}}
+    \toprule
+    \textbf{Persona} & \textbf{Capability} & \textbf{Objective}\\
+    \midrule
+    Novice      & walk; senses refresh every 3rd frame & reach the goal\\
+    Experienced & walk; full reactions                 & reach the goal\\
+    Speedrunner & sprint; full reactions               & goal + 25 fitness per second left\\
+    \bottomrule
+  \end{tabularx}
+  \capt{A persona is a capability + objective profile, not a reward function~[4]. The win-rate gap
+    between personas on one level is its skill-expression signal.}
+\end{pblock}
+
+\begin{pblock}{The probe in the design loop: Bomberman}
+  \begin{itemize}
+    \item A draft level was reported unsolvable, one rung after a trivial one: its bricks
+      \hi{sealed every route}. A reachability test now pins the intent of each level.
+    \item The dominant death on every level was the agent's own bomb (55--97\,\%). Fuse 2.5\,s
+      $\to$ 4\,s: level 6 went from 0/3 to 2/3 seeds.
+    \item A range-1 bomb killed a wandering enemy in \hi{0 of 200} trials. Enemy speed $\times$0.7
+      gave level 9 its first wins (0/3 $\to$ 2/3).
+    \item Every change was A/B-probed on identical seeds: measured, not guessed.
+  \end{itemize}
+\end{pblock}
+
+\end{column}
+
+% =====================================================================================
+\begin{column}{0.485\textwidth}
+
+\begin{pblock}{Result 1: levels rank themselves}
+  \fig{fig_difficulty}
+  \vspace{3mm}
+  \begin{itemize}
+    \item \textbf{Mario:} 1-1 is solved by every seed and persona; 1-2 falls to a 9--15\,\% win rate.
+    \item \textbf{Meat Boy:} from ``every seed, every persona'' (L3, L9) to a level that only the
+      speedrunner solves (L10). The sprinting persona is the worst on L0 and the best on L1 and L2.
+    \item \textbf{Bomberman:} a smooth ramp through L7, then \hi{a cliff}. That step is what the
+      tool exists to locate.
+  \end{itemize}
+\end{pblock}
+
+\begin{pblock}{Result 2: the agent is not the bottleneck}
+  \begin{minipage}[t]{0.385\linewidth}
+    \fig{fig_capacity}
+    \capt{\textbf{Bigger nets do not win sooner.} Hidden size 8 to 64 (147 to 1,155 weights):
+      generations-to-first-win stays inside overlapping 95\,\% CIs in all six sweeps.}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.585\linewidth}
+    \fig{fig_sensors}
+    \capt{\textbf{Fourteen rays beat 368 grid cells} in 6 of 6 sweeps (2 clear the 95\,\% CI).
+      More input is more weights to evolve, not more insight.}
+  \end{minipage}
+\end{pblock}
+
+\begin{pblock}{Result 3: one knob at a time}
+  \begin{minipage}[c]{0.56\linewidth}\fig{fig_knobs}\end{minipage}\hfill
+  \begin{minipage}[c]{0.41\linewidth}
+    \begin{itemize}
+      \item 22 variants $\times$ 6 sweeps. Each knob moves to its literature bound~[5,\,6], paired on
+        identical level $\times$ seed cells.
+      \item \hi{One change wins everywhere:} anneal mutation $\times$0.5 after the first win. It is
+        now the default.
+      \item Population 100 is worse in 6 of 6, at ten times the compute.
+      \item Elite 6, $\sigma$ 0.02 and no crossover each hurt a Meat Boy persona significantly.
+      \item Winners go to \code{ga\_best.yaml} by strict majority vote.
+    \end{itemize}
+  \end{minipage}
+\end{pblock}
+
+\begin{pblock}{Limitations and next steps}
+  \begin{itemize}
+    \item Reactive agents are a \emph{lower bound} on difficulty, not a model of a human. The probe
+      is not yet validated against human play data.
+    \item One-factor-at-a-time sweeps ignore interactions; three seeds give wide CIs on hard levels.
+    \item Next: path and strategy-diversity metrics from logged trajectories, and risk/reward
+      metrics from forced-collector agents.
+  \end{itemize}
+\end{pblock}
+
+\begin{pblock}{References}
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}r@{\ \,}X@{}}
+    {[1]} & J. Bergdahl et al., ``Augmenting Automated Game Testing with Deep Reinforcement
+            Learning,'' IEEE CoG, 2020.\\
+    {[2]} & A. Isaksen, D. Gopstein, A. Nealen, ``Exploring Game Space Using Survival Analysis,'' FDG, 2015.\\
+    {[3]} & F. P. Such et al., ``Deep Neuroevolution: Genetic Algorithms Are a Competitive Alternative
+            for Training Deep Neural Networks for RL,'' arXiv:1712.06567, 2017.\\
+    {[4]} & C. Holmg\aa{}rd et al., ``Evolving Personas for Player Decision Modeling,'' IEEE CIG, 2014.\\
+    {[5]} & K. A. De Jong, ``An Analysis of the Behavior of a Class of Genetic Adaptive Systems,'' PhD
+            thesis, Univ. of Michigan, 1975.\\
+    {[6]} & J. J. Grefenstette, ``Optimization of Control Parameters for Genetic Algorithms,'' IEEE
+            Trans. SMC 16(1), 1986.\\
+  \end{tabularx}
+\end{pblock}
+
+\end{column}
+\end{columns}
+\end{frame}
+\end{document}
