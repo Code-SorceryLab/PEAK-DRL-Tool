@@ -147,7 +147,8 @@ data_path = config.get("dashboard_paths", ["runs/probes/**/episodes.csv"])
 df_all = load_all_csvs(data_path)
 
 if df_all.empty:
-    st.warning(f"No episode logs found in `{data_path}`. Run a Full Sweep, or train / play with metrics on.")
+    st.warning(f"No episode logs found in `{data_path}`. Play (menu 5) or watch an agent (menu 6 / 8) "
+               "with balance metrics on.")
     st.stop()
 
 # ── Game / source filters ───────────────────────────────────────────────────
@@ -157,7 +158,7 @@ with fc1:
     game = st.selectbox("game", games, key="game")
 with fc2:
     sources = sorted(df_all["source"].unique().tolist())
-    picked = st.multiselect("data source (probe = Full Sweep, train = training runs, manual = your play)",
+    picked = st.multiselect("data source (manual = your play, watch = watched agents)",
                             sources, default=sources, key="sources")
 df_all = df_all[(df_all["game"] == game) & (df_all["source"].isin(picked or sources))]
 if df_all.empty:

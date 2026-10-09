@@ -23,8 +23,10 @@ parser.add_argument("--file", default=None, help="Absolute path to a .txt level 
 parser.add_argument("--random", action="store_true", help="random actions instead of keyboard")
 parser.add_argument("--metrics", action="store_true",
                     help="measure balance metrics: every attempt is one life, logged to "
-                         "runs/manual/<game>/<level>/episodes.csv, summarized when you quit")
-parser.add_argument("--persona", default="human", help="persona label written with the metrics")
+                         "runs/manual/<game>/<level>/episodes.csv (runs/watch/... with --random), "
+                         "summarized when you quit")
+parser.add_argument("--persona", default=None,
+                    help="player label written with the metrics (default: human, or random with --random)")
 args = parser.parse_args()
 
 # Level ID priority: CLI arg > env var > default
@@ -237,7 +239,10 @@ if args.metrics:
     _jump_idx = stats_class(STATS_GAME).JUMP_INDEX
     _session = _time.strftime("%Y%m%d-%H%M%S")
     _level_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in (level_id or ("editor" if level_file else "auto")))
-    METRICS_CSV = os.path.join("runs", "manual", STATS_GAME, _level_key, "episodes.csv")
+    # A random agent is a watched agent (menu 8), not a human: its attempts sit with the replays.
+    _PLAYER = args.persona or ("random" if args.random else "human")
+    _SOURCE = "watch" if args.random else "manual"
+    METRICS_CSV = os.path.join("runs", _SOURCE, STATS_GAME, _level_key, "episodes.csv")
     _attempt = 0
 
     def _one_life():
@@ -256,8 +261,8 @@ if args.metrics:
     def _new_stats():
         global _attempt
         _attempt += 1
-        return make_stats(STATS_GAME, core_game, level=_level_now(), persona=args.persona, source="manual",
-                          agent="human", gen=_attempt, session=_session)
+        return make_stats(STATS_GAME, core_game, level=_level_now(), persona=_PLAYER, source=_SOURCE,
+                          agent=_PLAYER, gen=_attempt, session=_session)
 
     def _jump_pressed(action, keys) -> bool:
         if args.game == "meatboy" and not args.random:  # MeatboyPlayer reads the keyboard itself

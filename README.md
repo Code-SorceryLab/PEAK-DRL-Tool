@@ -154,12 +154,14 @@ python -m code.neuro.balance --game mario --gens 40 --best
 # Report
 python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
 python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
-streamlit run code/stats/dashboard/app.py                              # stats dashboard (probes, training, manual)
-python -m code.stats.summarize runs/<run dir>                         # balance metrics for any episode log
+streamlit run code/stats/dashboard/app.py                              # stats dashboard (play sessions)
+python -m code.stats.summarize runs/manual/mario/Mario1-2              # balance metrics for any episode log
 
-# Play
+# Play — balance metrics are recorded only here (one life per attempt), never while training
 python -m code.games.tools.manual_play --game platformer --level Mario1-2
-python -m code.games.tools.manual_play --game platformer --level Mario1-2 --metrics   # one life per attempt, measured
+python -m code.games.tools.manual_play --game platformer --level Mario1-2 --metrics            # you
+python -m code.games.tools.manual_play --game platformer --level Mario1-2 --random --metrics   # random agent
+python -m code.neuro.trainer --game mario --replay runs/<run>/best.npz --metrics              # a trained agent
 python -m code.games.tools.manual_play --game meatboy --level 3        # Meat Boy levels are indices
 ```
 

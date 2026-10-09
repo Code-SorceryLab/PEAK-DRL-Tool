@@ -2,7 +2,7 @@
 
 Run:  python -m code.neuro.trainer --game mario [--level Mario1-1a] [--turbo] [--no-serve]
       python -m code.neuro.trainer --resume runs/mario
-      python -m code.neuro.trainer --replay runs/mario/best.npz
+      python -m code.neuro.trainer --replay runs/mario/best.npz [--metrics]
 
 All population members play simultaneously (round-robin stepped) so the dashboard
 can show a live grid. The trainer thread owns every pygame surface; the server
@@ -94,7 +94,6 @@ class EnvSlot:
         self.last_rays: list = []
         self.last_tiles: list = []
         self.last_sensors: np.ndarray = np.zeros(net.n_inputs, dtype=np.float32)
-        self.stats = None  # this episode's EpisodeStats (code/stats/episode_stats.py)
 
 
 def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
@@ -109,27 +108,28 @@ def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
     return buf.getvalue()
 
 
+def _fit_net_io(cfg: GAConfig, game: str) -> None:
+    """Size the net for the game: top-down games steer on two axes, and a game owning sense()
+    owns its ray vector length."""
+    cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))
+    if cfg.sensors == "rays":
+        cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)
+
+
 class Trainer:
     def __init__(self, game: str, level: str | None, cfg: GAConfig, run_dir: str,
                  state: SharedState | None = None, population: Population | None = None,
-                 persona: Persona | None = None, metrics: bool = True, source: str = "train") -> None:
+                 persona: Persona | None = None) -> None:
+        # Training never records balance metrics: those come from play only — manual play and
+        # watched agents (replay() below, manual_play --random). See docs/BALANCE.md.
         self.game = game
         self.cfg = cfg
         self.run_dir = run_dir
         self.state = state
         self.persona = persona or PERSONAS["experienced"]
-        # Balance metrics: every episode goes to <run_dir>/episodes.csv; a training run also
-        # writes the per-level metrics to <run_dir>/metrics.json when it stops.
-        self.metrics = metrics
-        self.source = source  # "train" (menu 2-4) | "probe" (balance sweeps, summarized by balance.py)
-        self.episodes_path = os.path.join(run_dir, "episodes.csv")
-        cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))  # top-down games steer on two axes
-        if cfg.sensors == "rays":
-            cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)  # a game owning sense() owns its vector length
+        _fit_net_io(cfg, game)
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
-        if metrics and self.pop.generation == 0:
-            episode_log.reset(self.episodes_path)  # a fresh population never inherits an old log
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.game = game  # tags embedded in best.npz
 
@@ -282,9 +282,6 @@ class Trainer:
             slot.frames = 0
             slot.stuck_anchor_x = 0.0
             slot.stuck_frames = 0
-            slot.stats = make_stats(self.game, slot.adapter.core, level=self.level or "auto",  # type: ignore[attr-defined]
-                                    persona=self.persona.name, source=self.source, agent=i,
-                                    gen=self.pop.generation + 1)
 
         clock = pygame.time.Clock()
         last_thumb = last_watch = last_stats = 0.0
@@ -311,7 +308,6 @@ class Trainer:
                 slot.adapter.step(move_x, jump, move_y)
                 slot.frames += 1
                 self._step_accum += 1
-                slot.stats.on_step(jump)
                 # trainer-side stuck kill (faster than the core's 20s stall watchdog)
                 fit = slot.adapter.fitness()
                 if fit > slot.stuck_anchor_x + 1.0:
@@ -325,8 +321,6 @@ class Trainer:
                         slot.adapter.alive = False
                         slot.adapter.status = "STUCK"
                         slot.adapter._end_xy = (slot.adapter.x, slot.adapter.y)  # type: ignore[attr-defined]
-                if not slot.adapter.alive:
-                    slot.stats.finish(slot.adapter.status)
 
             if self.state is not None:
                 now = time.time()
@@ -352,18 +346,6 @@ class Trainer:
         return [s.adapter.fitness() for s in self.slots]
 
     def run(self, max_gens: int | None = None, verbose: bool = True) -> None:
-        try:
-            self._run(max_gens, verbose)
-        finally:  # Ctrl+C is the normal way to stop a training run — summarize what it played
-            if self.metrics and self.source == "train":
-                self.write_metrics(verbose)
-
-    def write_metrics(self, verbose: bool = True) -> str | None:
-        """Per-level balance metrics from this run's episodes.csv -> <run_dir>/metrics.json."""
-        from code.stats.summarize import summarize_file
-        return summarize_file(self.episodes_path, verbose=verbose)
-
-    def _run(self, max_gens: int | None, verbose: bool) -> None:
         while max_gens is None or self.pop.generation < max_gens:
             t0 = time.time()
             fitnesses = self.run_generation()
@@ -374,10 +356,6 @@ class Trainer:
                 rec.update({"env": i, "fit": round(fitnesses[i], 1),
                             "status": statuses[i], "frames": slot.frames})
                 env_rows.append(rec)
-                if not slot.stats.finished:
-                    slot.stats.finish(slot.adapter.status)
-            if self.metrics:
-                episode_log.append(self.episodes_path, [slot.stats.to_dict() for slot in self.slots])
             # Post-first-win annealing: once this level is solved, drop mutation so the
             # population exploits the winning lineage instead of re-exploring forever.
             if (statuses.count("WON") > 0 and not self.pop.annealed
@@ -477,7 +455,13 @@ def format_results(history: list[dict], tail: int | None = None) -> str:
     return "\n".join(out)
 
 
-def replay(path: str, game: str, level: str | None, state: SharedState | None) -> None:
+WATCH_ROOT = os.path.join("runs", "watch")  # balance metrics of watched agents: <game>/<level>/episodes.csv
+
+
+def replay(path: str, game: str, level: str | None, state: SharedState | None,
+           metrics: bool = False) -> None:
+    """Watch a best genome play. With `metrics`, every finished attempt (one life, start to death
+    or goal) is logged for the balance metrics, like manual play; the logs are summarized on Ctrl+C."""
     if not os.path.exists(path):
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
@@ -496,37 +480,65 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
                   f"(where the record was set)", flush=True)
     weights = np.load(path)["weights"]
     cfg = GAConfig(pop_size=1, **net_cfg)
+    _fit_net_io(cfg, game)  # before make_net: a Bomberman genome has more inputs/outputs than the default
     sensors = cfg.sensors
     net = make_net(cfg)
     net.set_weights(weights.astype(np.float32))
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
                            sprint=persona.sprint, time_rate=persona.time_rate)
     clock = pygame.time.Clock()
-    trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state, metrics=False)
+    trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state)
     trainer.slots[0].adapter = adapter
     trainer.slots[0].net = net
     all_levels = list_levels(game)
     cur_level = level if level is not None else (all_levels[0] if all_levels else None)
-    while True:
-        adapter.reset()
-        net.reset()
-        while adapter.alive:
-            vec, rays, tiles = read_sensors(adapter, sensors)
-            slot0 = trainer.slots[0]
-            slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
-            move_x, jump, move_y = net.act(vec)
-            adapter.step(move_x, jump, move_y)
-            if state is not None:
-                trainer._publish_frames(encode_thumbs=True)
-                trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)
-            clock.tick(60)
-        print(f"replay episode done: {adapter.status}, fitness {adapter.fitness():.1f}", flush=True)
-        # A win advances the replay to the next enabled level (wrapping), like the game would.
-        if getattr(adapter, "won", False) and all_levels and cur_level in all_levels:
-            cur_level = all_levels[(all_levels.index(cur_level) + 1) % len(all_levels)]
-            adapter.set_level(cur_level)
-            trainer.level = cur_level  # dashboard header follows
-            print(f"replay: level cleared — advancing to [{cur_level}]", flush=True)
+    run_name = os.path.basename(os.path.dirname(os.path.abspath(path)))  # the agent, as the report names it
+    session = time.strftime("%Y%m%d-%H%M%S")
+    logs: list[str] = []
+    attempt = 0
+    if metrics:
+        print(f"replay: measuring balance metrics — every attempt is logged under {WATCH_ROOT}", flush=True)
+    try:
+        while True:
+            adapter.reset()
+            net.reset()
+            stats = None
+            if metrics:
+                attempt += 1
+                lvl = str(cur_level) if cur_level is not None else "auto"
+                stats = make_stats(game, adapter.core, level=lvl, persona=persona.name, source="watch",
+                                   agent=run_name, gen=attempt, session=session)
+            while adapter.alive:
+                vec, rays, tiles = read_sensors(adapter, sensors)
+                slot0 = trainer.slots[0]
+                slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
+                move_x, jump, move_y = net.act(vec)
+                adapter.step(move_x, jump, move_y)
+                if stats is not None:
+                    stats.on_step(jump)
+                if state is not None:
+                    trainer._publish_frames(encode_thumbs=True)
+                    trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)
+                clock.tick(60)
+            print(f"replay episode done: {adapter.status}, fitness {adapter.fitness():.1f}", flush=True)
+            if stats is not None:  # an attempt cut short by Ctrl+C never gets here — not counted
+                stats.finish(adapter.status)
+                key = "".join(c if c.isalnum() or c in "-_" else "_" for c in stats.meta["level"])
+                log = os.path.join(WATCH_ROOT, game, key, "episodes.csv")
+                episode_log.append(log, [stats.to_dict()])
+                if log not in logs:
+                    logs.append(log)
+            # A win advances the replay to the next enabled level (wrapping), like the game would.
+            if getattr(adapter, "won", False) and all_levels and cur_level in all_levels:
+                cur_level = all_levels[(all_levels.index(cur_level) + 1) % len(all_levels)]
+                adapter.set_level(cur_level)
+                trainer.level = cur_level  # dashboard header follows
+                print(f"replay: level cleared — advancing to [{cur_level}]", flush=True)
+    finally:
+        if logs:
+            from code.stats.summarize import summarize_file
+            for log in logs:
+                summarize_file(log)
 
 
 def main() -> None:
@@ -554,9 +566,9 @@ def main() -> None:
     ap.add_argument("--best", action="store_true",
                     help="start from this game's GA-sweep winners (code/neuro/ga_best.yaml); "
                          "flags you pass explicitly still win")
-    ap.add_argument("--metrics", action=argparse.BooleanOptionalAction, default=True,
-                    help="log every episode to <run-dir>/episodes.csv and write the balance metrics "
-                         "to <run-dir>/metrics.json when training stops (default: on)")
+    ap.add_argument("--metrics", action="store_true",
+                    help="with --replay: log every attempt to runs/watch/<game>/<level>/episodes.csv "
+                         "for the balance metrics (training never records them)")
     args = ap.parse_args()
 
     if args.results:
@@ -574,8 +586,10 @@ def main() -> None:
         print(f"dashboard: http://127.0.0.1:{args.port}/mario/index.html", flush=True)
 
     if args.replay:
-        replay(args.replay, args.game, args.level, state)
+        replay(args.replay, args.game, args.level, state, metrics=args.metrics)
         return
+    if args.metrics:
+        print("--metrics only applies to --replay: training never records balance metrics", flush=True)
 
     run_dir = args.run_dir or args.resume or os.path.join("runs", args.game)
     if args.resume:
@@ -602,7 +616,7 @@ def main() -> None:
         from .adapters import validate_level
         validate_level(args.game, args.level)
     trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
-                      persona=get_persona(args.persona), metrics=args.metrics)
+                      persona=get_persona(args.persona))
     trainer.run(args.gens)
 
 

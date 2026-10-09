@@ -44,15 +44,25 @@ probes.*
 
 ## The metric table
 
-Every balance metric is defined once in `code/stats/registry.py` and computed from the episode
-log (`episodes.csv`, one row per episode, written by the game's `EpisodeStats` class in
-`code/stats/episode_stats.py`). The probe report, training-run and manual-play summaries
-(`metrics.json`), the Balance Command page and the Streamlit dashboard all call the same
-functions. A metric that doesn't apply to a game isn't computed for it; one that applies but
-has no data (no wins yet, nothing to collect in the level) is `N/A`.
+Balance metrics are recorded **only during play, never during training** (Train Single / All /
+Full Grid, and the sweeps' probes, record none):
 
-Every episode is one life. Personas stand in for skill tiers: novice = `novice`,
-mid = `experienced`, expert = `speedrunner`.
+- **Manual play** (menu 5) — your attempts, logged to `runs/manual/<game>/<level>/episodes.csv`.
+- **Watching an agent** — menu 6 replays a trained run's best genome (`trainer --replay … --metrics`),
+  menu 8 plays random actions (`manual_play --random --metrics`); both log to
+  `runs/watch/<game>/<level>/episodes.csv`.
+
+Each asks "Measure balance metrics?" first. Every attempt is one life — from starting the level to
+death or the goal — and is one row in the log (written by the game's `EpisodeStats` class in
+`code/stats/episode_stats.py`, which only observes the game). Every balance metric is defined once
+in `code/stats/registry.py`; the session summaries (`metrics.json`), the Balance Command page and
+the Streamlit dashboard all call the same functions. A metric that doesn't apply to a game isn't
+computed for it; one that applies but has no data (no wins yet, nothing to collect) is `N/A`.
+
+The Balance Command page aggregates each player's attempts per level — you, the random agent, or
+watched agents of a persona — into one card; a card's window has a **Run** picker to show all
+attempts pooled or any single attempt, with every metric, map and sentence following the pick.
+Personas stand in for skill tiers: novice = `novice`, mid = `experienced`, expert = `speedrunner`.
 
 | # | Dimension | All games | Mario | Meat Boy | Bomberman |
 |---|---|---|---|---|---|
@@ -66,13 +76,13 @@ mid = `experienced`, expert = `speedrunner`.
 | 8 | Reward density | — | `coin_collection_rate` | `bandage_collection_rate` (N/A) | `powerup_collection_rate` |
 
 Mega Man and Sonic get the shared metrics plus side-scroller `progress_at_death`.
-Dimensions 5 and 6 compare personas, so they exist only in the sweep report, for levels probed
-with the novice and speedrunner personas on the same config.
+Dimensions 5 and 6 compare personas: they fill in for a level once agents of the novice and
+speedrunner personas have been watched playing it with metrics on.
 
-A probe level's balance metrics pool every seed's episodes. The GA's own numbers
-(generations-to-first-win ± CI, win rate after the first win, improvement rate, stuck rate) and
-`learning_gain` (last third of generations minus the first third — formerly "novice_expert_gap")
-come from the population history.
+The sweeps show only the GA's own numbers per level (generations-to-first-win ± CI, win rate after
+the first win, improvement rate, stuck rate, death causes), from the population history; each
+sweep level links to its play metrics when it has any. `learning_gain` compares a training run's
+early and late generations, so with no training episodes recorded it is always N/A.
 
 **Bands and verdicts:** `code/stats/thresholds/default.yaml` holds target ± warning per metric,
 and `<game>.yaml` next to it overrides any of them. Dimensions 1 (completion rate, mean win
@@ -83,10 +93,9 @@ verdict pill: all in band, partial, or off band.
 (`code/stats/episode_stats.py`), then add one `Metric(...)` entry to `code/stats/registry.py`.
 The report, the dashboard and every `metrics.json` pick it up.
 
-**Measuring outside sweeps:** Train Single / All / Full Grid and Play Manually ask whether to
-measure. Training writes `runs/<run>/episodes.csv` and, when it stops, `metrics.json`. Manual
-play runs each attempt with one life, logs to `runs/manual/<game>/<level>/`, and prints the
-summary when you quit. `python -m code.stats.summarize <dir>` recomputes either.
+**Summaries:** a play session prints its per-level summary and writes `metrics.json` next to the
+log when you quit (ESC in manual / random play, Ctrl+C in a replay); an attempt still running then
+is not counted. `python -m code.stats.summarize <dir>` recomputes one.
 
 ## Levels
 
@@ -301,14 +310,13 @@ playtest, no GPU.
 
 ## Episode logs & the stats dashboard
 
-Every balance probe, and every training run or manual-play session with metrics on, writes one
-row per finished episode to `episodes.csv` (the game's `EpisodeStats.to_dict()`: status, cause,
-time, progress, end position, the route as a sampled `(x, y)` trace at ~7.5 points/s, and the
-game's own counters). A fresh population starts a fresh log. Amr's Streamlit dashboard
-(`code/stats/dashboard/`) reads the logs matched by `dashboard_paths` in
-`code/stats/thresholds/default.yaml` (probes, training runs, manual play; filter by game and
-source) and shows the same registry metrics as the report, with the B1/B2/B3 cards and a
-route overlay. Launch: `streamlit run code/stats/dashboard/app.py` from the repo root (not in
+Every play session with metrics on — manual play, a watched replay, the random agent — appends
+one row per finished attempt to `episodes.csv` (the game's `EpisodeStats.to_dict()`: status,
+cause, time, progress, end position, the route as a sampled `(x, y)` trace at ~7.5 points/s, and
+the counts the stats observe frame to frame). Training and probes write none. Amr's Streamlit
+dashboard (`code/stats/dashboard/`) reads the logs matched by `dashboard_paths` in
+`code/stats/thresholds/default.yaml` (manual play and watched agents; filter by game and source)
+and shows the same registry metrics as the report, with the B1/B2/B3 cards and a route overlay. Launch: `streamlit run code/stats/dashboard/app.py` from the repo root (not in
 the menu).
 
 Speed: `balance.py --workers N` runs probes in parallel processes (default cores-1;

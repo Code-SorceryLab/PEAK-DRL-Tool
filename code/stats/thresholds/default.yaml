@@ -21,9 +21,8 @@ bands:
 # many pixels on average.
 route_cluster_threshold: 96
 
-# Where the Streamlit dashboard looks for episode logs (glob patterns). runs/gasweep is left
-# out on purpose: its cells use deliberately non-default GA configs.
+# Where the Streamlit dashboard looks for episode logs (glob patterns). Only play records them:
+# training and sweeps never do.
 dashboard_paths:
-  - runs/probes/**/episodes.csv     # Full Sweep probes
-  - runs/*/episodes.csv             # training runs (menu 2-4, with metrics on)
-  - runs/manual/**/episodes.csv     # manual play sessions (with metrics on)
+  - runs/manual/**/episodes.csv     # manual play (menu 5, with metrics on)
+  - runs/watch/**/episodes.csv      # watched agents: replays (menu 6) and random (menu 8), metrics on

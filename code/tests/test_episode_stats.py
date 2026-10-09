@@ -14,7 +14,7 @@ def _play(game, level, frames=300):
     pygame.init()
     ad = make_adapter(game, level, frames, 5000.0)
     ad.reset()
-    st = make_stats(game, ad.core, level=level, persona="experienced", source="probe", agent=0, gen=1)
+    st = make_stats(game, ad.core, level=level, persona="experienced", source="watch", agent=0, gen=1)
     i = 0
     while ad.alive:
         jump = i % 20 < 5

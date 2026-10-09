@@ -484,15 +484,16 @@ def _prompt_persona_sensors_tag():
 
 
 def _ask_metrics(default: bool, note: str) -> bool:
-    """Balance metrics on/off for one run (sweeps always measure — the report is their output)."""
+    """Balance metrics on/off for one play session. Only play records them — manual play
+    (5) and watching an agent (6, 8); training and sweeps never do."""
     hint = "Y/n" if default else "y/N"
     print(_DIM(f"\n    {note}"))
     raw = input(_DIM(f"    Measure balance metrics? [{hint}]: ")).strip().lower()
     return default if not raw else raw.startswith("y")
 
 
-_TRAIN_METRICS_NOTE = ("Balance metrics: every episode is logged to <run dir>/episodes.csv and the per-level\n"
-                       "    metrics are written to <run dir>/metrics.json when training stops (Ctrl+C included).")
+_WATCH_METRICS_NOTE = ("Balance metrics: every attempt (one life, start to death or goal) is logged to\n"
+                       "    runs/watch/<game>/<level>/episodes.csv and summarized when you stop.")
 
 
 def _run_dir(game, level, persona, sensors, tag) -> Path:
@@ -545,21 +546,18 @@ def run_training():
     if gens == "invalid":
         return
     turbo = input(_DIM("    Start in turbo? [y/N]: ")).strip().lower().startswith("y")
-    metrics = _ask_metrics(True, _TRAIN_METRICS_NOTE)
 
     run_dir = _run_dir(game, level, persona, sensors, tag)
     if not _print_run_summary(Game=game, Level=level or "auto", Persona=persona, Sensors=sensors,
                               Tag=tag or "-", Generations=gens or "until stopped",
-                              Mode="turbo" if turbo else "real-time", Metrics="on" if metrics else "off",
-                              **{"Run dir": run_dir}):
+                              Mode="turbo" if turbo else "real-time", **{"Run dir": run_dir}):
         return
 
     print()
     print(f"    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print()
     ok = execute_training_run(_trainer_cmd(game, level, gens, turbo, run_dir=run_dir,
-                                           extra=("--persona", persona, "--sensors", sensors,
-                                                  "--metrics" if metrics else "--no-metrics")))
+                                           extra=("--persona", persona, "--sensors", sensors)))
     print_training_summary(1, int(ok), int(not ok))
     if ok:
         play_chime()
@@ -604,10 +602,8 @@ def _train_batch(jobs, **summary):
         if gens is None:
             print(_RED("  A generation count is required for batch runs."))
         return
-    metrics = _ask_metrics(True, _TRAIN_METRICS_NOTE)
     if not _print_run_summary(**summary, Persona=persona, Sensors=sensors, Tag=tag or "-",
-                              Generations=f"{gens} per run", Metrics="on" if metrics else "off",
-                              **{"Total runs": len(jobs)}):
+                              Generations=f"{gens} per run", **{"Total runs": len(jobs)}):
         return
 
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
@@ -616,8 +612,7 @@ def _train_batch(jobs, **summary):
         print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(level or 'auto')}")
         ok = execute_training_run(
             _trainer_cmd(game, level, gens, turbo=True, run_dir=_run_dir(game, level, persona, sensors, tag),
-                         extra=("--persona", persona, "--sensors", sensors,
-                                "--metrics" if metrics else "--no-metrics")))
+                         extra=("--persona", persona, "--sensors", sensors)))
         successful += int(ok)
 
     print_training_summary(len(jobs), successful, len(jobs) - successful)
@@ -723,12 +718,14 @@ def watch_trained_agent():
         return
 
     game = guess_game_for_run(run_dir)
-    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
+    metrics = _ask_metrics(False, _WATCH_METRICS_NOTE)
+    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}"
+          + (f"  ·  {_YEL('measuring metrics')}" if metrics else ""))
     print(_DIM("    Ctrl+C to stop the replay.\n"))
     threading.Timer(2.0, lambda: webbrowser.open(DASHBOARD_URL)).start()  # after the server is up
     execute_training_run(
         [sys.executable, "-m", "code.neuro.trainer", "--game", game,
-         "--replay", str(best)])
+         "--replay", str(best)] + (["--metrics"] if metrics else []))
 
 
 def watch_all_models():
@@ -756,15 +753,27 @@ def watch_random_agent():
     game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
     if not game:
         return
+    levels = get_levels_for_game(game)
+    level = None
+    if levels:
+        level = ask_index("\n  Choose a level:", ["auto (first level)"] + levels,
+                          default="auto (first level)")
+        if level is None:
+            return
+        if level.startswith("auto"):
+            level = None
+    metrics = _ask_metrics(False, _WATCH_METRICS_NOTE)
 
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
     print(_DIM(f"\n    Launching {game} with random actions... (ESC to quit)\n"))
-    subprocess.run(
-        [sys.executable, "-m", "code.games.tools.manual_play",
-         "--game", CONFIG_KEY.get(game, game), "--fps", "30", "--random"],
-        env=proc_env
-    )
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play",
+           "--game", CONFIG_KEY.get(game, game), "--fps", "30", "--random"]
+    if level:
+        cmd += ["--level", level]
+    if metrics:
+        cmd += ["--metrics"]
+    subprocess.run(cmd, env=proc_env)
 
 
 # ============================================================================
