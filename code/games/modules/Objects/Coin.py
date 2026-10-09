@@ -14,7 +14,7 @@ class Coin():
     animation: int = 0
     flyup: bool = False
     vy: float = -280.0 
-    life: float = 0.3 
+    life: float = 0.4 
     auto_collect: bool = False
 
     @property

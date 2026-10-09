@@ -40,7 +40,6 @@ class MeatboyPlayer:
         self.buffer = 0
         self.jumps_left = int(jump.get("max_jumps", 1))
         self._wall_jumped = False       # this-frame flag: WallJump owns vy
-        self.wall_jumps = 0             # wall jumps this life (balance metric)
 
         # wall-slide diagnostics (for obs)
         self.sliding = False
@@ -148,7 +147,6 @@ class MeatboyPlayer:
         self.facing_right = (wall < 0)
         self.air_lockout = int(self.wl.get("control_lockout_frames", 6))
         self._wall_jumped = True
-        self.wall_jumps += 1
         self.jump_pressed = False                       # consume so _jump won't refire
 
     def _move(self, dt):

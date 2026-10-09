@@ -215,9 +215,28 @@ class _ScrollerStats(EpisodeStats):
 
 
 class MarioStats(_ScrollerStats):
+    """Power-ups lost = tiers the power state drops between frames (FIRE -> BIG -> SMALL); a hit
+    pops one tier and i-frames stop a second hit, so each drop is one lost power-up."""
+
+    _TIER = {"SMALL": 0, "BIG": 1, "FIRE": 2}
+
+    def _tier(self) -> int:
+        pm = self.core.player.power_machine  # re-read: a level load can swap the player object
+        return self._TIER.get(pm.state.name, 0)
+
+    def _begin(self) -> None:
+        self._powerups_lost = 0  # set first: if the tier read fails, only this metric goes quiet
+        super()._begin()
+        self._last_tier = self._tier()
+
+    def _frame(self) -> None:
+        super()._frame()
+        tier = self._tier()
+        self._powerups_lost += max(0, self._last_tier - tier)
+        self._last_tier = tier
+
     def extra(self) -> dict:
-        pm = getattr(getattr(self.core, "player", None), "power_machine", None)
-        return {**super().extra(), "powerups_lost": int(getattr(pm, "powerups_lost", 0) or 0)}
+        return {**super().extra(), "powerups_lost": self._powerups_lost}
 
     @staticmethod
     def end_status(core, terminated, truncated, info) -> str:
@@ -262,10 +281,19 @@ class MeatboyStats(EpisodeStats):
         return float(self.core.player.vx)
 
     def _begin(self) -> None:
+        self._wall_jumps = 0
+        self._lockout = int(self.core.player.air_lockout)
         self._bfs_start = float(self.core._bfs_norm_dist())
         self._bfs_last = self._bfs_start
 
     def _frame(self) -> None:
+        # A wall jump is the only thing that raises air_lockout (to control_lockout_frames, 6);
+        # otherwise it only counts down. Its own flag is set and cleared inside one control()
+        # call, so the rise is what's visible between frames. (Needs control_lockout_frames >= 2.)
+        lockout = int(self.core.player.air_lockout)
+        if lockout > self._lockout:
+            self._wall_jumps += 1
+        self._lockout = lockout
         d = float(self.core._bfs_norm_dist())
         if d >= 0.0:  # -1 = off-grid (fell out) — keep the last cell the player stood on
             self._bfs_last = d
@@ -276,7 +304,7 @@ class MeatboyStats(EpisodeStats):
         return (self._bfs_start - self._bfs_last) / self._bfs_start
 
     def extra(self) -> dict:
-        return {"wall_jumps": int(getattr(self.core.player, "wall_jumps", 0) or 0)}
+        return {"wall_jumps": self._wall_jumps}
 
     @staticmethod
     def end_status(core, terminated, truncated, info) -> str:
@@ -311,9 +339,21 @@ class BombermanStats(EpisodeStats):
         self._exit_found_frame: int | None = None
         self._bricks_at_exit: int | None = None
         self._first_kill_frame: int | None = None
+        self._bomb_drops: list[tuple[int, int]] = []
+        self._chain_bombs = 0
+        self._bombs = {id(b): b for b in core.bombs}  # live bombs last frame (refs keep ids unique)
+
+    def _watch_bombs(self) -> None:
+        """A bomb new in core.bombs was dropped at its tile. A bomb gone from it went off: with
+        fuse left, another blast set it off (a chain); at fuse 0, its own fuse did."""
+        now = {id(b): b for b in self.core.bombs}
+        self._bomb_drops += [(b.tx, b.ty) for k, b in now.items() if k not in self._bombs]
+        self._chain_bombs += sum(1 for k, b in self._bombs.items() if k not in now and b.fuse > 0)
+        self._bombs = now
 
     def _frame(self) -> None:
         core = self.core
+        self._watch_bombs()
         if self._first_kill_frame is None and core.kills_total > 0:
             self._first_kill_frame = self.frames
         if self._exit_found_frame is None:
@@ -338,9 +378,9 @@ class BombermanStats(EpisodeStats):
             "kills": int(core.kills_total), "level_enemies": self._enemies,
             "powerups": int(core.coins_total), "level_powerups": self._powerups,
             "bricks": int(core.bricks_destroyed),
-            "bombs_placed": len(core.bomb_drops),
-            "bomb_drops": [list(t) for t in core.bomb_drops],
-            "chain_bombs": int(core.chain_bombs),
+            "bombs_placed": len(self._bomb_drops),
+            "bomb_drops": [list(t) for t in self._bomb_drops],
+            "chain_bombs": self._chain_bombs,
             "exit_hidden": int(self._exit_hidden),
             "exit_found": int(found is not None),
             "exit_found_s": round(found / FPS, 2) if found is not None else None,

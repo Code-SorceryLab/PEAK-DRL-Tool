@@ -185,8 +185,6 @@ class BombermanCore:
         self.coins_total = 0       # power-ups collected (the adapter's "coins")
         self.kills_total = 0
         self.bricks_destroyed = 0
-        self.bomb_drops: list[tuple[int, int]] = []  # tile of every bomb placed, in order
-        self.chain_bombs = 0         # bombs set off by another bomb's blast, not their own fuse
         self.safe_detonations = 0    # bombs that went off while the player stood clear (learned retreat)
         self.useful_detonations = 0  # ...of those, the ones that opened a brick or landed on an enemy
         self.best_aim = 0.0        # closest a blast came to a living enemy (1 = hit); the aiming gradient
@@ -286,7 +284,6 @@ class BombermanCore:
         if self.bomb_at(tx, ty) is not None or len(self.bombs) >= p.bombs_max:
             return False
         self.bombs.append(Bomb(tx, ty, self.fuse_frames, p.blast_range))
-        self.bomb_drops.append((tx, ty))
         return True
 
     # ── bombs & blasts ───────────────────────────────────────────────────────
@@ -320,7 +317,6 @@ class BombermanCore:
             for other in list(self.bombs):  # chain reaction
                 if (other.tx, other.ty) in bc:
                     queue.append(other)
-        self.chain_bombs += len(done) - 1
         ld = self.level_data
         opened = 0
         for x, y in cells:
