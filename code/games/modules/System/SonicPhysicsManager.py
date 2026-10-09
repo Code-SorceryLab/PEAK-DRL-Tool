@@ -618,9 +618,9 @@ class SonicPhysicsManager:
                 spawn_y = row * TILE_SIZE - 22
 
                 if block.contains == "coin":
-                    # Collected on the hit; the fly-up coin is only the animation.
+                    # See the comment at PhysicManager._hit_qblock
                     c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
-                             collected=True, flyup=True, vy=-280.0, life=0.3, auto_collect=True)
+                            flyup=True, vy=-280.0, life=0.3, auto_collect=True)
                     c.gObj.type_id = EntityType.COIN
                     core.level_data.coins.append(c)
                     core.score += 10

@@ -62,8 +62,6 @@ def _platformer_action(keys) -> list:
     """
     k = pygame.key.get_pressed()
 
-    # Same keys Player.handle_input reads, so the action (and the metrics' jump count) match
-    # what the player actually did — arrows included.
     left  = k[pygame.K_a] or k[pygame.K_LEFT]
     right = k[pygame.K_d] or k[pygame.K_RIGHT]
     jump  = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
@@ -88,8 +86,9 @@ def _megaman_action(keys) -> list:
     """
     k = pygame.key.get_pressed()
 
-    left  = k[pygame.K_a]
-    right = k[pygame.K_d]
+    # Same keys MegamanCore._keyboard_state reads — arrows move; ↑ is climb here, never jump
+    left  = k[pygame.K_a] or k[pygame.K_LEFT]
+    right = k[pygame.K_d] or k[pygame.K_RIGHT]
     up    = k[pygame.K_w] or k[pygame.K_UP]
     down  = k[pygame.K_s] or k[pygame.K_DOWN]
     jump  = k[pygame.K_SPACE]
@@ -121,7 +120,7 @@ def _sonic_action(keys) -> list:
     """
     k = pygame.key.get_pressed()
 
-    left = k[pygame.K_a] or k[pygame.K_LEFT]    # SonicPlayer reads the arrows too
+    left = k[pygame.K_a] or k[pygame.K_LEFT]
     right = k[pygame.K_d] or k[pygame.K_RIGHT]
     jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
     run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
