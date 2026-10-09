@@ -8,7 +8,9 @@ from __future__ import annotations
 import os
 from typing import Protocol
 
-import pygame
+# SDL otherwise turns SIGTERM into a quit event nobody polls, so `kill` / Popen.terminate() did nothing
+os.environ.setdefault("SDL_NO_SIGNAL_HANDLERS", "1")
+import pygame  # noqa: E402
 
 
 class GameAdapter(Protocol):
@@ -117,7 +119,7 @@ def _episode_stats(adapter, x: float) -> dict:
         "x": round(float(x), 1),
         "score": int(getattr(core, "score", 0) or 0),
         "coins": int(getattr(core, "coins_total", 0) or 0),
-        "kills": int(getattr(core, "kills_total", 0) or 0),
+        "kills": adapter.events()["kills"],
         "time_left": round(float(getattr(core, "timer", 0.0) or 0.0), 1),
         "cause": str(getattr(core, "death_cause", "") or getattr(core, "last_cause", "") or ""),
         # balance-metric fields (Amr's table): where the episode ended, level extents, loot pool
@@ -128,7 +130,44 @@ def _episode_stats(adapter, x: float) -> dict:
     }
 
 
-class MarioAdapter:
+class _EventWeights:
+    """Persona event weights (personas.py). A weight is what doing ALL of an event in the level is
+    worth, as a share of the progress-to-goal scale: kills 1.0 = clearing every enemy pays as much
+    as reaching the goal. Per-level shares keep one weight meaningful across games and across
+    crowded vs empty levels; an event the level does not contain pays nothing.
+    make_adapter sets `weights`; empty = progress only."""
+    weights: dict[str, float] = {}
+    kills = 0           # side-scroller cores only count kills per step; their adapters sum them here
+    _level_enemies = 0  # set on reset, beside _level_coins
+
+    def _count_enemies(self) -> int:
+        try:
+            return len(self.enemy_positions())
+        except Exception:  # megaman builds its level on the first reset
+            return 0
+
+    def events(self) -> dict[str, int]:
+        core = self.core
+        return {"kills": int(getattr(core, "kills_total", self.kills) or 0),
+                "coins": int(getattr(core, "coins_total", 0) or 0)}
+
+    def level_events(self) -> dict[str, int]:
+        """How many of each event the current level holds (0 = a weight on it is dead here)."""
+        return {"kills": self._level_enemies, "coins": self._level_coins}
+
+    def progress_scale(self) -> float:
+        return float(getattr(self, "_FIT_SCALE", 0.0) or self.core.level_data.width)
+
+    def fitness(self) -> float:
+        f = self._progress_fitness()
+        if self.weights:
+            ev, tot = self.events(), self.level_events()
+            f += self.progress_scale() * sum(w * min(ev.get(e, 0) / tot[e], 1.0)
+                                             for e, w in self.weights.items() if tot.get(e))
+        return f
+
+
+class MarioAdapter(_EventWeights):
     """Wraps PlatformerCore, pinned to one level, one life, no curriculum, no gym obs."""
 
     # move_x -1/0/+1 -> MultiDiscrete move component (1=left, 0=idle, 3=right; walk speed only)
@@ -168,6 +207,7 @@ class MarioAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
 
     # ── state ────────────────────────────────────────────────────────────
 
@@ -215,11 +255,14 @@ class MarioAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
+        self.kills = 0
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
+        self.kills += int(getattr(self.core, "kills_step", 0) or 0)
         if terminated or truncated:
             self.alive = False
             self._end_xy = (self.x, self.y)
@@ -263,7 +306,7 @@ class MarioAdapter:
                 n += 1
         return n
 
-    def fitness(self) -> float:
+    def _progress_fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
@@ -273,7 +316,7 @@ class MarioAdapter:
         _set_locked_level(self.core, level)
 
 
-class MegamanAdapter:
+class MegamanAdapter(_EventWeights):
     """Wraps MegamanCore. Horizontal progress fitness; enemies shoot but the net can't (fire=0)."""
 
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
@@ -303,6 +346,7 @@ class MegamanAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
 
     @property
     def x(self) -> float:
@@ -342,6 +386,7 @@ class MegamanAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
@@ -376,7 +421,7 @@ class MegamanAdapter:
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
-    def fitness(self) -> float:
+    def _progress_fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
@@ -386,7 +431,7 @@ class MegamanAdapter:
         _set_locked_level(self.core, level)
 
 
-class SonicAdapter:
+class SonicAdapter(_EventWeights):
     """Wraps SonicCore. Goal does NOT terminate the core's episode — we end it on info['won']."""
 
     _MOVE_MD = {-1: 1, 0: 0, 1: 3}
@@ -419,6 +464,7 @@ class SonicAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
 
     @property
     def x(self) -> float:
@@ -459,11 +505,14 @@ class SonicAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
+        self.kills = 0
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
         _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
+        self.kills += int(getattr(self.core, "kills_step", 0) or 0)
         won = bool(info.get("won"))  # core.reached_goal is wiped by the mid-step level reload
         if won or terminated or truncated:
             self.alive = False
@@ -504,7 +553,7 @@ class SonicAdapter:
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
-    def fitness(self) -> float:
+    def _progress_fitness(self) -> float:
         return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
 
     def episode_stats(self) -> dict:
@@ -514,7 +563,7 @@ class SonicAdapter:
         _set_locked_level(self.core, level)
 
 
-class MeatboyAdapter:
+class MeatboyAdapter(_EventWeights):
     """Wraps MeatboyCore (plain class, no gym). Levels are 2-D mazes, so fitness is
     BFS-distance-to-goal progress scaled to ~pixels (0..1000) instead of max_x."""
 
@@ -542,6 +591,7 @@ class MeatboyAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
         self._best_bfs = 1.0
         self.reset()
 
@@ -585,6 +635,7 @@ class MeatboyAdapter:
         self.status = "RUNNING"
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
+        self._level_enemies = self._count_enemies()
         self._best_bfs = 1.0
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
@@ -616,10 +667,13 @@ class MeatboyAdapter:
     def enemy_positions(self) -> list[tuple[float, float]]:
         return [(float(s.cx), float(s.cy)) for s in self.core.level_data.saws]
 
+    def _count_enemies(self) -> int:
+        return 0  # saws are hazards, not enemies: no kill events in Meat Boy
+
     def qblock_count_near(self, r_tiles: int) -> int:
         return 0
 
-    def fitness(self) -> float:
+    def _progress_fitness(self) -> float:
         if self.won:
             return self._FIT_SCALE + self.win_bonus + _win_time_bonus(self)
         return (1.0 - self._best_bfs) * self._FIT_SCALE
@@ -632,7 +686,7 @@ class MeatboyAdapter:
         self.core.won = False
 
 
-class BombermanAdapter:
+class BombermanAdapter(_EventWeights):
     """Wraps BombermanCore (top-down). jump = drop a bomb; move_y is the second axis.
     Fitness is cost-to-exit progress (Dijkstra, bricks cost extra) so bombing the right brick
     counts as progress, plus kills (the exit only opens on a clear arena)."""
@@ -727,6 +781,7 @@ class BombermanAdapter:
         self.status = "RUNNING"
         self._end_xy = None
         self._level_coins = sum(row.count("C") + row.count("F") + row.count("S") for row in self.core.level_data.grid)
+        self._level_enemies = self._count_enemies()
         self._start_cost = max(self.core.start_cost(), 1.0)
         self._best_cost = self._start_cost
 
@@ -820,7 +875,7 @@ class BombermanAdapter:
     def progress(self) -> float:
         return max(0.0, min(1.0, 1.0 - self._best_cost / self._start_cost))
 
-    def fitness(self) -> float:
+    def _progress_fitness(self) -> float:
         """Two halves when the exit is gated on a clear arena: cost-to-exit progress and share of
         enemies killed — so a kill always beats camping the exit. Where the exit is not gated,
         killing is optional, so progress carries the full scale and kills only add their bonus.
@@ -866,9 +921,12 @@ def active_games() -> list[str]:
 
 
 def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float,
-                 sprint: bool = False, time_rate: float = 0.0) -> GameAdapter:
+                 sprint: bool = False, time_rate: float = 0.0,
+                 weights: dict[str, float] | None = None) -> GameAdapter:
     try:
         cls = _ADAPTERS[game]
     except KeyError:
         raise ValueError(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})") from None
-    return cls(level, max_frames, win_bonus, sprint, time_rate)
+    adapter = cls(level, max_frames, win_bonus, sprint, time_rate)
+    adapter.weights = dict(weights or {})
+    return adapter

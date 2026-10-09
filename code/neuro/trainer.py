@@ -24,7 +24,7 @@ import pygame
 
 from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
-from .personas import PERSONAS, Persona, get_persona
+from .personas import PERSONAS, Hands, Persona, get_persona
 from .net import NeuralNet, make_net
 from .sensors import N_BODY, SENSOR_MODES, read_sensors
 
@@ -146,11 +146,16 @@ class Trainer:
 
         self.slots = [
             EnvSlot(make_adapter(game, self.level, cfg.max_frames, cfg.win_bonus,
-                                 sprint=self.persona.sprint, time_rate=self.persona.time_rate),
+                                 sprint=self.persona.sprint, time_rate=self.persona.time_rate,
+                                 weights=self.persona.weights),
                     make_net(cfg))
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
+        slip_rng = np.random.default_rng(cfg.seed)  # bad-persona input slips, apart from the GA's rng
+        for slot in self.slots:
+            slot.hands = Hands(self.persona, slip_rng)
+        self._warned_levels: set = set()
         # Base mutation settings, restored when the curriculum moves to an unsolved level.
         # If resuming an already-annealed run, recover the originals by inverting the factor.
         if self.pop.annealed and cfg.anneal_factor not in (0.0, 1.0):
@@ -291,6 +296,18 @@ class Trainer:
 
     # ── core loop ────────────────────────────────────────────────────────
 
+    def _warn_dead_weights(self, adapter) -> None:
+        """Once per level: say so when the level holds none of the events the persona is paid for,
+        because there it can only play like `experienced`."""
+        if not self.persona.weights or self.level in self._warned_levels:
+            return
+        self._warned_levels.add(self.level)
+        have = adapter.level_events()
+        dead = [e for e in self.persona.weights if not have.get(e)]
+        if dead:
+            print(f"  note: {self.game} level [{self.level}] has no {'/'.join(dead)} — persona "
+                  f"[{self.persona.name}] plays like 'experienced' here", flush=True)
+
     def run_generation(self) -> list[float]:
         for i, slot in enumerate(self.slots):
             slot.net.set_weights(self.pop.weights[i])
@@ -303,6 +320,8 @@ class Trainer:
             slot.jump_count = 0
             slot.prev_jump = False
             slot.vx_sum = 0.0
+            slot.hands.left = 0
+        self._warn_dead_weights(self.slots[0].adapter)
 
         clock = pygame.time.Clock()
         last_thumb = last_watch = last_stats = 0.0
@@ -325,7 +344,7 @@ class Trainer:
                     move_y = (1 if k.get("down") else 0) - (1 if k.get("up") else 0)
                     jump = k["jump"]
                 else:
-                    move_x, jump, move_y = slot.net.act(vec)
+                    move_x, jump, move_y = slot.hands(slot.net.act(vec))
                 slot.adapter.step(move_x, jump, move_y)
                 slot.frames += 1
                 self._step_accum += 1
@@ -506,21 +525,26 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
     net = make_net(cfg)
     net.set_weights(weights.astype(np.float32))
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus,
-                           sprint=persona.sprint, time_rate=persona.time_rate)
+                           sprint=persona.sprint, time_rate=persona.time_rate, weights=persona.weights)
     clock = pygame.time.Clock()
     trainer = Trainer(game, level, cfg, run_dir="runs/_replay", state=state)
     trainer.slots[0].adapter = adapter
     trainer.slots[0].net = net
     all_levels = list_levels(game)
     cur_level = level if level is not None else (all_levels[0] if all_levels else None)
+    hands = Hands(persona, np.random.default_rng())
     while True:
         adapter.reset()
         net.reset()
+        hands.left = 0
+        frame = 0
+        slot0 = trainer.slots[0]
         while adapter.alive:
-            vec, rays, tiles = read_sensors(adapter, sensors)
-            slot0 = trainer.slots[0]
-            slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
-            move_x, jump, move_y = net.act(vec)
+            if frame % persona.sensor_period == 0:  # the persona's reaction time, as in training
+                vec, rays, tiles = read_sensors(adapter, sensors)
+                slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
+            frame += 1
+            move_x, jump, move_y = hands(net.act(slot0.last_sensors))
             adapter.step(move_x, jump, move_y)
             if state is not None:
                 trainer._publish_frames(encode_thumbs=True)
@@ -574,7 +598,7 @@ def main() -> None:
         from .server import start_server
         state = SharedState(Controls(turbo=args.turbo))
         start_server(state, http_port=args.port)
-        print(f"dashboard: http://127.0.0.1:{args.port}/mario/index.html", flush=True)
+        print(f"dashboard: http://127.0.0.1:{args.port}/{args.game}/index.html", flush=True)
 
     if args.replay:
         replay(args.replay, args.game, args.level, state)

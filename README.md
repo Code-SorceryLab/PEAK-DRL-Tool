@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/agent-291%20weights-ef4444?style=flat-square" alt="291 weights">
   <img src="https://img.shields.io/badge/deterministic-seed%2042-22c55e?style=flat-square" alt="Deterministic">
   <img src="https://img.shields.io/badge/GPU-not%20required-9a9a9a?style=flat-square" alt="No GPU">
-  <img src="https://img.shields.io/badge/tests-76%20passing-22c55e?style=flat-square" alt="76 tests">
+  <img src="https://img.shields.io/badge/tests-80%20passing-22c55e?style=flat-square" alt="80 tests">
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ The menu drives everything — train, watch, play, edit levels, run probes, open
 # Train — dashboard at http://127.0.0.1:8000/<game>/index.html
 python -m code.neuro.trainer --game mario                              # curriculum over enabled levels
 python -m code.neuro.trainer --game mario --level Mario1-2 --turbo     # one level, max speed
-python -m code.neuro.trainer --game sonic --persona speedrunner         # novice / experienced / speedrunner
+python -m code.neuro.trainer --game sonic --persona speedrunner         # see Player personas below
 python -m code.neuro.trainer --game megaman --sensors grid --seed 7     # tile-grid sensors, custom seed
 python -m code.neuro.trainer --game mario --hidden 32 --memory 2       # bigger net, 2 Jordan memory units
 python -m code.neuro.trainer --resume runs/mario                       # continue a run
@@ -212,14 +212,12 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 - Fixed-topology GA over a numpy MLP; hidden size, last-action feedback and Jordan memory units are `GAConfig` knobs (`--hidden`, `--action-feedback`, `--memory`)
 - 14-sensor perception: six raycasts (forward, forward-up ±30°/60°, forward-down ±30°/60°, back), enemy corridor, pit probe, velocity, grounded / can-jump, nearby question blocks
 - Two sensor modes, `rays` (14) or `grid` (368), switchable per run
-- Fitness = furthest x reached, +5000 on a win, + time left × persona bonus; Meat Boy uses BFS path progress
+- Fitness = furthest x reached, +5000 on a win, + time left × persona bonus, + persona event weights; Meat Boy uses BFS path progress
 - Curriculum: the population advances to the next enabled level after three winners in one generation
 - Full determinism from one seed
 
 **Player personas** (`code/neuro/personas.py`)
-- **Novice** — fresh senses every 3rd frame, walking pace
-- **Experienced** — default reactions and movement
-- **Speedrunner** — sprint plus 25 fitness per second left
+- Seven player types on two axes — skill (novice · bad · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
 
 </td>
 <td width="50%" valign="top">
@@ -245,6 +243,63 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 
 ---
 
+## Player personas
+
+A persona is the kind of player the evolved agents imitate. Pick one with `--persona <name>`
+or at the persona prompt in the TRAIN menus. Every persona plays the same game with the same
+291-weight network; they differ in two ways:
+
+- **Hands** (skill): how often the net gets fresh senses, whether sprint is unlocked, and how often
+  the input slips.
+- **Event weights** (play style): what the persona is paid for on the way to the goal.
+
+| Persona | Hands | Paid for | Use it to ask |
+|---|---|---|---|
+| `novice` | walk only, senses every 3rd frame | reaching the goal | can a new player finish this? |
+| `bad` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
+| `experienced` | walk, senses every frame (the default) | reaching the goal | the baseline |
+| `good` | sprint, senses every frame, clean inputs | reaching the goal | how far does skill carry? |
+| `killer` | as `experienced` | goal **+ enemies killed** | does fighting pay, or is it a detour? |
+| `collector` | as `experienced` | goal **+ coins / power-ups picked up** | are the pickups worth the risk? |
+| `speedrunner` | sprint, senses every frame | goal **+ 25 per second left** on a win | is there a fast route? |
+
+**Event weights are shares of the goal.** `weights={"kills": 1.0}` means that killing every enemy
+in the level pays as much as reaching the goal; killing 3 of 21 pays 3/21 of it. The share is
+per level and capped at 1, so one weight means the same thing in Mario (pixels) and Bomberman
+(a 0–1000 exit-cost scale), on crowded and empty levels, and kills cannot be farmed. This is the
+*procedural personas* idea of Holmgård et al. (MiniDungeons): one game, one controller, a
+different utility over game events per player archetype.
+
+**A level without the event gives a plain player.** Meat Boy has no enemies or pickups; most of the
+Bomberman ladder has no power-ups. The trainer prints
+`note: meatboy level [0] has no kills — persona [killer] plays like 'experienced' here`.
+
+**Measured** (40 generations, 3 seeds × 20 test episodes, Mario 1-1, 21 enemies):
+
+| Persona | Win % | Kills |
+|---|---|---|
+| `experienced` | 100 | 2.7 |
+| `killer` | 100 | **7.0** |
+| `good` | 100 | 4.7 |
+| `bad` | **20** | 2.1 |
+
+The killer kills 2.6× as many enemies and still wins every time; weights 0.5, 1.0 and 2.0 gave the
+same kill count, so 1.0 is the default. On Mario 1-2 (17 coins) the collector picked up 1.5–2.5
+coins against 0 for `experienced`.
+
+**Add a persona** — one entry in `PERSONAS`:
+
+```python
+"pacifist": Persona(name="pacifist", sprint=False, sensor_period=1, time_rate=0.0,
+                    weights={"kills": -1.0}, description="avoids killing"),
+```
+
+Events available today: `kills` and `coins` (`_EventWeights.events()` in `code/neuro/adapters.py`).
+New personas are opt-in in the sweep menus, because each one multiplies sweep cost. The persona is
+saved with the run (`state.json`) and replay uses it, including its reaction time and slips.
+
+---
+
 ## Configuration
 
 | Knob | Where | What it changes |
@@ -252,12 +307,12 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 | GA hyperparameters | `GAConfig` in `code/neuro/evolution.py` | population 10 · elite 4 · tournament k 5 · crossover 0.7 · mutation rate 0.15 / σ 0.15 · init σ 0.5 · anneal ×0.5 after a level's first win (the sweep's one universal winner) · 3600-frame episodes · 300-frame stall kill · advance after 3 wins · win bonus 5000 · seed 42 · hidden 16 · feedback off · memory 0 |
 | Network shape | `--hidden / --action-feedback / --memory`, `code/neuro/net.py` | 147 / 291 / 579 / 1,155 weights for hidden 8 / 16 / 32 / 64; +2 inputs with feedback; +N in/out with memory |
 | Sensors | `--sensors rays\|grid`, `code/neuro/sensors.py` | ray angles, max distance 250 px, march step 8 px, pit-probe depth 4 tiles, grid half-width 5 |
-| Personas | `code/neuro/personas.py` | sprint, sensor reaction period, time-left bonus — one dataclass per persona |
+| Personas | `code/neuro/personas.py` | sprint, sensor reaction period, time-left bonus, input slips (`mistake_rate`, `slip_frames`), event `weights` — one dataclass per persona |
 | Levels | `code/games/levels/<game>/*.txt` + `game_config.yaml` / `meatboy_config.yaml` | ASCII tilemaps; enable/disable per level; the trainer re-reads the list every generation |
 | Game feel | per-game blocks in `game_config.yaml`, `meatboy_config.yaml` | gravity, jump velocity, run speed, coyote frames, wall-jump forces, per-level `time_limit` |
 | Balance probes | `code/neuro/balance.py` | seeds 1234 / 2025 / 31337 (keep for comparability), gens budget, `--workers` |
 | Stats bands | `code/stats/MarioThresholds.yaml` | B1 / B2 / B3 target bands and warning margins |
-| Dashboard | `--port` (HTTP 8000), websocket 8765 | thumbnails 5 fps (1 in Turbo), watched env 20 fps |
+| Dashboard | `--port` (HTTP 8000), websocket = HTTP port + 765 (8765) — pick another `--port` if something else holds 8765 | thumbnails 5 fps (1 in Turbo), watched env 20 fps |
 
 Deep dives: [`docs/GUIDE.md`](docs/GUIDE.md) (how the system works) and
 [`docs/BALANCE.md`](docs/BALANCE.md) (every metric, the personas, the GA-sweep bounds and citations,
@@ -430,11 +485,11 @@ the sweep has never covered simply falls back to the baseline.
 python -m pytest code/tests -q
 ```
 
-76 tests: GA determinism (seeded mutation, crossover, elitism), net parameter counts and the
+80 tests: GA determinism (seeded mutation, crossover, elitism), net parameter counts and the
 feedback/memory carry, raycasts and the tile grid on synthetic levels, headless adapter and trainer
 smoke tests, balance-probe aggregation, the GA-sweep config / tag / verdict logic, and — for
 Bomberman — every level file's geometry and reachability, blast and chain-reaction rules, and the
-sensor contract.
+sensor contract; persona event weights (share of the goal, cap, dead events) and input slips.
 
 Known wart: the top-level package is named `code`, which shadows a stdlib module. Renaming it
 touches every import under `code/games/` and hasn't been worth the churn.
