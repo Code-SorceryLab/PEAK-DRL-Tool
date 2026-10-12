@@ -53,14 +53,27 @@ except ImportError:
 # ─── Tile definitions ─────────────────────────────────────────────
 GAME_LABELS = {
     "platformer": "Mario / Platformer",
-    "megaman": "Mega Man",
     "sonic": "Sonic",
+    "megaman": "Mega Man (NES)",
 }
+
+# Games that keep their level list in their own file, next to game_config.yaml, in the same
+# levels / disabled_levels shape; the rest of that game's configuration is never rewritten here.
+GAME_LEVELS_CONFIG = {
+    "megaman": "megaman_levels.yaml",
+}
+# Games built from fixed-size screens (cols, rows): the viewport outlines them, and the level is
+# saved untrimmed so the screens stay on their grid. A screen block left blank does not exist.
+GAME_SCREEN_GRID = {
+    "megaman": (16, 15),
+}
+# Games whose physics is not tuned per level: no sliders, nothing baked into the sidecar YAML.
+NO_PHYSICS_GAMES = {"megaman"}
 
 GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
-    "megaman": ["mm_*.txt", "mega*.txt"],
     "sonic": ["green_hill*.txt", "sonic*.txt", "gh*.txt"],
+    "megaman": ["*.txt"],
 }
 
 TILE_LIBRARY = [
@@ -92,13 +105,29 @@ TILE_LIBRARY = [
     ('D', 'Boss Door',      (255, 90, 140),  (60, 10, 30)),
     ('X', 'Boss Spawn',     (255, 120, 80),  (70, 18, 18)),
     ('P', 'Player Start',   (60, 160, 255),  (0, 30, 120)),
+    # Mega Man (NES): drawn as lettered badges
+    ('b', 'Blader',         (60, 120, 220),  (255, 255, 255)),
+    ('k', 'Beak <',         (200, 70, 60),   (255, 255, 255)),
+    ('j', 'Beak < (early)', (160, 60, 50),   (255, 255, 255)),
+    ('K', 'Beak >',         (200, 70, 60),   (255, 255, 255)),
+    ('J', 'Beak > (early)', (160, 60, 50),   (255, 255, 255)),
+    ('c', 'Super Cutter',   (150, 150, 160), (20, 20, 30)),
+    ('f', 'Flea',           (70, 170, 90),   (255, 255, 255)),
+    ('v', 'Octopus |',      (220, 120, 40),  (30, 20, 0)),
+    ('h', 'Octopus -',      (220, 120, 40),  (30, 20, 0)),
+    ('s', 'Flying Shell',   (120, 90, 190),  (255, 255, 255)),
+    ('e', 'Big Eye',        (210, 60, 90),   (255, 255, 255)),
+    ('w', 'Screw (floor)',  (200, 160, 60),  (30, 20, 0)),
+    ('W', 'Screw (ceil)',   (200, 160, 60),  (30, 20, 0)),
+    ('+', 'Life Energy',    (250, 230, 150), (40, 30, 0)),
 ]
 TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
 TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
 GAME_TILE_ORDER = {
     "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
-    "megaman": [' ', '#', '=', '^', 'O', 'H', 'M', 'B', 'G', 'D', 'X', 'P'],
     "sonic": [' ', '#', '=', '^', 'O', 'S', '/', '\\', '(', ')', '[', ']', 'U', 'n', 'C', 'E', 'G', 'P'],
+    "megaman": [' ', '#', 'H', '^', 'D', 'G', 'X', 'P',
+                 'b', 'k', 'j', 'K', 'J', 'c', 'f', 'v', 'h', 's', 'e', 'w', 'W', '+'],
 }
 SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
 
@@ -403,7 +432,7 @@ class GameConfig:
         self._load()
 
     def _root_cfg(self, data, create=False):
-        if self.game == "platformer":
+        if self.game == "platformer" or self.game in GAME_LEVELS_CONFIG:
             return data
         if create and self.game not in data:
             data[self.game] = {}
@@ -411,11 +440,8 @@ class GameConfig:
 
     def _default_level_entry(self, filename):
         filename = self.normalize_level_file(filename)
-        if self.game == "megaman":
-            return {
-                "file": filename,
-                "background_color": [120, 160, 255],
-            }
+        if self.game in GAME_LEVELS_CONFIG:
+            return {"file": filename}
         if self.game == "sonic":
             return {
                 "file": filename,
@@ -534,7 +560,8 @@ class GameConfig:
             return
         cwd = Path.cwd()
         sd = Path(__file__).resolve().parent
-        for p in [
+        cfg_name = GAME_LEVELS_CONFIG.get(self.game, "game_config.yaml")
+        for p in [sd.parent / cfg_name, cwd / "code" / "games" / cfg_name] if self.game in GAME_LEVELS_CONFIG else [
             cwd / "game_config.yaml",
             cwd / "code" / "games" / "platformer" / "game_config.yaml",
             cwd / "code" / "games" / "game_config.yaml",
@@ -858,8 +885,22 @@ def render_tile_object(surf, char, sx, sy, ts):
         pygame.draw.rect(surf,(12,12,20),(sx,sy,ti,ti)); cx2,cy2=sx+ti//2,sy+ti//2; hr=max(2,ti//6)
         pygame.draw.circle(surf,(255,204,170),(cx2,cy2-hr),hr)
         pygame.draw.rect(surf,(68,136,255),(cx2-ti//5,cy2,ti*2//5,ti//3))
+    elif char in TILE_BY_CHAR:
+        pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); draw_badge(surf,char,pygame.Rect(sx,sy,ti,ti))
     else:
         pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti))
+
+_BADGE_FONTS={}
+def draw_badge(surf, char, rect):
+    """A library tile with no art of its own: its colour, with its glyph on top."""
+    _,_,bg,fg=TILE_BY_CHAR[char]
+    r=rect.inflate(-max(2,rect.w//8),-max(2,rect.h//8))
+    pygame.draw.rect(surf,bg,r,border_radius=max(2,rect.w//6))
+    pygame.draw.rect(surf,tuple(min(255,c+60) for c in bg),r,1,border_radius=max(2,rect.w//6))
+    size=max(6,int(rect.h*0.6))
+    if size>=8:
+        fnt=_BADGE_FONTS.get(size) or _BADGE_FONTS.setdefault(size,pygame.font.SysFont("Consolas,monospace",size,bold=True))
+        t=fnt.render(char,True,fg); surf.blit(t,t.get_rect(center=rect.center))
 
 def draw_tile_rect(surf, char, x, y, w, h, alpha=255):
     tile=TILE_BY_CHAR.get(char,TILE_BY_CHAR[' ']); color=tile[2]
@@ -993,11 +1034,18 @@ def draw_palette_icon(surf, char, rect):
     elif char=='P':
         hr=max(3,h//5); pygame.draw.circle(surf,(80,180,255),(cx,y+h//3),hr)
         pygame.draw.rect(surf,(50,140,220),(cx-w//5,y+h//3+hr-1,w*2//5,h//3),border_radius=2)
+    elif char=='X':
+        pygame.draw.rect(surf,col,(x+3,y+3,w-6,h-6),border_radius=3)
+        pygame.draw.rect(surf,(255,255,255),(x+w//3-1,cy-2,3,3)); pygame.draw.rect(surf,(255,255,255),(x+w*2//3-1,cy-2,3,3))
+    elif char in TILE_BY_CHAR:
+        draw_badge(surf,char,rect)
 
 # ═══════════════════════════════════════════════════════════════════
 # LEVEL
 # ═══════════════════════════════════════════════════════════════════
 class Level:
+    TRIM = True            # main() turns these off for games that need the grid or the sidecar left alone
+    SAVE_PHYSICS = True
     def __init__(self, rows=DEFAULT_ROWS, cols=DEFAULT_COLS):
         self.rows=rows; self.cols=cols; self.grid=[[' ']*cols for _ in range(rows)]
         self.platforms=[]; self.filename=None; self.level_id=None
@@ -1036,11 +1084,14 @@ class Level:
             while len(rc)<w: rc.append(' ')
             lines.append(''.join(rc))
         return '\n'.join(lines)
-    def save(self, path, trim=True):
-        with open(path,'w') as f: f.write(self.to_ascii(trim=trim))
+    def save(self, path, trim=None):
+        with open(path,'w') as f: f.write(self.to_ascii(trim=self.TRIM if trim is None else trim))
         self.filename=str(path); self._save_yaml(path)
     def _save_yaml(self, tp):
         if yaml is None: return
+        if not self.SAVE_PHYSICS:
+            if not self.platforms: return
+            self.physics_overrides={}; self.enemy_physics={}
         yp=str(tp).rsplit('.',1)[0]+'.yaml'
         d={'dynamics':{'moving_platforms':[p.to_dict() for p in self.platforms]} if self.platforms else {}}
         if self.physics_overrides:
@@ -1311,6 +1362,14 @@ def draw_viewport(surf,ed,font,sfont):
         for r in range(rs,re+1):
             sy=int(r*ts-ed.cam_y+vy);bold=r%10==0
             pygame.draw.line(surf,GRID_BOLD if bold else GRID_COLOR,(vx,sy),(vx+vw,sy),2 if bold else 1)
+    if ed.game in GAME_SCREEN_GRID:
+        sc,sr=GAME_SCREEN_GRID[ed.game];sw2,sh2=int(sc*ts),int(sr*ts)
+        tint=pygame.Surface((sw2,sh2),pygame.SRCALPHA);tint.fill((*UI_ACCENT2,22))
+        for gy in range(rs//sr,(re-1)//sr+1):
+            for gx in range(cs//sc,(ce-1)//sc+1):
+                if any(ch!=' ' for row in lv.grid[gy*sr:(gy+1)*sr] for ch in row[gx*sc:(gx+1)*sc]):
+                    sx,sy=ed.w2s(gx*sc,gy*sr);surf.blit(tint,(sx,sy))
+                    pygame.draw.rect(surf,UI_ACCENT2,(sx,sy,sw2,sh2),2)
     if ed.hover_cell:
         hr,hc=ed.hover_cell;sx,sy=ed.w2s(hc,hr)
         if ed.eraser_mode:
@@ -1533,11 +1592,14 @@ def draw_right_panel(surf,ed,sfont,mpos):
         except:pass
     y+=54
     # Physics
-    pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
-    try:sfont.render_to(surf,(rx+pad,y),"PHYSICS",fgcolor=UI_ACCENT,size=12)
+    show_phys=ed.game not in NO_PHYSICS_GAMES
+    if show_phys:pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
+    try:
+        if show_phys:sfont.render_to(surf,(rx+pad,y),"PHYSICS",fgcolor=UI_ACCENT,size=12)
     except:pass
-    y+=14;sw=cw-pad*2-4
-    for sl in ed.phys_sliders:
+    if show_phys:y+=14
+    sw=cw-pad*2-4
+    for sl in (ed.phys_sliders if show_phys else []):
         try:
             sfont.render_to(surf,(rx+pad+2,y),sl.label,fgcolor=UI_SUBTEXT,size=9)
             vs=f"{sl.value:.0f}";vb=sfont.get_rect(vs,size=9)
@@ -1550,11 +1612,12 @@ def draw_right_panel(surf,ed,sfont,mpos):
         tx2=tr.x+2+int(fr*(sw-4));pygame.draw.rect(surf,UI_TEXT,(tx2-4,tr.y-2,8,12),border_radius=3)
         sl.rect=tr;y+=16
     # Enemy Physics
-    pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
-    try:sfont.render_to(surf,(rx+pad,y),"ENEMY PHYSICS",fgcolor=(220,140,80),size=12)
+    if show_phys:pygame.draw.line(surf,UI_BORDER,(rx+pad,y),(rx+cw-pad,y),1);y+=6
+    try:
+        if show_phys:sfont.render_to(surf,(rx+pad,y),"ENEMY PHYSICS",fgcolor=(220,140,80),size=12)
     except:pass
-    y+=14
-    for sl in ed.enemy_sliders:
+    if show_phys:y+=14
+    for sl in (ed.enemy_sliders if show_phys else []):
         val_str=f"{sl.value/100:.2f}x" if sl.key=="enemy_grav_pct" else f"{sl.value:.0f}"
         try:
             sfont.render_to(surf,(rx+pad+2,y),sl.label,fgcolor=UI_SUBTEXT,size=9)
@@ -1689,6 +1752,8 @@ def do_action(result,ed,scr,sf):
         if not ed.check_unsaved(scr,sf):return
         r,c=dlg_new(scr,sf)
         if r and c:
+            if ed.game in GAME_SCREEN_GRID:   # whole screens only
+                sc,sr=GAME_SCREEN_GRID[ed.game];r=-(-r//sr)*sr;c=-(-c//sc)*sc
             ed.level=Level(r,c)
             for r2 in range(r):ed.level.set(r2,0,'#');ed.level.set(r2,c-1,'#')
             for c2 in range(c):ed.level.set(0,c2,'#');ed.level.set(r-1,c2,'#')
@@ -1736,6 +1801,10 @@ def main(argv=None):
     font=pygame.freetype.SysFont("monospace",14);sfont=pygame.freetype.SysFont("monospace",14)
     clock=pygame.time.Clock()
     gc=GameConfig(args.game)
+    Level.TRIM=args.game not in GAME_SCREEN_GRID
+    Level.SAVE_PHYSICS=args.game not in NO_PHYSICS_GAMES
+    if not args.level and args.game in GAME_SCREEN_GRID and gc.level_ids:
+        args.level=gc.get_level_file_path(gc.level_ids[0])   # a blank canvas is off the screen grid
     if args.level:
         lv=Level.load(args.level); lv.level_id=next((lid for lid,cfg in gc.levels.items() if Path(cfg.get('file','')).name==Path(args.level).name), None)
     else:

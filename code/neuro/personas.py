@@ -86,12 +86,12 @@ class Hands:
         self.rate, self.hold, self.rng = persona.mistake_rate, persona.slip_frames, rng
         self.left, self.action = 0, (0, False, 0)
 
-    def __call__(self, action: tuple[int, bool, int]) -> tuple[int, bool, int]:
+    def __call__(self, action: tuple) -> tuple:
         if self.left == 0 and self.rate > 0.0 and self.rng.random() < self.rate:
             r = self.rng
             self.left = self.hold  # side-scrollers ignore move_y
             self.action = (int(r.integers(-1, 2)), bool(r.random() < 0.5), int(r.integers(-1, 2)))
         if self.left:
             self.left -= 1
-            return self.action
+            return self.action + action[3:]   # a slip is a movement slip: any extra button passes through
         return action

@@ -71,6 +71,7 @@ async def _ws_handler(ws, state: SharedState) -> None:
                     "jump": bool(msg.get("jump")),
                     "up": bool(msg.get("up")),
                     "down": bool(msg.get("down")),
+                    "fire": bool(msg.get("fire")),
                 }
 
     async def send_loop() -> None:

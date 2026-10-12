@@ -343,22 +343,22 @@ class LevelLoader:
                     data.goals.append(g)
 
                 elif ascii_char == 'M':
-                    # Met spawn (generic Enemy for now, MegaManCore will convert)
+                    # Met spawn (generic Enemy; the core converts it)
                     e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
                     e.gObj.type_id = EntityType.ENEMY
                     e.spawn_tag = "met"
                     data.enemies.append(e)
 
                 elif ascii_char == 'B':
-                    # Bat spawn (generic Enemy for now, MegaManCore will convert)
+                    # Bat spawn (generic Enemy; the core converts it)
                     e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
                     e.gObj.type_id = EntityType.ENEMY
                     e.spawn_tag = "bat"
                     data.enemies.append(e)
 
                 elif ascii_char == 'X':
-                    # Boss spawn placeholder. MegaManCore upgrades this into the
-                    # real boss object during level load.
+                    # Boss spawn placeholder: the core upgrades it into the real boss
+                    # object during level load.
                     e = Enemy(GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), vx=0.0)
                     e.gObj.type_id = EntityType.ENEMY
                     e.spawn_tag = "boss"

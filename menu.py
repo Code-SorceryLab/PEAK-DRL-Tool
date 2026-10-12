@@ -48,7 +48,8 @@ def _active_games() -> list[str]:
 
 GAMES = _active_games()
 INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
-CONFIG_KEY = {"mario": "platformer", "megaman": "megaman", "sonic": "sonic"}
+CONFIG_KEY = {"mario": "platformer", "sonic": "sonic"}
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels in the game's own, editor-owned file
 
 # ============================================================================
 # MAIN MENU — PEAK ENGINE
@@ -204,6 +205,13 @@ def get_levels_for_game(game: str) -> list:
             import yaml
             data = yaml.safe_load(Path(f"code/games/{game}_config.yaml").read_text(encoding="utf-8")) or {}
             return [str(i) for i in range(len(data.get("levels", [])))]
+        except Exception:
+            return []
+    if game in OWN_LEVEL_FILES:
+        try:
+            import yaml
+            data = yaml.safe_load(Path(f"code/games/{OWN_LEVEL_FILES[game]}").read_text(encoding="utf-8")) or {}
+            return list((data.get("levels") or {}).keys())
         except Exception:
             return []
     _, data, _ = _load_game_config_yaml()
@@ -627,12 +635,12 @@ def _train_batch(jobs, **summary):
 _PLAY_CONTROLS = {
     "mario":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
                 ("Z", "Fire (with fire flower)")],
-    "megaman": [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE", "Jump"),
-                ("W / S", "Climb ladder"), ("Z", "Fire")],
     "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
                 ("S", "Crouch / spin dash")],
     "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
     "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
+    "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
+                 ("I", "Toggle invincibility (debug)"), ("", "A game controller works too: stick / d-pad, Cross, Square")],
 }
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
                ("F4", "Hitboxes"), ("F5", "Agent max view")]
@@ -662,7 +670,7 @@ def run_manual_play():
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
-    if game not in INDEXED_GAMES:  # meatboy / bomberman have no debug manager
+    if game not in INDEXED_GAMES and game not in OWN_LEVEL_FILES:  # those cores have no debug manager
         print()
         print(f"    {_BOLD('Debug overlays')}")
         for key, what in _DEBUG_KEYS:
@@ -776,7 +784,7 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
-    game_choices = ["platformer", "megaman", "sonic"]
+    game_choices = ["platformer", "sonic", "megaman"]
     game = ask_index(
         "\n  Choose which game to edit:",
         game_choices,
@@ -806,7 +814,7 @@ def run_toggle_levels():
         print("\n  Could not find a readable game_config.yaml")
         return
 
-    game_choices = ["platformer", "megaman", "sonic"]
+    game_choices = ["platformer", "sonic"]
     game = ask_index(
         "\n  Choose which game's levels to manage:",
         game_choices,

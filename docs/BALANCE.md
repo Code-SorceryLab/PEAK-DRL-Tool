@@ -83,19 +83,19 @@ sampling positions every N frames into the env rows.
 
 Levels are ASCII tilemaps (`code/games/levels/`, legend in `levels/common/ASCII_TILEMAP.md` —
 note: use `G` for goals, never `D`). Enabled levels register in `code/games/game_config.yaml`
-(Mario at root, megaman/sonic nested) and `meatboy_config.yaml` (ordered list). New
+(Mario at root, sonic nested) and `meatboy_config.yaml` (ordered list). New
 game-faithful levels added:
 
 | Level | Style | Probe verdict (2 seeds, 20-gen budget) |
 |---|---|---|
 | `Green Hill 3` | Sonic act: rolling slopes, ring arcs, springs, badniks | solved 2/2, first win gen 3.5 ±6.4, 50% win rate; Enemy 75% — easy/medium |
 | `Mario1-3` | SMB 1-3 athletic: platform islands over pits, koopas | solved 2/2, first win gen 9 ±0, 16% win rate; Koopa 92% — medium |
-| `MM-Stage2` | Mega Man: jumpable pillar corridor, spike troughs, mets + bats (ladders are manual-play flavor) | solved 2/2, first win gen 14 ±12.7, 7% win rate; Spike 94% — hard |
+| `MM-Stage2` (old Mega Man clone, since removed) | Mega Man: jumpable pillar corridor, spike troughs, mets + bats (ladders are manual-play flavor) | solved 2/2, first win gen 14 ±12.7, 7% win rate; Spike 94% — hard |
 | `world1_11_salt_factory` | Meat Boy: wall-jump shafts, saws, crumble bridges | unsolved at 20 gens (75% BFS progress, still improving) — hardest; BFS-verified reachable |
 
-**Design constraint the probes exposed:** agents act with left/right/jump only — Mega Man's
-climb action is never pressed, so **ladders are unusable by agents** (manual play only).
-Agent-facing megaman levels must have a jumpable critical path. The first MM-Stage2 draft
+**Design constraint the probes exposed:** in the old Mega Man clone (since removed; the
+current `megaman` is the NES stage, whose agents do climb) agents acted with left/right/jump
+only, so **ladders were unusable by agents** and its levels needed a jumpable critical path. The first MM-Stage2 draft
 violated this (0/2 seeds, Spike 71%) and was redesigned; the first Green Hill 3 draft had
 its goal floating above the running surface (agents sprinted underneath it — OOB 78%) and
 got a full-height goal column instead. This is the tool working as intended: **probe every

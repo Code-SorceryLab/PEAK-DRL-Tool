@@ -11,7 +11,6 @@ thread only ever sees encoded frame bytes.
 from __future__ import annotations
 
 import argparse
-import csv
 import io
 import json
 import os
@@ -22,6 +21,7 @@ import time
 import numpy as np
 import pygame
 
+from .episodes import append_rows
 from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
 from .personas import PERSONAS, Hands, Persona, get_persona
@@ -43,7 +43,7 @@ class Controls:
         self.watch_env = 0
         self.sensors_on = True
         self.manual = False  # human plays the watched env instead of its net
-        self.keys = {"left": False, "right": False, "jump": False, "up": False, "down": False}
+        self.keys = {"left": False, "right": False, "jump": False, "up": False, "down": False, "fire": False}
         self.hitboxes = False  # classic PEAK debug overlays, drawn by the game cores
         self.grid = False
         self.level_request: str | None = None  # dashboard level pick; applied at the next gen boundary
@@ -267,24 +267,17 @@ class Trainer:
 
     def _append_episode_csv(self, env_rows: list[dict]) -> None:
         """One row per finished episode, in the stats dashboard's CSV schema."""
-        path = os.path.join(self.run_dir, "episodes.csv")
-        os.makedirs(self.run_dir, exist_ok=True)
-        new = not os.path.exists(path)
-        with open(path, "a", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            if new:
-                w.writerow(["persona", "game", "world", "cause_of_death", "jump_count",
-                            "coins_collected", "avg_vx", "progress_ratio", "route",
-                            "enemies_killed", "bricks_destroyed", "elapsed_time"])
-            for slot, rec in zip(self.slots, env_rows):
-                cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
-                level_len = rec.get("level_len") or 1.0
-                progress = min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)
-                w.writerow([self.persona.name, self.game, self.level or "auto", cause,
-                            slot.jump_count, rec.get("coins", 0),
-                            round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
-                            repr(slot.route), rec.get("kills", 0), rec.get("bricks", 0),
-                            round(slot.frames / 60.0, 2)])
+        rows = []
+        for slot, rec in zip(self.slots, env_rows):
+            cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
+            level_len = rec.get("level_len") or 1.0
+            progress = min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)
+            rows.append([self.persona.name, self.game, self.level or "auto", cause,
+                         slot.jump_count, rec.get("coins", 0),
+                         round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
+                         repr(slot.route), rec.get("kills", 0), rec.get("bricks", 0),
+                         round(slot.frames / 60.0, 2)])
+        append_rows(self.run_dir, rows)
 
     def _steps_per_sec(self) -> float:
         now = time.time()
@@ -343,9 +336,10 @@ class Trainer:
                     move_x = (1 if k["right"] else 0) - (1 if k["left"] else 0)
                     move_y = (1 if k.get("down") else 0) - (1 if k.get("up") else 0)
                     jump = k["jump"]
+                    extra = (bool(k.get("fire")),) if self.cfg.n_outputs >= 6 else ()
                 else:
-                    move_x, jump, move_y = slot.hands(slot.net.act(vec))
-                slot.adapter.step(move_x, jump, move_y)
+                    move_x, jump, move_y, *extra = slot.hands(slot.net.act(vec))
+                slot.adapter.step(move_x, jump, move_y, *extra)   # extra: the fire button of a 6-output game
                 slot.frames += 1
                 self._step_accum += 1
                 if jump and not slot.prev_jump:
@@ -502,7 +496,7 @@ def format_results(history: list[dict], tail: int | None = None) -> str:
     return "\n".join(out)
 
 
-def replay(path: str, game: str, level: str | None, state: SharedState | None) -> None:
+def replay(path: str, game: str, level: str | None, state: SharedState | None, loop: bool = False) -> None:
     if not os.path.exists(path):
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
@@ -519,8 +513,14 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
             level = meta["best_level"]
             print(f"replaying on level [{level}] as [{persona.name}] "
                   f"(where the record was set)", flush=True)
+        elif level is not None and meta.get("best_level") and level != meta["best_level"]:
+            print(f"replay: warning — --level [{level}] differs from the checkpoint's level "
+                  f"[{meta['best_level']}]; omit --level to replay where the record was set", flush=True)
     weights = np.load(path)["weights"]
     cfg = GAConfig(pop_size=1, **net_cfg)
+    cfg.n_outputs = max(cfg.n_outputs, N_OUTPUTS_BY_GAME.get(game, 3))   # as Trainer does: a game that
+    if cfg.sensors == "rays":                                            # owns its vector sizes the net
+        cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)
     sensors = cfg.sensors
     net = make_net(cfg)
     net.set_weights(weights.astype(np.float32))
@@ -544,15 +544,16 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None) -
                 vec, rays, tiles = read_sensors(adapter, sensors)
                 slot0.last_sensors, slot0.last_rays, slot0.last_tiles = vec, rays, tiles
             frame += 1
-            move_x, jump, move_y = hands(net.act(slot0.last_sensors))
-            adapter.step(move_x, jump, move_y)
+            move_x, jump, move_y, *extra = hands(net.act(slot0.last_sensors))
+            adapter.step(move_x, jump, move_y, *extra)
             if state is not None:
                 trainer._publish_frames(encode_thumbs=True)
                 trainer._publish_stats([adapter.status], [adapter.fitness()], 60.0)
             clock.tick(60)
         print(f"replay episode done: {adapter.status}, fitness {adapter.fitness():.1f}", flush=True)
-        # A win advances the replay to the next enabled level (wrapping), like the game would.
-        if getattr(adapter, "won", False) and all_levels and cur_level in all_levels:
+        # A win advances the replay to the next enabled level (wrapping), like the game would;
+        # --loop stays on the one level instead.
+        if not loop and getattr(adapter, "won", False) and all_levels and cur_level in all_levels:
             cur_level = all_levels[(all_levels.index(cur_level) + 1) % len(all_levels)]
             adapter.set_level(cur_level)
             trainer.level = cur_level  # dashboard header follows
@@ -570,6 +571,8 @@ def main() -> None:
     ap.add_argument("--run-dir", default=None, help="checkpoint dir (default: runs/<game>)")
     ap.add_argument("--resume", default=None, help="resume from a run dir")
     ap.add_argument("--replay", default=None, help="path to a best.npz to watch")
+    ap.add_argument("--loop", action="store_true",
+                    help="with --replay: keep replaying the same level after a win instead of advancing")
     ap.add_argument("--results", default=None, help="print the results table for a run dir and exit")
     ap.add_argument("--persona", default="experienced", choices=sorted(PERSONAS),
                     help="player type the agents imitate")
@@ -581,6 +584,10 @@ def main() -> None:
                     help="feed the previous action (move, jump) back in as 2 extra inputs")
     ap.add_argument("--memory", type=int, default=0,
                     help="Jordan memory units: extra outputs looped back as inputs next frame")
+    ap.add_argument("--seed-from", default=None, metavar="RUN",
+                    help="start the population from this run folder's best genome and mutated copies of it "
+                         "(e.g. a network fitted to demonstrations: python -m code.neuro.imitate); "
+                         "its network shape replaces --hidden / --memory")
     ap.add_argument("--best", action="store_true",
                     help="start from this game's GA-sweep winners (code/neuro/ga_best.yaml); "
                          "flags you pass explicitly still win")
@@ -601,7 +608,7 @@ def main() -> None:
         print(f"dashboard: http://127.0.0.1:{args.port}/{args.game}/index.html", flush=True)
 
     if args.replay:
-        replay(args.replay, args.game, args.level, state)
+        replay(args.replay, args.game, args.level, state, loop=args.loop)
         return
 
     run_dir = args.run_dir or args.resume or os.path.join("runs", args.game)
@@ -623,6 +630,10 @@ def main() -> None:
         for k, v in given.items():
             if k not in fields or k in typed:
                 fields[k] = v
+        if args.seed_from:                       # the seed genome fixes the network's shape
+            with open(os.path.join(args.seed_from, "state.json"), encoding="utf-8") as f:
+                shape = json.load(f).get("config") or {}
+            fields.update({k: shape[k] for k in ("sensors", "hidden", "action_feedback", "memory") if k in shape})
         cfg = GAConfig(**fields)
 
     if args.level is not None:
@@ -630,6 +641,9 @@ def main() -> None:
         validate_level(args.game, args.level)
     trainer = Trainer(args.game, args.level, cfg, run_dir, state=state, population=pop,
                       persona=get_persona(args.persona))
+    if args.seed_from and not args.resume:
+        trainer.pop.seed_from(np.load(os.path.join(args.seed_from, "best.npz"))["weights"])
+        print(f"population seeded from {args.seed_from}", flush=True)
     trainer.run(args.gens)
 
 

@@ -27,7 +27,7 @@ class MeatboyCore:
     """Super Meat Boy — monolithic character (the "old way", like PlatformerCore).
 
     A single MeatboyPlayer + a per-game MeatboyPhysicsManager, mirroring how
-    Sonic/Megaman are structured. Mirrors the Gym contract GameEnv/train.py
+    Sonic is structured. Mirrors the Gym contract GameEnv/train.py
     expect (reset/step/render + get_*_space)."""
 
     WIDTH = 672
