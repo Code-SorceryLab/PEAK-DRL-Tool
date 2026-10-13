@@ -32,7 +32,7 @@ def load_config(path):
 @st.cache_data
 def load_game_config(path):
     """world -> level-file mapping across every game section (mario top-level,
-    nested megaman/sonic, and meatboy's indexed level list)."""
+    nested sonic, and meatboy's indexed level list)."""
     mapping = {}
     try:
         with open(path, "r") as f:

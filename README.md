@@ -135,7 +135,7 @@ The menu drives everything — train, watch, play, edit levels, run probes, open
 python -m code.neuro.trainer --game mario                              # curriculum over enabled levels
 python -m code.neuro.trainer --game mario --level Mario1-2 --turbo     # one level, max speed
 python -m code.neuro.trainer --game sonic --persona speedrunner         # see Player personas below
-python -m code.neuro.trainer --game megaman --sensors grid --seed 7     # tile-grid sensors, custom seed
+python -m code.neuro.trainer --game mario --sensors grid --seed 7       # tile-grid sensors, custom seed
 python -m code.neuro.trainer --game mario --hidden 32 --memory 2       # bigger net, 2 Jordan memory units
 python -m code.neuro.trainer --resume runs/mario                       # continue a run
 python -m code.neuro.trainer --game mario --replay runs/mario/best.npz # watch the all-time best
@@ -159,6 +159,8 @@ streamlit run code/stats/dashboard/app.py                              # B1/B2/B
 # Play
 python -m code.games.tools.manual_play --game platformer --level Mario1-2
 python -m code.games.tools.manual_play --game meatboy --level 3        # Meat Boy levels are indices
+python -m code.games.tools.manual_play --game mario --level Mario1-1 --record --player p1 --episodes 10
+                                                                       # log each attempt to runs/manual/<game>/<player>/episodes.csv
 ```
 
 `A`/`D` or arrows move, `Shift` run, `Space`/`W` jump, `Z` fire (Mario / Megaman), `W`/`S` climb
@@ -185,7 +187,7 @@ flowchart LR
 
 | Layer | Where | What it does |
 |---|---|---|
-| Engines | `code/games/*_core.py` | Five deterministic Pygame games — four platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling. Mario, Meat Boy and Bomberman are the active roster; Megaman and Sonic are archived (`ARCHIVED_GAMES`): off the menus and sweeps, still runnable with `--game sonic` |
+| Engines | `code/games/*_core.py` | Five deterministic Pygame games — four platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling. Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`) are the active roster; Sonic is archived (`ARCHIVED_GAMES`): off the menus and sweeps, still runnable with `--game sonic` |
 | Adapters | `code/neuro/adapters.py` | One `GameAdapter` face per engine: reset, step, solid/hazard queries, fitness, episode stats |
 | Sensors | `code/neuro/sensors.py` | Raycast marching + scalar senses → 14 floats; or a 3 × 11 × 11 tile window + body senses → 368 |
 | Evolution | `code/neuro/evolution.py` | `GAConfig` + `Population`: flat weight vectors, elitism, tournament, uniform crossover, gaussian mutation, checkpoints with RNG state |
@@ -217,7 +219,7 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 - Full determinism from one seed
 
 **Player personas** (`code/neuro/personas.py`)
-- Seven player types on two axes — skill (novice · bad · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
+- Seven player types on two axes — skill (novice · clumsy · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
 
 </td>
 <td width="50%" valign="top">
@@ -256,7 +258,7 @@ or at the persona prompt in the TRAIN menus. Every persona plays the same game w
 | Persona | Hands | Paid for | Use it to ask |
 |---|---|---|---|
 | `novice` | walk only, senses every 3rd frame | reaching the goal | can a new player finish this? |
-| `bad` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
+| `clumsy` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
 | `experienced` | walk, senses every frame (the default) | reaching the goal | the baseline |
 | `good` | sprint, senses every frame, clean inputs | reaching the goal | how far does skill carry? |
 | `killer` | as `experienced` | goal **+ enemies killed** | does fighting pay, or is it a detour? |
@@ -281,7 +283,7 @@ Bomberman ladder has no power-ups. The trainer prints
 | `experienced` | 100 | 2.7 |
 | `killer` | 100 | **7.0** |
 | `good` | 100 | 4.7 |
-| `bad` | **20** | 2.1 |
+| `clumsy` | **20** | 2.1 |
 
 The killer kills 2.6× as many enemies and still wins every time; weights 0.5, 1.0 and 2.0 gave the
 same kill count, so 1.0 is the default. On Mario 1-2 (17 coins) the collector picked up 1.5–2.5

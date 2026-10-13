@@ -118,6 +118,45 @@ coming but not which way is out, and every genome in every generation dies on it
 that was the measured behaviour before they existed. With them, "step to the neighbour that
 burns latest" walks out of the cross one tile at a time, and a reactive net can express it.
 
+### Mega Man (NES): a route, ladders and a fire button
+
+`megaman` is the Cut Man stage of the NES game, rebuilt from the ROM's layout and the
+disassembly's numbers (`code/games/megaman_core.py`, `megaman_enemies.py`). A stage climbs,
+doubles back and drops, so x means nothing; the adapter owns a **26**-slot vector and the net
+grows to **six** outputs — left, right, jump, up, down, **fire**:
+
+| # | Sensor | Meaning |
+|---|---|---|
+| 0–5 | rays | The six side-scroller rays, relative to the way Mega Man faces |
+| 6 | NMY | Enemy in the corridor straight ahead |
+| 7–8 | NX / NY | Nearest enemy, bearing on each axis |
+| 9 | SHOT | Nearest enemy shot or blade |
+| 10 | PIT | No floor (or spikes) below a point 1.5 tiles ahead |
+| 11–14 | GND / VX / VY / JUMP | Body |
+| 15–17 | CLMB / LAD^ / LADv | Holding a ladder · a ladder here · a ladder under the feet |
+| 18–19 | GX / GY | Which way the route to the exit goes next, in screen terms (left/right, up/down) |
+| 20 | BOSS | Boss energy left |
+| 21–22 | FACE / HP | Facing · energy left |
+| 23–24 | LAD+ / LAD> | A ladder overhead within a jump · the nearest ladder ahead |
+| 25 | bias | Constant 1.0 |
+
+Ladders are not solid, so no ray ever stops on one, and the two touch sensors (15–17) only read
+once Mega Man overlaps the ladder. Slots 23–24 are what let him see a ladder coming: without
+them, grabbing one whose bottom rung hangs above the floor was a one-run-in-three accident.
+
+Fitness is progress along that route on the 0–1000 scale: a cost-to-exit field over the tiles
+that only lets a body go up by a jump from somewhere to stand or straight up a ladder. Where the
+level ends in a boss, half the scale is the route to him and half is the energy taken off him.
+Jump and fire need a fresh press on the console, so a held output repeats, as a turbo pad would.
+
+The whole stage is too much to learn at once, so the curriculum walks eight **sections** of it
+(street, climb, ledges, shaft, rooftop, descent, corridor, boss) before the full stage. A section
+is not a separate file: it is the stage itself with its own starting point, won on reaching the
+screens where the next section begins — so what a network senses in training is exactly what it
+senses in the whole stage. `python -m code.games.tools.mm1_make_slices` lists them again after
+the stage is edited, and `python -m code.neuro.relay` plays the full stage with one trained
+network per section, handing over as Mega Man crosses from one to the next.
+
 ---
 
 ## 4. Is there a reward system?
@@ -241,6 +280,16 @@ Immediate balance insight: the 1-1a slice is *harder than the full level* (slice
 invert difficulty), and full Mario1-2 is a wall — the curriculum population reached x≈4990
 and won zero episodes in 25 generations there.
 
+### Telemetry: play, then measure
+
+Play writes one row per attempt to an `episodes.csv` through one writer (`code/stats/`), whoever
+played: a person (`manual_play --record`), a random-action player (`--random --record`), or
+trained agents in a test run (`python -m code.neuro.relay --episodes 20` for a full Mega Man 1
+stage). `python -m code.stats.telemetry <run dirs>` turns any set of those logs into one
+self-contained HTML page: completion, win rate, furthest progress, where and how attempts ended,
+time to finish, the routes drawn on the level, and per-episode counts. It reads nothing but the
+rows, so it cannot tell who played.
+
 ## 10. Files and tools
 
 ```
@@ -248,7 +297,7 @@ menu.py                     PEAK ENGINE hub (train / play / watch / tools)
 code/neuro/                 the neuroevolution system (net, evolution, sensors,
                             adapters, trainer, server, web dashboard)
 code/games/                 the five engines + levels + assets (four platformers + bomberman;
-                            megaman and sonic are archived — see adapters.ARCHIVED_GAMES)
+                            sonic is archived — see adapters.ARCHIVED_GAMES)
 code/games/tools/           level_editor.py, manual_play.py, make_level_slices.py
 runs/<name>/                gen_state.npz (weights) + state.json (config, RNG,
                             full history) + best.npz (all-time best genome)

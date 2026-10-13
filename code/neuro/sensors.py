@@ -93,13 +93,13 @@ def _fit_window(core) -> None:
     call time, so _obs() builds 121 cells instead of 441 and the agent stays the centre cell."""
     if hasattr(core, "window"):  # meatboy
         core.window = GRID_N
-    else:  # platformer / megaman / sonic
+    else:  # platformer / sonic
         core.obs_width = core.obs_height = GRID_N
         core.obs_pad_x = core.obs_pad_y = GRID_HALF
         for k in ("_hazard_window_cache", "_dijkstra_window_cache", "_solid_window_cache"):
             if hasattr(core, k):  # per-step caches were built at the old size
                 setattr(core, k, None)
-        if hasattr(core, "_update_debug_caches"):  # megaman fills hazards from that cache
+        if hasattr(core, "_update_debug_caches"):  # a core that fills hazards from that cache
             core._update_debug_caches()
 
 

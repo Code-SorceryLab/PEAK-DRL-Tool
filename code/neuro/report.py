@@ -27,10 +27,11 @@ from datetime import datetime
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
-from .adapters import INDEXED_GAMES
+from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
+from .personas import COLORS as PERSONA_COLORS
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -106,15 +107,29 @@ def _indexed_entry(game: str, level: str) -> dict:
         return {}
 
 
+def _own_entry(game: str, level: str) -> dict:
+    """One level of a game that keeps named levels in its own file (megaman)."""
+    import yaml
+    try:
+        with open(os.path.join(GAMES_DIR, OWN_LEVEL_FILES[game]), encoding="utf-8") as f:
+            g = yaml.safe_load(f) or {}
+        return dict((g.get("levels") or {}).get(level) or (g.get("disabled_levels") or {}).get(level) or {})
+    except Exception:
+        return {}
+
+
 def _level_file(game: str, level: str) -> str | None:
     import yaml
     try:
+        if game in OWN_LEVEL_FILES:
+            f = _own_entry(game, level).get("file")
+            return os.path.join(GAMES_DIR, "levels", f) if f else None
         if game in INDEXED_GAMES:
             f = _indexed_entry(game, level).get("file")
             return os.path.join(GAMES_DIR, "levels", f) if f else None
         with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        section = {"mario": cfg, "megaman": cfg.get("megaman", {}), "sonic": cfg.get("sonic", {})}.get(game, {})
+        section = {"mario": cfg, "sonic": cfg.get("sonic", {})}.get(game, {})
         for key in ("levels", "disabled_levels"):
             entry = (section.get(key) or {}).get(level)
             if isinstance(entry, dict) and "file" in entry:
@@ -166,14 +181,18 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
     import yaml
     sections: list[tuple[str, dict]] = []
     try:
-        if game in INDEXED_GAMES:
+        if game in OWN_LEVEL_FILES:
+            with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
+                g = yaml.safe_load(f) or {}
+            entry = _own_entry(game, level)
+        elif game in INDEXED_GAMES:
             with open(os.path.join(GAMES_DIR, f"{game}_config.yaml"), encoding="utf-8") as f:
                 g = yaml.safe_load(f) or {}
             entry = _indexed_entry(game, level)
         else:
             with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
-            g = {"mario": cfg, "megaman": cfg.get("megaman", {}), "sonic": cfg.get("sonic", {})}.get(game, {})
+            g = {"mario": cfg, "sonic": cfg.get("sonic", {})}.get(game, {})
             entry = ((g.get("levels") or {}).get(level) or (g.get("disabled_levels") or {}).get(level) or {})
     except Exception:
         return sections
@@ -212,6 +231,9 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
         for k in ("physics", "movement", "jump", "wall"):
             phys.update(_flatten(g.get(k), k + "."))
         sections.append(("Player physics", phys))
+    elif game == "megaman":
+        sections.append(("Player (NES px, px/frame)", _flatten(g.get("player"))))
+        sections.append(("Buster", _flatten(g.get("buster"))))
     elif game == "bomberman":
         sections.append(("Player", _flatten(g.get("player"))))
         sections.append(("Bombs", _flatten(g.get("bomb"))))
@@ -1160,7 +1182,7 @@ def _overview(personas: dict[str, dict]) -> str:
 
 CONFIG_COLORS = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316", "#14b8a6", "#ec4899"]
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
-PERSONA_COLOR = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#22c55e"}
+PERSONA_COLOR = PERSONA_COLORS
 
 
 def _persona_chip(persona: str) -> str:
@@ -1317,6 +1339,10 @@ def _ray_layout(game: str) -> str:
     if game == "bomberman":
         return ("4 rays (N · E · S · W) + how soon each neighbouring tile burns + own-tile blast timer "
                 "+ nearest-enemy bearing + bombs left + bricks a bomb here would open + exit bearing")
+    if game == "megaman":
+        return (f"{len(RAY_DIRS)} rays relative to facing + enemy ahead + nearest-enemy bearing + nearest shot "
+                "+ pit probe + body + ladder here / below / overhead / ahead + route compass + boss energy; "
+                "outputs: left, right, jump, up, down, fire")
     return (f"{len(RAY_DIRS)} rays ({RAY_MAX_DIST:.0f} px reach, {RAY_STEP:.0f} px steps) + enemy corridor "
             f"+ pit probe + q-block count + body state")
 
@@ -1355,8 +1381,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
         f'<span class="chip" style="--c:{col}"><b>{p.name}</b> '
         f'{"sprint" if p.sprint else "walk"} · senses every {p.sensor_period} frame{"s" if p.sensor_period > 1 else ""}'
         f'{" · +" + format(p.time_rate, "g") + " fitness / s left" if p.time_rate else ""}</span>'
-        for (n, p), col in ((kv, {"experienced": "#ef4444", "novice": "#4a9eff",
-                                  "speedrunner": "#eab308"}.get(kv[0], "#a855f7"))
+        for (n, p), col in ((kv, PERSONA_COLORS.get(kv[0], "#a855f7"))
                             for kv in PERSONAS.items()) if n in personas)
     return f"""
     <dialog class="detail brain" id="brain_{sec_id}" aria-labelledby="brain_{sec_id}_t">

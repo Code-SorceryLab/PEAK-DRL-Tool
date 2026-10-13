@@ -1,2153 +1,1177 @@
+"""Mega Man (NES, 1987) — one stage, with the layout read from the ROM and the movement numbers
+read from the disassembly (github.com/TheRealQuantam/mm1dasm).
+
+Plain class like BombermanCore (no gym, no shared modules): the caller drives it with
+step((dx, dy, jump, fire)) and reads player / level_data / camera. Deterministic: no randomness
+yet, and every later random choice must go through `self.rng`, seeded at reset().
+
+A level is a stage file, or a *section* of one: the same file, world and enemies, but with its
+own starting point and a win on reaching the screens where the next section begins. Sections
+are how the stage is trained piece by piece without the pieces differing from the whole.
+
+A stage is one grid stitched from its 16 x 15-tile screens (tools/mm1_extract_level.py). A screen
+block left entirely blank is void: there is nothing there, so walking off a row of screens is
+blocked and falling out of one with nothing below is a pit. Inside a screen a blank reads as air.
+The camera behaves like the console's: it follows sideways within a run of screens, stays locked
+to one screen row, and slides to the next screen when the player climbs or falls into it.
+"""
 from __future__ import annotations
 
-from collections import deque
-from dataclasses import dataclass, field
-import heapq
 import math
 import os
 import random
-import yaml
-from typing import List, Set, Tuple
+from dataclasses import dataclass
 
-import gymnasium
-from gymnasium import spaces
-import numpy as np
 import pygame
+import yaml
 
-from .modules.Objects.Enemy import Enemy as SharedEnemy
-from .modules.Objects.GameObject import GameObject
-from .modules.Objects.Player import Player as SharedPlayer
-from .modules.Objects.Projectile import Projectile as SharedProjectile
-from .modules.System.EntityType import EntityType
-from .modules.System.LevelLoader import LevelLoader
-from .modules.System.PhysicsManager import PhysicsManager
-from .modules.System.config_manager import ConfigManager
-from .modules.System.debugging_mods.manager import DebugManager
-from .modules.Parameters.Map_parameters import (
-    TILE_AIR,
-    TILE_GROUND,
-    TILE_PLATFORM,
-    TILE_GOAL,
-    TILE_SPIKE,
-    TILE_QBLOCK,
-    TILE_PIT,
-)
+from . import megaman_enemies as en
+from .megaman_assets import Assets
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(_HERE, "megaman_config.yaml")
+LEVELS_PATH = os.path.join(_HERE, "megaman_levels.yaml")   # the level editor owns this one
+
+AIR, VOID, SOLID, LADDER, SPIKE, GOAL, START = ".", " ", "#", "H", "^", "G", "P"
+DOOR, DOOR_SHUT = "D", "d"      # a shutter lets the player through once, then seals behind them
+EPS = 1e-6
+MUTANT_ENV = "PEAK_MM1_MUTANT"  # a mutant's folder or mutant.json (megaman_mutants.py): play that copy of the game
 
 
-DEBUG_PANEL_WIDTH = 350
-MEGAMAN_BG = (120, 160, 255)
-MEGAMAN_SKY = (150, 190, 255)
-MEGAMAN_GRID = (170, 205, 255)
-METAL_LIGHT = (226, 234, 244)
-METAL_MID = (170, 184, 204)
-METAL_DARK = (104, 118, 146)
-HAZARD_RED = (230, 76, 76)
-GOAL_GREEN = (80, 214, 105)
-MEGAMAN_BLUE = (40, 120, 255)
-MEGAMAN_CYAN = (160, 236, 255)
-MEGAMAN_DARK = (8, 40, 112)
-MET_YELLOW = (255, 196, 72)
-BAT_PURPLE = (148, 96, 204)
-SHOT_ORANGE = (255, 182, 92)
-PIT_DARK = (26, 8, 16)
-PIT_ALERT = (196, 56, 84)
+def active_mutant() -> dict | None:
+    """The game mutant this process plays, if PEAK_MM1_MUTANT names one: its record, with `dir`.
+    A mutant swaps the stage file for its own copy, or overrides values of megaman_config.yaml;
+    level names, sections and every command stay the same."""
+    path = os.environ.get(MUTANT_ENV)
+    if not path:
+        return None
+    if os.path.isdir(path):
+        path = os.path.join(path, "mutant.json")
+    import json
+    with open(path, encoding="utf-8") as f:
+        record = json.load(f)
+    record["dir"] = os.path.dirname(os.path.abspath(path))
+    return record
 
 
 @dataclass
-class MegaManPlayer(SharedPlayer):
-    hp: int = 28
-    hp_max: int = 28
-    shot_cooldown: float = 0.0
-    jump_cut: bool = False
-    on_ladder: bool = False
-    ladder_x: float = 0.0
-    color = MEGAMAN_BLUE
-
-    def __post_init__(self):
-        # Mega Man uses the shared Player container/fields, but not Mario's
-        # animation and power-state machines.
-        self.anim_handler = None
-        self.power_machine = None
-        self.fire_requested = False
-        self.iframes_timer = 0.0
-        self.invincible_timer = 0.0
-        self.star_timer = 0.0
-        self.powered_up = False
-        self.coyote = 0
-        self.jump_hold = 0
-        self.jump_buffer = 0
-        self.last_jump_pressed = False
-        self.run_pressed = False
-        self.dt = 1.0
-        self.input_dir = 0
-        self.run_held = False
-        self.jump_pressed = False
+class LevelData:
+    grid: list[list[str]]
+    rows: int
+    cols: int
+    tile: int
+    start: tuple[int, int]
+    goal: tuple[int, int]
+    screens: set            # (sx, sy) of every screen block that holds anything
+    doors: list             # (row, col) of every shutter cell
+    spawns: list            # (glyph, col, row) of every enemy, item and boss placed in the level
 
     @property
-    def i_frames(self) -> float:
-        return float(self.iframes_timer)
-
-    @i_frames.setter
-    def i_frames(self, value: float):
-        self.iframes_timer = float(value)
-
-
-class MegaBusterProjectile(SharedProjectile):
-    WIDTH = 14
-    HEIGHT = 8
-    PLAYER_SPEED = 620.0
-    ENEMY_SPEED = 300.0
-    PLAYER_RANGE = 2.2
-    ENEMY_RANGE = 1.8
-
-    def __init__(self, x: float, y: float, vx: float, owner: str, damage: int, lifetime: float):
-        super().__init__(
-            gObj=GameObject(x, y, self.WIDTH, self.HEIGHT, True),
-            vx=vx,
-            vy=0.0,
-            owner=owner,
-            damage=damage,
-            lifetime=lifetime,
-        )
-
-    @classmethod
-    def from_player(cls, player: MegaManPlayer) -> "MegaBusterProjectile":
-        x = player.gObj.x + (player.gObj.width - 4 if player.facing_right else -cls.WIDTH + 4)
-        y = player.gObj.y + player.gObj.height * 0.45
-        vx = cls.PLAYER_SPEED if player.facing_right else -cls.PLAYER_SPEED
-        return cls(x, y, vx, "player", damage=1, lifetime=cls.PLAYER_RANGE)
-
-    @classmethod
-    def from_enemy(cls, x: float, y: float, facing_right: bool, damage: int = 4) -> "MegaBusterProjectile":
-        vx = cls.ENEMY_SPEED if facing_right else -cls.ENEMY_SPEED
-        return cls(x, y, vx, "enemy", damage=damage, lifetime=cls.ENEMY_RANGE)
-
-    def update(self, dt: float):
-        self.begin_frame()
-        if not self.tick_lifetime(dt):
-            return
-        self.gObj.x += self.vx * dt
-
-    def render(self, surface: pygame.Surface, sx: float, sy: float):
-        if not self.gObj.active:
-            return
-        outer = MEGAMAN_CYAN if self.owner == "player" else SHOT_ORANGE
-        pygame.draw.rect(surface, outer, (sx, sy, self.gObj.width, self.gObj.height), border_radius=4)
-        pygame.draw.rect(surface, (255, 255, 255), (sx + 3, sy + 2, self.gObj.width - 6, self.gObj.height - 4), border_radius=3)
-
-
-class MegaDijkstraSolver:
-    def __init__(self, grid: List[List[int]], rows: int, cols: int, ladders: Set[Tuple[int, int]]):
-        self.grid = grid
-        self.rows = rows
-        self.cols = cols
-        self.ladders = ladders
-        self.dist_map = np.full((rows, cols), float("inf"), dtype=np.float32)
-
-    def compute_map(self, goals: List[Tuple[int, int]]):
-        self.dist_map.fill(float("inf"))
-        if not goals:
-            return
-
-        solids = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
-        pq: list[tuple[float, int, int]] = []
-
-        for gx, gy in goals:
-            if 0 <= gx < self.cols and 0 <= gy < self.rows:
-                self.dist_map[gy, gx] = 0.0
-                heapq.heappush(pq, (0.0, gx, gy))
-
-        directions = [
-            (1, 0), (-1, 0), (0, 1), (0, -1),
-            (1, 1), (-1, 1), (1, -1), (-1, -1),
-        ]
-
-        def has_nearby_support(tx: int, ty: int) -> bool:
-            if (tx, ty) in self.ladders:
-                return True
-            for depth in range(1, 5):
-                ny = ty + depth
-                if ny >= self.rows:
-                    break
-                if self.grid[ny][tx] in solids or (tx, ny) in self.ladders:
-                    return True
-            return False
-
-        while pq:
-            current_dist, cx, cy = heapq.heappop(pq)
-            if current_dist > self.dist_map[cy, cx]:
-                continue
-
-            for dx, dy in directions:
-                nx = cx + dx
-                ny = cy + dy
-                if not (0 <= nx < self.cols and 0 <= ny < self.rows):
-                    continue
-
-                tile = self.grid[ny][nx]
-                if tile in solids or tile == TILE_PIT:
-                    continue
-
-                uses_ladder = (cx, cy) in self.ladders or (nx, ny) in self.ladders
-                if dy < 0:
-                    step_cost = 1.0 if uses_ladder else 3.5
-                elif dy > 0:
-                    step_cost = 1.0 if uses_ladder else 1.25
-                else:
-                    step_cost = 1.9
-
-                if dx != 0 and dy != 0:
-                    step_cost *= 1.12
-
-                if tile == TILE_SPIKE:
-                    step_cost += 14.0
-                if (nx, ny) in self.ladders:
-                    step_cost -= 0.45
-                if not uses_ladder and dy < 0 and not has_nearby_support(nx, ny):
-                    step_cost += 2.5
-                if tile == TILE_AIR and ny + 1 < self.rows and self.grid[ny + 1][nx] in solids:
-                    step_cost -= 0.35
-
-                step_cost = max(0.75, step_cost)
-                new_dist = current_dist + step_cost
-                if new_dist < self.dist_map[ny, nx]:
-                    self.dist_map[ny, nx] = new_dist
-                    heapq.heappush(pq, (new_dist, nx, ny))
-
-    def get_dist(self, x: int, y: int) -> float:
-        if 0 <= x < self.cols and 0 <= y < self.rows:
-            value = self.dist_map[y, x]
-            if math.isfinite(float(value)):
-                return float(value)
-        return -1.0
-
-
-class BaseEnemy(SharedEnemy):
-    def __init__(self, x: float, y: float, width: int, height: int, hp: int = 2):
-        super().__init__(
-            gObj=GameObject(x, y, width, height, True),
-            vx=0.0,
-            vy=0.0,
-            on_ground=False,
-            facing_right=True,
-            hp=hp,
-            hp_max=hp,
-            contact_damage=4,
-        )
-        self.gObj.type_id = EntityType.ENEMY
-
-    def take_damage(self, damage: int) -> bool:
-        self.hp -= damage
-        if self.hp <= 0:
-            self.gObj.active = False
-            return True
-        return False
-
-    def render(self, surface: pygame.Surface, sx: float, sy: float):
-        super().render(surface, sx, sy)
-
-
-class MetEnemy(BaseEnemy):
-    def __init__(self, x: float, y: float):
-        super().__init__(x, y, 28, 24, hp=2)
-        self.vx = 72.0
-        self.shot_timer = 0.8
-
-    def update(self, dt: float, core: "MegamanCore"):
-        self.facing_right = self.vx >= 0
-        self.shot_timer -= dt
-        if self.shot_timer <= 0.0:
-            shot_x = self.gObj.x + (self.gObj.width if self.facing_right else -MegaBusterProjectile.WIDTH)
-            shot_y = self.gObj.y + self.gObj.height * 0.42
-            core.projectiles.append(MegaBusterProjectile.from_enemy(shot_x, shot_y, self.facing_right))
-            self.shot_timer = 1.3
-
-    def render(self, surface: pygame.Surface, sx: float, sy: float):
-        pygame.draw.rect(surface, MET_YELLOW, (sx, sy, self.gObj.width, 12), border_radius=6)
-        pygame.draw.rect(surface, HAZARD_RED, (sx + 3, sy + 9, self.gObj.width - 6, self.gObj.height - 9), border_radius=5)
-        eye_x = sx + (self.gObj.width - 10 if self.facing_right else 4)
-        pygame.draw.rect(surface, (255, 255, 255), (eye_x, sy + 5, 5, 4), border_radius=2)
-
-
-class BatEnemy(BaseEnemy):
-    def __init__(self, x: float, y: float):
-        super().__init__(x, y, 26, 20, hp=1)
-        self.anchor_y = y
-        self.vx = 96.0
-        self.phase = 0.0
-
-    def update(self, dt: float, core: "MegamanCore"):
-        self.phase += dt * 5.0
-        self.facing_right = self.vx >= 0
-        self.gObj.y = self.anchor_y + np.sin(self.phase) * 10.0
-
-    def render(self, surface: pygame.Surface, sx: float, sy: float):
-        pygame.draw.polygon(surface, BAT_PURPLE, [(sx + 4, sy + 10), (sx - 7, sy + 3), (sx + 4, sy + 17)])
-        pygame.draw.polygon(surface, BAT_PURPLE, [(sx + 22, sy + 10), (sx + 33, sy + 3), (sx + 22, sy + 17)])
-        pygame.draw.rect(surface, BAT_PURPLE, (sx + 5, sy + 4, 16, 12), border_radius=6)
-        eye_x = sx + (14 if self.facing_right else 9)
-        pygame.draw.rect(surface, (255, 255, 255), (eye_x, sy + 8, 4, 3), border_radius=1)
-
-
-class BossEnemy(BaseEnemy):
-    def __init__(self, x: float, y: float):
-        super().__init__(x, y, 52, 58, hp=24)
-        self.contact_damage = 6
-        self.vx = -84.0
-        self.shot_timer = 0.7
-        self.jump_timer = 1.4
-        self.name = "BOSS CORE"
-
-    def update(self, dt: float, core: "MegamanCore"):
-        player = core.player
-        if player is not None:
-            dx = player.gObj.x - self.gObj.x
-            self.facing_right = dx >= 0.0
-            if abs(dx) > 28.0:
-                self.vx = 96.0 if dx > 0 else -96.0
-            else:
-                self.vx = 0.0
-
-        self.shot_timer -= dt
-        self.jump_timer -= dt
-        if self.shot_timer <= 0.0 and player is not None:
-            shot_x = self.gObj.x + (self.gObj.width if self.facing_right else -MegaBusterProjectile.WIDTH)
-            # Boss shots should come from its own muzzle height, not snap to the
-            # player's Y position.
-            shot_y = self.gObj.y + self.gObj.height * 0.45
-            core.projectiles.append(MegaBusterProjectile.from_enemy(shot_x, shot_y, self.facing_right, damage=5))
-            self.shot_timer = 0.95
-
-        if self.on_ground and self.jump_timer <= 0.0:
-            self.vy = core.jump_velocity * 0.7
-            self.on_ground = False
-            self.jump_timer = 1.6
-
-    def render(self, surface: pygame.Surface, sx: float, sy: float):
-        pygame.draw.rect(surface, (36, 18, 22), (sx, sy, self.gObj.width, self.gObj.height), border_radius=10)
-        pygame.draw.rect(surface, (236, 108, 90), (sx + 6, sy + 8, self.gObj.width - 12, self.gObj.height - 14), border_radius=10)
-        pygame.draw.rect(surface, MET_YELLOW, (sx + 10, sy + 3, self.gObj.width - 20, 12), border_radius=6)
-        pygame.draw.rect(surface, (88, 28, 32), (sx + 10, sy + self.gObj.height - 16, self.gObj.width - 20, 10), border_radius=5)
-        eye_y = sy + 20
-        if self.facing_right:
-            pygame.draw.rect(surface, (255, 255, 255), (sx + 28, eye_y, 7, 5), border_radius=2)
-            pygame.draw.rect(surface, (255, 255, 255), (sx + 38, eye_y, 7, 5), border_radius=2)
-        else:
-            pygame.draw.rect(surface, (255, 255, 255), (sx + 7, eye_y, 7, 5), border_radius=2)
-            pygame.draw.rect(surface, (255, 255, 255), (sx + 17, eye_y, 7, 5), border_radius=2)
-
-
-class MegaPhysicsManager(PhysicsManager):
-    def __init__(self, core: "MegamanCore"):
-        super().__init__()
-        self.core = core
-        self.gravity = 980.0
-        self.jump_force = 430.0
-
-    def rebuild_dynamic_hashes(self, core: "MegamanCore"):
-        self.hazard_hash.clear()
-        self.collectible_hash.clear()
-        self.platform_hash.clear()
-
-        for enemy in core.enemies:
-            if enemy.gObj.active:
-                self.hazard_hash.insert(enemy)
-        for spike in core.spike_tiles:
-            self.hazard_hash.insert(spike)
-        for pit in core._exposed_pit_objects():
-            self.hazard_hash.insert(pit)
-        for proj in core.projectiles:
-            if proj.gObj.active and proj.owner == "enemy":
-                self.hazard_hash.insert(proj)
-
-        if not core.level_data:
-            return
-
-        for coin in getattr(core.level_data, "coins", []):
-            if coin.gObj.active and not getattr(coin, "collected", False):
-                self.collectible_hash.insert(coin)
-
-        if not core.is_boss_level or core._current_boss() is None:
-            for goal in getattr(core.level_data, "goals", []):
-                if goal.gObj.active:
-                    self.collectible_hash.insert(goal)
-
-    def _tile_rects_for_rect(self, core: "MegamanCore", rect: pygame.Rect):
-        if not core.level_data:
-            return []
-        pad = core.TILE_SIZE * 1.5
-        found = []
-        nearby = core.level_data.static_hash.query_rect(rect.x - pad, rect.y - pad, rect.width + pad * 2, rect.height + pad * 2)
-        for item in nearby:
-            gobj = item.gObj if hasattr(item, "gObj") else item
-            col = int(gobj.x // core.TILE_SIZE)
-            row = int(gobj.y // core.TILE_SIZE)
-            if not (0 <= row < core.level_data.rows and 0 <= col < core.level_data.cols):
-                continue
-            tile_type = core.level_data.grid[row][col]
-            found.append((gobj.get_rect(), tile_type))
-        return found
-
-    def _support_tile_below(self, core: "MegamanCore", actor, epsilon: float = 3.0):
-        rect = actor.gObj.get_rect()
-        probe = pygame.Rect(rect.left + 2, rect.bottom, max(2, rect.width - 4), max(2, int(epsilon) + 1))
-        best = None
-        best_top = None
-        for tile_rect, tile_type in self._tile_rects_for_rect(core, probe):
-            if tile_type == TILE_SPIKE:
-                continue
-            if tile_type == TILE_PLATFORM and rect.bottom > tile_rect.top + epsilon:
-                continue
-            if not probe.colliderect(tile_rect):
-                continue
-            if best is None or tile_rect.top < best_top:
-                best = (tile_rect, tile_type)
-                best_top = tile_rect.top
-        return best
-
-    def _stabilize_ground_contact(self, core: "MegamanCore", actor, epsilon: float = 3.0) -> bool:
-        support = self._support_tile_below(core, actor, epsilon=epsilon)
-        if support is None:
-            actor.on_ground = False
-            return False
-        tile_rect, _tile_type = support
-        actor.gObj.y = tile_rect.top - actor.gObj.height
-        if actor.vy > 0.0:
-            actor.vy = 0.0
-        actor.on_ground = True
-        return True
-
-    def _resolve_actor_y(self, core: "MegamanCore", actor, damage_spikes: bool = False):
-        rect = actor.gObj.get_rect()
-        actor.on_ground = False
-        for tile_rect, tile_type in self._tile_rects_for_rect(core, rect):
-            if not rect.colliderect(tile_rect):
-                continue
-            if tile_type == TILE_SPIKE and damage_spikes and actor is core.player:
-                core._damage_player(actor.hp_max, "Spike")
-                continue
-            if tile_type == TILE_PLATFORM:
-                if actor.vy < 0:
-                    continue
-                if rect.bottom - actor.vy * core.dt > tile_rect.top + 4:
-                    continue
-            if actor.vy >= 0:
-                actor.gObj.y = tile_rect.top - actor.gObj.height
-                actor.vy = 0.0
-                actor.on_ground = True
-            else:
-                actor.gObj.y = tile_rect.bottom
-                actor.vy = 0.0
-            rect = actor.gObj.get_rect()
-
-    def _resolve_actor_x(self, core: "MegamanCore", actor, bounce: bool = False):
-        rect = actor.gObj.get_rect()
-        for tile_rect, tile_type in self._tile_rects_for_rect(core, rect):
-            if tile_type in (TILE_SPIKE, TILE_PLATFORM):
-                continue
-            if not rect.colliderect(tile_rect):
-                continue
-            if actor.vx > 0:
-                actor.gObj.x = tile_rect.left - actor.gObj.width
-                if bounce:
-                    actor.vx = -abs(actor.vx)
-                    actor.facing_right = False
-                else:
-                    actor.vx = 0.0
-            elif actor.vx < 0:
-                actor.gObj.x = tile_rect.right
-                if bounce:
-                    actor.vx = abs(actor.vx)
-                    actor.facing_right = True
-                else:
-                    actor.vx = 0.0
-            rect = actor.gObj.get_rect()
-
-    def update_system(self, dt: float, core: "MegamanCore"):
-        self._update_player(dt, core)
-        self._update_enemies(dt, core)
-        self._update_projectiles(dt, core)
-
-    def _update_player(self, dt: float, core: "MegamanCore"):
-        p = core.player
-        if not p:
-            return
-        p.shot_cooldown = max(0.0, p.shot_cooldown - dt)
-        p.i_frames = max(0.0, p.i_frames - dt)
-        p.invincible_timer = p.i_frames
-        supported = self._stabilize_ground_contact(core, p) if not p.on_ladder else False
-        p.grounded = p.on_ground
-        p.can_jump = p.on_ground or p.on_ladder
-
-        if p.on_ladder:
-            p.gObj.x = p.ladder_x
-            p.gObj.y += p.vy * dt
-            ladder = core._nearest_ladder(p.gObj)
-            if ladder is not None:
-                p.ladder_x = ladder.gObj.x + ladder.gObj.width * 0.5 - p.gObj.width * 0.5
-                p.gObj.x = p.ladder_x
-            else:
-                p.on_ladder = False
-
-            support = self._support_tile_below(core, p, epsilon=8.0)
-            if p.vy < 0.0 and support is not None:
-                tile_rect, _tile_type = support
-                if p.gObj.y + p.gObj.height <= tile_rect.top + 8:
-                    p.on_ladder = False
-                    p.on_ground = True
-                    p.can_jump = True
-                    p.vy = 0.0
-                    p.gObj.y = tile_rect.top - p.gObj.height
-                    core.progress_x_best = max(core.progress_x_best, p.gObj.x)
-                    return
-
-            self._resolve_actor_y(core, p, damage_spikes=True)
-            core.progress_x_best = max(core.progress_x_best, p.gObj.x)
-            return
-
-        if supported and p.vy >= 0.0:
-            p.vy = 0.0
-        else:
-            p.vy = min(p.vy + core.gravity * dt, core.max_fall_speed)
-        p.gObj.y += p.vy * dt
-        self._resolve_actor_y(core, p, damage_spikes=True)
-        p.gObj.x += p.vx * dt
-        self._resolve_actor_x(core, p)
-        self._stabilize_ground_contact(core, p)
-        core.progress_x_best = max(core.progress_x_best, p.gObj.x)
-
-    def _update_enemies(self, dt: float, core: "MegamanCore"):
-        gravity = core.gravity * core.enemy_gravity_mult
-        for enemy in core.enemies:
-            if not enemy.gObj.active:
-                continue
-            enemy.update(dt, core)
-            if isinstance(enemy, (MetEnemy, BossEnemy)):
-                supported = self._stabilize_ground_contact(core, enemy)
-                if supported and enemy.vy >= 0.0:
-                    enemy.vy = 0.0
-                else:
-                    enemy.vy = min(enemy.vy + gravity * dt, core.enemy_max_fall_speed)
-                enemy.gObj.y += enemy.vy * dt
-                self._resolve_actor_y(core, enemy)
-                enemy.gObj.x += enemy.vx * dt
-                self._resolve_actor_x(core, enemy, bounce=True)
-                self._stabilize_ground_contact(core, enemy)
-            elif isinstance(enemy, BatEnemy):
-                enemy.gObj.x += enemy.vx * dt
-                self._resolve_actor_x(core, enemy, bounce=True)
-            else:
-                enemy.gObj.x += enemy.vx * dt
-                self._resolve_actor_x(core, enemy, bounce=True)
-            if enemy.gObj.y > core.level_data.height + 120:
-                enemy.gObj.active = False
-
-    def _update_projectiles(self, dt: float, core: "MegamanCore"):
-        for proj in core.projectiles:
-            if not proj.gObj.active:
-                continue
-            proj.update(dt)
-
-    def _swept_rect(self, proj: MegaBusterProjectile) -> pygame.Rect:
-        prev_rect = pygame.Rect(int(proj.prev_x), int(proj.prev_y), proj.gObj.width, proj.gObj.height)
-        curr_rect = proj.gObj.get_rect()
-        return prev_rect.union(curr_rect)
-
-    def _hit_distance(self, start_x: float, rect: pygame.Rect, direction: float) -> float:
-        hit_x = rect.left if direction >= 0.0 else rect.right
-        return (float(hit_x) - start_x) * direction
-
-    def _resolve_projectile_collisions(self, core: "MegamanCore"):
-        player_rect = core.player.gObj.get_rect() if core.player else None
-
-        for proj in core.projectiles:
-            if not proj.gObj.active:
-                continue
-
-            swept = self._swept_rect(proj)
-            direction = 1.0 if proj.vx >= 0.0 else -1.0
-            start_x = proj.prev_x + proj.gObj.width * 0.5
-
-            world_hit = None
-            for tile_rect, tile_type in self._tile_rects_for_rect(core, swept):
-                if tile_type == TILE_AIR:
-                    continue
-                if not swept.colliderect(tile_rect):
-                    continue
-                dist = self._hit_distance(start_x, tile_rect, direction)
-                if dist < -4.0:
-                    continue
-                if world_hit is None or dist < world_hit[0]:
-                    world_hit = (dist, tile_rect)
-
-            if proj.owner == "player":
-                enemy_hit = None
-                for enemy in core.enemies:
-                    if not enemy.gObj.active:
-                        continue
-                    enemy_rect = enemy.gObj.get_rect()
-                    if not swept.colliderect(enemy_rect):
-                        continue
-                    dist = self._hit_distance(start_x, enemy_rect, direction)
-                    if dist < -4.0:
-                        continue
-                    if enemy_hit is None or dist < enemy_hit[0]:
-                        enemy_hit = (dist, enemy)
-
-                if enemy_hit is not None and (world_hit is None or enemy_hit[0] <= world_hit[0]):
-                    proj.gObj.active = False
-                    enemy = enemy_hit[1]
-                    if enemy.take_damage(proj.damage):
-                        core.enemies_killed_step += 1
-                        core.score += 100
-                    else:
-                        core.score += 20
-                    if isinstance(enemy, BossEnemy):
-                        core.boss_damage_step += proj.damage
-                    continue
-            elif player_rect is not None and swept.colliderect(player_rect):
-                player_dist = self._hit_distance(start_x, player_rect, direction)
-                if world_hit is None or player_dist <= world_hit[0]:
-                    proj.gObj.active = False
-                    core._damage_player(proj.damage, "Projectile")
-                    continue
-
-            if world_hit is not None:
-                proj.gObj.active = False
-
-    def _resolve_actor_contacts(self, core: "MegamanCore"):
-        if not core.player:
-            return
-
-        player_rect = core.player.gObj.get_rect()
-        for enemy in core.enemies:
-            if enemy.gObj.active and player_rect.colliderect(enemy.gObj.get_rect()):
-                core._damage_player(enemy.contact_damage, "Enemy")
-
-    def _check_goal_and_oob(self, core: "MegamanCore"):
-        if not core.player:
-            return
-
-        player_rect = core.player.gObj.get_rect()
-        boss = core._current_boss()
-        if core.is_boss_level:
-            if boss is None:
-                core.reached_goal = True
-                core.alive = False
-                core.last_event = "WIN"
-                core.last_cause = ""
-                core._episode_won_current = True
-                return
-        else:
-            for goal in core.level_data.goals:
-                if player_rect.colliderect(goal.gObj.get_rect()):
-                    core.reached_goal = True
-                    core.alive = False
-                    core.last_event = "WIN"
-                    core.last_cause = ""
-                    core._episode_won_current = True
-                    return
-
-        for pit in core._exposed_pit_objects():
-            if player_rect.colliderect(pit.get_rect()):
-                core.alive = False
-                core.last_cause = "Pit"
-                return
-
-        if core.player.gObj.y > core.level_data.height + 80:
-            core.alive = False
-            core.last_cause = "Pit"
-
-    def resolve_collisions(self, core: "MegamanCore"):
-        self._resolve_projectile_collisions(core)
-        self.rebuild_dynamic_hashes(core)
-        self._resolve_actor_contacts(core)
-        self._check_goal_and_oob(core)
-        core.projectiles = [proj for proj in core.projectiles if proj.gObj.active]
-        core.enemies = [enemy for enemy in core.enemies if enemy.gObj.active]
-        core.level_data.enemies = core.enemies
-        core.level_data.projectiles = core.projectiles
-
-
-class MegamanCore(gymnasium.Env):
-    metadata = {"render_modes": ["none", "human", "rgb_array"]}
-
-    def _apply_physics_config(self, physics_cfg: dict | None, enemy_cfg: dict | None = None):
-        physics_cfg = physics_cfg or {}
-        enemy_cfg = enemy_cfg or physics_cfg.get("enemies", {}) or {}
-        friction_cfg = physics_cfg.get("friction", 2600.0)
-        if isinstance(friction_cfg, dict):
-            friction_value = float(friction_cfg.get("ground", 2600.0))
-        else:
-            friction_value = float(friction_cfg)
-        self.walk_speed = float(physics_cfg.get("walk_speed", getattr(self, "walk_speed", 240.0)))
-        self.run_speed = float(physics_cfg.get("run_speed", getattr(self, "run_speed", 320.0)))
-        self.accel = float(physics_cfg.get("accel", getattr(self, "accel", 2800.0)))
-        self.friction = friction_value
-        self.jump_velocity = float(physics_cfg.get("jump_velocity", getattr(self, "jump_velocity", -560.0)))
-        self.climb_speed = float(physics_cfg.get("climb_speed", getattr(self, "climb_speed", 190.0)))
-        self.gravity = float(physics_cfg.get("gravity", getattr(self, "gravity", 1500.0)))
-        self.max_fall_speed = float(physics_cfg.get("max_fall_speed", getattr(self, "max_fall_speed", 900.0)))
-        self.i_frame_duration = float(physics_cfg.get("i_frame_duration", getattr(self, "i_frame_duration", 0.75)))
-        self.hp_max = int(physics_cfg.get("hp_max", getattr(self, "hp_max", 28)))
-        self.shot_cooldown_time = float(physics_cfg.get("shot_cooldown", getattr(self, "shot_cooldown_time", 0.16)))
-        self.max_player_shots = int(physics_cfg.get("max_player_shots", getattr(self, "max_player_shots", 3)))
-        self.fire_buffer_time = float(physics_cfg.get("fire_buffer", getattr(self, "fire_buffer_time", 0.12)))
-        self.enemy_gravity_mult = float(enemy_cfg.get("gravity_mult", getattr(self, "enemy_gravity_mult", 1.0)))
-        self.enemy_max_fall_speed = float(enemy_cfg.get("max_fall_speed", getattr(self, "enemy_max_fall_speed", 760.0)))
-        self.physics_manager.gravity = self.gravity
-        self.physics_manager.jump_force = abs(self.jump_velocity)
-        MegaBusterProjectile.PLAYER_SPEED = float(physics_cfg.get("bullet_speed", getattr(MegaBusterProjectile, "PLAYER_SPEED", 760.0)))
-        MegaBusterProjectile.ENEMY_SPEED = float(enemy_cfg.get("bullet_speed", getattr(MegaBusterProjectile, "ENEMY_SPEED", MegaBusterProjectile.PLAYER_SPEED * 0.58)))
-        if getattr(self, "player", None) is not None:
-            self.player.hp_max = self.hp_max
-            self.player.hp = min(self.player.hp, self.player.hp_max)
-
-    def __init__(self, render_mode: str = "none", **kwargs):
+    def width(self) -> float:
+        return float(self.cols * self.tile)
+
+    @property
+    def height(self) -> float:
+        return float(self.rows * self.tile)
+
+
+@dataclass
+class Player:
+    x: float
+    y: float
+    width: int
+    height: int
+    vx: float = 0.0
+    vy: float = 0.0
+    facing: int = 1             # +1 right, -1 left
+    grounded: bool = False
+    climbing: bool = False
+    hp: int = 28
+    hp_max: int = 28
+    moving_frames: int = 0      # frames the pad has been held on the ground (the first-step inch)
+    slide_frames: int = 0       # frames of slide left after letting go
+    blink: int = 0              # frames of invulnerability left after a hit
+    knock: int = 0              # frames of knockback left (no control)
+    knock_dir: int = 0
+    shoot_timer: int = 0        # frames the arm stays out after a shot (animation only)
+
+
+@dataclass
+class Shot:
+    x: float
+    y: float
+    vx: float
+
+
+def parse_level(rows: list[str], sc: int, sr: int, tile: int, where: str = "level") -> LevelData:
+    """A stage file's lines as the game sees them: sc x sr-tile screens, air, start, exits, spawns."""
+    rows = list(rows)
+    while rows and not rows[-1].strip():
+        rows.pop()
+    cols = max(len(r) for r in rows)
+    grid = [list(r.ljust(cols, VOID)) for r in rows]
+    screens = {(x // sc, y // sr) for y, row in enumerate(grid) for x, ch in enumerate(row) if ch != VOID}
+    start = goal = None
+    doors, spawns = [], []
+    placed = en.ENEMY_GLYPHS + en.ITEM_GLYPHS + en.BOSS_GLYPH
+    for y, row in enumerate(grid):
+        for x, ch in enumerate(row):
+            if ch == VOID and (x // sc, y // sr) in screens:
+                row[x] = AIR                       # the editor writes air as a blank
+            elif ch == START:
+                start = (x, y); row[x] = AIR
+            elif ch == GOAL:
+                goal = (x, y)
+            elif ch == DOOR:
+                doors.append((y, x))
+            elif ch in placed:
+                spawns.append((ch, x, y)); row[x] = AIR
+    if start is None or (goal is None and not any(g == en.BOSS_GLYPH for g, _, _ in spawns)):
+        raise ValueError(f"{where}: needs one P, and a G or a boss (X) to end on")
+    return LevelData(grid, len(grid), cols, tile, start, goal, screens, doors, spawns)
+
+
+class MegamanCore:
+    WIDTH, HEIGHT = 16 * 32, 15 * 32   # one NES screen at 2x
+
+    def __init__(self, render_mode: str = "none", max_steps=None, level_idx: int = 0, seed: int = 0,
+                 level_file: str | None = None, invincible: bool = False, level: str | None = None) -> None:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            self.cfg = yaml.safe_load(f)
+        self.mutant = active_mutant()
+        for key, value in ((self.mutant or {}).get("config") or {}).items():   # "player.gravity": 0.3
+            node = self.cfg
+            *parents, leaf = key.split(".")
+            for k in parents:
+                node = node[k]
+            node[leaf] = value
+        with open(LEVELS_PATH, encoding="utf-8") as f:   # {id: {file: ...}} in campaign order
+            self.levels = list(((yaml.safe_load(f) or {}).get("levels") or {}).items())
+        self._level_file = level_file                    # an unlisted file (the editor's Play button)
+        self.invincible = invincible                     # debug: enemies, shots and spikes do no damage
+        ac = self.cfg.get("assets") or {}
+        self.assets = Assets.get(ac, int(self.cfg["tile_size"]) / 16.0) if ac.get("enabled", True) else None
+        self.sfx_events: list[str] = []                  # this frame's sounds, played by render()
         self.render_mode = render_mode
-        self.config_manager = ConfigManager("game_config.yaml")
-        self.raw_config = self.config_manager.yaml_data.get("megaman", {})
-        physics_cfg = self.raw_config.get("physics", {}) or {}
+        self.tile_size = int(self.cfg["tile_size"])
+        self.scale = self.tile_size / 16.0          # world px per NES px
+        self.fps = int(self.cfg.get("fps", 60))
+        self.dt = 1.0 / self.fps
+        self.max_steps = int(max_steps) if max_steps else int(self.cfg.get("time_limit", 300) * self.fps)
+        self.screen_cols = int(self.cfg["screen"]["cols"])
+        self.screen_rows = int(self.cfg["screen"]["rows"])
+        self.WIDTH = self.screen_cols * self.tile_size
+        self.HEIGHT = self.screen_rows * self.tile_size
+        self._level_idx = self.level_index(level) if level is not None else level_idx
+        self._seed = seed
+        self.rng = random.Random(seed)
+        self._font = None
+        self.won = False
+        self.reset()
 
-        self.WIDTH = int(self.raw_config.get("screen_width", 960))
-        self.HEIGHT = int(self.raw_config.get("screen_height", 600))
-        self.FPS = int(self.raw_config.get("fps", 60))
-        self.TILE_SIZE = int(self.raw_config.get("tile_size", 32))
-        self.TOTAL_WIDTH = self.WIDTH + DEBUG_PANEL_WIDTH
-        self.DEBUG_PANEL_X = self.WIDTH
-        self.obs_mode = "dict"
+    # ── level ────────────────────────────────────────────────────────────────
+    def level_entry(self, idx: int | None = None) -> dict:
+        """Levels are addressed by position in megaman_levels.yaml (menu / --level N)."""
+        idx = self._level_idx if idx is None else idx
+        if not 0 <= idx < len(self.levels):
+            raise IndexError(f"megaman level {idx} out of range (0..{len(self.levels) - 1})")
+        name, entry = self.levels[idx]
+        return {"id": name, **(entry if isinstance(entry, dict) else {"file": entry})}
 
-        self.action_space = spaces.MultiDiscrete([5, 3, 2, 2])
-        self.observation_space = spaces.Dict({
-            "grids": spaces.Box(low=-1.0, high=1.0, shape=(4, 21, 21), dtype=np.float32),
-            "scalars": spaces.Box(low=-np.inf, high=np.inf, shape=(24,), dtype=np.float32),
-        })
+    def level_index(self, level) -> int:
+        """A level id (its name in megaman_levels.yaml) or its position in that list."""
+        names = [name for name, _ in self.levels]
+        if str(level) in names:
+            return names.index(str(level))
+        if str(level).isdigit() and int(level) < len(names):
+            return int(level)
+        raise ValueError(f"unknown megaman level '{level}' (levels: {', '.join(names)})")
 
-        self.loader = LevelLoader(tile_size=self.TILE_SIZE)
-        pygame.init()
-        self.debug_manager = DebugManager(
-            default_active=(render_mode == "human"),
-            print_help=(render_mode == "human"),
-            sensor_mode="shot",
-        )
-        self.debug_manager.show_grid = False
+    def art_entry(self) -> dict:
+        """The level entry that says which stage's art to draw (an unlisted file borrows the
+        entry of the listed level with the same file name)."""
+        if not self._level_file:
+            return self.level_entry()
+        base = os.path.basename(self._level_file)
+        return next((e for _, e in self.levels if isinstance(e, dict) and os.path.basename(e.get("file", "")) == base), {})
 
-        if self.render_mode == "human":
-            pygame.display.set_caption("PEAK Mega Man")
-            self._surf = pygame.display.set_mode((self.TOTAL_WIDTH, self.HEIGHT))
-        else:
-            self._surf = pygame.Surface((self.TOTAL_WIDTH, self.HEIGHT))
+    def level_file(self, idx: int | None = None) -> str:
+        if self._level_file and idx is None:
+            return self._level_file
+        file = self.level_entry(idx)["file"]
+        m = self.mutant or {}
+        if m.get("level_file") and m.get("base_file") == file:      # the mutant's copy of this stage
+            return os.path.join(m["dir"], m["level_file"])
+        return os.path.join(_HERE, "levels", file)
 
-        self.ui_font = pygame.font.SysFont("segoeui", 20, bold=True)
-        self.small_font = pygame.font.SysFont("consolas", 16)
+    def _load_level(self) -> LevelData:
+        with open(self.level_file(), encoding="utf-8") as f:
+            rows = [r.rstrip("\n") for r in f]
+        return parse_level(rows, self.screen_cols, self.screen_rows, self.tile_size, self.level_file())
 
-        self.player: MegaManPlayer | None = None
-        self.level_data = None
-        self.enemies: List[BaseEnemy] = []
-        self.projectiles: List[MegaBusterProjectile] = []
-        self.source_lines: List[str] = []
-        self.spike_tiles: List[object] = []
-        self.ladder_tiles: Set[Tuple[int, int]] = set()
-        self.physics_manager = MegaPhysicsManager(self)
-        self.level_meta: dict = {}
-        self.is_boss_level = False
-        self.shot_cooldown_time = 0.16
-        self.max_player_shots = 3
-        self.fire_buffer_time = 0.12
-        self.fire_buffer = 0.0
-        self._apply_physics_config(physics_cfg)
-
-        config_levels = self.raw_config.get("levels", {}) or {}
-        self.level_order = list(config_levels.keys())
-        default_world = self.level_order[0] if self.level_order else "MM-Stage1"
-        self.world = str(kwargs.get("world", default_world))
-        self.current_index_world = 0
-        self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
-        self._refresh_level_order()
-        self._curriculum_window_size = int(kwargs.pop("curriculum_window", 5))
-        self._batch_window = int(kwargs.pop("batch_window", 10))
-        self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
-        self._batch_fallback_threshold = float(kwargs.pop("fallback_threshold", 0.20))
-        self._max_stay_windows = int(kwargs.pop("max_stay_windows", 3))
-        self._review_prob = float(kwargs.pop("review_prob", 0.25))
-        self.curriculum_enabled = bool(kwargs.pop("curriculum_enabled", True))
-        self._curriculum_position = max(0, min(int(kwargs.pop("start_unlocked", 0)), max(0, len(self.level_order) - 1)))
-        self._max_unlocked_index = self._curriculum_position
-        self._batch_results: List[bool] = []
-        self._episode_won_current = False
-        self._is_review_episode = False
-        self._windows_on_level = 0
-        self._consecutive_fallbacks = {}
-        self._level_visits = {lvl: 0 for lvl in self.level_order}
-        self._level_wins = {lvl: 0 for lvl in self.level_order}
-        self._level_window = {
-            lvl: deque(maxlen=self._curriculum_window_size)
-            for lvl in self.level_order
-        }
-        self.camera_x = 0.0
-        self.camera_y = 0.0
-        self.steps = 0
-        max_steps_cfg = kwargs.pop("max_steps", self.raw_config.get("episode", {}).get("max_steps", 3000))
-        self.max_steps = None if max_steps_cfg is None else int(max_steps_cfg)
-        self.time_limit = 400.0
-        self.lives = 3
+    def reset(self, *, seed=None, options=None):
+        if self.won and not self._level_file:  # beating a level advances to the next (wrapping)
+            self._level_idx = (self._level_idx + 1) % len(self.levels)
+        if seed is not None:
+            self._seed = seed
+        self.rng = random.Random(self._seed)
+        self.level_data = self._load_level()
+        self._art = self.art_entry()
+        ts, s = self.tile_size, self.scale
+        pc = self.cfg["player"]
+        self.k = {name: float(pc[name]) * s for name in (
+            "run_speed", "air_speed", "step_speed", "slide_speed", "jump_velocity", "jump_cut_velocity",
+            "gravity", "max_fall_speed", "ladder_speed", "ladder_mount_drop",
+            "knockback_speed", "knockback_hop")}
+        self.hurt_blink = int(pc.get("hurt_invulnerable_frames", 111))
+        self.knock_frames = int(pc.get("knockback_frames", 29))
+        self.step_frames = int(pc.get("step_frames", 7))
+        self.slide_frames = int(pc.get("slide_frames", 8))
+        w, h = int(pc["width"] * s), int(pc["height"] * s)
+        sec = (self.level_entry().get("section") or {}) if not self._level_file else {}
+        tx, ty = sec.get("start") or self.level_data.start
+        self.player = Player(tx * ts + (ts - w) / 2, (ty + 1) * ts - h, w, h,
+                             hp=int(pc.get("hp", 28)), hp_max=int(pc.get("hp", 28)))
+        self.player.climbing = bool(sec.get("climbing"))     # a section entered up a ladder starts on it
+        if self.player.climbing:
+            # ... and where the full stage hands it over: the screen flips as the body's centre
+            # crosses the edge between the two screens, not once its feet are in the start tile
+            edge = (ty // self.screen_rows + 1) * self.screen_rows * ts
+            self.player.y = edge - self.k["ladder_speed"] - h / 2.0
+        self.goal_screens = {tuple(s) for s in sec.get("goal_screens") or []}
+        for (r, c) in self.level_data.doors:                 # shutters already behind the player are shut
+            if r // self.screen_rows == ty // self.screen_rows and c < tx:
+                self.level_data.grid[r][c] = DOOR_SHUT
+        bc = self.cfg["buster"]
+        self.shot_speed = float(bc["speed"]) * s
+        self.max_shots = int(bc["max_shots"])
+        self.shot_size = (int(bc["size"][0] * s), int(bc["size"][1] * s))
+        self.shots: list[Shot] = []
+        n = len(self.level_data.spawns)
+        self.enemies: list[en.Enemy] = []
+        self.enemy_bullets: list[en.Bullet] = []
+        self.items: list[en.Item] = []
+        self._live = [None] * n         # the enemy each spawn point currently owns
+        self._in_view = [False] * n     # a point re-arms only by leaving the screen and coming back
+        self._taken = set()             # placed items already collected
+        self._room = None
+        self.boss: en.Enemy | None = None
+        self.boss_cutter: en.RollingCutter | None = None
+        self.boss_intro = 0             # frames of the boss-room intro left (no control)
+        self.boss_dead = False
+        self.fx: list[list] = []        # [x, y, frames left] of each explosion puff
+        self.sfx("start")
+        self.screen = (tx // self.screen_cols, ty // self.screen_rows)
+        self.player.grounded = not self.player.climbing and \
+            self._floor_under(self.player.y + h + 1.0, self.player.y + h) is not None
+        self.camera_x, self.camera_y = self._camera_target()
+        self.scroll_step = float(self.cfg.get("scroll_speed", 4.0)) * s
+        self._prev_jump = self._prev_fire = False
+        self.boss_damage = 0            # hit points taken off the boss this attempt
         self.score = 0
         self.coins_total = 0
-        self.reached_goal = False
+        self.kills_total = 0
+        self.timer = float(self.cfg.get("time_limit", 300))
+        self.won = False
         self.alive = True
-        self.dt = 1.0 / float(self.FPS)
-        self.last_action = [0, 0, 0, 0]
-        self.frame = 0
-        self.timer = self.time_limit
-        self.persona = str(kwargs.pop("persona", "simple")).lower()
-        if self.persona == "default":
-            self.persona = "simple"
-        self.arch_tag = str(kwargs.pop("arch_tag", "mlp")).lower()
-        self.progress_x_best = 0.0
-        self.stall_timer = 0.0
-        self.stall_windows_count = 0
-        self.stalled_this_frame = False
-        self.obs_width = 21
-        self.obs_height = 21
-        self.obs_pad_x = self.obs_width // 2
-        self.obs_pad_y = self.obs_height // 2
-        self._visit_map = None
-        self._dijkstra_window_cache = None
-        self._solid_window_cache = None
-        self._hazard_window_cache = None
-        self._step_dx = 0.0
-        self._step_dy = 0.0
-        self.dijkstra = None
-        self.dijkstra_current_tile = -1.0
-        self.num_rays = 1
-        self.ray_max_dist = 240.0
-        self.ray_step = 8.0
-        self.ray_angles = np.array([0.0], dtype=np.float32)
-        self.last_rays = []
-        self.last_event = ""
-        self.last_cause = ""
-        self.enemies_killed_step = 0
-        self.boss_damage_step = 0
-        self.damage_taken_step = 0
-        self._prev_goal_dist = 0.0
-        self.max_x_seen = 0.0
-        self._obs_check_interval = 1
-        self._obs_check_counter = 0
-        self._obs_stats = {
-            "grid_solid_mean": 0.0,       "grid_solid_std": 0.0,
-            "grid_solid_min": 0.0,        "grid_solid_max": 0.0,
-            "grid_collectible_mean": 0.0, "grid_collectible_std": 0.0,
-            "grid_collectible_min": 0.0,  "grid_collectible_max": 0.0,
-            "grid_hazard_mean": 0.0,      "grid_hazard_std": 0.0,
-            "grid_hazard_min": 0.0,       "grid_hazard_max": 0.0,
-            "grid_dijkstra_mean": 0.0,    "grid_dijkstra_std": 0.0,
-            "grid_dijkstra_min": 0.0,     "grid_dijkstra_max": 0.0,
-            "scalar_mean": 0.0, "scalar_std": 0.0,
-            "scalar_min": 0.0,  "scalar_max": 0.0,
-            "dijkstra_val": 0.0, "obs_warnings": "",
-        }
-
-    def _hazard_objects(self):
-        hazards = []
-        hazards.extend(self.enemies)
-        hazards.extend(self.spike_tiles)
-        if self.level_data:
-            hazards.extend(self._exposed_pit_objects())
-        hazards.extend(
-            proj for proj in self.projectiles
-            if getattr(proj.gObj, "active", True) and proj.owner == "enemy"
-        )
-        return hazards
-
-    def _collectible_objects(self):
-        if not self.level_data:
-            return []
-        items = list(getattr(self.level_data, "coins", []))
-        if not self.is_boss_level or self._current_boss() is None:
-            items.extend(list(getattr(self.level_data, "goals", [])))
-        return items
-
-    def _levels_config(self) -> dict:
-        levels = {}
-        for level_id, cfg in (self.raw_config.get("levels", {}) or {}).items():
-            if isinstance(cfg, dict):
-                levels[str(level_id)] = cfg
-
-        injected_levels = self.config_manager.yaml_data.get("levels", {}) or {}
-        for level_id, cfg in injected_levels.items():
-            if not isinstance(cfg, dict):
-                continue
-            level_file = str(cfg.get("file", ""))
-            if os.path.isabs(level_file) or str(level_id).startswith("__editor_"):
-                levels[str(level_id)] = cfg
-        return levels
-
-    def _refresh_level_order(self):
-        levels = self._levels_config()
-        self.level_order = list(levels.keys())
-        if self.locked_level:
-            self.locked_level = self._resolve_level_key(self.locked_level)
-        resolved_world = self._resolve_level_key(self.world)
-        if self.level_order:
-            if resolved_world not in self.level_order:
-                resolved_world = self.level_order[0]
-            self.world = resolved_world
-            self.current_index_world = self.level_order.index(self.world)
-        else:
-            self.world = resolved_world
-            self.current_index_world = 0
-
-    def _select_level_for_reset(self, won_previous: bool):
-        self._refresh_level_order()
-        if self.locked_level:
-            self.world = self.locked_level
-            if self.locked_level in self.level_order:
-                self.current_index_world = self.level_order.index(self.locked_level)
-            else:
-                self.current_index_world = 0
-            self._episode_won_current = False
-            self._is_review_episode = False
-            return
-        if not self.level_order:
-            return
-
-        if not self.curriculum_enabled:
-            if self.world in self.level_order:
-                self.current_index_world = self.level_order.index(self.world)
-            else:
-                self.current_index_world = 0
-            if won_previous and len(self.level_order) > 1:
-                self.current_index_world = (self.current_index_world + 1) % len(self.level_order)
-            self.world = self.level_order[self.current_index_world]
-            self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
-            self._episode_won_current = False
-            self._is_review_episode = False
-            return
-
-        completed_level = self.world if self.world in self.level_order else self.level_order[self.current_index_world]
-        self._level_window.setdefault(completed_level, deque(maxlen=self._curriculum_window_size)).append(1 if won_previous else 0)
-        if won_previous:
-            self._level_wins[completed_level] = self._level_wins.get(completed_level, 0) + 1
-
-        if not self._is_review_episode:
-            self._batch_results.append(bool(won_previous))
-        if len(self._batch_results) >= self._batch_window:
-            self._evaluate_curriculum_batch()
-
-        self._episode_won_current = False
-        self._is_review_episode = False
-        self._curriculum_position = max(0, min(self._curriculum_position, len(self.level_order) - 1))
-        self._max_unlocked_index = max(self._max_unlocked_index, self._curriculum_position)
-
-        if self._curriculum_position > 0 and random.random() < self._review_prob:
-            self.current_index_world = random.randint(0, self._curriculum_position - 1)
-            self._is_review_episode = True
-        else:
-            self.current_index_world = self._curriculum_position
-
-        self.world = self.level_order[self.current_index_world]
-        self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
-
-    def _evaluate_curriculum_batch(self):
-        wins = sum(1 for r in self._batch_results if r)
-        total = len(self._batch_results)
-        if total <= 0 or not self.level_order:
-            self._batch_results.clear()
-            return
-
-        win_rate = wins / total
-        pos = max(0, min(self._curriculum_position, len(self.level_order) - 1))
-        consec_fb = self._consecutive_fallbacks.get(pos, 0)
-        effective_advance = self._batch_advance_threshold
-        if consec_fb >= 2:
-            effective_advance = max(0.10, effective_advance - 0.10)
-
-        if win_rate >= effective_advance and pos < len(self.level_order) - 1:
-            self._curriculum_position += 1
-            self._windows_on_level = 0
-            self._consecutive_fallbacks[pos] = 0
-            self._max_unlocked_index = max(self._max_unlocked_index, self._curriculum_position)
-        elif win_rate <= self._batch_fallback_threshold and pos > 0:
-            self._curriculum_position -= 1
-            self._windows_on_level = 0
-            self._consecutive_fallbacks[pos] = consec_fb + 1
-        else:
-            self._windows_on_level += 1
-            if self._windows_on_level >= self._max_stay_windows and pos > 0:
-                self._curriculum_position -= 1
-                self._windows_on_level = 0
-
-        self._batch_results.clear()
-
-    def _curriculum_win_rate(self) -> float:
-        if self.world not in self._level_window or not self._level_window[self.world]:
-            return -1.0
-        window = self._level_window[self.world]
-        return float(sum(window) / len(window))
-
-    def _resolve_level_key(self, level_id: str) -> str:
-        levels = self._levels_config()
-        if level_id in levels:
-            return level_id
-        level_id_lower = str(level_id).lower()
-        for key in levels:
-            if str(key).lower() == level_id_lower:
-                return str(key)
-        return str(level_id)
-
-    def _level_config(self) -> dict:
-        resolved = self._resolve_level_key(self.world)
-        levels = self._levels_config()
-        if resolved in levels:
-            self.world = resolved
-        return levels.get(self.world, {"file": "megaman/mm_stage1.txt"})
-
-    def _level_file_path(self) -> str:
-        level_file = self._level_config().get("file", "megaman/mm_stage1.txt")
-        return self.loader.resolve_level_path(level_file)
-
-    def _load_source_lines(self) -> List[str]:
-        path = self._level_file_path()
-        if not os.path.isfile(path):
-            return []
-        with open(path, "r", encoding="utf-8") as fh:
-            return [line.rstrip("\n") for line in fh]
-
-    def _goal_metrics(self) -> Tuple[float, float, float]:
-        if not self.player or not self.level_data:
-            return 0.0, 0.0, 0.0
-
-        target = None
-        if self.is_boss_level:
-            target = self._current_boss()
-        if target is None and self.level_data.goals:
-            target = min(
-                self.level_data.goals,
-                key=lambda g: abs(g.gObj.x - self.player.gObj.x) + abs(g.gObj.y - self.player.gObj.y),
-            )
-        if target is None:
-            return 0.0, 0.0, 0.0
-
-        goal_dx = target.gObj.x - self.player.gObj.x
-        goal_dy = target.gObj.y - self.player.gObj.y
-        path_norm = self._normalized_dijkstra()
-        if path_norm >= 0.0:
-            return goal_dx, goal_dy, path_norm
-        norm = (abs(goal_dx) + abs(goal_dy)) / max(1.0, self.level_data.width + self.level_data.height)
-        return goal_dx, goal_dy, float(np.clip(norm, 0.0, 1.0))
-
-    def _is_cover_tile(self, tile: int) -> bool:
-        return tile in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK)
-
-    def _is_exposed_pit_tile(self, tile_x: int, tile_y: int) -> bool:
-        if not self.level_data:
-            return False
-        if not (0 <= tile_x < self.level_data.cols and 0 <= tile_y < self.level_data.rows):
-            return False
-        if self.level_data.grid[tile_y][tile_x] != TILE_PIT:
-            return False
-        if tile_y == 0:
-            return True
-        return not self._is_cover_tile(self.level_data.grid[tile_y - 1][tile_x])
-
-    def _exposed_pit_objects(self):
-        if not self.level_data:
-            return []
-        out = []
-        for pit in getattr(self.level_data, "pits", []):
-            tx = int(pit.x // self.TILE_SIZE)
-            ty = int(pit.y // self.TILE_SIZE)
-            if self._is_exposed_pit_tile(tx, ty):
-                out.append(pit)
-        return out
-
-    def _ladder_tiles(self) -> Set[Tuple[int, int]]:
-        ladder_tiles: Set[Tuple[int, int]] = set()
-        for ladder in getattr(self.level_data, "ladders", []):
-            c0 = int(ladder.gObj.x // self.TILE_SIZE)
-            c1 = int((ladder.gObj.x + ladder.gObj.width - 1) // self.TILE_SIZE)
-            r0 = int(ladder.gObj.y // self.TILE_SIZE)
-            r1 = int((ladder.gObj.y + ladder.gObj.height - 1) // self.TILE_SIZE)
-            for row in range(r0, r1 + 1):
-                for col in range(c0, c1 + 1):
-                    ladder_tiles.add((col, row))
-        return ladder_tiles
-
-    def _build_dijkstra_map(self):
-        self.dijkstra = None
-        self.dijkstra_current_tile = -1.0
-        if not self.level_data:
-            return
-
-        goal_positions = []
-        if self.is_boss_level:
-            boss = self._current_boss()
-            if boss is not None:
-                goal_positions.append(
-                    (int(boss.gObj.x // self.TILE_SIZE), int(boss.gObj.y // self.TILE_SIZE))
-                )
-        if not goal_positions:
-            goal_positions = [
-                (int(goal.gObj.x // self.TILE_SIZE), int(goal.gObj.y // self.TILE_SIZE))
-                for goal in self.level_data.goals
-            ]
-        if not goal_positions:
-            return
-
-        self.dijkstra = MegaDijkstraSolver(
-            self.level_data.grid,
-            self.level_data.rows,
-            self.level_data.cols,
-            self.ladder_tiles,
-        )
-        self.dijkstra.compute_map(goal_positions)
-
-    def _dijkstra_norm_scale(self) -> float:
-        return max(1.0, self.level_data.cols * 2.4, self.level_data.rows * 3.5)
-
-    def _normalized_dijkstra(self, tile_x: int | None = None, tile_y: int | None = None) -> float:
-        if not self.player or not self.level_data or self.dijkstra is None:
-            return -1.0
-        if tile_x is None:
-            tile_x = int(self.player.gObj.x // self.TILE_SIZE)
-        if tile_y is None:
-            tile_y = int(self.player.gObj.y // self.TILE_SIZE)
-        dist = self.dijkstra.get_dist(tile_x, tile_y)
-        if dist < 0.0:
-            return -1.0
-        return float(np.clip(dist / self._dijkstra_norm_scale(), 0.0, 1.0))
-
-    def _player_muzzle_world(self) -> Tuple[float, float]:
-        if not self.player:
-            return 0.0, 0.0
-        p = self.player
-        muzzle_x = p.gObj.x + (p.gObj.width + 2 if p.facing_right else -2)
-        muzzle_y = p.gObj.y + p.gObj.height * 0.5
-        return float(muzzle_x), float(muzzle_y)
-
-    def get_jump_arc_debug_state(self) -> dict:
-        if not self.player:
-            return {}
-        p = self.player
-        origin_x = p.gObj.x + p.gObj.width * 0.5
-        origin_y = p.gObj.y + p.gObj.height
-        grounded = bool(p.on_ground)
-        can_jump = bool(p.on_ground or p.on_ladder)
-        preview_jump = grounded and can_jump
-        if preview_jump:
-            preview_vx = p.vx if abs(p.vx) > 10.0 else (self.run_speed * 0.55 if p.facing_right else -self.run_speed * 0.55)
-            preview_vy = self.jump_velocity
-        else:
-            preview_vx = p.vx
-            preview_vy = p.vy
-        return {
-            "x": float(origin_x),
-            "y": float(origin_y),
-            "vx": float(preview_vx),
-            "vy": float(preview_vy),
-            "grounded": grounded,
-            "can_jump": can_jump,
-            "preview_jump": preview_jump,
-            "color": MEGAMAN_CYAN,
-        }
-
-    def _cast_debug_rays(self):
-        self.last_rays = []
-        if not self.player or not self.level_data:
-            return
-
-        start_x, start_y = self._player_muzzle_world()
-        dx = 1.0 if self.player.facing_right else -1.0
-        dy = 0.0
-        end_x = start_x + dx * self.ray_max_dist
-        end_y = start_y
-        found = False
-
-        dist = 0.0
-        while dist <= self.ray_max_dist:
-            wx = start_x + dx * dist
-            wy = start_y
-            tx = int(wx // self.TILE_SIZE)
-            ty = int(wy // self.TILE_SIZE)
-
-            if not (0 <= tx < self.level_data.cols and 0 <= ty < self.level_data.rows):
-                end_x, end_y = wx, wy
-                break
-
-            tile = self.level_data.grid[ty][tx]
-            enemy_hit = any(
-                enemy.gObj.active and enemy.gObj.get_rect().collidepoint(wx, wy)
-                for enemy in self.enemies
-            )
-            wall_hit = tile in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK)
-            spike_hit = tile == TILE_SPIKE
-            pit_hit = tile == TILE_PIT and self._is_exposed_pit_tile(tx, ty)
-            if enemy_hit or wall_hit or spike_hit or pit_hit:
-                end_x, end_y = wx, wy
-                found = True
-                break
-
-            dist += self.ray_step
-
-        self.last_rays.append(((start_x, start_y), (end_x, end_y), found, 0.0))
-
-    def _spawn_enemies(self):
-        self.enemies = []
-        placeholders = list(getattr(self.level_data, "enemies", []))
-        for enemy in placeholders:
-            tag = str(getattr(enemy, "spawn_tag", "enemy")).lower()
-            x = float(enemy.gObj.x)
-            y = float(enemy.gObj.y)
-            if tag == "met":
-                self.enemies.append(MetEnemy(x, y))
-            elif tag == "bat":
-                self.enemies.append(BatEnemy(x, y))
-            elif tag == "boss":
-                self.enemies.append(BossEnemy(x, y))
-            else:
-                self.enemies.append(MetEnemy(x, y))
-
-    def _current_boss(self) -> BossEnemy | None:
-        for enemy in self.enemies:
-            if isinstance(enemy, BossEnemy) and enemy.gObj.active:
-                return enemy
-        return None
-
-    def load_level(self):
-        self.source_lines = self._load_source_lines()
-        self.level_data = self.loader.load_level(self._level_config().get("file", "megaman/mm_stage1.txt"))
-        level_yaml = os.path.splitext(self._level_file_path())[0] + ".yaml"
-        self.level_meta = {}
-        self.is_boss_level = False
-        if os.path.isfile(level_yaml):
-            try:
-                with open(level_yaml, "r", encoding="utf-8") as fh:
-                    sidecar = yaml.safe_load(fh) or {}
-                self.level_meta = sidecar
-                self.is_boss_level = bool(sidecar.get("boss_level", False))
-                self._apply_physics_config(sidecar.get("physics", {}) or {})
-            except Exception:
-                self.level_meta = {}
-                self.is_boss_level = False
-                self._apply_physics_config(self.raw_config.get("physics", {}) or {})
-        else:
-            self._apply_physics_config(self.raw_config.get("physics", {}) or {})
-
-        px, py = self.level_data.player_start
-        if self.player is None:
-            self.player = MegaManPlayer(GameObject(px, py, 20, 28, True))
-            self.player.hp_max = self.hp_max
-            self.player.hp = self.hp_max
-        else:
-            self.player.gObj.x = px
-            self.player.gObj.y = py
-            self.player.gObj.active = True
-            self.player.gObj.width = 20
-            self.player.gObj.height = 28
-            self.player.vx = 0.0
-            self.player.vy = 0.0
-            self.player.on_ground = False
-            self.player.facing_right = True
-            self.player.hp_max = self.hp_max
-            self.player.hp = self.player.hp_max
-            self.player.i_frames = 0.0
-            self.player.invincible_timer = 0.0
-            self.player.star_timer = 0.0
-            self.player.shot_cooldown = 0.0
-            self.player.jump_cut = False
-            self.player.powered_up = False
-            self.player.fire_requested = False
-            self.player.on_ladder = False
-            self.player.ladder_x = 0.0
-            self.player.can_jump = False
-            self.player.grounded = False
-            self.fire_buffer = 0.0
-
-        self.projectiles = []
-        self._spawn_enemies()
-        self.is_boss_level = self.is_boss_level or self._current_boss() is not None
-        self.level_data.enemies = self.enemies
-        self.level_data.projectiles = self.projectiles
-        self.spike_tiles = [
-            tile for row in getattr(self.level_data, "tiles", [])
-            for tile in row
-            if tile is not None and getattr(getattr(tile, "gObj", tile), "type_id", None) == EntityType.SPIKE
-        ]
-        self.ladder_tiles = self._ladder_tiles()
-        self._build_dijkstra_map()
-        self._visit_map = np.zeros((self.level_data.rows, self.level_data.cols), dtype=np.int32)
-        self.camera_x = 0.0
-        self.camera_y = 0.0
-        self.timer = self.time_limit
-        self.alive = True
-        self.reached_goal = False
-        self.last_event = ""
-        self.last_cause = ""
-        self.enemies_killed_step = 0
-        self.boss_damage_step = 0
-        self.damage_taken_step = 0
-        self.max_x_seen = max(0.0, self.player.gObj.x if self.player else 0.0)
-        self.last_rays = []
-        _goal_dx, _goal_dy, self._prev_goal_dist = self._goal_metrics()
-        self.physics_manager.rebuild_dynamic_hashes(self)
-        self._update_debug_caches()
-        self._cast_debug_rays()
-
-    def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
-        won_previous = bool(self.reached_goal or self.last_event == "WIN")
-        self.steps = 0
-        self.score = 0
-        self.reached_goal = False
-        self.alive = True
-        self.time_limit = 400.0
-        self.timer = self.time_limit
-        self.camera_x = 0.0
-        self.camera_y = 0.0
-        self.last_action = [0, 0, 0, 0]
-        self.frame = 0
-        self.progress_x_best = 0.0
-        self.stall_timer = 0.0
-        self.stall_windows_count = 0
-        self.stalled_this_frame = False
-        self.last_event = ""
-        self.last_cause = ""
-        self.enemies_killed_step = 0
-        self.boss_damage_step = 0
-        self.damage_taken_step = 0
-        self.last_rays = []
-        self.fire_buffer = 0.0
-
-        self._select_level_for_reset(won_previous)
-        self.load_level()
-
+        self.death_cause = ""
+        self._steps = 0
         return self._obs(), self._info()
 
-    def _parse_action(self, action) -> Tuple[int, int, int, int]:
-        try:
-            move = int(action[0])
-            if len(action) >= 4:
-                climb = int(action[1])
-                jump = int(action[2])
-                fire = int(action[3])
-            else:
-                climb = 0
-                jump = int(action[1])
-                fire = int(action[2])
-        except Exception:
-            move = climb = jump = fire = 0
-        return move, climb, jump, fire
+    # ── geometry ─────────────────────────────────────────────────────────────
+    def tile(self, tx: int, ty: int) -> str:
+        ld = self.level_data
+        if 0 <= ty < ld.rows and 0 <= tx < ld.cols:
+            return ld.grid[ty][tx]
+        return VOID
 
-    def _keyboard_state(self):
-        if not pygame.get_init():
-            return False, False, False, False, False, False
-        keys = pygame.key.get_pressed()
-        left = bool(keys[pygame.K_a] or keys[pygame.K_LEFT])
-        right = bool(keys[pygame.K_d] or keys[pygame.K_RIGHT])
-        up = bool(keys[pygame.K_w] or keys[pygame.K_UP])
-        down = bool(keys[pygame.K_s] or keys[pygame.K_DOWN])
-        jump = bool(keys[pygame.K_SPACE])
-        fire = bool(keys[pygame.K_z])
-        return left, right, up, down, jump, fire
+    def tile_at(self, wx: float, wy: float) -> str:
+        return self.tile(int(wx // self.tile_size), int(wy // self.tile_size))
 
-    def _nearest_ladder(self, gObj: GameObject):
-        if not self.level_data:
-            return None
-        probe = gObj.get_rect().inflate(-6, -2)
-        ladders = []
-        for ladder in getattr(self.level_data, "ladders", []):
-            if probe.colliderect(ladder.gObj.get_rect().inflate(10, 8)):
-                ladders.append(ladder)
-        if not ladders:
-            return None
-        return min(
-            ladders,
-            key=lambda ladder: abs(
-                (ladder.gObj.x + ladder.gObj.width * 0.5) - (gObj.x + gObj.width * 0.5)
-            ),
-        )
+    def solid(self, tx: int, ty: int) -> bool:
+        if not 0 <= tx < self.level_data.cols:
+            return True
+        return self.tile(tx, ty) in (SOLID, DOOR_SHUT)
 
-    def _handle_input(self, action):
-        if not self.player:
-            return
-        move, climb, jump, fire = self._parse_action(action)
+    def ladder_top(self, tx: int, ty: int) -> bool:
+        """The top rung is a floor you can stand on and drop through."""
+        return self.tile(tx, ty) == LADDER and self.tile(tx, ty - 1) != LADDER
+
+    def _centre(self) -> tuple[float, float]:
         p = self.player
-        kb_left, kb_right, kb_up, kb_down, kb_jump, kb_fire = self._keyboard_state()
+        return p.x + p.width / 2.0, p.y + p.height / 2.0
 
-        if kb_left:
-            move = 1
-        elif kb_right:
-            move = 3
-        if kb_jump:
-            jump = 1
-        if kb_fire:
-            fire = 1
+    def _columns(self) -> range:
+        p, ts = self.player, self.tile_size
+        return range(int(p.x // ts), int((p.x + p.width - EPS) // ts) + 1)
 
-        ladder = self._nearest_ladder(p.gObj)
-        climb_up = kb_up or climb == 1
-        climb_down = kb_down or climb == 2
-        climb_cmd = 1 if climb_up else (2 if climb_down else 0)
-        self.last_action = [move, climb_cmd, jump, fire]
-        if fire:
-            self.fire_buffer = max(self.fire_buffer, self.fire_buffer_time)
+    def _row_bounds(self) -> tuple[float, float]:
+        """World-x span of the unbroken run of screens the player's screen sits in."""
+        sx, sy = self.screen
+        screens = self.level_data.screens
+        lo = hi = sx
+        while (lo - 1, sy) in screens:
+            lo -= 1
+        while (hi + 1, sy) in screens:
+            hi += 1
+        return lo * float(self.WIDTH), (hi + 1) * float(self.WIDTH)
 
-        if ladder and (climb_up or climb_down):
-            p.on_ladder = True
-            p.ladder_x = ladder.gObj.x + ladder.gObj.width * 0.5 - p.gObj.width * 0.5
-        elif p.on_ladder and ladder is None:
-            p.on_ladder = False
-
-        if p.on_ladder:
-            p.gObj.x = p.ladder_x
-            p.vx = 0.0
-            if climb_up:
-                p.vy = -self.climb_speed
-            elif climb_down:
-                p.vy = self.climb_speed
+    def _segment(self) -> tuple[float, float]:
+        """World-x span of the room the player is in: the run of screens, cut at shutters."""
+        lo, hi = self._row_bounds()
+        ts, sc, sr = self.tile_size, self.screen_cols, self.screen_rows
+        p = self.player
+        for (r, c) in self.level_data.doors:
+            if r // sr != self.screen[1]:
+                continue
+            edge = round((c + 0.5) / sc) * sc * ts      # the screen boundary the shutter stands on
+            if edge <= p.x:
+                lo = max(lo, edge)
             else:
-                p.vy = 0.0
+                hi = min(hi, edge)
+        return lo, hi
 
-            if jump:
-                p.on_ladder = False
-                p.vy = self.jump_velocity
-            elif move in (1, 2, 3, 4) and not (climb_up or climb_down):
-                p.on_ladder = False
-            else:
-                self._try_spawn_player_shot()
-                return
+    def _camera_target(self) -> tuple[float, float]:
+        """Follow the player inside the current room."""
+        lo, hi = self._segment()
+        p = self.player
+        cx = p.x + p.width / 2.0
+        x = min(max(cx - self.WIDTH / 2.0, lo), max(lo, hi - self.WIDTH))
+        return x, float(self.screen[1] * self.HEIGHT)
 
-        target_vx = 0.0
-        if move == 1:
-            target_vx = -self.walk_speed
-            p.facing_right = False
-        elif move == 2:
-            target_vx = -self.run_speed
-            p.facing_right = False
-        elif move == 3:
-            target_vx = self.walk_speed
-            p.facing_right = True
-        elif move == 4:
-            target_vx = self.run_speed
-            p.facing_right = True
+    @property
+    def camera(self) -> tuple[float, float]:
+        return self.camera_x, self.camera_y
 
-        if target_vx != 0.0:
-            if p.vx < target_vx:
-                p.vx = min(target_vx, p.vx + self.accel * self.dt)
-            elif p.vx > target_vx:
-                p.vx = max(target_vx, p.vx - self.accel * self.dt)
+    # What the enemy module sees: NES pixels, centre-anchored.
+    @property
+    def frame(self) -> int:
+        return self._steps
+
+    def nes_view(self) -> tuple[float, float]:
+        return self.camera_x / self.scale, self.camera_y / self.scale
+
+    def nes_solid(self, x: float, y: float) -> bool:
+        return self.solid(int(x // 16), int(y // 16))
+
+    def nes_player(self) -> tuple[float, float]:
+        cx, cy = self._centre()
+        return cx / self.scale, cy / self.scale
+
+    def nes_player_feet(self) -> float:
+        return (self.player.y + self.player.height) / self.scale
+
+    def player_airborne(self) -> bool:
+        return not self.player.grounded and not self.player.climbing
+
+    def sfx(self, name: str) -> None:
+        if self.render_mode == "human":
+            self.sfx_events.append(name)
+
+    # ── movement ─────────────────────────────────────────────────────────────
+    def _move_x(self) -> None:
+        p, ts = self.player, self.tile_size
+        if not p.vx:
+            return
+        lo, hi = self._row_bounds()
+        nx = min(max(p.x + p.vx, lo), hi - p.width)
+        rows = range(int(p.y // ts), int((p.y + p.height - EPS) // ts) + 1)
+        if p.vx > 0:
+            tx = int((nx + p.width - EPS) // ts)
+            if any(self.solid(tx, ty) for ty in rows):
+                nx = tx * ts - p.width
         else:
-            if p.vx > 0:
-                p.vx = max(0.0, p.vx - self.friction * self.dt)
-            elif p.vx < 0:
-                p.vx = min(0.0, p.vx + self.friction * self.dt)
+            tx = int(nx // ts)
+            if any(self.solid(tx, ty) for ty in rows):
+                nx = (tx + 1) * ts
+        p.x = nx
 
-        if jump and p.on_ground:
-            p.vy = self.jump_velocity
-            p.on_ground = False
-            p.jump_cut = False
-        elif not jump and p.vy < 0 and not p.jump_cut:
-            p.vy *= 0.55
-            p.jump_cut = True
+    def _floor_under(self, bottom: float, old_bottom: float) -> int | None:
+        """Tile row that stops feet arriving at `bottom`, if any. A ladder top only counts
+        when the feet came from above it."""
+        ts = self.tile_size
+        ty = int((bottom - EPS) // ts)
+        for tx in self._columns():
+            if self.solid(tx, ty) or (self.ladder_top(tx, ty) and old_bottom <= ty * ts + EPS):
+                return ty
+        return None
 
-        self._try_spawn_player_shot()
+    def _move_y(self) -> None:
+        p, ts = self.player, self.tile_size
+        bottom = p.y + p.height
+        if p.grounded:
+            if self._floor_under(bottom + 1.0, bottom) is None:
+                p.grounded = False                 # walked off a ledge
+            return
+        ny = p.y + p.vy
+        if p.vy >= 0:
+            ty = self._floor_under(ny + p.height + 2 * EPS, bottom)   # feet resting exactly on a tile count
+            if ty is not None:
+                p.y, p.vy, p.grounded = ty * ts - p.height, 0.0, True
+                self.sfx("land")
+                return
+        else:
+            ty = int(ny // ts)
+            if any(self.solid(tx, ty) for tx in self._columns()):
+                ny, p.vy = (ty + 1) * ts, 0.0      # bumped a ceiling
+        p.y = ny
+        p.vy = min(p.vy + self.k["gravity"], self.k["max_fall_speed"])
 
-    def _try_spawn_player_shot(self):
-        p = self.player
-        if not p or self.fire_buffer <= 0.0:
-            return False
+    def _mount(self, tx: int, drop: float = 0.0) -> None:
+        p, ts = self.player, self.tile_size
+        p.x = tx * ts + (ts - p.width) / 2.0
+        p.y += drop
+        p.vx = p.vy = 0.0
+        p.climbing, p.grounded = True, False
+        p.moving_frames = p.slide_frames = 0
 
-        self.projectiles = [proj for proj in self.projectiles if proj.gObj.active]
-        if self.level_data is not None:
-            self.level_data.projectiles = self.projectiles
+    def _walk(self, dx: int, dy: int, jump: bool, jump_edge: bool) -> None:
+        p, k, ts = self.player, self.k, self.tile_size
+        cx, cy = self._centre()
+        if dy < 0 and self.tile_at(cx, cy) == LADDER:
+            return self._mount(int(cx // ts))
+        if dy > 0 and p.grounded and self.ladder_top(int(cx // ts), int((p.y + p.height + 1) // ts)):
+            return self._mount(int(cx // ts), k["ladder_mount_drop"])
 
-        cooldown_ready = p.shot_cooldown <= 1e-4
-        if not cooldown_ready:
-            return False
-
-        active_player_shots = sum(
-            1 for proj in self.projectiles if proj.gObj.active and proj.owner == "player"
-        )
-        if active_player_shots >= self.max_player_shots:
-            return False
-
-        self.projectiles.append(MegaBusterProjectile.from_player(p))
-        if self.level_data is not None:
-            self.level_data.projectiles = self.projectiles
-        p.shot_cooldown = self.shot_cooldown_time
-        self.fire_buffer = 0.0
-        return True
-
-    def _nearby_tile_rects(self, gObj: GameObject):
-        tx = int(gObj.x // self.TILE_SIZE)
-        ty = int(gObj.y // self.TILE_SIZE)
-        rects = []
-        for row in range(ty - 2, ty + 4):
-            for col in range(tx - 2, tx + 4):
-                if 0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols:
-                    tile_type = self.level_data.grid[row][col]
-                    if tile_type in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_SPIKE):
-                        rect = pygame.Rect(col * self.TILE_SIZE, row * self.TILE_SIZE, self.TILE_SIZE, self.TILE_SIZE)
-                        rects.append((rect, tile_type))
-        return rects
-
-    def _support_tile_below(self, actor, epsilon: float = 3.0):
-        rect = actor.gObj.get_rect()
-        probe = pygame.Rect(rect.left + 2, rect.bottom, max(2, rect.width - 4), max(2, int(epsilon) + 1))
-        best = None
-        best_top = None
-        for tile_rect, tile_type in self._nearby_tile_rects(actor.gObj):
-            if tile_type == TILE_SPIKE:
-                continue
-            if tile_type == TILE_PLATFORM and rect.bottom > tile_rect.top + epsilon:
-                continue
-            if not probe.colliderect(tile_rect):
-                continue
-            if best is None or tile_rect.top < best_top:
-                best = (tile_rect, tile_type)
-                best_top = tile_rect.top
-        return best
-
-    def _stabilize_ground_contact(self, actor, epsilon: float = 3.0) -> bool:
-        support = self._support_tile_below(actor, epsilon=epsilon)
-        if support is None:
-            actor.on_ground = False
-            return False
-        tile_rect, _tile_type = support
-        actor.gObj.y = tile_rect.top - actor.gObj.height
-        if actor.vy > 0.0:
-            actor.vy = 0.0
-        actor.on_ground = True
-        return True
-
-    def _resolve_actor_y(self, actor, damage_spikes: bool = False):
-        rect = actor.gObj.get_rect()
-        actor.on_ground = False
-        for tile_rect, tile_type in self._nearby_tile_rects(actor.gObj):
-            if not rect.colliderect(tile_rect):
-                continue
-            if tile_type == TILE_SPIKE and damage_spikes and actor is self.player:
-                self._damage_player(actor.hp_max, "Spike")
-                continue
-            if tile_type == TILE_PLATFORM:
-                if actor.vy < 0:
-                    continue
-                if rect.bottom - actor.vy * self.dt > tile_rect.top + 4:
-                    continue
-            if actor.vy >= 0:
-                actor.gObj.y = tile_rect.top - actor.gObj.height
-                actor.vy = 0.0
-                actor.on_ground = True
+        if dx:
+            p.facing = dx
+            if p.grounded:
+                p.moving_frames += 1
+                speed = k["step_speed"] if p.moving_frames <= self.step_frames else k["run_speed"]
             else:
-                actor.gObj.y = tile_rect.bottom
-                actor.vy = 0.0
-            rect = actor.gObj.get_rect()
+                p.moving_frames = self.step_frames + 1     # landing with the pad held keeps running
+                speed = k["air_speed"]
+            p.vx = dx * speed
+            p.slide_frames = self.slide_frames if p.moving_frames > self.step_frames else 0
+        else:
+            p.moving_frames = 0
+            if p.grounded and p.slide_frames > 0:
+                p.slide_frames -= 1
+                p.vx = p.facing * k["slide_speed"]
+            else:
+                p.slide_frames = 0
+                p.vx = 0.0
 
-    def _resolve_actor_x(self, actor, bounce: bool = False):
-        rect = actor.gObj.get_rect()
-        for tile_rect, tile_type in self._nearby_tile_rects(actor.gObj):
-            if tile_type == TILE_SPIKE:
-                continue
-            if not rect.colliderect(tile_rect):
-                continue
-            if actor.vx > 0:
-                actor.gObj.x = tile_rect.left - actor.gObj.width
-                if bounce:
-                    actor.vx = -abs(actor.vx)
-                    actor.facing_right = False
-                else:
-                    actor.vx = 0.0
-            elif actor.vx < 0:
-                actor.gObj.x = tile_rect.right
-                if bounce:
-                    actor.vx = abs(actor.vx)
-                    actor.facing_right = True
-                else:
-                    actor.vx = 0.0
-            rect = actor.gObj.get_rect()
+        if jump_edge and p.grounded:
+            p.vy, p.grounded = -k["jump_velocity"], False
+        elif not jump and p.vy < -k["jump_cut_velocity"]:
+            p.vy = -k["jump_cut_velocity"]          # letting go early cuts the jump short
+        self._move_x()
+        self._move_y()
 
-    def _damage_player(self, amount: int, cause: str):
-        if not self.player or self.player.i_frames > 0.0:
+    def _climb(self, dx: int, dy: int, jump_edge: bool) -> None:
+        p, k, ts = self.player, self.k, self.tile_size
+        if dx:
+            p.facing = dx
+        tx = int((p.x + p.width / 2.0) // ts)
+        if jump_edge and not dy:                    # jump lets go of the ladder
+            p.climbing, p.vy = False, k["ladder_speed"]
             return
-        self.player.hp = max(0, self.player.hp - amount)
-        self.damage_taken_step += max(0, int(amount))
-        self.player.i_frames = self.i_frame_duration
-        self.player.invincible_timer = self.player.i_frames
-        if self.player.hp <= 0:
-            self.lives = max(0, self.lives - 1)
-            self.alive = False
-            self.last_cause = cause
+        if dy < 0:
+            ny = p.y - k["ladder_speed"]
+            if self.solid(tx, int(ny // ts)):
+                return
+            p.y = ny
+            cy = p.y + p.height / 2.0
+            if self.tile_at(p.x + p.width / 2.0, cy) != LADDER:      # past the top rung: step off onto it
+                p.y = (int(cy // ts) + 1) * ts - p.height
+                p.climbing, p.grounded = False, True
+        elif dy > 0:
+            ny = p.y + k["ladder_speed"]
+            feet = int((ny + p.height - EPS) // ts)
+            if self.solid(tx, feet):
+                p.y = feet * ts - p.height
+                p.climbing, p.grounded = False, True
+                return
+            p.y = ny
+            if self.tile(tx, int((p.y + p.height / 2.0) // ts)) != LADDER and self.tile(tx, feet) != LADDER:
+                p.climbing = False                  # ran out of ladder: fall
 
-    def _update_debug_caches(self):
-        if not self.player or not self.level_data:
-            return
-
+    def _update_shots(self, fire_edge: bool) -> None:
         p = self.player
-        px = int(p.gObj.x // self.TILE_SIZE)
-        py = int(p.gObj.y // self.TILE_SIZE)
+        w, h = self.shot_size
+        p.shoot_timer = max(0, p.shoot_timer - 1)
+        if fire_edge and len(self.shots) < self.max_shots:
+            x = p.x + p.width if p.facing > 0 else p.x - w
+            self.shots.append(Shot(x, p.y + p.height / 2.0 - h, p.facing * self.shot_speed))
+            p.shoot_timer = 16
+            self.sfx("shoot")
+        kept = []
+        for s in self.shots:
+            s.x += s.vx                             # buster shots ignore walls, as on the console
+            sx, sy = (s.x + w / 2.0) / self.scale, (s.y + h / 2.0) / self.scale
+            target = next((e for e in self.enemies if e.hittable and en.shot_hits(e, sx, sy)), None)
+            if target is None or not self._hit_enemy(target):
+                kept.append(s)
+        self.shots = [s for s in kept if self.camera_x - w <= s.x <= self.camera_x + self.WIDTH]
 
-        if self._visit_map is not None and 0 <= py < self.level_data.rows and 0 <= px < self.level_data.cols:
-            self._visit_map[py, px] += 1
+    def _track_screen(self) -> None:
+        """Which screen the player is in. Going up needs a ladder; going down only needs a screen
+        to land in, and without one it is a pit."""
+        cx, cy = self._centre()
+        sx, sy = int(cx // self.WIDTH), self.screen[1]
+        screens = self.level_data.screens
+        if cy >= (sy + 1) * self.HEIGHT:
+            if (sx, sy + 1) not in screens:
+                return self._die("Pit")
+            sy += 1
+        elif cy < sy * self.HEIGHT and self.player.climbing and (sx, sy - 1) in screens:
+            sy -= 1
+        self.screen = (sx, sy)
 
-        dijkstra = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        hazards = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        player_cost = self.dijkstra.get_dist(px, py) if self.dijkstra else -1.0
-        self.dijkstra_current_tile = player_cost
-        max_cost = max(1.0, self.obs_width * 2.4, self.obs_height * 3.5)
-        best_cost = player_cost if player_cost >= 0.0 else float("inf")
-        best_step = (0, 0)
-        for ddy in range(-self.obs_pad_y, self.obs_pad_y + 1):
-            for ddx in range(-self.obs_pad_x, self.obs_pad_x + 1):
-                tx = px + ddx
-                ty = py + ddy
-                ly = ddy + self.obs_pad_y
-                lx = ddx + self.obs_pad_x
-
-                if not (0 <= tx < self.level_data.cols and 0 <= ty < self.level_data.rows):
-                    continue
-
-                tile = self.level_data.grid[ty][tx]
-                if tile == TILE_SPIKE:
-                    hazards[ly, lx] = -1.0
-                elif tile == TILE_PIT and self._is_exposed_pit_tile(tx, ty):
-                    hazards[ly, lx] = -0.5
-                elif any(int(e.gObj.x // self.TILE_SIZE) == tx and int(e.gObj.y // self.TILE_SIZE) == ty for e in self.enemies if e.gObj.active):
-                    hazards[ly, lx] = 1.0
-
-                tile_cost = self.dijkstra.get_dist(tx, ty) if self.dijkstra else -1.0
-                if player_cost >= 0.0 and tile_cost >= 0.0:
-                    dijkstra[ly, lx] = np.clip((player_cost - tile_cost) / max_cost, -1.0, 1.0)
-                else:
-                    dijkstra[ly, lx] = 0.0
-
-                if (abs(ddx) <= 1 and abs(ddy) <= 1 and (ddx != 0 or ddy != 0)
-                        and tile_cost >= 0.0 and tile_cost < best_cost):
-                    best_cost = tile_cost
-                    best_step = (ddx, ddy)
-
-        self._dijkstra_window_cache = dijkstra
-        self._hazard_window_cache = hazards
-        mag = max(1.0, float(np.hypot(best_step[0], best_step[1])))
-        self._step_dx = best_step[0] / mag
-        self._step_dy = best_step[1] / mag
-
-    def _player_obs(self) -> np.ndarray:
-        if not self.player:
-            return np.zeros(15, dtype=np.float32)
-        p = self.player
-        active_player_shots = sum(
-            1 for proj in self.projectiles if proj.gObj.active and proj.owner == "player"
-        )
-        climb_axis = 0.0
-        if len(self.last_action) >= 2:
-            if self.last_action[1] == 1:
-                climb_axis = 1.0
-            elif self.last_action[1] == 2:
-                climb_axis = -1.0
-        return np.array([
-            np.clip(p.gObj.x / max(1.0, self.level_data.width), 0.0, 1.0),
-            np.clip(p.gObj.y / max(1.0, self.level_data.height), 0.0, 1.0),
-            np.clip(p.vx / max(1.0, self.run_speed), -1.0, 1.0),
-            np.clip(p.vy / max(1.0, self.max_fall_speed), -1.0, 1.0),
-            1.0 if p.on_ground else 0.0,
-            np.clip(p.hp / float(max(1, p.hp_max)), 0.0, 1.0),
-            1.0 if p.shot_cooldown <= 0.0 else 0.0,
-            1.0 if p.i_frames > 0 else 0.0,
-            1.0 if p.facing_right else 0.0,
-            np.clip(p.shot_cooldown / max(0.001, self.shot_cooldown_time), 0.0, 1.0),
-            np.clip(p.i_frames, 0.0, 1.0),
-            1.0 if p.on_ladder else 0.0,
-            climb_axis,
-            1.0 if p.can_jump else 0.0,
-            np.clip(active_player_shots / float(max(1, self.max_player_shots)), 0.0, 1.0),
-        ], dtype=np.float32)
-
-    def get_obs_value_labels(self):
-        return (
-            [
-                "Px", "Py", "Vx", "Vy", "Grnd", "HP", "Fire",
-                "Invinc", "FaceR", "FirCD", "InvTmr", "Laddr", "Climb",
-                "CanJmp", "ShotQ",
-            ],
-            [
-                "EnmDst", "GoalDst", "Timer", "GoalDY", "Dijkstra", "StepX", "StepY",
-                "BossLvl", "BossHP",
-            ],
-        )
-
-    def _tracking_obs(self) -> np.ndarray:
-        if not self.player:
-            return np.zeros(9, dtype=np.float32)
-
-        p = self.player
-        enemy_dist = 1.0
-        active_enemies = [e for e in self.enemies if e.gObj.active]
-        if active_enemies:
-            enemy_dist = min(
-                np.hypot(e.gObj.x - p.gObj.x, e.gObj.y - p.gObj.y) for e in active_enemies
-            ) / max(1.0, np.hypot(self.level_data.width, self.level_data.height))
-
-        goal_dx, goal_dy, goal_dist = self._goal_metrics()
-        dijkstra_dist = self._normalized_dijkstra()
-        boss = self._current_boss()
-        boss_ratio = boss.hp / float(max(1, boss.hp_max)) if boss is not None else 0.0
-
-        return np.array([
-            np.clip(enemy_dist, 0.0, 1.0),
-            goal_dist,
-            np.clip(self.timer / 400.0, 0.0, 1.0),
-            np.clip(goal_dy / max(1.0, self.level_data.height), -1.0, 1.0),
-            max(0.0, dijkstra_dist),
-            self._step_dx,
-            self._step_dy,
-            1.0 if self.is_boss_level else 0.0,
-            np.clip(boss_ratio, 0.0, 1.0),
-        ], dtype=np.float32)
-
-    def _check_obs_sanity(self, obs: dict) -> None:
-        self._obs_check_counter += 1
-        if self._obs_check_counter % self._obs_check_interval != 0:
-            return
-
-        warnings_list = []
-        grid_names = ["solid", "collectible", "hazard", "dijkstra"]
-        grids = obs.get("grids")
-        if grids is not None:
-            for i, name in enumerate(grid_names):
-                ch = grids[i]
-                self._obs_stats[f"grid_{name}_mean"] = float(ch.mean())
-                self._obs_stats[f"grid_{name}_std"] = float(ch.std())
-                self._obs_stats[f"grid_{name}_min"] = float(ch.min())
-                self._obs_stats[f"grid_{name}_max"] = float(ch.max())
-                if i == 0 and float(ch.std()) < 1e-6:
-                    warnings_list.append(f"Grid '{name}' DEAD")
-                if i != 3 and float(ch.max()) > 1.01:
-                    warnings_list.append(f"Grid '{name}' >1.0")
-
-        scalars = obs.get("scalars")
-        if scalars is not None:
-            self._obs_stats["scalar_mean"] = float(scalars.mean())
-            self._obs_stats["scalar_std"] = float(scalars.std())
-            self._obs_stats["scalar_min"] = float(scalars.min())
-            self._obs_stats["scalar_max"] = float(scalars.max())
-            self._obs_stats["dijkstra_val"] = float(scalars[19])
-            if float(scalars.std()) < 1e-8:
-                warnings_list.append("Scalars DEAD")
-            if abs(float(scalars.max())) > 100:
-                warnings_list.append("Scalars unnormalized")
-
-        self._obs_stats["obs_warnings"] = "|".join(warnings_list) if warnings_list else ""
-
-    def _world_to_screen(self, gObj: GameObject):
-        sx = gObj.x - self.camera_x
-        sy = gObj.y - self.camera_y
-        on_screen = sx < self.WIDTH and sy < self.HEIGHT and sx + gObj.width > 0 and sy + gObj.height > 0
-        return sx, sy, on_screen
-
-    def _update_player(self):
-        self.physics_manager._update_player(self.dt, self)
-
-    def _update_enemies(self):
-        self.physics_manager._update_enemies(self.dt, self)
-
-    def _update_projectiles(self):
-        self.physics_manager._update_projectiles(self.dt, self)
-
-    def _handle_combat(self):
-        self.physics_manager.resolve_collisions(self)
-
-    def _check_goal_and_oob(self):
-        self.physics_manager._check_goal_and_oob(self)
-
-    def _update_camera(self):
-        if not self.player:
-            return
-
-        if self.render_mode == "human" and self.debug_manager.free_cam_active:
-            dx, dy = self.debug_manager.current_cam_move
-            max_x = max(0.0, self.level_data.width - self.WIDTH)
-            max_y = max(0.0, self.level_data.height - self.HEIGHT)
-            self.camera_x = max(0.0, min(max_x, self.camera_x + dx * self.dt))
-            self.camera_y = max(0.0, min(max_y, self.camera_y + dy * self.dt))
-            return
-
-        target_x = self.player.gObj.x - self.WIDTH * 0.35
-        target_y = self.player.gObj.y - self.HEIGHT * 0.45
-        max_x = max(0.0, self.level_data.width - self.WIDTH)
-        max_y = max(0.0, self.level_data.height - self.HEIGHT)
-        self.camera_x = max(0.0, min(max_x, target_x))
-        self.camera_y = max(0.0, min(max_y, target_y))
+    def _update_camera(self) -> None:
+        tx, ty = self._camera_target()
+        step = self.scroll_step
+        self.camera_x += min(max(tx - self.camera_x, -step), step)
+        self.camera_y += min(max(ty - self.camera_y, -step), step)
 
     def step(self, action):
-        if not self.alive and not self.reached_goal:
+        """action = (dx, dy, jump, fire) with dx, dy in {-1, 0, 1}; returns
+        (obs, reward, terminated, truncated, info)."""
+        if not self.alive or self.won:
             return self._obs(), 0.0, True, False, self._info()
+        dx = (int(action[0]) > 0) - (int(action[0]) < 0)
+        dy = (int(action[1]) > 0) - (int(action[1]) < 0)
+        jump = bool(action[2])
+        fire = bool(action[3]) if len(action) > 3 else False
+        jump_edge, fire_edge = jump and not self._prev_jump, fire and not self._prev_fire
+        self._prev_jump, self._prev_fire = jump, fire
+        self._steps += 1
+        self.timer = max(0.0, self.timer - self.dt)
+        p, ts = self.player, self.tile_size
 
-        self.last_action = list(self._parse_action(action))
-        self.last_event = ""
-        self.last_cause = ""
-        self.enemies_killed_step = 0
-        self.boss_damage_step = 0
-        self.damage_taken_step = 0
-        self.steps += 1
-        self.frame += 1
-        self.fire_buffer = max(0.0, self.fire_buffer - self.dt)
-        self.time_limit = max(0.0, self.time_limit - self.dt)
-        self.timer = self.time_limit
-        if self.render_mode == "human":
-            self.debug_manager.update_input()
+        if self.camera_y != self._camera_target()[1]:   # flipping to the next screen: the world holds still
+            self._update_camera()
+            return self._finish()
+        if self.boss_intro > 0:                         # the boss-room intro takes the pad away
+            self.boss_intro -= 1
+            dx = dy = 0
+            jump = jump_edge = fire_edge = False
+            if self.boss_intro == en.BOSS_INTRO_FRAMES - en.BOSS_APPEARS_AT:
+                self._spawn_boss()
 
-        self._handle_input(action)
-        self.physics_manager.update_system(self.dt, self)
-        self.physics_manager.resolve_collisions(self)
-        self._try_spawn_player_shot()
-        self._update_camera()
-        self._update_debug_caches()
-        self._cast_debug_rays()
-
-        if self.player:
-            self.max_x_seen = max(self.max_x_seen, self.player.gObj.x)
-            self.stalled_this_frame = False
-            if abs(self.player.vx) < 8.0 and not self.player.on_ladder:
-                prev_stall = self.stall_timer
-                self.stall_timer += self.dt
-                if prev_stall < 1.5 <= self.stall_timer:
-                    self.stall_windows_count += 1
-                    self.stalled_this_frame = True
-            else:
-                self.stall_timer = 0.0
+        if p.knock > 0:                                 # thrown back by a hit: no control, no firing
+            p.knock -= 1
+            p.vx = p.knock_dir * self.k["knockback_speed"]
+            fire_edge = False
+            self._move_x()
+            self._move_y()
+        elif p.climbing:
+            self._climb(dx, dy, jump_edge)
         else:
-            self.stalled_this_frame = False
+            self._walk(dx, dy, jump, jump_edge)
+        self._track_screen()
 
-        truncated = (self.max_steps is not None and self.steps >= self.max_steps) or self.time_limit <= 0.0
-        terminated = self.reached_goal or not self.alive
-        if terminated and not self.reached_goal:
-            self.last_event = "DIED"
-            if not self.last_cause:
-                self.last_cause = "Enemy"
-        reward = 0.01
-        reward += (self.player.gObj.x if self.player else 0.0) / max(1.0, self.level_data.width) * 0.02
-        if self.reached_goal:
-            reward += 10.0
-        if terminated and not self.reached_goal:
-            reward -= 5.0
+        if self.alive:
+            inset = 2 * self.scale
+            for ty in range(int((p.y + inset) // ts), int((p.y + p.height - inset) // ts) + 1):
+                for tx in range(int((p.x + inset) // ts), int((p.x + p.width - inset) // ts) + 1):
+                    if self.tile(tx, ty) == SPIKE and not self.invincible:
+                        self._die("Spike")              # spikes ignore the invulnerability blink
+        if self.alive:
+            grid = self.level_data.grid
+            for (r, c) in self.level_data.doors:      # a shutter seals once the player is through
+                if grid[r][c] == DOOR and p.x >= (c + 1) * ts and r // self.screen_rows == self.screen[1]:
+                    grid[r][c] = DOOR_SHUT
+                    self.sfx("gate")
+            if self.tile_at(*self._centre()) == GOAL or self.screen in self.goal_screens:
+                self.won = True                         # the goal tile, or the next section's first screen
+                self.score += 1000
+        if self.alive and not self.won:
+            self._update_world(fire_edge)
+        self._update_camera()
+        return self._finish()
 
-        obs = self._obs()
-        self._check_obs_sanity(obs)
-        return obs, reward, terminated, truncated, self._info()
+    def _finish(self):
+        if self.alive and not self.won and (self.timer <= 0 or self._steps >= self.max_steps):
+            self._die("Timeout")
+        done = (not self.alive) or self.won
+        return self._obs(), 0.0, done, False, self._info()
 
-    def _grid_obs_window(self):
-        solid = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        collect = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        hazard = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
-        dijkstra = np.zeros((self.obs_height, self.obs_width), dtype=np.float32)
+    # ── enemies, bullets, items (the console's order: contact, shots, enemy AI, spawning) ──
+    def _update_world(self, fire_edge: bool) -> None:
+        p, s = self.player, self.scale
+        room = (self.screen[1], *self._segment())
+        if room != self._room:                          # a new room forgets everything in the old one
+            self._room = room
+            self.enemies.clear(); self.enemy_bullets.clear(); self.shots.clear()
+            self.items = [it for it in self.items if it.kind == "clear"]
+            self._live = [None] * len(self._live)
+            self._in_view = [False] * len(self._in_view)
+            self.boss_cutter = None
+        if p.blink > 0:
+            p.blink -= 1
+        self.fx = [[x, y, t - 1] for x, y, t in self.fx if t > 1]
+        px, py = self.nes_player()
 
-        if not self.player or not self.level_data:
-            return solid, collect, hazard, dijkstra
+        for e in self.enemies:
+            if e.hurts and en.touches_player(e.x, e.y, e.hw, e.hh, px, py):
+                self._hurt(en.STATS[e.kind][4], e.name, e.facing)
+        for b in self.enemy_bullets:
+            if en.touches_player(b.x, b.y, en.BULLET_HALF, en.BULLET_HALF, px, py):
+                self._hurt(en.BULLET_DAMAGE, b.src, b.facing)
+        c = self.boss_cutter
+        if c and en.touches_player(c.x, c.y, en.ROLLING_CUTTER_HALF, en.ROLLING_CUTTER_HALF, px, py):
+            self._hurt(en.STATS[en.BOSS_GLYPH][4], "Cut Man", 1 if c.vx >= 0 else -1)
+        for it in list(self.items):
+            if en.touches_player(it.x, it.y, *en.ITEM_HALF[it.kind], px, py):
+                self._collect(it)
+        if not self.alive or self.won:
+            return
 
-        if self._hazard_window_cache is not None:
-            hazard = self._hazard_window_cache.copy()
-        if self._dijkstra_window_cache is not None:
-            dijkstra = self._dijkstra_window_cache.copy()
+        self._update_shots(fire_edge)
+        for e in list(self.enemies):
+            if e.kind != en.BOSS_GLYPH and not en.ROUTINES[e.kind](e, self):
+                self._remove(e)
+        if self.boss and self.boss_intro == 0:
+            en.cut_man(self.boss, self)
+            if self.boss_cutter and not en.rolling_cutter(self.boss_cutter, self.boss, self):
+                self.boss_cutter = None
+        cam_x, cam_y = self.nes_view()
+        for b in self.enemy_bullets:                    # enemy shots ignore walls too
+            b.x += b.vx
+            b.y += b.vy
+        self.enemy_bullets = [b for b in self.enemy_bullets
+                              if cam_x <= b.x <= cam_x + 255 and en.CULL_TOP <= b.y - cam_y < en.CULL_BOTTOM]
+        for it in list(self.items):
+            hh = en.ITEM_HALF[it.kind][1]
+            it.vy = min(it.vy + en.GRAVITY, en.MAX_FALL)
+            if it.vy > 0 and self.nes_solid(it.x, it.y + it.vy + hh):
+                it.y, it.vy = int((it.y + it.vy + hh) // 16) * 16 - hh, 0.0
+            else:
+                it.y += it.vy
+            if it.ttl > 0:
+                it.ttl -= 1
+                if it.ttl == 0:
+                    self.items.remove(it)
 
-        px = int(self.player.gObj.x // self.TILE_SIZE)
-        py = int(self.player.gObj.y // self.TILE_SIZE)
-        active_coins = {
-            (int(c.gObj.x // self.TILE_SIZE), int(c.gObj.y // self.TILE_SIZE))
-            for c in self.level_data.coins
-            if c.gObj.active and not getattr(c, "collected", False)
-        }
-        active_goals = {
-            (int(g.gObj.x // self.TILE_SIZE), int(g.gObj.y // self.TILE_SIZE))
-            for g in self.level_data.goals
-            if g.gObj.active
-        }
+        lo, hi = room[1] / s, room[2] / s               # spawn what the screen edge just uncovered
+        sr = self.screen_rows
+        for i, (glyph, col, row) in enumerate(self.level_data.spawns):
+            x, y = en.spawn_position(glyph, col, row)
+            seen = row // sr == self.screen[1] and lo <= x < hi and cam_x <= x <= cam_x + 255
+            if seen and not self._in_view[i] and self._live[i] is None:
+                if glyph == en.BOSS_GLYPH:
+                    if self.boss is None and not self.boss_dead and self.boss_intro == 0:
+                        self.boss_intro = en.BOSS_INTRO_FRAMES
+                elif glyph in en.ITEM_GLYPHS:
+                    if i not in self._taken:
+                        self._live[i] = en.Item("life_large", x, y, spawn=i)
+                        self.items.append(self._live[i])
+                else:
+                    self._live[i] = en.make(glyph, col, row, i)
+                    self.enemies.append(self._live[i])
+            self._in_view[i] = seen
 
-        for ddy in range(-self.obs_pad_y, self.obs_pad_y + 1):
-            for ddx in range(-self.obs_pad_x, self.obs_pad_x + 1):
-                tx = px + ddx
-                ty = py + ddy
-                ly = ddy + self.obs_pad_y
-                lx = ddx + self.obs_pad_x
+    def _spawn_boss(self) -> None:
+        for i, (glyph, col, row) in enumerate(self.level_data.spawns):
+            if glyph == en.BOSS_GLYPH and row // self.screen_rows == self.screen[1]:
+                self.boss = en.make(glyph, col, row, i)
+                self.enemies.append(self.boss)
+                return
 
-                if not (0 <= tx < self.level_data.cols and 0 <= ty < self.level_data.rows):
-                    continue
+    def _remove(self, e) -> None:
+        if e in self.enemies:
+            self.enemies.remove(e)
+        if e.spawn >= 0 and self._live[e.spawn] is e:
+            self._live[e.spawn] = None
 
-                tile = self.level_data.grid[ty][tx]
-                if tile in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK) or (tx, ty) in self.ladder_tiles:
-                    solid[ly, lx] = 1.0
-                elif tile == TILE_PIT and self._is_exposed_pit_tile(tx, ty):
-                    solid[ly, lx] = -0.5
+    def _collect(self, it) -> None:
+        p = self.player
+        self.items.remove(it)
+        if it.spawn >= 0:
+            self._taken.add(it.spawn)
+            self._live[it.spawn] = None
+        if it.kind == "clear":                          # the orb the boss leaves behind ends the stage
+            self.won = True
+            self.score += 1000
+        elif it.kind == "pearl":
+            self.score += en.PEARL_SCORE
+            self.coins_total += 1
+            self.sfx("pearl")
+        else:
+            p.hp = min(p.hp_max, p.hp + en.ITEM_HEAL[it.kind])
+            self.sfx("heal")
 
-                if (tx, ty) in active_goals or tile == TILE_GOAL:
-                    collect[ly, lx] = max(collect[ly, lx], 1.0)
-                if (tx, ty) in self.ladder_tiles:
-                    collect[ly, lx] = max(collect[ly, lx], 0.69)
-                if (tx, ty) in active_coins:
-                    collect[ly, lx] = max(collect[ly, lx], 0.35)
+    def _hurt(self, amount: int, cause: str, facing: int) -> None:
+        """Damage from an enemy or its shot: thrown back the way the attacker faces, then a
+        long blink during which nothing but spikes and pits can hurt."""
+        p = self.player
+        if p.blink > 0 or not self.alive or self.invincible:
+            return
+        p.hp -= amount
+        if p.hp <= 0:
+            p.hp = 0
+            return self._die(cause)
+        self.sfx("hurt")
+        p.blink, p.knock, p.knock_dir = self.hurt_blink, self.knock_frames, facing
+        p.facing = -facing
+        p.vy, p.grounded, p.climbing = -self.k["knockback_hop"], False, False
+        p.moving_frames = p.slide_frames = 0
 
-        self._solid_window_cache = solid
-        return solid, collect, hazard, dijkstra
+    def _hit_enemy(self, e) -> bool:
+        """A buster shot touched this enemy. Returns False if the shot passes through untouched."""
+        if e is self.boss:
+            if e.blink or self.boss_intro:
+                return False                            # blinking: shots fly straight through him
+            hp = e.hp
+            en.hit_boss(e, self)
+            self.boss_damage += hp - max(e.hp, 0)
+            self.sfx("enemy_hit")
+            if e.hp <= 0:
+                self._boss_defeated()
+            return True
+        if e.shielded:                                  # bounces off armour
+            self.sfx("deflect")
+            return True
+        if self._steps - e.last_hit < 4:                # absorbed by the console's hit latch
+            return True
+        e.last_hit = self._steps
+        e.hp -= en.STATS[e.kind][3]
+        if e.hp > 0:
+            self.sfx("enemy_hit")
+        else:
+            self.fx.append([e.x, e.y, 12])
+            self.sfx("explosion")
+            if en.kill(e, self):
+                self._remove(e)
+        return True
 
-    def _dict_obs(self) -> dict:
-        solid, collect, hazard, dijkstra = self._grid_obs_window()
-        return {
-            "grids": np.stack([solid, collect, hazard, dijkstra], axis=0).astype(np.float32),
-            "scalars": np.concatenate([self._player_obs(), self._tracking_obs()]).astype(np.float32),
-        }
+    def _boss_defeated(self) -> None:
+        cam_x, cam_y = self.nes_view()
+        self.fx.append([self.boss.x, self.boss.y, 24])
+        self.sfx("explosion")
+        self._remove(self.boss)
+        self.boss, self.boss_cutter, self.boss_dead = None, None, True
+        self.enemy_bullets.clear()
+        self.kills_total += 1
+        self.items.append(en.Item("clear", cam_x + 0x80, cam_y + 0x28))
+
+    def _die(self, cause: str) -> None:
+        self.alive = False
+        self.death_cause = cause
+        self.sfx("death")
+
+    window = 21         # cells per side of the grid observation (the grid sensor mode resizes it)
 
     def _obs(self):
-        return self._dict_obs()
+        """A window of cells centred on the player, for the grid sensor mode: channel 0 solid,
+        1 worth reaching (goal, items), 2 dangerous (spikes, enemies, shots). The ray sensors do
+        not use it: the adapter reads tile() / player / enemies directly."""
+        import numpy as np
+        W, half, ts, s = self.window, self.window // 2, self.tile_size, self.scale
+        cx, cy = self._centre()
+        px, py = int(cx // ts), int(cy // ts)
+        out = np.zeros((3, W, W), dtype=np.float32)
+        for j in range(W):
+            for i in range(W):
+                t = self.tile(px - half + i, py - half + j)
+                if t in (SOLID, DOOR_SHUT):
+                    out[0, j, i] = 1.0
+                elif t == GOAL:
+                    out[1, j, i] = 1.0
+                elif t == SPIKE:
+                    out[2, j, i] = -1.0
+
+        def mark(ch, x, y, v):                      # an NES-pixel point
+            i, j = int(x * s // ts) - px + half, int(y * s // ts) - py + half
+            if 0 <= i < W and 0 <= j < W:
+                out[ch, j, i] = v
+        for it in self.items:
+            mark(1, it.x, it.y, 1.0)
+        for e in self.enemies:
+            if e.hurts:
+                mark(2, e.x, e.y, -1.0)
+        for b in self.enemy_bullets:
+            mark(2, b.x, b.y, -1.0)
+        if self.boss_cutter:
+            mark(2, self.boss_cutter.x, self.boss_cutter.y, -1.0)
+        p = self.player
+        return {"grids": out, "scalars": np.asarray([p.vx / (3.0 * s), p.vy / (12.0 * s)], dtype=np.float32)}
 
     def _info(self):
-        goal_dx, goal_dy, goal_dist = self._goal_metrics()
-        dijkstra_dist = self._normalized_dijkstra()
-        progress = self._prev_goal_dist - goal_dist
-        self._prev_goal_dist = goal_dist
-        boss = self._current_boss()
-        return {
-            "hp": self.player.hp if self.player else 0,
-            "lives": self.lives,
-            "score": self.score,
-            "level": self.world,
-            "won": self.reached_goal,
-            "event": self.last_event,
-            "cause": self.last_cause,
-            "terminated": self.reached_goal or not self.alive,
-            "action_name": self.action_to_str(self.last_action),
-            "x_position": self.player.gObj.x if self.player else 0.0,
-            "y_position": self.player.gObj.y if self.player else 0.0,
-            "velocity_x": self.player.vx if self.player else 0.0,
-            "velocity_y": self.player.vy if self.player else 0.0,
-            "goal_dx": goal_dx,
-            "goal_dy": goal_dy,
-            "goal_dist": goal_dist,
-            "dijkstra_dist": max(0.0, dijkstra_dist),
-            "progress": progress,
-            "step_dx": self._step_dx,
-            "step_dy": self._step_dy,
-            "max_x_seen": self.max_x_seen,
-            "coins_collected": self.coins_total,
-            "enemies_killed_step": self.enemies_killed_step,
-            "boss_damage_step": self.boss_damage_step,
-            "damage_taken_step": self.damage_taken_step,
-            "stalled": self.stall_timer >= 1.5,
-            "stalled_this_frame": self.stalled_this_frame,
-            "on_ladder": bool(self.player and self.player.on_ladder),
-            "on_ground": bool(self.player and self.player.on_ground),
-            "boss_level": self.is_boss_level,
-            "boss_active": boss is not None,
-            "boss_hp_ratio": boss.hp / float(max(1, boss.hp_max)) if boss is not None else 0.0,
-            "curriculum_level_idx": self.current_index_world,
-            "curriculum_win_rate": self._curriculum_win_rate(),
-            "curriculum_max_unlocked": self._max_unlocked_index,
-            **self._obs_stats,
-        }
+        return {"score": self.score, "won": self.won, "alive": self.alive, "steps": self._steps,
+                "hp": self.player.hp, "screen": self.screen, "kills": self.kills_total,
+                "boss_hp": self.boss.hp if self.boss else None}
 
-    def _draw_background(self):
-        self._surf.fill(MEGAMAN_SKY)
-        pygame.draw.rect(self._surf, MEGAMAN_BG, (0, self.HEIGHT * 0.55, self.WIDTH, self.HEIGHT * 0.45))
-        for i in range(5):
-            cx = 80 + i * 180 - (self.camera_x * 0.12) % 180
-            cy = 70 + (i % 2) * 40
-            pygame.draw.circle(self._surf, (230, 240, 255), (int(cx), cy), 22)
-            pygame.draw.circle(self._surf, (230, 240, 255), (int(cx + 20), cy + 2), 18)
-            pygame.draw.circle(self._surf, (230, 240, 255), (int(cx - 18), cy + 4), 16)
+    # ── rendering (placeholder art: flat tiles, no sprites) ──────────────────
+    PAL = {"void": (0, 0, 0), "sky": (20, 28, 60), "solid": (176, 184, 196), "solid_hi": (228, 232, 240),
+           "solid_lo": (96, 104, 124), "ladder": (236, 180, 84), "ladder_lo": (148, 92, 28),
+           "spike": (228, 232, 240), "spike_lo": (140, 148, 164), "door": (232, 92, 60), "door_lo": (120, 36, 24),
+           "goal": (88, 216, 84), "body": (0, 112, 236), "body_hi": (60, 188, 252), "skin": (252, 216, 168),
+           "eye": (16, 16, 24), "shot": (252, 228, 160), "hp": (252, 228, 160), "hp_bg": (0, 0, 0),
+           "bullet": (255, 255, 255), "armour": (120, 124, 136), "boss_hp": (232, 92, 60),
+           "life": (252, 228, 160), "pearl": (120, 220, 252), "clear": (255, 255, 255)}
+    ENEMY_COL = {"b": (60, 120, 220), "f": (70, 170, 90), "v": (220, 120, 40), "h": (220, 120, 40),
+                 "w": (200, 160, 60), "W": (200, 160, 60), "e": (210, 60, 90), "s": (120, 90, 190),
+                 "k": (200, 70, 60), "j": (200, 70, 60), "K": (200, 70, 60), "J": (200, 70, 60),
+                 "cutter": (200, 204, 212), "X": (236, 236, 240)}
 
-    def _draw_world(self):
-        for ladder in getattr(self.level_data, "ladders", []):
-            sx = ladder.gObj.x - self.camera_x
-            sy = ladder.gObj.y - self.camera_y
-            if sx + ladder.gObj.width < 0 or sy + ladder.gObj.height < 0 or sx > self.WIDTH or sy > self.HEIGHT:
-                continue
-            ladder.render(self._surf, sx, sy)
+    def render(self, surface=None, blit_only: bool = False):
+        ld, ts, pal, A, sc = self.level_data, self.tile_size, self.PAL, self.assets, self.scale
+        if surface is None:
+            surface = pygame.Surface((self.WIDTH, self.HEIGHT))
+        vw, vh = surface.get_size()
+        camx, camy = int(self.camera_x), int(self.camera_y)
+        surface.fill(pal["void"])
 
-        for row in range(self.level_data.rows):
-            for col in range(self.level_data.cols):
-                tile = self.level_data.grid[row][col]
-                if tile == TILE_AIR:
+        painted = set()                             # screens drawn from the stage map
+        if A:
+            for sy in range(camy // self.HEIGHT, (camy + vh - 1) // self.HEIGHT + 1):
+                for sx in range(camx // self.WIDTH, (camx + vw - 1) // self.WIDTH + 1):
+                    if (sx, sy) in ld.screens:
+                        art = A.backdrop(self.level_file(), self._art, ld.grid, sx, sy,
+                                         self.screen_cols, self.screen_rows)
+                        if art:
+                            surface.blit(art, (sx * self.WIDTH - camx, sy * self.HEIGHT - camy))
+                            painted.add((sx, sy))
+        for ty in range(max(0, camy // ts), min(ld.rows, (camy + vh) // ts + 1)):
+            for tx in range(max(0, camx // ts), min(ld.cols, (camx + vw) // ts + 1)):
+                t = ld.grid[ty][tx]
+                if t == VOID:
                     continue
-                sx = col * self.TILE_SIZE - self.camera_x
-                sy = row * self.TILE_SIZE - self.camera_y
-                if sx + self.TILE_SIZE < 0 or sy + self.TILE_SIZE < 0 or sx > self.WIDTH or sy > self.HEIGHT:
-                    continue
-                if tile in (TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK):
-                    pygame.draw.rect(self._surf, METAL_MID, (sx, sy, self.TILE_SIZE, self.TILE_SIZE))
-                    pygame.draw.rect(self._surf, METAL_LIGHT, (sx, sy, self.TILE_SIZE, 6))
-                    pygame.draw.rect(self._surf, METAL_DARK, (sx, sy + self.TILE_SIZE - 6, self.TILE_SIZE, 6))
-                elif tile == TILE_PIT and self._is_exposed_pit_tile(col, row):
-                    pygame.draw.line(self._surf, PIT_ALERT, (sx + 4, sy + 4), (sx + self.TILE_SIZE - 4, sy + self.TILE_SIZE - 4), 2)
-                    pygame.draw.line(self._surf, PIT_ALERT, (sx + self.TILE_SIZE - 4, sy + 4), (sx + 4, sy + self.TILE_SIZE - 4), 2)
-                    pygame.draw.line(self._surf, PIT_ALERT, (sx + 3, sy + self.TILE_SIZE - 3), (sx + self.TILE_SIZE - 3, sy + self.TILE_SIZE - 3), 1)
-                elif tile == TILE_SPIKE:
-                    pygame.draw.polygon(
-                        self._surf,
-                        HAZARD_RED,
-                        [(sx, sy + self.TILE_SIZE), (sx + self.TILE_SIZE * 0.5, sy), (sx + self.TILE_SIZE, sy + self.TILE_SIZE)],
-                    )
-        for goal in self.level_data.goals:
-            sx = goal.gObj.x - self.camera_x
-            sy = goal.gObj.y - self.camera_y
-            if sx + goal.gObj.width < 0 or sy + goal.gObj.height < 0 or sx > self.WIDTH or sy > self.HEIGHT:
+                r = pygame.Rect(tx * ts - camx, ty * ts - camy, ts, ts)
+                if (tx // self.screen_cols, ty // self.screen_rows) in painted:
+                    if t != GOAL:
+                        continue
+                else:
+                    pygame.draw.rect(surface, pal["sky"], r)
+                if t == SOLID:
+                    pygame.draw.rect(surface, pal["solid"], r)
+                    pygame.draw.line(surface, pal["solid_hi"], r.topleft, (r.right - 1, r.top), 2)
+                    pygame.draw.line(surface, pal["solid_hi"], r.topleft, (r.left, r.bottom - 1), 2)
+                    pygame.draw.line(surface, pal["solid_lo"], (r.left, r.bottom - 1), (r.right - 1, r.bottom - 1), 2)
+                    pygame.draw.line(surface, pal["solid_lo"], (r.right - 1, r.top), (r.right - 1, r.bottom - 1), 2)
+                elif t == LADDER:
+                    for x in (r.left + 6, r.right - 8):
+                        pygame.draw.rect(surface, pal["ladder"], (x, r.top, 3, ts))
+                    for y in range(r.top + 4, r.bottom, 8):
+                        pygame.draw.rect(surface, pal["ladder_lo"], (r.left + 6, y, ts - 12, 3))
+                elif t == SPIKE:
+                    for i in range(2):
+                        x0 = r.left + i * ts // 2
+                        pts = [(x0, r.bottom), (x0 + ts // 4, r.top + 4), (x0 + ts // 2, r.bottom)]
+                        pygame.draw.polygon(surface, pal["spike"], pts)
+                        pygame.draw.polygon(surface, pal["spike_lo"], pts, 2)
+                elif t in (DOOR, DOOR_SHUT):
+                    pygame.draw.rect(surface, pal["door"], r.inflate(-12 if t == DOOR else 0, 0))
+                    for y in range(r.top, r.bottom, 8):
+                        pygame.draw.line(surface, pal["door_lo"], (r.left, y), (r.right - 1, y), 2)
+                elif t == GOAL:
+                    glow = 40 * math.sin(self._steps / 8)
+                    col = tuple(int(min(255, max(0, c + glow))) for c in pal["goal"])
+                    pygame.draw.rect(surface, col, r.inflate(-8, -8), border_radius=6)
+
+        def box(x, y, hw, hh):                      # an NES centre-anchored box, on screen
+            return pygame.Rect(int((x - hw) * sc) - camx, int((y - hh) * sc) - camy, int(2 * hw * sc), int(2 * hh * sc))
+
+        def put(name, x, y, anchor="cc", flip_x=False, flip_y=False) -> bool:
+            """Draw a sprite with its left/centre/right and top/centre/bottom at NES point (x, y)."""
+            img = A.sprite(name, flip_x, flip_y) if A else None
+            if img is None:
+                return False
+            w, h = img.get_size()
+            px = x * sc - camx - {"l": 0, "c": w / 2, "r": w}[anchor[0]]
+            py = y * sc - camy - {"t": 0, "c": h / 2, "b": h}[anchor[1]]
+            surface.blit(img, (int(px), int(py)))
+            return True
+
+        tick = self._steps
+        for it in self.items:
+            if not put(it.kind, it.x, it.y + en.ITEM_HALF[it.kind][1], "cb"):
+                r = box(it.x, it.y, *en.ITEM_HALF[it.kind])
+                if it.kind == "clear":
+                    pygame.draw.ellipse(surface, pal["clear"], r.inflate(int(4 * math.sin(tick / 6)), 0))
+                else:
+                    pygame.draw.rect(surface, pal["pearl" if it.kind == "pearl" else "life"], r, border_radius=3)
+                    pygame.draw.rect(surface, pal["eye"], r, 2, border_radius=3)
+        for e in self.enemies:
+            if not e.visible or (e.blink and (tick // 2) % 2):
                 continue
-            door_h = self.TILE_SIZE * 2
-            pygame.draw.rect(self._surf, (32, 88, 44), (sx + 3, sy - self.TILE_SIZE, self.TILE_SIZE - 6, door_h), border_radius=6)
-            pygame.draw.rect(self._surf, GOAL_GREEN, (sx + 5, sy - self.TILE_SIZE + 4, self.TILE_SIZE - 10, door_h - 8), border_radius=5)
-            pygame.draw.circle(self._surf, (220, 255, 220), (int(sx + self.TILE_SIZE - 9), int(sy + 2)), 3)
+            if put(*self._enemy_sprite(e)):
+                continue
+            r = box(e.x, e.y, max(e.hw, 6) if e.kind in "kjKJ" else e.hw, e.hh)
+            pygame.draw.rect(surface, self.ENEMY_COL[e.kind], r, border_radius=4)
+            pygame.draw.rect(surface, pal["armour"] if e.shielded else pal["eye"], r, 3 if e.shielded else 1,
+                             border_radius=4)
+            look = e.look if e is self.boss else e.facing
+            pygame.draw.rect(surface, pal["eye"], (r.centerx + look * r.width // 4 - 2, r.top + r.height // 4, 4, 5))
+        for b in self.enemy_bullets:
+            if not put("bullet", b.x, b.y):
+                pygame.draw.circle(surface, pal["bullet"], (int(b.x * sc) - camx, int(b.y * sc) - camy), int(2 * sc))
+        if self.boss_cutter:
+            c = self.boss_cutter
+            if not put(f"rolling{(tick // 4) % 4}", c.x, c.y):
+                pygame.draw.circle(surface, pal["armour"], (int(c.x * sc) - camx, int(c.y * sc) - camy), int(6 * sc))
+                pygame.draw.circle(surface, pal["clear"], (int(c.x * sc) - camx, int(c.y * sc) - camy), int(6 * sc), 2)
+        for s in self.shots:
+            w, h = self.shot_size
+            if not put("shot", (s.x + w / 2) / sc, (s.y + h / 2) / sc):
+                pygame.draw.ellipse(surface, pal["shot"], (int(s.x) - camx, int(s.y) - camy, w, h))
+        for x, y, _ in self.fx:
+            if not put("boom", x, y):
+                pygame.draw.circle(surface, pal["clear"], (int(x * sc) - camx, int(y * sc) - camy), int(10 * sc), 3)
+        p = self.player
+        if (self.alive or self.won) and not (p.blink and (tick // 2) % 2):
+            if not put(*self._player_sprite()):
+                body = pygame.Rect(int(p.x) - camx, int(p.y) - camy, p.width, p.height)
+                pygame.draw.rect(surface, pal["body"], body, border_radius=4)
+                pygame.draw.rect(surface, pal["body_hi"], (body.left, body.top, body.width, body.height // 3),
+                                 border_radius=4)
+                face = pygame.Rect(0, 0, body.width // 2, body.height // 5)
+                face.midtop = (body.centerx + p.facing * body.width // 5, body.top + body.height // 4)
+                pygame.draw.rect(surface, pal["skin"], face)
+                pygame.draw.rect(surface, pal["eye"], (face.centerx + p.facing * 3 - 1, face.top + 2, 3, face.height - 4))
+                arm = pygame.Rect(0, 0, 10, 8)      # the buster arm points where a shot would leave
+                arm.midleft = body.midright if p.facing > 0 else (body.left - 10, body.centery)
+                pygame.draw.rect(surface, pal["body_hi"], arm, border_radius=3)
+        if self.render_mode != "none":
+            self._hud(surface)
+        if self.sfx_events:
+            if A:
+                A.play(self.sfx_events)
+            self.sfx_events.clear()
+        return surface
 
-    def _draw_player(self):
-        if not self.player:
-            return
-        if self.player.i_frames > 0.0 and int(self.player.i_frames * 20) % 2 == 0:
-            return
-        sx = int(self.player.gObj.x - self.camera_x)
-        sy = int(self.player.gObj.y - self.camera_y)
-        w = self.player.gObj.width
-        h = self.player.gObj.height
-        pygame.draw.rect(self._surf, MEGAMAN_BLUE, (sx + 4, sy + 6, w - 8, h - 6), border_radius=6)
-        pygame.draw.rect(self._surf, MEGAMAN_CYAN, (sx + 3, sy, w - 6, 12), border_radius=6)
-        pygame.draw.rect(self._surf, MEGAMAN_DARK, (sx + 5, sy + h - 10, 7, 10), border_radius=4)
-        pygame.draw.rect(self._surf, MEGAMAN_DARK, (sx + w - 12, sy + h - 10, 7, 10), border_radius=4)
-        arm_x = sx + (w - 8 if self.player.facing_right else 2)
-        pygame.draw.rect(self._surf, MEGAMAN_CYAN, (arm_x, sy + 16, 6, 10), border_radius=3)
-        eye_x = sx + (w - 10 if self.player.facing_right else 6)
-        pygame.draw.rect(self._surf, (255, 255, 255), (eye_x, sy + 5, 4, 3))
-        if self.player.on_ladder:
-            pygame.draw.rect(self._surf, (255, 240, 150), (sx + 6, sy + 11, w - 12, 6), border_radius=3)
+    # Which frame, and where it hangs: (name, x, y, anchor, flip_x, flip_y) in NES pixels. The
+    # anchor names the sprite's left/centre/right and top/centre/bottom that sits on (x, y).
+    def _player_sprite(self):
+        p, tick = self.player, self._steps
+        cx, feet = self.nes_player()[0], self.nes_player_feet()
+        right = p.facing > 0                         # the sheet faces left
+        shoot = p.shoot_timer > 0
 
-    def _draw_entities(self):
-        for enemy in self.enemies:
-            enemy.render(self._surf, enemy.gObj.x - self.camera_x, enemy.gObj.y - self.camera_y)
-        for proj in self.projectiles:
-            proj.render(self._surf, proj.gObj.x - self.camera_x, proj.gObj.y - self.camera_y)
+        def aiming(name, half):                      # arm-out frames are wider on the facing side
+            return (name, cx - half if right else cx + half, feet, "lb" if right else "rb", right, False)
 
-    def _draw_hud(self):
-        hud = pygame.Surface((338, 92), pygame.SRCALPHA)
-        hud.fill((0, 0, 0, 170))
-        self._surf.blit(hud, (10, 10))
-        top_text = self.small_font.render(
-            f"Lives {self.lives}   Score {self.score}   Time {int(self.time_limit)}",
-            True,
-            (255, 255, 255),
-        )
-        self._surf.blit(top_text, (18, 14))
-        hp_text = self.small_font.render(f"HP {self.player.hp}/{self.player.hp_max}", True, MEGAMAN_CYAN)
-        self._surf.blit(hp_text, (18, 32))
-        bar_w = 170
-        bar_x = 18
-        bar_y = 48
-        pygame.draw.rect(self._surf, (30, 30, 30), (bar_x, bar_y, bar_w, 8), border_radius=4)
-        pygame.draw.rect(
-            self._surf,
-            MEGAMAN_CYAN,
-            (bar_x, bar_y, int(bar_w * (self.player.hp / float(self.player.hp_max))), 8),
-            border_radius=4,
-        )
-        shot_text = self.small_font.render("Buster", True, SHOT_ORANGE)
-        self._surf.blit(shot_text, (205, 32))
-        cd_w = 92
-        cd_x = 205
-        cd_y = 48
-        cooldown_ratio = 1.0 - np.clip(self.player.shot_cooldown / max(0.001, self.shot_cooldown_time), 0.0, 1.0)
-        pygame.draw.rect(self._surf, (30, 30, 30), (cd_x, cd_y, cd_w, 8), border_radius=4)
-        pygame.draw.rect(self._surf, SHOT_ORANGE, (cd_x, cd_y, int(cd_w * cooldown_ratio), 8), border_radius=4)
-        active_player_shots = sum(
-            1 for proj in self.projectiles if proj.gObj.active and proj.owner == "player"
-        )
-        pip_x = 205
-        pip_y = 64
-        for i in range(self.max_player_shots):
-            filled = i < active_player_shots
-            color = SHOT_ORANGE if filled else (60, 52, 44)
-            pygame.draw.circle(self._surf, color, (pip_x + i * 16, pip_y), 5)
-            pygame.draw.circle(self._surf, (255, 228, 190), (pip_x + i * 16, pip_y), 5, 1)
+        if p.knock > 0:
+            return ("mm_hurt", cx, feet + 4, "cb", right, False)
+        if p.climbing:
+            if shoot:
+                return aiming("mm_climb_shoot", 8)[:2] + (feet + 4,) + aiming("mm_climb_shoot", 8)[3:]
+            return (f"mm_climb{int(p.y / self.scale) // 8 % 2}", cx, feet + 4, "cb", False, False)
+        if not p.grounded:
+            return ("mm_jump_shoot" if shoot else "mm_jump", cx, feet + 4, "cb", right, False)
+        if p.moving_frames > self.step_frames:
+            i = (0, 1, 2, 1)[tick // 6 % 4]
+            return aiming(f"mm_walk{i}_shoot", 12) if shoot else (f"mm_walk{i}", cx, feet, "cb", right, False)
+        if shoot:
+            return aiming("mm_idle_shoot", 12)
+        name = "mm_inch" if p.moving_frames else "mm_blink" if tick % 128 < 8 else "mm_idle"
+        return (name, cx, feet, "cb", right, False)
 
-        boss = self._current_boss()
-        if self.is_boss_level and boss is not None:
-            boss_w = 320
-            boss_hud = pygame.Surface((boss_w, 42), pygame.SRCALPHA)
-            boss_hud.fill((0, 0, 0, 170))
-            hud_left = 10
-            hud_w = 338
-            safe_left = hud_left + hud_w + 24
-            safe_right = self.WIDTH - 24
-            open_w = safe_right - safe_left
-            if open_w >= boss_w:
-                boss_x = safe_left + (open_w - boss_w) // 2
+    def _enemy_sprite(self, e):
+        k, tick = e.kind, self._steps
+        right = e.facing > 0
+        if k == "b":
+            return (f"blader{tick // 4 % 2}", e.x, e.y + e.hh, "cb", right, False)
+        if k in "kjKJ":                              # hangs off the wall behind it
+            i = 0 if e.t < 82 else 1 if e.t < 89 or e.t >= 199 else 2 if e.t < 96 or e.t >= 192 else 3
+            return (f"beak{i}", e.x - 8 if right else e.x + 8, e.y, "lc" if right else "rc", right, False)
+        if k == "f":
+            return ("flea_jump" if e.state == "air" else "flea_sit", e.x, e.y + e.hh, "cb", right, False)
+        if k in "vh":
+            i = 2 if e.fd == 0 else 1 if e.fd < 8 else 0
+            return (f"octopus{i}", e.x, e.y, "cc", False, False)
+        if k in "wW":                                # grows out of the floor below / ceiling above
+            name = f"screw{tick // 4 % 4}" if e.state == "up" else "screw_shut"
+            return (name, e.x, e.home[1], "cb" if k == "w" else "ct", False, k == "W")
+        if k == "e":
+            return ("bigeye_high" if e.state == "air" else "bigeye_low", e.x, e.y + e.hh, "cb", right, False)
+        if k == "s":
+            return ("shell_shut" if e.shielded else "shell_open", e.x, e.y + 8, "cb", False, False)
+        if k == "cutter":
+            return (f"cutter{tick // 4 % 2}", e.x, e.y, "cc", not right, False)
+        if k == en.BOSS_GLYPH:                       # his sheet faces right
+            left = e.look < 0
+            bare = "bare_" if self.boss_cutter else ""
+            if e.state in (15, 17, 19, 21, 23):
+                name = "cut_throw" if e.anim < 16 and not bare else "cut_thrown"
+            elif e.vy != en.REST_SPEED:
+                name = f"cut_{bare}jump"
+            elif e.state == 6:
+                name = f"cut_{bare}walk{tick // 6 % 3}"
+                left = not left                      # the walk frames are drawn facing the other way
             else:
-                boss_x = max(10, (self.WIDTH - boss_w) // 2)
-            boss_y = 12
-            self._surf.blit(boss_hud, (boss_x, boss_y))
-            title = self.small_font.render("BOSS", True, (255, 215, 180))
-            self._surf.blit(title, (boss_x + 12, boss_y + 9))
-            pygame.draw.rect(self._surf, (36, 24, 24), (boss_x + 74, boss_y + 15, 228, 10), border_radius=5)
-            pygame.draw.rect(
-                self._surf,
-                HAZARD_RED,
-                (boss_x + 74, boss_y + 15, int(228 * (boss.hp / float(max(1, boss.hp_max)))), 10),
-                border_radius=5,
-            )
+                name = f"cut_{bare}idle{1 if tick % 64 < 8 else 0}"
+            return (name, e.x, e.y + e.hh, "cb", left, False)
+        return ("bullet", e.x, e.y, "cc", False, False)
 
-    def render(self, surface: pygame.Surface | None = None, blit_only: bool = False):
-        self._draw_background()
-        self._draw_world()
-        self._draw_entities()
-        self._draw_player()
-        self._draw_hud()
-        if self.render_mode == "human" and getattr(self.debug_manager, "show_sensors", False):
-            ray_surf = pygame.Surface((self.WIDTH, self.HEIGHT), pygame.SRCALPHA)
-            for start, end, found, rtype in self.last_rays:
-                color = (*MEGAMAN_CYAN, 190)
-                s_cam = (start[0] - self.camera_x, start[1] - self.camera_y)
-                e_cam = (end[0] - self.camera_x, end[1] - self.camera_y)
-                pygame.draw.line(ray_surf, color, s_cam, e_cam, 2)
-                if found:
-                    pygame.draw.circle(ray_surf, (255, 255, 255, 220), (int(e_cam[0]), int(e_cam[1])), 3)
-            mx, my = self._player_muzzle_world()
-            origin = (int(mx - self.camera_x), int(my - self.camera_y))
-            pygame.draw.circle(ray_surf, MEGAMAN_CYAN, origin, 4)
-            pygame.draw.circle(ray_surf, (255, 255, 255), origin, 4, 1)
-            self._surf.blit(ray_surf, (0, 0))
-        if self.render_mode == "human":
-            self.debug_manager.render_overlays(self._surf, self)
-
-        if blit_only and surface is not None:
-            surface.blit(self._surf, (0, 0))
-            return
-
-        if self.render_mode == "human":
-            pygame.display.flip()
-
-    def get_action_space(self):
-        return self.action_space
-
-    def get_observation_space(self):
-        return self.observation_space
-
-    def action_to_str(self, action):
-        try:
-            move, climb, jump, fire = self._parse_action(action)
-        except Exception:
-            return "IDLE"
-        names = {
-            0: "IDLE",
-            1: "LEFT",
-            2: "RUN_LEFT",
-            3: "RIGHT",
-            4: "RUN_RIGHT",
-        }
-        out = names.get(move, "IDLE")
-        if climb == 1:
-            out += "+UP"
-        elif climb == 2:
-            out += "+DOWN"
-        if jump:
-            out += "+JUMP"
-        if fire:
-            out += "+FIRE"
-        return out
-
-    def close(self):
-        if self.render_mode == "human":
-            pygame.quit()
+    def _hud(self, surface) -> None:
+        """The console's vertical energy meter, top left."""
+        p, s = self.player, int(self.scale)
+        x, y, w = 24 * s, 16 * s, 6 * s
+        pygame.draw.rect(surface, self.PAL["hp_bg"], (x - s, y - s, w + 2 * s, p.hp_max * 2 * s + s))
+        colour = self.PAL["goal"] if self.invincible else self.PAL["hp"]   # green meter: debug invincibility
+        for i in range(p.hp):
+            pygame.draw.rect(surface, colour, (x, y + (p.hp_max - 1 - i) * 2 * s, w, s))
+        if self.boss:                                # the boss's meter stands beside it
+            x += 16 * s
+            pygame.draw.rect(surface, self.PAL["hp_bg"], (x - s, y - s, w + 2 * s, en.BOSS_HP * 2 * s + s))
+            for i in range(max(0, self.boss.hp)):
+                pygame.draw.rect(surface, self.PAL["boss_hp"], (x, y + (en.BOSS_HP - 1 - i) * 2 * s, w, s))
 
 
-MegaManCore = MegamanCore
+if __name__ == "__main__":  # smoke: movement numbers, ladders, screen flips, both deaths, a win
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+    from code.games.megaman_core import MegamanCore, en, SPIKE, DOOR_SHUT   # one copy of the classes
+    IDLE, RIGHT, LEFT, UP, DOWN, JUMP = (0, 0, 0, 0), (1, 0, 0, 0), (-1, 0, 0, 0), (0, -1, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)
+
+    def place(core, col, row):
+        """Stand the player in a cell, feet on its bottom edge."""
+        p, ts = core.player, core.tile_size
+        p.x, p.y = col * ts + (ts - p.width) / 2.0, (row + 1) * ts - p.height
+        p.vx = p.vy = 0.0
+        p.grounded = p.climbing = False
+        core.screen = (col // core.screen_cols, row // core.screen_rows)
+        core.camera_x, core.camera_y = core._camera_target()
+
+    def find(core, glyph):
+        return [(c, r) for r, row in enumerate(core.level_data.grid) for c, ch in enumerate(row) if ch == glyph]
+
+    core = MegamanCore(level="CutMan")
+    p, ts, s = core.player, core.tile_size, core.scale
+    y0 = p.y
+    for _ in range(10):
+        core.step(IDLE)
+    assert p.grounded and p.y == y0, (p.grounded, p.y, y0)
+
+    x0 = p.x                                         # 7 frames of inching, then 1.375 px/frame
+    for _ in range(27):
+        core.step(RIGHT)
+    assert abs((p.x - x0) / s - (7 * 0.125 + 20 * 1.375)) < 1e-6, (p.x - x0) / s
+
+    core = MegamanCore(level="CutMan")
+    p = core.player
+    core.step(IDLE)
+    top = y0 = p.y
+    for _ in range(60):
+        core.step(JUMP)
+        top = min(top, p.y)
+    assert 48.0 < (y0 - top) / s < 51.0 and p.grounded, (y0 - top) / s       # full jump: about 3.1 tiles
+    core.step(IDLE)
+    top = p.y
+    for i in range(60):
+        core.step(JUMP if i < 3 else IDLE)
+        top = min(top, p.y)
+    assert (y0 - top) / s < 20.0, (y0 - top) / s                              # tap: a short hop
+
+    core = MegamanCore(level="CutMan")                            # first ladder: down from the walkway, back up
+    p = core.player
+    place(core, 5, 125)
+    core.step(IDLE)
+    assert p.grounded, "the ladder top should hold the player up"
+    for _ in range(400):
+        core.step(DOWN)
+    assert not p.climbing and p.grounded and p.y + p.height == 132 * ts, (p.climbing, p.y)
+    for _ in range(400):
+        core.step(UP)
+    assert not p.climbing and p.grounded and p.y + p.height == 126 * ts, (p.climbing, p.y)
+
+    core = MegamanCore(level="CutMan")                            # the ladder out of the first run of screens
+    p = core.player
+    place(core, 61, 122)
+    core.step(UP)
+    assert p.climbing and core.screen == (3, 8)
+    for _ in range(200):
+        core.step(UP)
+    assert core.screen == (3, 7) and core.camera_y == 7 * core.HEIGHT, (core.screen, core.camera_y)
+    assert p.grounded and not p.climbing             # stepped off the top rung, one screen up
+    core.step(DOWN)                                  # back onto the ladder ...
+    core.step(IDLE)
+    core.step(JUMP)                                  # ... and let go: fall back into the screen below
+    for _ in range(200):
+        core.step(IDLE)
+    assert core.alive and core.screen == (3, 8), (core.alive, core.screen)
+
+    core = MegamanCore(level="CutMan")
+    place(core, 42, 131)                             # over the first real pit
+    for _ in range(120):
+        core.step(IDLE)
+    assert not core.alive and core.death_cause == "Pit", (core.alive, core.death_cause)
+
+    core = MegamanCore(level="CutMan")
+    c, r = find(core, SPIKE)[0]
+    place(core, c, r - 2)
+    for _ in range(120):
+        core.step(IDLE)
+    assert not core.alive and core.death_cause == "Spike", (core.alive, core.death_cause)
+
+    core = MegamanCore(level="CutMan")                            # through the first shutter; it seals behind
+    p = core.player
+    doors = core.level_data.doors
+    r, c = max(d for d in doors if d[1] == min(d[1] for d in doors))
+    place(core, c - 2, r)
+    for _ in range(120):
+        core.step(RIGHT)
+    assert p.x > (c + 1) * ts and core.tile(c, r) == DOOR_SHUT, (p.x, core.tile(c, r))
+    for _ in range(240):
+        core.step(LEFT)
+    assert p.x == (c + 1) * ts, p.x
+    assert core.camera_x == (c + 1) * ts, core.camera_x
+
+    def spawn_cell(glyph):
+        return next((c, r) for g, c, r in MegamanCore(level="CutMan").level_data.spawns if g == glyph)
+
+    core = MegamanCore(level="CutMan")                            # a Beak: armoured shut, one shot kills it open
+    p = core.player
+    c, r = spawn_cell("k")                           # fires left; stand five tiles to its left
+    place(core, c - 5, r + 3)
+    core.step(IDLE)
+    beak = next(e for e in core.enemies if e.kind == "k" and e.spawn >= 0 and (e.x // 16, e.y // 16) == (c, r))
+    assert beak.shielded and core._hit_enemy(beak) and beak.hp == en.ENEMY_HP
+    while beak.t != 100:
+        core.step(IDLE)
+    assert not beak.shielded and len(core.enemy_bullets) >= 1, (beak.t, core.enemy_bullets)
+    core._hit_enemy(beak)
+    assert beak not in core.enemies and core.kills_total == 1 and core.score >= 200
+
+    core = MegamanCore(level="CutMan")                            # contact damage, knockback, then the blink
+    p = core.player
+    c, r = spawn_cell("v")
+    place(core, c, r)
+    hp = p.hp
+    core.step(IDLE)
+    core.step(IDLE)
+    assert p.hp == hp - 4 and p.blink > 100 and p.knock > 0, (p.hp, p.blink, p.knock)
+    for _ in range(60):
+        core.step(RIGHT)
+    assert p.hp == hp - 4 and p.knock == 0, (p.hp, p.knock)
+
+    core = MegamanCore(level="CutMan", seed=7)                      # the boss room: intro, fight, the orb he leaves
+    p = core.player
+    bx, by = spawn_cell(en.BOSS_GLYPH)
+    place(core, bx - 6, by)
+    for _ in range(en.BOSS_INTRO_FRAMES + 2):
+        core.step(RIGHT)
+    assert core.boss and core.boss.hp == en.BOSS_HP and p.x < (bx - 5) * ts, (core.boss, p.x)
+    states = set()
+    for i in range(1500):
+        states.add(core.boss.state)
+        core.step(IDLE)
+        if not core.alive:
+            break
+    assert len(states) >= 6, states                  # he walks, jumps and throws
+    assert not core.alive and core.death_cause == "Cut Man", (core.alive, core.death_cause, p.hp)
+
+    core = MegamanCore(level="CutMan", seed=7)
+    p = core.player
+    place(core, bx - 6, by)
+    for _ in range(en.BOSS_INTRO_FRAMES + 2):
+        core.step(IDLE)
+    core.boss.hp = 3                                 # one buster shot from defeat
+    for i in range(3000):
+        if core.boss is None:
+            break
+        toward = 1 if core.boss.x * s > p.x else -1
+        core.step((toward if i % 20 == 0 else 0, 0, 0, i % 4 == 0))
+    assert core.boss_dead and core.alive, (core.boss_dead, core.alive, core.death_cause)
+    orb = next(it for it in core.items if it.kind == "clear")
+    for _ in range(600):
+        _, _, done, _, _ = core.step((1 if orb.x * s > p.x + p.width / 2 else -1, 0, 0, 0))
+        if done:
+            break
+    assert core.won and core.alive, (core.won, core.alive, core.death_cause)
+    assert core.render().get_size() == (core.WIDTH, core.HEIGHT)
+    print("megaman core ok")

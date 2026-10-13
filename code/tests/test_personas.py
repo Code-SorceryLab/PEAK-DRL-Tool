@@ -43,9 +43,9 @@ def test_only_the_bad_player_slips_and_slips_last():
     act = (1, False, 0)
     good = Hands(PERSONAS["good"], np.random.default_rng(0))
     assert all(good(act) == act for _ in range(500))
-    bad = Hands(PERSONAS["bad"], np.random.default_rng(0))
-    out = [bad(act) != act for _ in range(6000)]
+    clumsy = Hands(PERSONAS["clumsy"], np.random.default_rng(0))
+    out = [clumsy(act) != act for _ in range(6000)]
     share = sum(out) / len(out)
     assert 0.1 < share < 0.4  # ~0.03 starts/frame x 12 frames held, minus no-op draws
     runs = [len(r) for r in "".join("x" if o else "." for o in out).split(".") if r]
-    assert max(runs) >= PERSONAS["bad"].slip_frames // 2  # a slip is held, not a 1-frame flicker
+    assert max(runs) >= PERSONAS["clumsy"].slip_frames // 2  # a slip is held, not a 1-frame flicker

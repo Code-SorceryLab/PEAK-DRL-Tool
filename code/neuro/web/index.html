@@ -164,6 +164,7 @@
           <span title="In-game score">score <b class="text-zinc-200" id="m_score">–</b></span>
           <span title="Coins collected this episode">coins <b class="text-zinc-200" id="m_coins">–</b></span>
           <span title="In-game timer remaining">time <b class="text-zinc-200" id="m_time">–</b></span>
+          <span id="m_energy_wrap" class="hidden" title="Energy (life) the watched specimen has left">energy <b class="text-zinc-200" id="m_energy">–</b></span>
           <span id="m_cause_wrap" class="hidden">ended by <b class="text-red-300" id="m_cause">–</b></span>
         </div>
       </section>
@@ -291,7 +292,7 @@ const INVERT = new Set([0,1,2,3,4,5,6]);
 let ws, turbo=false, manual=false, sensorsOn=true, watched=0, nEnvs=0, levelLen=0, curLevel="", lastSeen=0, hadFirstWin=false;
 let history=[], hitboxes=false, gridOn=false, pendingLevel=null;
 const lastImg={}, specEls=[], senseEls=[];
-const keys={left:false,right:false,jump:false,up:false,down:false};
+const keys={left:false,right:false,jump:false,up:false,down:false,fire:false};
 const $ = id => document.getElementById(id);
 const send = o => { if (ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
 const fmt = v => v===undefined||v===null ? "–" : (+v).toLocaleString("en-US",{maximumFractionDigits:0});
@@ -513,7 +514,7 @@ function onUpdate(m){
   const s = m.stats || {};
   lastSeen = Date.now();
   if (s.pop_size && s.pop_size !== nEnvs) buildWall(s.pop_size);
-  if (s.game){ $("h_game").textContent = s.game; KEYMAP = TOPDOWN.has(s.game) ? KEYMAPS.topdown : KEYMAPS.side;
+  if (s.game){ $("h_game").textContent = s.game; KEYMAP = TOPDOWN.has(s.game) ? KEYMAPS.topdown : LADDER.has(s.game) ? KEYMAPS.ladder : KEYMAPS.side;
     $("m_x_lbl").textContent = TOPDOWN.has(s.game) ? "reach" : "x";
     $("m_x_wrap").title = TOPDOWN.has(s.game) ? "How much of the route to the exit is behind the agent"
                                               : "Horizontal position in pixels";
@@ -619,6 +620,8 @@ function onUpdate(m){
         $("m_score").textContent = fmt(e.live.score);
         $("m_coins").textContent = e.live.coins;
         $("m_time").textContent = Math.max(0, Math.round(e.live.time_left));
+        $("m_energy_wrap").classList.toggle("hidden", e.live.energy == null);
+        if (e.live.energy != null) $("m_energy").textContent = e.live.energy + " / " + e.live.energy_max;
         const ended = e.live.cause && e.status !== "RUNNING";
         $("m_cause_wrap").classList.toggle("hidden", !ended);
         if (ended) $("m_cause").textContent = e.live.cause.toLowerCase();
@@ -675,7 +678,7 @@ function setManual(on, notify=true){
   bz.classList.toggle("shadow-[0_12px_40px_-8px_rgba(239,68,68,0.45)]", on);
   $("ribbon").classList.toggle("hidden", !on);
   if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();  // keys go to the game, not a button
-  if (!on) keys.left = keys.right = keys.jump = keys.up = keys.down = false;
+  if (!on) keys.left = keys.right = keys.jump = keys.up = keys.down = keys.fire = false;
   if (notify) send({cmd:"manual", on});
 }
 $("b_manual").onclick = () => setManual(!manual);
@@ -710,8 +713,10 @@ $("levelcancel").onclick = () => {
 const KEYMAPS = {  // side-scrollers: up = jump; top-down (bomberman): WASD/arrows move, space drops a bomb (the "jump" output)
   side:    {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"jump",w:"jump"," ":"jump"},
   topdown: {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"up",w:"up",ArrowDown:"down",s:"down"," ":"jump"},
+  ladder:  {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"up",w:"up",ArrowDown:"down",s:"down"," ":"jump",z:"fire",j:"fire"},
 };
 const TOPDOWN = new Set(["bomberman"]);
+const LADDER = new Set(["megaman"]);   // side view with ladders and a fire button; progress is route, not x
 let KEYMAP = KEYMAPS.side;
 const HOTKEYS = {t:"b_turbo", s:"b_sensors", h:"b_hitboxes", g:"b_grid", m:"b_manual"};
 const inField = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement||{}).tagName || "");

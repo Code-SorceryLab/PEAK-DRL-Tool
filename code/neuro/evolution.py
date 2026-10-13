@@ -63,6 +63,19 @@ class Population:
         # rest (median, wins, statuses, per-env episode stats, duration, ...).
         self.history: list[dict] = []
 
+    def seed_from(self, weights: np.ndarray, rate: float = 0.3) -> None:
+        """Start from one given genome (e.g. a network fitted to demonstrations) instead of random
+        ones: the genome itself, then copies each with a share of its weights nudged."""
+        w = np.asarray(weights, dtype=np.float32).ravel()
+        if w.size != self.n_params:
+            raise ValueError(f"seed genome has {w.size} weights, this population needs {self.n_params} "
+                             f"(check --hidden / --memory against the seed)")
+        self.weights[0] = w
+        for i in range(1, self.cfg.pop_size):
+            mut = self.rng.random(self.n_params) < rate
+            self.weights[i] = (w + mut * self.rng.normal(0.0, self.cfg.mutation_sigma, self.n_params)).astype(np.float32)
+        self.best_weights = w.copy()
+
     def _tournament(self, fitnesses: np.ndarray) -> int:
         idx = self.rng.integers(0, self.cfg.pop_size, self.cfg.tournament_k)
         return int(idx[np.argmax(fitnesses[idx])])

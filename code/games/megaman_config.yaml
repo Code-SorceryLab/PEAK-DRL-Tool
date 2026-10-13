@@ -1,0 +1,69 @@
+# Mega Man (NES, 1987) — standalone game: megaman_core.py reads only this file.
+# World pixels are NES pixels x (tile_size / 16), so the stage keeps the 32 px tiles the sensors
+# and the editor expect while every number below stays in the units the ROM uses.
+tile_size: 32              # one NES tile (16 px) at 2x
+fps: 60
+time_limit: 300            # seconds per attempt (the NES game has no clock; this caps an episode)
+screen: {cols: 16, rows: 15}   # one NES screen, 256 x 240 px
+scroll_speed: 4.0          # NES px/frame the camera moves between screens (a 60-frame vertical flip)
+
+# NES px and px/frame at 60 fps, read from the disassembly (github.com/TheRealQuantam/mm1dasm).
+# 8.8 fixed point in the ROM: $04.DF = 4 + 223/256.
+player:
+  width: 14                # hitbox; the sprite is 16 x 24
+  height: 23
+  hp: 28
+  run_speed: 1.375         # $01.60  ground, running
+  air_speed: 1.3125        # $01.50  steering in the air
+  step_speed: 0.125        # $00.20  the first-step "inch" after standing still
+  step_frames: 7           # approximate: the ROM times it off the animation counter
+  slide_speed: 0.5         # $00.80  the slide after letting go of the pad
+  slide_frames: 8          # approximate, same reason
+  jump_velocity: 4.871     # $04.DF  about 3.1 tiles at full hold
+  jump_cut_velocity: 1.0   # releasing jump while rising caps the upward speed here
+  gravity: 0.25            # $00.40 per frame
+  max_fall_speed: 12.0     # $0C.00
+  ladder_speed: 0.75       # $00.C0, up and down
+  ladder_mount_drop: 12    # px moved down when stepping onto a ladder from its top
+  hurt_invulnerable_frames: 111   # $6F: the blink after a hit (spikes and pits ignore it)
+  knockback_frames: 29     # no control and no firing while thrown back
+  knockback_speed: 0.5625  # $00.90, the way the attacker faces
+  knockback_hop: 1.25      # $01.40 upward on the first frame
+buster:
+  speed: 4.0               # px/frame
+  max_shots: 3             # on screen at once
+  size: [8, 6]
+
+# How fast an agent may work the pad (frames at 60 fps). A net decides every frame, which no
+# hand can do; these caps hold it to what a quick human manages. They apply to agents only —
+# manual play reads your keys and controller directly. Set a value to 1 to lift that cap.
+agent_input:
+  fire_period: 8             # at most one shot every 8 frames (7.5 presses a second)
+  jump_period: 8             # at least 8 frames between two jump presses
+  turn_period: 6             # a direction, once chosen, is held at least 6 frames (0.1 s)
+
+# How a genome is scored on a stage section while training. One attempt from one fixed start
+# breeds agents that only work from that start; in the full stage a section is entered with
+# whatever energy is left and slightly different timing. So each genome plays the section
+# several times and its fitness is the mean: the first attempt as the section is defined, the
+# rest with a different seed and (except in the stage's first section) random starting energy
+# and facing; the second attempt always starts in the lower half of the energy range.
+# A genome counts as a winner only if it wins every attempt.
+training:
+  attempts: 3                # PEAK_MM1_ATTEMPTS overrides it (the tests use 1)
+  min_start_energy: 10       # later attempts start with between this much and full energy
+  stall_frames: 240          # an attempt with no progress for this long is over
+  sticky_actions: 0.25       # on later attempts, each frame has this chance of repeating the last frame's
+                             # buttons: the game is mostly not random, so this is what makes attempts differ
+
+# Optional art and sound. The folder is git-ignored (it holds the ROM, ripped sprite sheets and
+# sound effects); without it the game draws flat placeholder shapes and is silent.
+assets:
+  enabled: true
+  dir: megaman-data          # relative to the repository root; PEAK_MM1_ASSETS overrides it
+  rom: "Mega Man (USA).nes"
+  maps:                      # ROM stage -> the map image its tile art is cropped from; a level
+    cutman: "sprites/NES - Mega Man - Stages - Cut Man Stage.png"   # names its stage in megaman_levels.yaml
+
+# The level list lives in megaman_levels.yaml: the level editor rewrites that file when levels
+# are added, renamed, reordered or switched off, and it must never rewrite this one.

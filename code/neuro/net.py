@@ -58,9 +58,10 @@ class NeuralNet:
         h = np.tanh(x @ self._w1 + self._b1)
         return 1.0 / (1.0 + np.exp(-(h @ self._w2 + self._b2)))
 
-    def act(self, x: np.ndarray) -> tuple[int, bool, int]:
+    def act(self, x: np.ndarray) -> tuple:
         """Sensor vector -> (move_x, jump, move_y), each axis in {-1,0,+1}; opposing outputs resolve
-        by argmax. move_y is always 0 for 3-output nets (side-scrollers)."""
+        by argmax. move_y is always 0 for 3-output nets (side-scrollers). A net with a sixth
+        output (megaman) returns (move_x, jump, move_y, fire)."""
         if self.carry.size:
             x = np.concatenate((x, self.carry))
         out = self.forward(x)
@@ -77,6 +78,8 @@ class NeuralNet:
         if self.carry.size:
             head = [float(move_x), float(jump)] if self.feedback else []
             self.carry = np.concatenate((head, out[self.n_outputs:])).astype(np.float32)
+        if self.n_outputs >= 6:
+            return move_x, jump, move_y, bool(out[5] > 0.5)
         return move_x, jump, move_y
 
 

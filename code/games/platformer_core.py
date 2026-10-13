@@ -462,7 +462,7 @@ class PlatformerCore(gymnasium.Env):
 
         # ── Eval-trust flags (Task 1) ─────────────────────────────────────────
         # curriculum_enabled=False: reset() pins to self.world and never touches
-        #   the shared curriculum/batch state. Mirrors sonic_core/megaman_core.
+        #   the shared curriculum/batch state. Mirrors sonic_core.
         # terminate_on_goal=True: reaching the goal ENDS the episode (eval only),
         #   instead of the inline next-level transition done during training.
         self.curriculum_enabled = bool(kwargs.pop("curriculum_enabled", True))
