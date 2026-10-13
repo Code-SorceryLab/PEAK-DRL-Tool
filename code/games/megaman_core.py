@@ -35,7 +35,7 @@ LEVELS_PATH = os.path.join(_HERE, "megaman_levels.yaml")   # the level editor ow
 AIR, VOID, SOLID, LADDER, SPIKE, GOAL, START = ".", " ", "#", "H", "^", "G", "P"
 DOOR, DOOR_SHUT = "D", "d"      # a shutter lets the player through once, then seals behind them
 EPS = 1e-6
-MUTANT_ENV = "PEAK_MM1_MUTANT"  # a mutant's folder or mutant.json (megaman_mutants.py): play that copy of the game
+MUTANT_ENV = "PEAK_MM1_MUTANT"  # a mutant's folder or mutant.json (mutants.py): play that copy of the game
 
 
 def active_mutant() -> dict | None:

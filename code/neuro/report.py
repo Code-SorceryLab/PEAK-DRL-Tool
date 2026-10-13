@@ -205,7 +205,7 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
         for row in grid:
             for ch in row:
                 if ch not in " #":
-                    census[GLYPH_NAME[ch]] = census.get(GLYPH_NAME[ch], 0) + 1
+                    census[GLYPH_NAME.get(ch, ch)] = census.get(GLYPH_NAME.get(ch, ch), 0) + 1
         if census:
             sections.append(("Entities", dict(sorted(census.items()))))
     path = _level_file(game, level)
@@ -233,6 +233,9 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
     elif game == "megaman":
         sections.append(("Player (NES px, px/frame)", _flatten(g.get("player"))))
         sections.append(("Buster", _flatten(g.get("buster"))))
+    elif game == "castlevania":
+        sections.append(("Player (NES px, px/frame)", _flatten(g.get("player"))))
+        sections.append(("Whip", _flatten(g.get("whip"))))
     elif game == "bomberman":
         sections.append(("Player", _flatten(g.get("player"))))
         sections.append(("Bombs", _flatten(g.get("bomb"))))
@@ -1342,6 +1345,10 @@ def _ray_layout(game: str) -> str:
         return (f"{len(RAY_DIRS)} rays relative to facing + enemy ahead + nearest-enemy bearing + nearest shot "
                 "+ pit probe + body + ladder here / below / overhead / ahead + route compass + boss energy; "
                 "outputs: left, right, jump, up, down, fire")
+    if game == "castlevania":
+        return (f"{len(RAY_DIRS)} rays relative to facing + enemy ahead + nearest-enemy bearing + nearest fireball "
+                "+ pit probe + body + whip ready + stairs here (foot / head) / along the floor + route compass "
+                "+ boss energy; outputs: left, right, jump, up, down, fire")
     return (f"{len(RAY_DIRS)} rays ({RAY_MAX_DIST:.0f} px reach, {RAY_STEP:.0f} px steps) + enemy corridor "
             f"+ pit probe + q-block count + body state")
 

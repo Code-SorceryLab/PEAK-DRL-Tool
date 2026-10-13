@@ -1,4 +1,4 @@
-"""Game mutants (code/games/megaman_mutants.py): one change each, a class the route check backs,
+"""Game mutants (code/games/mutants.py): one change each, a class the route check backs,
 and a game that loads them when PEAK_MM1_MUTANT names one."""
 import os
 
@@ -6,7 +6,7 @@ import pytest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-from code.games import megaman_mutants as mm
+from code.games import mutants as mm
 from code.games.megaman_core import MUTANT_ENV, MegamanCore
 
 
@@ -21,7 +21,7 @@ def test_one_mutant_per_operator_and_section_or_a_reason(generated):
     level = [(m["section"], m["operator"]) for m in index["mutants"] if m["family"] == "level"]
     skipped = [(s["section"], s["operator"]) for s in index["skipped"]]
     assert len(set(level)) == len(level) and not set(level) & set(skipped)
-    assert set(level) | set(skipped) == {(name, op) for name, _ in stage.sections for op in mm.LEVEL_OPERATORS}
+    assert set(level) | set(skipped) == {(name, op) for name, _ in stage.sections for op in stage.game.level_operators}
     assert all(s["reason"] for s in index["skipped"])
     assert {m["class"] for m in index["mutants"]} == {"breaking", "degrading", "neutral"}
 

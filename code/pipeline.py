@@ -1,13 +1,17 @@
-"""Pipeline pages: one local site that walks the Mega Man pipeline from start to finish.
+"""Pipeline pages: one local site that walks a game's pipeline from start to finish.
 
     python -m code.pipeline --open            # http://127.0.0.1:8003/
+    python -m code.pipeline --game castlevania --open
+
+The games are the ones played as a stage in sections (Mega Man, Castlevania); the links at the
+top of every page switch between them.
 
     Design  ->  Mutate | Train | Play  ->  Measure
 
 One page per stage, linked in that order, and a hub that shows where each stage stands:
 
     Design    the stage map with its sections outlined (read-only; edit in the level editor)
-    Mutate    the game mutants (code/games/megaman_mutants.py): what each changes and its class
+    Mutate    the game mutants (code/games/mutants.py): what each changes and its class
     Train     per section, the runs on disk and the one the relay uses; start runs, re-pick
     Play      agents (a batch, or live on the trainer's dashboard) and a person at the keyboard
     Measure   the telemetry page (code/stats/telemetry.py) over the agents' and the person's logs
@@ -33,17 +37,28 @@ import urllib.parse
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-from code.games import megaman_mutants as mutants  # noqa: E402
+from code.games import mutants  # noqa: E402
 from code.neuro import relay  # noqa: E402
 from code.stats import episode_log, telemetry  # noqa: E402
 
-GAME = relay.GAME
-RUNS = os.path.join("runs", GAME)
-MANIFEST = os.path.join(RUNS, "relay.json")
-RELAY_OUT = os.path.join(RUNS, "relay")
+GAMES = {"megaman": "Mega Man", "castlevania": "Castlevania"}   # the games played as a stage in sections
 HUMAN_DIR = os.path.join("runs", "manual")                  # manual play writes <dir>/<game>/<player>/episodes.csv
-JOB_LOGS = os.path.join(RUNS, "pipeline_jobs")
 DASH_PORT = 8000
+
+
+def use_game(game: str) -> str:
+    """Point every page at this game. Returns the level id of its full stage."""
+    global GAME, RUNS, MANIFEST, RELAY_OUT, JOB_LOGS
+    stage = relay.set_game(game)
+    GAME = game
+    RUNS = os.path.join("runs", GAME)
+    MANIFEST = os.path.join(RUNS, "relay.json")
+    RELAY_OUT = os.path.join(RUNS, "relay")
+    JOB_LOGS = os.path.join(RUNS, "pipeline_jobs")
+    return stage
+
+
+use_game(relay.GAME)
 STAGES = [("design", "Design"), ("mutate", "Mutate"), ("train", "Train"), ("play", "Play"), ("measure", "Measure")]
 esc = html.escape
 
@@ -112,17 +127,17 @@ def pick_section(section: str, stage: str, attempts: int = 12, shortlist: int = 
     tested = found[:shortlist] + [s for s in found[shortlist:] if s["run"] == current]
     print(f"{section}: testing {len(tested)} of {len(found)} runs over {attempts} varied attempts", flush=True)
     for s in tested:
-        s["tested_win_rate"], s["tested_progress"] = relay.evaluate(s["run"], section, attempts)
+        s["tested_win_rate"], s["tested_progress"], s["tested_fitness"] = relay.evaluate(s["run"], section, attempts)
         s["candidates"] = len(found)
         print(f"  {os.path.basename(s['run']):<12} training wins {100 * s['win_rate']:>3.0f}%   "
               f"tested wins {100 * s['tested_win_rate']:>3.0f}%   tested reach {100 * s['tested_progress']:>3.0f}%"
               f"{'   (current pick)' if s['run'] == current else ''}", flush=True)
-    best = max(tested, key=lambda s: (s["tested_win_rate"], s["tested_progress"], s["win_rate"]))
+    best = max(tested, key=lambda s: (s["tested_win_rate"], s["tested_progress"], s["tested_fitness"]))
     try:
         with open(MANIFEST, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
-        data = {"stage": stage, "legs": {}}
+        data = {"game": GAME, "stage": stage, "legs": {}}
     data.setdefault("legs", {})[section] = best
     with open(MANIFEST, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -258,8 +273,9 @@ def nav(cur: str) -> str:
     links = [f'<a class="home{" cur" if cur == "" else ""}" href="/">Pipeline</a>']
     for i, (key, name) in enumerate(STAGES):
         links.append(f'<a class="{"cur" if cur == key else ""}" href="/{key}">{i + 1}. {name}</a>')
+    games = "".join(f'<a class="{"cur" if g == GAME else ""}" href="/game?g={g}">{esc(name)}</a>' for g, name in GAMES.items())
     return '<nav class="pipe" aria-label="Pipeline stages">' + links[0] + '<span class="sep">·</span>' + \
-        '<span class="sep">→</span>'.join(links[1:]) + "</nav>"
+        '<span class="sep">→</span>'.join(links[1:]) + f'<span class="sep" style="margin-left:auto">Game</span>{games}</nav>'
 
 
 def page(cur: str, title: str, sub: str, body: str, reload_on_change: bool = False) -> str:
@@ -308,10 +324,12 @@ def hub(stage: str) -> str:
 def design(stage: str) -> str:
     legs, entries = sections(stage), level_entries()
     path = telemetry.level_file(GAME, stage)
-    geo = telemetry.geometry(path, 1)
+    geo = telemetry.geometry(path, 1, GAME)
+    up, lethal = ("Stairs", "Water") if GAME == "castlevania" else ("Ladder", "Spikes")
     body = ""
     if geo:
-        sc, sr = 16, 15                                   # a screen is 16 x 15 tiles (megaman_core.py)
+        st = mutants.Stage(stage, GAME)
+        sc, sr = st.sc, st.sr                             # a screen, in tiles (the game's config)
         svg = [f'<svg class="map" viewBox="0 0 {geo["cols"]} {geo["rows"]}" role="img" aria-label="Stage map with its sections outlined">']
         svg += [f'<rect x="{c}" y="{r}" width="{n}" height="1" fill="var(--geo)"/>' for c, r, n in geo["solid"]]
         svg += [f'<rect x="{c + .3}" y="{r}" width="{n - .6}" height="1" fill="var(--geo2)"/>' for c, r, n in geo["ladder"]]
@@ -326,26 +344,29 @@ def design(stage: str) -> str:
             if start:
                 svg.append(f'<circle cx="{start[0] + .5}" cy="{start[1] + .5}" r=".9" fill="var(--s3)" stroke="var(--surface)" stroke-width=".25"/>')
         body += ('<div class="card"><h2>Stage map</h2><div class="legend"><span><i class="line" style="background:var(--s1)"></i>Section (numbered)</span>'
-                 '<span><i style="background:var(--s3)"></i>Section start</span><span><i style="background:var(--geo2)"></i>Ladder</span>'
-                 '<span><i style="background:var(--s2)"></i>Spikes</span></div>' + "".join(svg) + "</svg></div>")
+                 '<span><i style="background:var(--s3)"></i>Section start</span><span><i style="background:var(--geo2)"></i>' + up + '</span>'
+                 '<span><i style="background:var(--s2)"></i>' + lethal + '</span></div>' + "".join(svg) + "</svg></div>")
     rows = ""
     for i, leg in enumerate(legs):
         sec = (entries.get(leg.level) or {}).get("section") or {}
         rows += (f"<tr><td>{i + 1}</td><td class='l'>{esc(leg.level)}</td><td>{len(leg.screens)}</td>"
-                 f"<td>{tuple(sec.get('start') or ()) or '—'}</td><td class='l'>{'up a ladder' if sec.get('climbing') else 'on foot'}</td>"
+                 f"<td>{tuple(sec.get('start') or ()) or '—'}</td><td class='l'>{('on the ' + up.lower()) if sec.get('climbing') else 'on foot'}</td>"
                  f"<td>{tuple(sec.get('end') or ()) or 'stage goal'}</td></tr>")
     body += ('<div class="card"><h2>Sections</h2><div class="scroll"><table><tr><th>#</th><th class="l">Section</th><th>Screens</th>'
              '<th>Start tile</th><th class="l">Entered</th><th>Ends at tile</th></tr>' + rows + "</table></div></div>")
     body += ('<div class="card"><h2>Editing</h2><p>This page is read-only. The stage is the file '
              f"<code>{esc(os.path.relpath(path) if path else '?')}</code>; its sections are listed in "
              f"<code>code/games/{relay.OWN_LEVEL_FILES[GAME]}</code>.</p>"
-             "<pre>python code/games/tools/level_editor.py        # edit the stage\n"
-             "python -m code.games.tools.mm1_make_slices     # cut it into sections again</pre></div>")
+             + ("<pre>python code/games/tools/level_editor.py        # edit the stage\n"
+                "python -m code.games.tools.mm1_make_slices     # cut it into sections again</pre></div>" if GAME == "megaman" else
+                "<p>The stage file is plain text and can be edited by hand; the sections are edited in the level list. "
+                "To rebuild the stage from the reference maps:</p>"
+                "<pre>python -m code.games.tools.cv_extract_level</pre></div>"))
     return page("design", "1. Design", "The stage as the agents and players get it.", body)
 
 
 def mutate_status() -> list[str]:
-    index = mutants.load()
+    index = mutants.load(game_name=GAME)
     if not index:
         return ['<span class="todo">No mutants generated yet</span>']
     by: dict = {}
@@ -367,11 +388,11 @@ def mutant_map(m: dict, st) -> str:
                 ch = changed.get((c, r), st.char(c, r))
                 if ch in "#d":
                     out.append(f'<rect x="{c}" y="{r}" width="1.02" height="1.02" fill="var(--geo)"/>')
-                elif ch == "H":
+                elif ch in st.game.climb:
                     out.append(f'<rect x="{c + .3}" y="{r}" width=".4" height="1.02" fill="var(--geo2)"/>')
-                elif ch == "^":
+                elif ch == st.game.hazard:
                     out.append(f'<rect x="{c}" y="{r + .4}" width="1" height=".6" fill="var(--s2)"/>')
-                elif ch in mutants.en.ENEMY_GLYPHS:
+                elif ch in st.game.enemy_glyphs:
                     out.append(f'<circle cx="{c + .5}" cy="{r + .5}" r=".38" fill="var(--bad)"/>')
         for c, r in after:
             out.append(f'<rect x="{c}" y="{r}" width="1" height="1" fill="none" stroke="var(--s1)" stroke-width=".12"/>')
@@ -382,12 +403,13 @@ def mutant_map(m: dict, st) -> str:
 
 
 def mutate(stage: str) -> str:
-    index = mutants.load()
+    index = mutants.load(game_name=GAME)
+    spec = mutants.game(GAME)
     make = post("mutants", "/mutate", "Generate mutants" if not index else "Generate again", primary=not index)
     if not index:
         return page("mutate", "2. Mutate", "Deliberate changes to the stage, to see whether the pipeline notices them.",
                     f'<div class="card"><p class="empty">No mutants yet.</p>{make}</div>', reload_on_change=True)
-    st = mutants.Stage(stage)
+    st = mutants.Stage(stage, GAME)
     tone = {"breaking": "bad", "neutral": "good", "degrading": ""}
     by: dict = {}
     for m in index["mutants"]:
@@ -409,8 +431,8 @@ def mutate(stage: str) -> str:
                       f"{check['route_cost_after'] if check['route_cost_after'] is not None else '—'}. Expected effect on play: {esc(m['direction'])}.</p>")
             detail += mutant_map(m, st) if m["family"] == "level" else f"<pre>{esc(json.dumps(m['config']))}</pre>"
             rows += (f"<tr><td class='l'><details><summary><code>{esc(m['id'])}</code></summary>{detail}"
-                     f"<pre>PEAK_MM1_MUTANT={esc(os.path.join(mutants.OUT, m['id']))} python -m code.neuro.relay --episodes 20 \\\n"
-                     f"    --out {esc(os.path.join(mutants.OUT, m['id'], 'relay'))}</pre></details></td>"
+                     f"<pre>{spec.env}={esc(os.path.join(spec.out, m['id']))} python -m code.neuro.relay --game {GAME} --episodes 20 \\\n"
+                     f"    --out {esc(os.path.join(spec.out, m['id'], 'relay'))}</pre></details></td>"
                      f"<td class='l'>{esc(m['operator'])}</td><td class='l {tone[m['class']]}'><b>{esc(m['class'])}</b></td>"
                      f"<td class='l' style='white-space:normal'>{esc(m['description'])}</td></tr>")
         body += (f'<div class="card"><h2>{esc(name)}</h2><div class="scroll"><table><tr><th class="l">Mutant</th><th class="l">Operator</th>'
@@ -421,10 +443,10 @@ def mutate(stage: str) -> str:
                  "".join(f"<tr><td class='l'>{esc(k['section'])}</td><td class='l'>{esc(k['operator'])}</td>"
                          f"<td class='l' style='white-space:normal'>{esc(k['reason'])}</td></tr>" for k in index["skipped"]) + "</table></div></div>")
     body += ('<div class="card"><h2>How this works</h2><p>Each mutant makes one change: its own copy of the stage file, or one value of '
-             "<code>megaman_config.yaml</code>. The class is assigned before any agent plays it, by searching the route from the stage's "
+             f"<code>{GAME}_config.yaml</code>. The class is assigned before any agent plays it, by searching the route from the stage's "
              "true start. Open a mutant to see the change and the command that plays it with the trained agents. Mutants are played by "
              f"agents only; people play the baseline.</p>{make}"
-             f'<p class="muted" style="margin:8px 0 0">Files: <code>{esc(mutants.OUT)}/&lt;mutant&gt;/mutant.json</code> (+ <code>level.txt</code>). '
+             f'<p class="muted" style="margin:8px 0 0">Files: <code>{esc(spec.out)}/&lt;mutant&gt;/mutant.json</code> (+ <code>level.txt</code>). '
              "Generating again rewrites those two files and leaves any results beside them.</p></div>")
     return page("mutate", "2. Mutate", "Deliberate changes to the stage, to see whether the pipeline notices them.", body,
                 reload_on_change=True)
@@ -508,6 +530,14 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
     section_names = levels - {stage}
     dash = f"http://127.0.0.1:{DASH_PORT}/{GAME}/index.html"
 
+    def switch(game: str) -> None:
+        """The game the pages show from now on. Jobs already running carry on."""
+        nonlocal stage, levels, section_names, dash
+        stage = use_game(game)
+        levels = {stage} | {leg.level for leg in sections(stage)}
+        section_names = levels - {stage}
+        dash = f"http://127.0.0.1:{DASH_PORT}/{GAME}/index.html"
+
     def clamp(raw: str, lo: int, hi: int, default: int) -> int:
         try:
             return min(max(int(raw), lo), hi)
@@ -551,15 +581,17 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
                        "--gens", str(gens), "--no-serve", "--run-dir", os.path.join(RUNS, section, f"seed{n}")]
                 if source and os.path.exists(os.path.join(source, "best.npz")):
                     cmd += ["--seed-from", source]
+                else:                                             # a first run: the network shape the picks use
+                    cmd += ["--hidden", "32", "--memory", "2"]
                 jobs.start(f"Train {section} seed{n}, {gens} generations", cmd)
         elif action == "mutants":
-            jobs.start("Generate mutants", [sys.executable, "-m", "code.games.megaman_mutants", "--stage", stage], group="mutants")
+            jobs.start("Generate mutants", [sys.executable, "-m", "code.games.mutants", "--game", GAME, "--stage", stage], group="mutants")
         elif action == "pick" and section in section_names:
-            jobs.start(f"Re-pick {section}", [sys.executable, "-m", "code.pipeline", "--stage", stage, "--pick-section", section],
+            jobs.start(f"Re-pick {section}", [sys.executable, "-m", "code.pipeline", "--game", GAME, "--stage", stage, "--pick-section", section],
                        group=f"pick-{section}")
         elif action == "batch" and level in levels:
             n = clamp(q.get("episodes"), 1, 200, 20)
-            cmd = [sys.executable, "-m", "code.neuro.relay", "--stage", stage, "--episodes", str(n)]
+            cmd = [sys.executable, "-m", "code.neuro.relay", "--game", GAME, "--stage", stage, "--episodes", str(n)]
             jobs.start(f"Agents play {level}, {n} attempts", cmd + (["--section", level] if level != stage else []),
                        group=f"batch-{level}")
         elif action == "watch" and level in levels:
@@ -599,6 +631,13 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
             try:
                 if u.path == "/jobs":
                     return self._send(200, json.dumps(jobs.view()), "application/json")
+                if u.path == "/game":                     # the game links in the nav
+                    g = (urllib.parse.parse_qs(u.query).get("g") or [""])[0]
+                    if g in GAMES:
+                        switch(g)
+                    self.send_response(303)
+                    self.send_header("Location", "/")
+                    return self.end_headers()
                 if u.path == "/watch":                    # the Measure page's ▶ links
                     return self._send(*start_watch({k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}))
                 pages = {"/": lambda: hub(stage), "/design": lambda: design(stage), "/mutate": lambda: mutate(stage),
@@ -647,15 +686,18 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Pipeline pages: design, mutate, train, play, measure")
-    ap.add_argument("--stage", default="CutMan", help="the full-stage level id")
+    ap.add_argument("--game", default="megaman", choices=sorted(GAMES), help="the game the pages open on")
+    ap.add_argument("--stage", default=None, help="the full-stage level id (default: the game's stage)")
     ap.add_argument("--port", type=int, default=8003)
     ap.add_argument("--open", action="store_true", help="open the hub in the default browser")
     ap.add_argument("--pick-section", default=None, metavar="SECTION",
                     help="test this section's best runs, point the relay at the winner, and exit")
     args = ap.parse_args()
+    stage = args.stage or use_game(args.game)
+    use_game(args.game)
     if args.pick_section:
-        return pick_section(args.pick_section, args.stage)
-    serve(args.stage, args.port, args.open)
+        return pick_section(args.pick_section, stage)
+    serve(stage, args.port, args.open)
 
 
 if __name__ == "__main__":

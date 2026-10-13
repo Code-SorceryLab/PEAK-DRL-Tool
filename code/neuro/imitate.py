@@ -2,6 +2,7 @@
 
     python -m code.neuro.imitate --demos runs/demos/megaman/human               # every section with demos
     python -m code.neuro.imitate --demos runs/demos/megaman/human --section CutMan-3-Ledges
+    python -m code.neuro.imitate --game castlevania --demos runs/demos/castlevania/compass-bot
 
 A demonstration (manual_play --demo) is, per frame, the 26 sensor values an agent would have seen
 and the buttons the player held. Here a network of the agent's own shape is fitted to predict the
@@ -67,7 +68,7 @@ def labels(held: np.ndarray, fire_window: int = 8) -> np.ndarray:
     return np.stack([mx < 0, mx > 0, jump > 0, my < 0, my > 0, wants_fire], axis=1).astype(np.float32)
 
 
-def section_frames(demos: list[dict], screens: set, later: set, include_losses: bool = False):
+def section_frames(demos: list[dict], screens: set, later: set, include_losses: bool = False, fire_window: int = 8):
     """(sensors, labels, frames per demo) for the frames played inside one section. A section
     counts from a demo only if the player got through it: won there, or went on to a later one."""
     xs, ys, counts = [], [], []
@@ -81,7 +82,7 @@ def section_frames(demos: list[dict], screens: set, later: set, include_losses: 
             (d["meta"].get("status") == "WON" and last == len(where) - 1)
         if not (cleared or include_losses):
             continue
-        y = labels(d["held"])
+        y = labels(d["held"], fire_window)
         # Standing still with nothing held (getting ready, looking at the screen) is not a
         # decision to copy: a network that reacts only to what it senses would learn to stand
         # in that spot forever. Waiting in mid-air or mid-step is kept.
@@ -187,19 +188,29 @@ def record_agent(run_dir: str, level: str, attempts: int = 3, max_frames: int = 
 
 
 def main() -> None:
+    global GAME
+    from . import relay
     from .relay import evaluate, stage_legs
     ap = argparse.ArgumentParser(description="Fit agent networks to recorded demonstrations")
     ap.add_argument("--demos", required=True, help="folder of demonstrations (searched for .npz files)")
-    ap.add_argument("--stage", default="CutMan", help="the full-stage level id whose sections to fit")
+    ap.add_argument("--game", default=GAME, choices=sorted(relay.STAGE_GAMES), help="which game (default: megaman)")
+    ap.add_argument("--stage", default=None, help="the full-stage level id whose sections to fit (default: the game's stage)")
     ap.add_argument("--section", default=None, help="fit only this section (default: every one with demos)")
     ap.add_argument("--hidden", type=int, default=32)
     ap.add_argument("--memory", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=600)
+    ap.add_argument("--fire-window", type=int, default=8,
+                    help="frames either side of a fire press that count as wanting to fire: a person taps; "
+                         "use 0 for a scripted player, which holds fire exactly when it means it")
     ap.add_argument("--include-losses", action="store_true", help="also learn from attempts that did not get through")
-    ap.add_argument("--runs", default=os.path.join("runs", GAME), help="where the section run folders live")
+    ap.add_argument("--runs", default=None, help="where the section run folders live (default: runs/<game>)")
     ap.add_argument("--test", type=int, default=12, help="varied attempts to test each fitted network on (0 = skip)")
     args = ap.parse_args()
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    GAME = args.game
+    args.stage = args.stage or relay.set_game(GAME)
+    relay.set_game(GAME)
+    args.runs = args.runs or os.path.join("runs", GAME)
 
     demos = load_demos(args.demos)
     if not demos:
@@ -211,7 +222,7 @@ def main() -> None:
         if args.section and leg.level != args.section:
             continue
         later = set().union(*[other.screens for other in legs[i + 1:]]) if i + 1 < len(legs) else set()
-        x, y, counts = section_frames(demos, leg.screens, later, args.include_losses)
+        x, y, counts = section_frames(demos, leg.screens, later, args.include_losses, args.fire_window)
         if x is None:
             print(f"{leg.level:<20}{'—':>6}{'no demonstration got through this section':>48}")
             continue

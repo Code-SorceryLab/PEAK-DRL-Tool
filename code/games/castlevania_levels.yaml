@@ -1,0 +1,105 @@
+# Castlevania stage 1 and the sections it is trained in (see megaman_levels.yaml for the format).
+# A section with `climbing: true` is entered on the stairs: its start is the stair cell at the screen's edge.
+levels:
+  Entrance-1-Courtyard:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [3, 9]
+      climbing: false
+      screens:
+      - [0, 0]
+      - [1, 0]
+      - [2, 0]
+      goal_screens:
+      - [3, 0]
+      - [4, 0]
+      - [5, 0]
+      end: [50, 9]
+  Entrance-2-Hall:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [50, 9]
+      climbing: false
+      screens:
+      - [3, 0]
+      - [4, 0]
+      - [5, 0]
+      goal_screens:
+      - [6, 0]
+      - [7, 0]
+      - [8, 0]
+      end: [96, 9]
+  Entrance-3-Panthers:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [96, 9]
+      climbing: false
+      screens:
+      - [6, 0]
+      - [7, 0]
+      - [8, 0]
+      goal_screens:
+      - [9, 0]
+      end: [145, 3]
+  Entrance-4-Descent:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [145, 3]
+      climbing: false
+      screens:
+      - [9, 0]
+      goal_screens:
+      - [9, 1]
+      - [10, 1]
+      - [11, 1]
+      end: [149, 12]
+  Entrance-5-Crypt:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [149, 12]
+      climbing: true
+      screens:
+      - [9, 1]
+      - [10, 1]
+      - [11, 1]
+      goal_screens:
+      - [10, 0]
+      end: [168, 11]
+  Entrance-6-Ascent:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [168, 11]
+      climbing: true
+      screens:
+      - [10, 0]
+      goal_screens:
+      - [11, 0]
+      - [12, 0]
+      end: [177, 3]
+  Entrance-7-Gallery:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [177, 3]
+      climbing: false
+      screens:
+      - [11, 0]
+      - [12, 0]
+      goal_screens:
+      - [13, 0]
+      end: [209, 9]
+  Entrance-8-Boss:
+    file: castlevania/01_entrance.txt
+    stage: entrance
+    section:
+      start: [209, 9]
+      climbing: false
+      screens:
+      - [13, 0]
+  Entrance: {file: castlevania/01_entrance.txt, stage: entrance}

@@ -157,6 +157,9 @@ senses in the whole stage. `python -m code.games.tools.mm1_make_slices` lists th
 the stage is edited, and `python -m code.neuro.relay` plays the full stage with one trained
 network per section, handing over as Mega Man crosses from one to the next.
 
+Castlevania (`castlevania`, stage 1) is built on the same framework: see
+[CASTLEVANIA.md](CASTLEVANIA.md) for the game, what differs and the commands.
+
 ---
 
 ## 4. Is there a reward system?

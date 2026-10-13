@@ -152,6 +152,10 @@ def _pad_state() -> tuple[int, int, bool, bool]:
     return dx, dy, held(PAD_JUMP), held(PAD_FIRE)
 
 
+STAGE_GAMES = {"megaman": "CutMan", "castlevania": "Entrance"}   # stage games: [dx, dy, jump, fire], own level list
+STAGED = args.game in STAGE_GAMES
+
+
 def _megaman_action(keys) -> list:
     """[dx, dy, jump, fire] — arrows / WASD move and climb, SPACE jumps, Z (or J) fires;
     a controller works alongside the keyboard."""
@@ -166,12 +170,13 @@ ACTION_MAPPING = {
     "platformer": _platformer_action,
     "bomberman": _bomberman_action,
     "megaman": _megaman_action,
+    "castlevania": _megaman_action,      # the same pad: up / down take the stairs, fire is the whip
     "mario": _platformer_action,
     "sonic": _sonic_action,
     "meatboy": lambda k: [0, 0, 0],   # MeatboyPlayer reads the keyboard itself in human mode
 }
 
-_IDLE = {"megaman": [0, 0, 0, 0]}
+_IDLE = {"megaman": [0, 0, 0, 0], "castlevania": [0, 0, 0, 0]}
 
 
 def _random_action() -> list:
@@ -180,7 +185,7 @@ def _random_action() -> list:
         return [random.randrange(3), random.randrange(2), random.randrange(2)]
     if args.game == "bomberman":
         return [random.randrange(-1, 2), random.randrange(-1, 2), int(random.random() < 0.05)]
-    if args.game == "megaman":
+    if STAGED:
         return [random.randrange(-1, 2), random.randrange(-1, 2), random.randrange(2), random.randrange(2)]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
@@ -199,12 +204,12 @@ if level_file:
 env_kwargs = {}
 if args.game == "bomberman":
     env_kwargs = {"level_idx": int(level_id)} if level_id else {}
-elif args.game == "megaman":
-    env_kwargs = {"level": level_id} if level_id else {"level": "CutMan"}   # default: the whole stage
+elif STAGED:
+    env_kwargs = {"level": level_id} if level_id else {"level": STAGE_GAMES[args.game]}   # default: the whole stage
     if True:
         env_kwargs["invincible"] = args.invincible
         _open_pad()
-    if args.game == "megaman" and level_file:
+    if level_file:
         env_kwargs["level_file"] = level_file   # the core loads an unlisted file itself
         print(f"[Play] Loaded editor file: {Path(level_file).name}")
 elif level_id:
@@ -227,7 +232,7 @@ screen = core_game._surf if hasattr(core_game, "_surf") else \
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
 # load_level() to switch to the editor file (LevelLoader handles abs paths).
-if level_file and args.game != "megaman":
+if level_file and not STAGED:
     fp = Path(level_file)
     cm = core_game.config_manager
     if 'levels' not in cm.yaml_data:
@@ -244,7 +249,7 @@ if level_file and args.game != "megaman":
     print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
 # ── Recording: the same per-episode row an agent run writes ──────
-JUMP_IDX = {"bomberman": 2, "megaman": 2}   # where "jump" (bomberman: bomb) sits in the action
+JUMP_IDX = {"bomberman": 2, "megaman": 2, "castlevania": 2}   # where "jump" (bomberman: bomb) sits in the action
 
 
 class _Recorder:
@@ -349,15 +354,15 @@ class _DemoRecorder:
 
     def __init__(self) -> None:
         import numpy as np
-        from code.neuro.adapters import MegamanAdapter
+        from code.neuro.adapters import _ADAPTERS
         from code.neuro.sensors import read_sensors
         self._np, self._read = np, read_sensors
         self.player = args.player or ("random" if args.random else "human")
-        self.level = level_id or "CutMan"
+        self.level = level_id or STAGE_GAMES[args.game]
         self.dir = os.path.join(args.demo, args.game, self.player, self.level)
         os.makedirs(self.dir, exist_ok=True)
         self.saved = len([f for f in os.listdir(self.dir) if f.endswith(".npz")])
-        self.adapter = MegamanAdapter(self.level, 10 ** 9, 5000.0)
+        self.adapter = _ADAPTERS[args.game](self.level, 10 ** 9, 5000.0)
         self.adapter.core = core_game          # sense and step the game on screen, not a hidden copy
         self.adapter.attempts = 1
         self.attempts_done = 0
@@ -408,8 +413,8 @@ demo = recorder = None
 
 def _start_recording() -> None:
     global demo, recorder, append_rows
-    demo = _DemoRecorder() if args.demo and args.game == "megaman" else None
-    if args.record and args.game == "megaman":
+    demo = _DemoRecorder() if args.demo and STAGED else None
+    if args.record and STAGED:
         recorder = _StatsRecorder()
     elif args.record:
         from code.neuro.episodes import append_rows
@@ -418,7 +423,7 @@ def _start_recording() -> None:
 
 def _restart_level() -> None:
     """Back to the start of the level being played (a core's reset() may move on to the next)."""
-    if args.game == "megaman":
+    if STAGED:
         core_game.won = False          # stay on the level being played
     if args.game in INDEXED_GAMES and level_id:
         core_game.won = False          # reset() would otherwise advance to the next level
@@ -466,9 +471,9 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             running = False
-        elif args.game == "megaman" and event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
+        elif STAGED and event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
             _open_pad()
-        elif args.game == "megaman" and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+        elif STAGED and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             core_game.invincible = not core_game.invincible
             print(f"[Play] Invincible: {'on' if core_game.invincible else 'off'}")
 

@@ -32,6 +32,8 @@ from . import episode_log, registry
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(HERE, "..", "games")
 SOLID, LADDER, SPIKE = "#=?<>FLd", "H", "^"
+OWN_GLYPHS = {"castlevania": ("/\\", "~")}       # a game's own way up (stairs) and lethal tile (water)
+OWN_LEVELS = {"megaman": "megaman_levels.yaml", "castlevania": "castlevania_levels.yaml"}
 PER_EPISODE = [("jumps", "Jumps"), ("coins", "Pickups"), ("kills", "Enemies killed"),
                ("bricks", "Bricks destroyed"), ("damage_taken", "Damage taken"), ("shots", "Shots fired")]
 
@@ -50,8 +52,8 @@ def level_file(game: str, level: str) -> str | None:
     """The level's ASCII file, if this game's level list can be read without loading the game."""
     try:
         import yaml
-        if game == "megaman":
-            with open(os.path.join(GAMES_DIR, "megaman_levels.yaml"), encoding="utf-8") as f:
+        if game in OWN_LEVELS:
+            with open(os.path.join(GAMES_DIR, OWN_LEVELS[game]), encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
             entry = (data.get("levels") or {}).get(level) or (data.get("disabled_levels") or {}).get(level) or {}
             return os.path.join(GAMES_DIR, "levels", entry["file"]) if entry.get("file") else None
@@ -61,14 +63,15 @@ def level_file(game: str, level: str) -> str | None:
         return None
 
 
-def geometry(path: str | None, tile: int) -> dict | None:
+def geometry(path: str | None, tile: int, game: str | None = None) -> dict | None:
     """Runs of solid / ladder / spike cells, as [col, row, length], for drawing the level."""
     if not path or not os.path.exists(path):
         return None
     with open(path, encoding="utf-8") as f:
         rows = f.read().split("\n")
     out = {"tile": tile, "cols": max(map(len, rows)), "rows": len(rows), "solid": [], "ladder": [], "spike": []}
-    for kind, glyphs in (("solid", SOLID), ("ladder", LADDER), ("spike", SPIKE)):
+    up, lethal = OWN_GLYPHS.get(game, ("", ""))
+    for kind, glyphs in (("solid", SOLID), ("ladder", LADDER + up), ("spike", SPIKE + lethal)):
         for r, line in enumerate(rows):
             c = 0
             while c < len(line):
@@ -169,7 +172,7 @@ def build(paths: list[str]) -> dict:
                   "level_w": next((r["level_w"] for r in eps if r.get("level_w")), None),
                   "level_h": next((r["level_h"] for r in eps if r.get("level_h")), None),
                   "watch": next((r["_watch"] for r in eps if r.get("_watch") and r.get("seed") is not None), None),
-                  "geometry": geometry(level_file(game, level), tile)})
+                  "geometry": geometry(level_file(game, level), tile, game)})
         out.append(g)
     return {"logs": logs, "episodes": len(rows), "groups": out}
 
@@ -317,6 +320,19 @@ def render(data: dict) -> str:
     return PAGE.replace("__DATA__", json.dumps(data, separators=(",", ":")).replace("</", "<\\/"))
 
 
+def stage_game(stage: str) -> str | None:
+    """The game whose level list has this level id (megaman's CutMan, castlevania's Entrance)."""
+    import yaml
+    for game, file in OWN_LEVELS.items():
+        try:
+            with open(os.path.join(GAMES_DIR, file), encoding="utf-8") as f:
+                if stage in ((yaml.safe_load(f) or {}).get("levels") or {}):
+                    return game
+        except OSError:
+            pass
+    return None
+
+
 def watch_command(q: dict, dash_port: int = 8000) -> tuple[list[str], str] | None:
     """The `relay --watch` command for a /watch request (stage, section, manifest, seed), and a
     label for it; None when the request names something that cannot be played. Only manifests
@@ -327,14 +343,15 @@ def watch_command(q: dict, dash_port: int = 8000) -> tuple[list[str], str] | Non
     try:
         from code.neuro.relay import stage_legs
         seed = int(q.get("seed", ""))
-        ok = (bool(re.fullmatch(r"[\w-]+", stage)) and (not section or section in {leg.level for leg in stage_legs(stage)})
+        game = stage_game(stage) if re.fullmatch(r"[\w-]+", stage) else None
+        ok = (bool(game) and (not section or section in {leg.level for leg in stage_legs(stage, game)})
               and manifest.replace(os.sep, "/").startswith("runs/") and ".." not in manifest
               and manifest.endswith(".json") and os.path.exists(manifest))
     except (ValueError, SystemExit):
         ok = False
     if not ok:
         return None
-    cmd = [sys.executable, "-m", "code.neuro.relay", "--stage", stage, "--manifest", manifest,
+    cmd = [sys.executable, "-m", "code.neuro.relay", "--game", game, "--stage", stage, "--manifest", manifest,
            "--watch", "--seed", str(seed), "--port", str(dash_port)]
     if section:
         cmd += ["--section", section]
@@ -402,7 +419,6 @@ def serve(paths: list[str], port: int, open_browser: bool, dash_port: int = 8000
                 return self._send(404, "not found")
             q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
             esc = html.escape   # the query string is reflected into HTML: escape all of it
-            from code.neuro.relay import GAME
             found = watch_command(q, dash_port)
             if found is None:
                 return self._note(400, "That attempt cannot be played",
@@ -416,7 +432,7 @@ def serve(paths: list[str], port: int, open_browser: bool, dash_port: int = 8000
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     proc.kill()
-            dash = f"http://127.0.0.1:{dash_port}/{GAME}/index.html"
+            dash = f"http://127.0.0.1:{dash_port}/{stage_game(q.get('stage', ''))}/index.html"
             if port_busy(dash_port):
                 return self._note(409, "The live dashboard is already in use",
                                   f"<p>Something else is running on port {dash_port} (a training run or a replay started "

@@ -390,7 +390,7 @@ class BombermanStats(EpisodeStats):
 
 # ── Mega Man (NES): a route through stacked screens, in sections ───────────
 
-_mm1_fields: dict = {}   # (level file, mtime) -> route field; shared by every episode on that file
+_fields: dict = {}   # game -> {(level file, mtime): route field}; shared by every episode on that file
 
 
 class MegamanStats(EpisodeStats):
@@ -408,27 +408,38 @@ class MegamanStats(EpisodeStats):
     def speed(self) -> float:
         return float(self.core.player.vx)
 
+    def _glyphs(self):
+        """The module that names this game's enemy and boss glyphs."""
+        from code.games import megaman_enemies
+        return megaman_enemies
+
+    def _route(self):
+        from code.games.megaman_route import cost_at, route_field, section_costs
+        return cost_at, route_field, section_costs
+
+    def _enemy_count(self, spawns, own: set) -> int:
+        en, sc, sr = self._glyphs(), self.core.screen_cols, self.core.screen_rows
+        return sum(1 for g, c, r in spawns if (g in en.ENEMY_GLYPHS and g != "c" or g == en.BOSS_GLYPH)
+                   and (not own or (c // sc, r // sr) in own))
+
     def _begin(self) -> None:
         import os
 
-        from code.games import megaman_enemies as en
-        from code.games.megaman_route import cost_at, route_field, section_costs
+        en, (cost_at, route_field, section_costs) = self._glyphs(), self._route()
         core = self.core
         self._cost_at = cost_at
         path = core.level_file()
         key = (path, os.path.getmtime(path))
-        if key not in _mm1_fields:
-            _mm1_fields.clear()
-            _mm1_fields[key] = route_field(core.level_data)
-        self._cost = _mm1_fields[key]
+        fields = _fields.setdefault(self.meta["game"], {})
+        if key not in fields:
+            fields.clear()
+            fields[key] = route_field(core.level_data)
+        self._cost = fields[key]
         entry = core.level_entry() if not core._level_file else {}
         self._start_cost, self._end_cost = section_costs(self._cost, entry, self.pos(), float(core.tile_size))
         self._best_cost = self._start_cost
         own = {tuple(s) for s in (entry.get("section") or {}).get("screens") or []}
-        sc, sr = core.screen_cols, core.screen_rows
-        spawns = core.level_data.spawns
-        self._level_enemies = sum(1 for g, c, r in spawns if (g in en.ENEMY_GLYPHS and g != "c" or g == en.BOSS_GLYPH)
-                                  and (not own or (c // sc, r // sr) in own))
+        self._level_enemies = self._enemy_count(core.level_data.spawns, own)
         # the stage's sections, in order, by the screens each owns
         self._sections = [(name, {tuple(s) for s in e["section"]["screens"]}) for name, e in core.levels
                           if isinstance(e, dict) and e.get("file") == entry.get("file")
@@ -486,8 +497,35 @@ class MegamanStats(EpisodeStats):
         return "STUCK" if truncated else "DEAD"
 
 
+class CastlevaniaStats(MegamanStats):
+    """Castlevania keeps Mega Man's telemetry (route progress and the split by section). The
+    route is read at the feet, and "shots" are swings of the whip."""
+
+    def pos(self) -> tuple[float, float]:
+        return self.core.route_point()
+
+    def _glyphs(self):
+        from code.games import castlevania_core
+        return castlevania_core
+
+    def _route(self):
+        from code.games.castlevania_route import cost_at, route_field, section_costs
+        return cost_at, route_field, section_costs
+
+    def _enemy_count(self, spawns, own: set) -> int:
+        en, sc, sr = self._glyphs(), self.core.screen_cols, self.core.screen_rows
+        return sum(en.KILL_BUDGET.get(g, 0) + (g == en.BOSS_GLYPH) for g, c, r in spawns
+                   if not own or (c // sc, r // sr) in own)
+
+    def extra(self) -> dict:
+        out = super().extra()
+        out["shots"] = int(self.core.attacks_total)
+        return out
+
+
 STATS_BY_GAME: dict[str, type[EpisodeStats]] = {
     "megaman": MegamanStats,
+    "castlevania": CastlevaniaStats,
     "mario": MarioStats,
     "sonic": SonicStats,
     "meatboy": MeatboyStats,

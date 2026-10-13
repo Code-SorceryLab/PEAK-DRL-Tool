@@ -47,9 +47,13 @@ class GameAdapter(Protocol):
 
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
 TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
-N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6}   # megaman: left, right, jump, up, down, fire
-N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
-OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels kept in the game's own, editor-owned file
+N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6, "castlevania": 6}   # megaman, castlevania: left, right, jump, up, down, fire
+N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "castlevania": 26}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml",  # named levels kept in the game's own file
+                   "castlevania": "castlevania_levels.yaml"}
+# Games played as a stage cut into sections, one trained network per section (relay.py, pipeline.py):
+# the level id of each one's full stage.
+STAGE_GAMES = {"megaman": "CutMan", "castlevania": "Entrance"}
 # Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,
 # but kept out of the menus and off the default sweep roster so they do not cost probe budget.
 ARCHIVED_GAMES = {"sonic"}
@@ -849,14 +853,35 @@ class MegamanAdapter(_EventWeights):
             {"i": 20, "l": "BOSS", "d": "Boss energy left (0 when there is no boss on screen)", "inv": False}]},
     ]
 
+    ATTEMPTS_ENV = "PEAK_MM1_ATTEMPTS"
+    FIRE_REPEATS = True      # a held fire output presses again and again (at the pad's pace)
+
+    def _make_core(self, level, max_frames):
+        from code.games.megaman_core import MegamanCore
+        return MegamanCore(render_mode="none", max_steps=max_frames, level=level)
+
+    def _glyphs(self):
+        """The module that names this game's enemy and boss glyphs and the boss's energy."""
+        from code.games import megaman_enemies
+        return megaman_enemies
+
+    def _count_enemies(self, spawns, owned: set) -> int:
+        """How many kills the level offers (the kill bonus is capped at it); a section counts only its own."""
+        en, sc_, sr_ = self._glyphs(), self.core.screen_cols, self.core.screen_rows
+        return sum(1 for g, c, r in spawns if g in en.ENEMY_GLYPHS and g != "c"
+                   and (not owned or (c // sc_, r // sr_) in owned))
+
+    def _counts(self) -> bool:
+        """Whether where the body is right now counts as progress along the route."""
+        return True
+
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
                  sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         pygame.init()
-        from code.games.megaman_core import MegamanCore
         self.win_bonus = win_bonus
         self.time_rate = time_rate      # sprint has no meaning here: Mega Man has one running speed
-        self.core = MegamanCore(render_mode="none", max_steps=max_frames, level=level)
+        self.core = self._make_core(level, max_frames)
         self.tile_size = int(self.core.tile_size)
         self.alive = True
         self.won = False
@@ -868,7 +893,7 @@ class MegamanAdapter(_EventWeights):
         self.jump_period = max(1, int(pad.get("jump_period", 8)))
         self.turn_period = max(1, int(pad.get("turn_period", 6)))
         tr = self.core.cfg.get("training") or {}
-        self.attempts = max(1, int(os.environ.get("PEAK_MM1_ATTEMPTS") or tr.get("attempts", 1)))
+        self.attempts = max(1, int(os.environ.get(self.ATTEMPTS_ENV) or tr.get("attempts", 1)))
         self.min_start_energy = int(tr.get("min_start_energy", 10))
         self.attempt_stall = int(tr.get("stall_frames", 240))
         self.sticky = float(tr.get("sticky_actions", 0.0))
@@ -935,18 +960,16 @@ class MegamanAdapter(_EventWeights):
             self.core.player.facing = rng.choice((-1, 1))     # ... facing whichever way it arrived
         self.jitter(1299709 * self._episode + k if k else None)   # ... and a slightly unsteady hand
         self._attempt_best, self._attempt_idle = -1.0, 0
-        self._jump_held = False
+        self._jump_held = self._fire_down = False
         self._since_fire = self._since_jump = 10 ** 6        # frames since the last press
         self._held = [0, 0]                                   # the direction held on each axis ...
         self._held_for = [10 ** 6, 10 ** 6]                   # ... and for how many frames
-        from code.games import megaman_enemies as en
+        en = self._glyphs()
         spawns = self.core.level_data.spawns
         section = self.core.level_entry().get("section") or {}
         self._has_boss = any(g == en.BOSS_GLYPH for g, _, _ in spawns) and not section.get("goal_screens")
         owned = {tuple(sc) for sc in section.get("screens") or []}      # a section counts only its own enemies
-        sc_, sr_ = self.core.screen_cols, self.core.screen_rows
-        self._level_enemies = sum(1 for g, c, r in spawns if g in en.ENEMY_GLYPHS and g != "c"
-                                  and (not owned or (c // sc_, r // sr_) in owned)) + int(self._has_boss)
+        self._level_enemies = self._count_enemies(spawns, owned) + int(self._has_boss)
         self._level_coins = 0
         key = (self.core.level_file(), os.path.getmtime(self.core.level_file()))
         if key not in self._fields:
@@ -987,7 +1010,8 @@ class MegamanAdapter(_EventWeights):
         # while airborne (that is how a jump is held for height); a new one starts with a fresh press.
         self._since_fire += 1
         self._since_jump += 1
-        fire_now = bool(fire) and self._since_fire >= self.fire_period
+        fire_now = bool(fire) and self._since_fire >= self.fire_period and (self.FIRE_REPEATS or not self._fire_down)
+        self._fire_down = bool(fire)
         if fire_now:
             self._since_fire = 0
         if not jump:
@@ -1000,7 +1024,8 @@ class MegamanAdapter(_EventWeights):
                 self._since_jump = 0
         self._jump_held = jump_now
         _, _, terminated, truncated, _info = self.core.step((move_x, move_y, int(jump_now), int(fire_now)))
-        self._best_cost = min(self._best_cost, self._cell_cost())
+        if self._counts():
+            self._best_cost = min(self._best_cost, self._cell_cost())
         stalled = False
         if self._n_attempts > 1 and not (terminated or truncated):   # the adapter ends a stalled attempt itself
             fit = self._attempt_fitness(False)
@@ -1167,8 +1192,7 @@ class MegamanAdapter(_EventWeights):
         route = max(0.0, min(1.0, (self._start_cost - self._best_cost) / (self._start_cost - self._end_cost)))
         if not self._has_boss:
             return route
-        from code.games import megaman_enemies as en
-        return 0.5 * route + 0.5 * min(self.core.boss_damage / en.BOSS_HP, 1.0)
+        return 0.5 * route + 0.5 * min(self.core.boss_damage / self._glyphs().BOSS_HP, 1.0)
 
     def _attempt_fitness(self, won: bool) -> float:
         kills = self.KILL_BONUS * min(self.core.kills_total, self._level_enemies)
@@ -1202,12 +1226,215 @@ class MegamanAdapter(_EventWeights):
         self.core.won = False
 
 
+class CastlevaniaAdapter(MegamanAdapter):
+    """Wraps CastlevaniaCore (Castlevania, NES). The core keeps MegamanCore's interface, so the
+    episode logic is MegamanAdapter's: several attempts per section, progress as route cost, the
+    pad at human speed. What changes is the route (stairs, a shorter jump: castlevania_route.py),
+    the point progress is measured at (the feet, and only with a foot down: a jump is committed
+    and gains nothing until it lands), and the senses that stood for ladders, which here read
+    the stairs and the whip."""
+
+    ATTEMPTS_ENV = "PEAK_CV_ATTEMPTS"
+    # A swing of the whip roots Simon for its length, so a held fire output must not repeat: it
+    # would stop him walking and freeze him on the stairs. One swing per press; the output has
+    # to drop and rise again for the next, as a thumb does.
+    FIRE_REPEATS = False
+    KILL_BONUS = 10.0
+    WHIP_BONUS = 25.0        # per whip upgrade picked up: nothing else pays for stopping at a candle
+    ENERGY_BONUS = 1000.0    # to a winner, times the share of its starting energy it still has: nothing refills
+                             # energy in this stage, so a section won by walking through its enemies loses the stage
+    JUMP_CELLS = 2
+    DRIFT_CELLS = 2
+    STAIR_AHEAD_CELLS = 7    # how far along the floor a flight's foot or head is noticed
+    SENSOR_LABELS = MegamanAdapter.SENSOR_LABELS[:1] + [
+        {"g": "Threats", "color": "bg-red-500", "rows": [
+            {"i": 6, "l": "NMY", "d": "Enemy in the corridor straight ahead: distance", "inv": True},
+            {"i": 7, "l": "NX", "d": "Nearest enemy, horizontal bearing (behind negative, ahead positive)",
+             "center": True, "inv": False},
+            {"i": 8, "l": "NY", "d": "Nearest enemy, vertical bearing (up negative, down positive)",
+             "center": True, "inv": False},
+            {"i": 9, "l": "SHOT", "d": "Nearest fireball: distance", "inv": True},
+            {"i": 10, "l": "PIT", "d": "No floor (or water) below a point three quarters of a tile ahead", "inv": False}]},
+        {"g": "Body", "color": "bg-sky-400", "rows": [
+            {"i": 11, "l": "GND", "d": "On the ground", "inv": False},
+            {"i": 12, "l": "VX", "d": "Horizontal velocity", "center": True, "inv": False},
+            {"i": 13, "l": "VY", "d": "Vertical velocity", "center": True, "inv": False},
+            {"i": 14, "l": "JUMP", "d": "Jump available (on the ground, whip away)", "inv": False},
+            {"i": 21, "l": "FACE", "d": "Facing (left negative, right positive)", "center": True, "inv": False},
+            {"i": 22, "l": "HP", "d": "Energy left", "inv": False},
+            {"i": 24, "l": "WHIP", "d": "Whip ready (0 while a swing is under way)", "inv": False}]},
+        {"g": "Stairs", "color": "bg-amber-400", "rows": [
+            {"i": 15, "l": "STAR", "d": "On a flight of stairs", "inv": False},
+            {"i": 16, "l": "ST^", "d": "At the foot of a flight: up steps onto it", "inv": False},
+            {"i": 17, "l": "STv", "d": "At the head of a flight: down steps onto it", "inv": False},
+            {"i": 23, "l": "ST>", "d": "The nearest foot or head of a flight on this floor (behind negative, ahead "
+                                       "positive; stronger when nearer)", "center": True, "inv": False}]},
+        MegamanAdapter.SENSOR_LABELS[4],
+    ]
+
+    def _make_core(self, level, max_frames):
+        from code.games.castlevania_core import CastlevaniaCore
+        return CastlevaniaCore(render_mode="none", max_steps=max_frames, level=level)
+
+    def _glyphs(self):
+        from code.games import castlevania_core
+        return castlevania_core
+
+    def _count_enemies(self, spawns, owned: set) -> int:
+        en, sc_, sr_ = self._glyphs(), self.core.screen_cols, self.core.screen_rows   # a spawner is worth a few kills
+        return sum(en.KILL_BUDGET.get(g, 0) for g, c, r in spawns if not owned or (c // sc_, r // sr_) in owned)
+
+    def _counts(self) -> bool:
+        p = self.core.player
+        return bool(p.grounded or p.climbing)
+
+    def _begin_attempt(self) -> None:
+        import random
+        super()._begin_attempt()
+        k, p = len(self._done), self.core.player
+        section = self.core.level_entry().get("section") or {}
+        if k and list(section.get("start") or []) != list(self.core.level_data.start):
+            p.whip_level = random.Random(104729 * self._episode + k).randint(1, 3)   # whichever whip he arrived with
+        self._whip_start, self._hp_start = p.whip_level, max(1, p.hp)
+
+    def _attempt_fitness(self, won: bool) -> float:
+        p = self.core.player
+        kept = self.ENERGY_BONUS * p.hp / self._hp_start if won else 0.0
+        return super()._attempt_fitness(won) + self.WHIP_BONUS * (p.whip_level - self._whip_start) + kept
+
+    @property
+    def can_jump(self) -> bool:
+        p = self.core.player
+        return bool(p.grounded and p.attack < 0)
+
+    def _route_field(self):
+        from code.games.castlevania_route import route_field
+        return route_field(self.core.level_data, self.JUMP_CELLS, self.DRIFT_CELLS)
+
+    def _foot(self) -> tuple[float, float]:
+        """The point the route is read at: just inside the cell the feet are in."""
+        return self.core.route_point()
+
+    def _cell(self) -> tuple[int, int]:
+        x, y = self._foot()
+        return int(x // self.tile_size), int(y // self.tile_size)
+
+    def _cell_cost(self) -> float:
+        from code.games.castlevania_route import cost_at
+        return cost_at(self._cost, *self._foot(), float(self.tile_size))
+
+    def _compass(self) -> tuple[float, float]:
+        """The route's next move out of the cell the feet are in, as a direction (castlevania_route):
+        along the floor, off a ledge, or along a flight of stairs. Up without stairs means jump:
+        it is given only where a jump from this exact spot lands where the route goes (the jump is
+        played out); short of that spot it points along the floor toward it."""
+        from code.games import castlevania_route as rt
+        c0, r0 = self._cell()
+        kind, (nc, nr), way, x0 = rt.move_at(self._cost, c0, r0)
+        if not kind:
+            return 0.0, 0.0
+        if kind == rt.JUMP:
+            p, s = self.core.player, self.core.scale
+            x, feet = (p.x + p.width / 2.0) / s, (p.y + p.height) / s
+            if p.grounded:
+                land = self._cost.arc(x, feet, way)
+                if land is not None and float(self._cost[land[1], land[0]]) <= float(self._cost[nr, nc]) + 0.5:
+                    return float(way), -1.0
+            return float((x0 > x) - (x0 < x)) or float(way), 0.0
+        if kind == rt.DROP:
+            return float(way), 0.0
+        return float((nc > c0) - (nc < c0)), float((nr > r0) - (nr < r0))
+
+    def sense(self, march, ray_max, hit_solid, hit_enemy, hit_none, tile_hit, tile_probe):
+        """26-slot vector (see SENSOR_LABELS) + overlay rays/tiles for the dashboard."""
+        import math
+
+        import numpy as np
+        from code.neuro.sensors import RAY_DIRS
+        core, p = self.core, self.core.player
+        ox, oy = self.x, self.y
+        ts, s = float(self.tile_size), core.scale
+        face = float(p.facing)
+        vec = np.zeros(26, dtype=np.float32)
+        rays, tiles = [], []
+        for i, (dx, dy) in enumerate(RAY_DIRS):
+            dx *= face
+            d = march(self, ox, oy, dx, dy)
+            vec[i] = d / ray_max
+            hit = d < ray_max
+            rays.append((ox, oy, ox + dx * d, oy + dy * d, hit_solid if hit else hit_none))
+            if hit:
+                tiles.append(((ox + dx * d) // ts * ts, (oy + dy * d) // ts * ts, ts, tile_hit))
+
+        ahead, near, nx, ny = ray_max, ray_max, None, None
+        for ex, ey in self._threats():
+            fwd = (ex - ox) * face
+            if 0 <= fwd < ahead and abs(ey - oy) <= ts:
+                ahead = fwd
+            d = math.hypot(ex - ox, ey - oy)
+            if d < near:
+                near, nx, ny = d, ex, ey
+        vec[6] = ahead / ray_max
+        if nx is not None:
+            vec[7] = max(-1.0, min(1.0, (nx - ox) * face / ray_max))
+            vec[8] = max(-1.0, min(1.0, (ny - oy) / ray_max))
+            rays.append((ox, oy, nx, ny, hit_enemy))
+        vec[9] = min((min(math.hypot(b.x * s - ox, b.y * s - oy), ray_max) for b in core.enemy_bullets),
+                     default=ray_max) / ray_max
+
+        probe_x, feet = ox + face * 0.75 * ts, p.y + p.height     # where a jump over two tiles has to leave the ground
+        pit = 1.0
+        for k in range(4):
+            tx, ty = int(probe_x // ts), int((feet + (k + 0.5) * ts) // ts)
+            tiles.append((tx * ts, ty * ts, ts, tile_probe))
+            if core.tile(tx, ty) == "~":
+                break
+            if core.solid(tx, ty) or core.stair_floor(tx, ty):
+                pit = 0.0
+                break
+        vec[10] = pit
+        vec[11] = 1.0 if p.grounded else 0.0
+        vec[12] = max(-1.0, min(1.0, p.vx / (3.0 * s)))
+        vec[13] = max(-1.0, min(1.0, p.vy / (8.0 * s)))
+        vec[14] = 1.0 if self.can_jump else 0.0
+        vec[15] = 1.0 if p.climbing else 0.0
+        if p.grounded:
+            vec[16] = 1.0 if core.flight_at(-1) else 0.0
+            vec[17] = 1.0 if core.flight_at(1) else 0.0
+        vec[18], vec[19] = self._compass()
+        vec[20] = core.boss.hp / self._glyphs().BOSS_HP if core.boss else 0.0
+        vec[21] = face
+        vec[22] = p.hp / p.hp_max
+        # A flight is not solid, so no ray stops on one: this sees its foot or head along the floor.
+        reach = self.STAIR_AHEAD_CELLS * ts
+        best = None
+        for fl in core.level_data.flights:
+            for x, y in ((fl.bx, fl.by), fl.top):
+                if abs(y - feet) <= 2.0 and abs(x - ox) <= reach and (best is None or abs(x - ox) < abs(best[0] - ox)):
+                    best = (x, y)
+        if best is not None and (p.grounded or p.climbing):
+            off = (best[0] - ox) * face
+            vec[23] = (1.0 if off >= 0 else -1.0) * (1.0 - abs(off) / reach)
+            tiles.append((best[0] - ts / 2, best[1] - ts, ts, tile_probe))
+        vec[24] = 1.0 if p.attack < 0 else 0.0
+        vec[25] = 1.0
+        return vec, rays, tiles
+
+    @property
+    def busy(self) -> bool:
+        """Not a stall: a screen slide, which takes the pad away, and the boss fight, where waiting
+        for the bat to come down gains nothing for seconds at a time (his bites and the clock end it)."""
+        core = self.core
+        return core.camera_y != core._camera_target()[1] or (core.boss_lock is not None and not core.boss_dead)
+
+
 _ADAPTERS = {
     "mario": MarioAdapter,
     "sonic": SonicAdapter,
     "meatboy": MeatboyAdapter,
     "bomberman": BombermanAdapter,
     "megaman": MegamanAdapter,
+    "castlevania": CastlevaniaAdapter,
 }
 
 

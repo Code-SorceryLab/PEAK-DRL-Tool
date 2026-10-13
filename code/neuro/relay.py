@@ -1,8 +1,10 @@
-"""Relay: play a whole Mega Man 1 stage with one specialist network per slice.
+"""Relay: play a whole stage with one specialist network per slice.
 
 Each slice of the stage was trained as its own level; here they run back to back on the full
-stage, the network changing hands as Mega Man crosses from one slice's screens into the next.
+stage, the network changing hands as the player crosses from one slice's screens into the next.
 That gives the end-to-end attempt a playtest needs, with the metrics split by section.
+The game is Mega Man unless `--game castlevania` says otherwise; every path below then reads
+runs/castlevania/... and the sections are that game's.
 
     python -m code.neuro.relay --pick                 # choose the best trained run for each slice
     python -m code.neuro.relay --episodes 20          # play the full stage, print and save metrics
@@ -29,14 +31,23 @@ from dataclasses import dataclass
 import numpy as np
 import yaml
 
-from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, OWN_LEVEL_FILES, make_adapter
+from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, OWN_LEVEL_FILES, STAGE_GAMES, make_adapter
 from .evolution import GAConfig
 from .net import make_net
 from .personas import PERSONAS, Hands
 from .sensors import read_sensors
 
-GAME = "megaman"
+GAME = "megaman"             # the game in play; --game (or set_game) switches it
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
+
+
+def set_game(game: str) -> str:
+    """Play this game's stage from here on (megaman, castlevania). Returns its full-stage level id."""
+    global GAME
+    if game not in STAGE_GAMES:
+        raise SystemExit(f"'{game}' is not played as a stage in sections (those are: {', '.join(STAGE_GAMES)})")
+    GAME = game
+    return STAGE_GAMES[game]
 
 
 @dataclass
@@ -50,9 +61,9 @@ class Leg:
     persona: object = None
 
 
-def stage_legs(stage_level: str) -> list[Leg]:
+def stage_legs(stage_level: str, game: str | None = None) -> list[Leg]:
     """The slices cut from this stage, in order, each with the screens it owns."""
-    with open(os.path.join(GAMES_DIR, OWN_LEVEL_FILES[GAME]), encoding="utf-8") as f:
+    with open(os.path.join(GAMES_DIR, OWN_LEVEL_FILES[game or GAME]), encoding="utf-8") as f:
         levels = (yaml.safe_load(f) or {}).get("levels") or {}
     stage = (levels.get(stage_level) or {}).get("stage")
     legs = []
@@ -61,7 +72,7 @@ def stage_legs(stage_level: str) -> list[Leg]:
         if name != stage_level and entry.get("stage") == stage and section.get("screens"):
             legs.append(Leg(name, {tuple(sc) for sc in section["screens"]}))
     if not legs:
-        raise SystemExit(f"no sections of '{stage_level}' in {OWN_LEVEL_FILES[GAME]} — run mm1_make_slices first")
+        raise SystemExit(f"no sections of '{stage_level}' in {OWN_LEVEL_FILES[game or GAME]}")
     return legs
 
 
@@ -98,8 +109,8 @@ def load_net(run_dir: str):
     return net, cfg.sensors, PERSONAS.get(meta.get("persona") or "", PERSONAS["experienced"])
 
 
-def evaluate(run_dir: str, level: str, attempts: int) -> tuple[float, float]:
-    """Test a run's best genome on its section: (share of attempts won, mean progress) over
+def evaluate(run_dir: str, level: str, attempts: int) -> tuple[float, float, float]:
+    """Test a run's best genome on its section: (share of attempts won, mean progress, mean fitness) over
     `attempts` tries with varied seeds and starting energy — conditions it was not selected on."""
     net, sensors, persona = load_net(run_dir)
     adapter = make_adapter(GAME, level, 3600, 5000.0)
@@ -114,7 +125,7 @@ def evaluate(run_dir: str, level: str, attempts: int) -> tuple[float, float]:
             vec = read_sensors(adapter, sensors)[0]
         adapter.step(*hands(net.act(vec)))
         frames += 1
-    return adapter.attempt_wins / attempts, adapter.progress()
+    return adapter.attempt_wins / attempts, adapter.progress(), float(adapter.fitness())
 
 
 def pick(runs_root: str, stage_level: str, attempts: int = 12, shortlist: int = 6) -> dict:
@@ -125,10 +136,10 @@ def pick(runs_root: str, stage_level: str, attempts: int = 12, shortlist: int = 
         found = [s for s in map(run_summary, sorted(glob.glob(os.path.join(runs_root, leg.level, "*")))) if s]
         found.sort(key=lambda s: (s["win_rate"], s["best"]), reverse=True)
         for s in found[:shortlist]:
-            s["tested_win_rate"], s["tested_progress"] = evaluate(s["run"], leg.level, attempts)
+            s["tested_win_rate"], s["tested_progress"], s["tested_fitness"] = evaluate(s["run"], leg.level, attempts)
             s["candidates"] = len(found)
-        if found:
-            chosen[leg.level] = max(found[:shortlist], key=lambda s: (s["tested_win_rate"], s["tested_progress"]))
+        if found:                                       # between equal winners, the fitter: faster, and with more energy left
+            chosen[leg.level] = max(found[:shortlist], key=lambda s: (s["tested_win_rate"], s["tested_progress"], s["tested_fitness"]))
     return chosen
 
 
@@ -227,9 +238,10 @@ def report(episodes: list[dict], legs: list[Leg], what: str = "the full stage") 
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Play a full Mega Man 1 stage with one specialist per slice")
-    ap.add_argument("--stage", default="CutMan", help="the full-stage level id")
-    ap.add_argument("--runs", default=os.path.join("runs", GAME), help="where the slice runs live")
+    ap = argparse.ArgumentParser(description="Play a full stage with one specialist per slice")
+    ap.add_argument("--game", default=GAME, choices=sorted(STAGE_GAMES), help="which game (default: megaman)")
+    ap.add_argument("--stage", default=None, help="the full-stage level id (default: the game's stage)")
+    ap.add_argument("--runs", default=None, help="where the slice runs live (default: runs/<game>)")
     ap.add_argument("--manifest", default=None, help="which run plays which slice (default: <runs>/relay.json)")
     ap.add_argument("--pick", action="store_true", help="choose the best run per slice and write the manifest")
     ap.add_argument("--section", default=None, help="play this one slice alone, from its start, instead of the full stage")
@@ -241,6 +253,9 @@ def main() -> None:
     ap.add_argument("--watch", action="store_true", help="play live on the dashboard instead of in a batch")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
+    args.stage = args.stage or set_game(args.game)
+    set_game(args.game)
+    args.runs = args.runs or os.path.join("runs", GAME)
     manifest = args.manifest or os.path.join(args.runs, "relay.json")
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -256,7 +271,7 @@ def main() -> None:
             print(f"{leg.level:<20}{100 * s['tested_win_rate']:>11.0f}%{100 * s['tested_progress']:>13.0f}%"
                   f"{s['candidates']:>6}  {s['run']}")
         with open(manifest, "w", encoding="utf-8") as f:
-            json.dump({"stage": args.stage, "legs": chosen}, f, indent=2)
+            json.dump({"game": GAME, "stage": args.stage, "legs": chosen}, f, indent=2)
         print(f"\nwrote {manifest}")
         return
 
@@ -315,7 +330,7 @@ def main() -> None:
     episode_log.append(csv_path, episodes)              # the shared telemetry: one row per episode
     summarize.summarize_file(csv_path, verbose=False)   # -> metrics.json beside it
     with open(os.path.join(out, "legs.json"), "w", encoding="utf-8") as f:
-        json.dump({"stage": args.stage, "section": args.section, "manifest": manifest, "legs": {leg.level: leg.run_dir for leg in legs}}, f, indent=2)
+        json.dump({"game": GAME, "stage": args.stage, "section": args.section, "manifest": manifest, "legs": {leg.level: leg.run_dir for leg in legs}}, f, indent=2)
     print(f"\nsaved {csv_path} (+ metrics.json, legs.json)")
     print(f"dashboard: python -m code.stats.telemetry {out}")
 

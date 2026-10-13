@@ -716,7 +716,7 @@ const KEYMAPS = {  // side-scrollers: up = jump; top-down (bomberman): WASD/arro
   ladder:  {ArrowLeft:"left",a:"left",ArrowRight:"right",d:"right",ArrowUp:"up",w:"up",ArrowDown:"down",s:"down"," ":"jump",z:"fire",j:"fire"},
 };
 const TOPDOWN = new Set(["bomberman"]);
-const LADDER = new Set(["megaman"]);   // side view with ladders and a fire button; progress is route, not x
+const LADDER = new Set(["megaman", "castlevania"]);   // side view with ladders and a fire button; progress is route, not x
 let KEYMAP = KEYMAPS.side;
 const HOTKEYS = {t:"b_turbo", s:"b_sensors", h:"b_hitboxes", g:"b_grid", m:"b_manual"};
 const inField = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement||{}).tagName || "");

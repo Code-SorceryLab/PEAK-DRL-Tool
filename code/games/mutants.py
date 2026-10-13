@@ -1,20 +1,21 @@
-"""Game mutants of a Mega Man stage: copies of the game that differ by one small change.
+"""Game mutants of a stage: copies of the game that differ by one small change.
 
-    python -m code.games.megaman_mutants                 # -> runs/megaman/mutants/
-    python -m code.games.megaman_mutants --list          # what is there
+    python -m code.games.mutants                         # Mega Man  -> runs/megaman/mutants/
+    python -m code.games.mutants --game castlevania      # Castlevania -> runs/castlevania/mutants/
+    python -m code.games.mutants --list                  # what is there
 
 A mutant is a record (mutant.json) plus what it changes: its own copy of the stage file (level
-mutants) or new values for megaman_config.yaml (mechanics mutants). The game code is not touched.
-Each mutant makes exactly one change, and each level operator is applied once in every section of
-the stage where it has something to act on; where it has not (no ladder in the boss room) the
-section is skipped and the reason recorded.
+mutants) or new values for the game's config file (mechanics mutants). The game code is not
+touched. Each mutant makes exactly one change, and each level operator is applied once in every
+section of the stage where it has something to act on; where it has not (no ladder in the boss
+room) the section is skipped and the reason recorded.
 
-    Level operators      seal_route  remove_ladder  widen_gap  add_hazard
+    Level operators      seal_route  remove_ladder / remove_stairs  widen_gap  add_hazard
                          add_enemy   remove_enemy   cosmetic_tile  off_route
     Mechanics operators  one config value moved by a fixed step (jump, gravity, speeds, energy, ...)
 
-Every mutant gets its class before any agent plays it, from the route field
-(megaman_route.py) searched from the stage's true start:
+Every mutant gets its class before any agent plays it, from the game's route field
+(megaman_route.py, castlevania_route.py) searched from the stage's true start:
 
     breaking   the exit can no longer be reached
     degrading  still reachable, but something on the route changed
@@ -22,7 +23,8 @@ Every mutant gets its class before any agent plays it, from the route field
 
 The route field approximates the physics and is cautious, so spot-check a sample by hand.
 
-To play a mutant, name it in the environment; every command then runs on that copy of the game:
+To play a mutant, name it in the environment; every command then runs on that copy of the game
+(PEAK_MM1_MUTANT for Mega Man, PEAK_CV_MUTANT for Castlevania):
 
     PEAK_MM1_MUTANT=runs/megaman/mutants/s3-seal_route python -m code.neuro.relay --episodes 20 \\
         --out runs/megaman/mutants/s3-seal_route/relay
@@ -30,45 +32,107 @@ To play a mutant, name it in the environment; every command then runs on that co
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import math
 import os
+from dataclasses import dataclass
 
 import yaml
 
-from . import megaman_enemies as en
-from .megaman_core import AIR, CONFIG_PATH, DOOR, DOOR_SHUT, GOAL, LADDER, LEVELS_PATH, SOLID, SPIKE, START, VOID, parse_level
-from .megaman_route import DRIFT_CELLS, JUMP_CELLS, route_field
-
-GAME = "megaman"
-OUT = os.path.join("runs", GAME, "mutants")
 LEVELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels")
-LEVEL_OPERATORS = ["seal_route", "remove_ladder", "widen_gap", "add_hazard", "add_enemy", "remove_enemy",
-                   "cosmetic_tile", "off_route"]
 INF = float("inf")
+AIR, VOID, SOLID, START, GOAL, DOOR, DOOR_SHUT = ".", " ", "#", "P", "G", "D", "d"   # the same in every stage game
 SOLIDS = (SOLID, DOOR_SHUT)
-KEEP = START + GOAL + DOOR + DOOR_SHUT + en.ENEMY_GLYPHS + en.ITEM_GLYPHS + en.BOSS_GLYPH   # never overwritten by a wall
-# Mechanics mutants: (id, config key, new value from the old one, what a player would notice)
-MECHANICS = [
-    ("jump_velocity_down", "player.jump_velocity", lambda v: round(v * 0.85, 3), "harder"),
-    ("jump_velocity_low", "player.jump_velocity", lambda v: round(v * 0.70, 3), "harder"),
-    ("jump_velocity_up", "player.jump_velocity", lambda v: round(v * 1.10, 3), "easier"),
-    ("gravity_up", "player.gravity", lambda v: round(v * 1.25, 4), "harder"),
-    ("run_speed_down", "player.run_speed", lambda v: round(v * 0.8, 4), "harder"),
-    ("air_speed_down", "player.air_speed", lambda v: round(v * 0.8, 4), "harder"),
-    ("ladder_speed_down", "player.ladder_speed", lambda v: round(v * 2 / 3, 4), "harder"),
-    ("energy_down", "player.hp", lambda v: int(v) - 8, "harder"),
-    ("max_shots_down", "buster.max_shots", lambda v: 1, "harder"),
-    ("time_limit_down", "time_limit", lambda v: int(v * 0.8), "harder"),
-]
+
+
+@dataclass
+class Game:
+    """What the operators need to know about one game."""
+    name: str
+    stage: str              # the full-stage level id
+    core: str               # module with CONFIG_PATH, LEVELS_PATH, MUTANT_ENV, parse_level
+    route: str              # module with route_field, JUMP_CELLS, DRIFT_CELLS
+    glyphs: str             # module with ENEMY_GLYPHS, ITEM_GLYPHS, BOSS_GLYPH
+    climb: str              # the glyphs of the way up: a ladder, or the two kinds of stair cell
+    climb_name: str
+    hazard: str             # the lethal tile add_hazard puts on a floor
+    hazard_name: str
+    enemy: tuple            # add_enemy: (glyph, name, whether it needs a floor under it)
+    air_speed: str          # the player's config key for sideways speed in a jump
+    mechanics: list         # (id, config key, new value from the old one, what a player would notice)
+
+    def __post_init__(self) -> None:
+        core, route, glyphs = (importlib.import_module(m) for m in (self.core, self.route, self.glyphs))
+        self.config_path, self.levels_path, self.env = core.CONFIG_PATH, core.LEVELS_PATH, core.MUTANT_ENV
+        self.parse_level, self.route_field = core.parse_level, route.route_field
+        self.path = getattr(route, "path", None)        # the route's cells, where the field records its own moves
+        self.jump_cells, self.drift_cells = route.JUMP_CELLS, route.DRIFT_CELLS
+        self.enemy_glyphs, self.boss_glyph = glyphs.ENEMY_GLYPHS, glyphs.BOSS_GLYPH
+        self.keep = START + GOAL + DOOR + DOOR_SHUT + glyphs.ENEMY_GLYPHS + glyphs.ITEM_GLYPHS + glyphs.BOSS_GLYPH
+        self.out = os.path.join("runs", self.name, "mutants")
+        remove = "remove_ladder" if self.climb == "H" else "remove_stairs"
+        self.level_operators = ["seal_route", remove, "widen_gap", "add_hazard", "add_enemy", "remove_enemy",
+                                "cosmetic_tile", "off_route"]
+
+
+def _megaman() -> Game:
+    return Game("megaman", "CutMan", "code.games.megaman_core", "code.games.megaman_route", "code.games.megaman_enemies",
+                climb="H", climb_name="ladder", hazard="^", hazard_name="Spikes", enemy=("b", "Blader", False),
+                air_speed="air_speed", mechanics=[
+                    ("jump_velocity_down", "player.jump_velocity", lambda v: round(v * 0.85, 3), "harder"),
+                    ("jump_velocity_low", "player.jump_velocity", lambda v: round(v * 0.70, 3), "harder"),
+                    ("jump_velocity_up", "player.jump_velocity", lambda v: round(v * 1.10, 3), "easier"),
+                    ("gravity_up", "player.gravity", lambda v: round(v * 1.25, 4), "harder"),
+                    ("run_speed_down", "player.run_speed", lambda v: round(v * 0.8, 4), "harder"),
+                    ("air_speed_down", "player.air_speed", lambda v: round(v * 0.8, 4), "harder"),
+                    ("ladder_speed_down", "player.ladder_speed", lambda v: round(v * 2 / 3, 4), "harder"),
+                    ("energy_down", "player.hp", lambda v: int(v) - 8, "harder"),
+                    ("max_shots_down", "buster.max_shots", lambda v: 1, "harder"),
+                    ("time_limit_down", "time_limit", lambda v: int(v * 0.8), "harder"),
+                ])
+
+
+def _castlevania() -> Game:
+    return Game("castlevania", "Entrance", "code.games.castlevania_core", "code.games.castlevania_route",
+                "code.games.castlevania_core", climb="/\\", climb_name="flight of stairs", hazard="~", hazard_name="Water",
+                enemy=("p", "panther", True), air_speed="walk_speed", mechanics=[
+                    ("jump_velocity_down", "player.jump_velocity", lambda v: round(v * 0.85, 4), "harder"),
+                    ("jump_velocity_low", "player.jump_velocity", lambda v: round(v * 0.70, 4), "harder"),
+                    ("jump_velocity_up", "player.jump_velocity", lambda v: round(v * 1.10, 4), "easier"),
+                    ("gravity_up", "player.gravity", lambda v: round(v * 1.25, 4), "harder"),
+                    ("walk_speed_down", "player.walk_speed", lambda v: round(v * 0.8, 4), "harder"),
+                    ("stair_speed_down", "player.stair_speed", lambda v: round(v * 2 / 3, 4), "harder"),
+                    ("energy_down", "player.hp", lambda v: int(v) - 4, "harder"),
+                    ("whip_reach_down", "whip.reach", lambda v: [int(x * 0.6) for x in v], "harder"),
+                    ("whip_windup_up", "whip.windup_frames", lambda v: int(v * 1.5), "harder"),
+                    ("time_limit_down", "time_limit", lambda v: int(v * 0.8), "harder"),
+                ])
+
+
+_MAKERS = {"megaman": _megaman, "castlevania": _castlevania}
+_GAMES: dict = {}
+
+
+def game(name: str = "megaman") -> Game:
+    if name not in _MAKERS:
+        raise SystemExit(f"no mutant operators for '{name}' (games: {', '.join(_MAKERS)})")
+    if name not in _GAMES:
+        _GAMES[name] = _MAKERS[name]()
+    return _GAMES[name]
+
+
+OUT = os.path.join("runs", "megaman", "mutants")      # Mega Man's, the default game
 
 
 # ── the stage, as text and as the game reads it ──────────────────────────────────────────────────
 class Stage:
-    def __init__(self, stage: str) -> None:
-        with open(CONFIG_PATH, encoding="utf-8") as f:
+    def __init__(self, stage: str | None = None, game_name: str = "megaman") -> None:
+        self.game = g = game(game_name)
+        stage = stage or g.stage
+        with open(g.config_path, encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
-        with open(LEVELS_PATH, encoding="utf-8") as f:
+        with open(g.levels_path, encoding="utf-8") as f:
             levels = (yaml.safe_load(f) or {}).get("levels") or {}
         if stage not in levels:
             raise SystemExit(f"unknown level '{stage}'")
@@ -82,10 +146,10 @@ class Stage:
         self.sections = [(name, e["section"]) for name, e in levels.items()
                          if name != stage and e.get("file") == self.file and (e.get("section") or {}).get("screens")]
         self.ld = self.parse(self.text)
-        self.cost = route_field(self.ld)
+        self.cost = g.route_field(self.ld)
 
     def parse(self, text: list[str]):
-        return parse_level(text, self.sc, self.sr, self.tile, self.file)
+        return self.game.parse_level(text, self.sc, self.sr, self.tile, self.file)
 
     def edit(self, cells: dict[tuple[int, int], str]) -> list[str]:
         """A copy of the stage text with these cells rewritten: {(col, row): glyph}."""
@@ -104,14 +168,17 @@ class Stage:
         return not (0 <= r < ld.rows and 0 <= c < ld.cols) or ld.grid[r][c] in SOLIDS
 
     def open(self, c: int, r: int) -> bool:
-        """A cell a body may pass through: inside a screen, not solid, not spikes."""
+        """A cell a body may pass through: inside a screen, not solid, not lethal."""
         ld = self.ld
-        return 0 <= r < ld.rows and 0 <= c < ld.cols and ld.grid[r][c] in (AIR, LADDER)
+        return 0 <= r < ld.rows and 0 <= c < ld.cols and ld.grid[r][c] in AIR + self.game.climb
 
-    def reachable(self, text: list[str], jump: int = JUMP_CELLS, drift: int = DRIFT_CELLS):
-        """(can the exit be reached from the true start, cost of the route from there, the field)."""
+    def reachable(self, text: list[str], jump: int | None = None, drift: int | None = None, player: dict | None = None):
+        """(can the exit be reached from the true start, cost of the route from there, the field).
+        `player` is the mutated movement config, for a field that plays the jump out itself."""
+        g = self.game
         ld = self.parse(text)
-        cost = route_field(ld, jump, drift)
+        extra = {"player": player} if player and g.path else {}
+        cost = g.route_field(ld, g.jump_cells if jump is None else jump, g.drift_cells if drift is None else drift, **extra)
         start = float(cost[ld.start[1], ld.start[0]])
         return math.isfinite(start), start, cost
 
@@ -123,6 +190,8 @@ def route(stage: Stage, sec: dict) -> list[tuple[int, int]]:
     c, r = sec["start"]
     end = sec.get("end")
     stop = float(cost[end[1], end[0]]) if end else 0.0
+    if stage.game.path:                                 # a field that records its own moves (castlevania_route)
+        return [p for p in stage.game.path(cost, (c, r), stop) if (p[0] // stage.sc, p[1] // stage.sr) in own]
     path = [(c, r)]
     while cost[r, c] > stop and len(path) < 4000:
         here, best = float(cost[r, c]), None
@@ -164,7 +233,7 @@ def seal_route(st: Stage, sec: dict, path: list, own) -> tuple | str:
             while st.open(x, y) and own(x, y) and len(bar) < 16:
                 bar.append((x, y))
                 x, y = x + sign * across[0], y + sign * across[1]
-        if any(st.char(x, y) in KEEP for x, y in bar) or any((x, y) == tuple(sec["start"]) for x, y in bar):
+        if any(st.char(x, y) in st.game.keep for x, y in bar) or any((x, y) == tuple(sec["start"]) for x, y in bar):
             continue
         cells = {p: SOLID for p in bar}
         if not st.reachable(st.edit(cells))[0]:
@@ -174,36 +243,41 @@ def seal_route(st: Stage, sec: dict, path: list, own) -> tuple | str:
 
 
 def remove_ladder(st: Stage, sec: dict, path: list, own) -> tuple | str:
-    """The first ladder the route climbs, taken out whole."""
+    """The first ladder (or flight of stairs) the route climbs, taken out whole."""
+    g = st.game
     seen = set()
     runs = []
     for c, r in path:
-        if st.char(c, r) != LADDER or (c, r) in seen:
+        ch = st.char(c, r)
+        if ch not in g.climb or (c, r) in seen:
             continue
-        top = bottom = r
-        while st.char(c, top - 1) == LADDER:
-            top -= 1
-        while st.char(c, bottom + 1) == LADDER:
-            bottom += 1
-        cells = [(c, y) for y in range(top, bottom + 1)]
+        dc = {"/": 1, "\\": -1}.get(ch, 0)                # a stair cell's neighbours are diagonal: up and to its side
+        cells = [(c, r)]
+        while st.char(cells[0][0] + dc, cells[0][1] - 1) == ch:
+            cells.insert(0, (cells[0][0] + dc, cells[0][1] - 1))
+        while st.char(cells[-1][0] - dc, cells[-1][1] + 1) == ch:
+            cells.append((cells[-1][0] - dc, cells[-1][1] + 1))
         seen.update(cells)
         runs.append(cells)
     if not runs:
-        return "the route uses no ladder here"
+        return f"the route uses no {g.climb_name} here"
     inside = [run for run in runs if all(own(*p) for p in run)]
     if not inside:
-        return "the only ladders on the route here are shared with the next section or the one before"
+        return f"every {g.climb_name} on the route here is shared with the next section or the one before"
     run = inside[0]
+    # a stair cell set into a floor becomes floor again, so taking the flight out leaves no hole
+    cells = {(x, y): SOLID if st.char(x - 1, y) == SOLID and st.char(x + 1, y) == SOLID else AIR for x, y in run}
     c = run[0][0]
-    return {p: AIR for p in run}, {"col": c, "top": run[0][1], "bottom": run[-1][1], "tiles": len(run)}, \
-        f"The {len(run)}-tile ladder in column {c}, rows {run[0][1]}-{run[-1][1]}, removed", "harder"
+    what = f"The {len(run)}-tile ladder in column {c}" if not dc else f"The {len(run)}-tile flight of stairs from column {c}"
+    return cells, {"col": c, "top": run[0][1], "bottom": run[-1][1], "tiles": len(run)}, \
+        f"{what}, rows {run[0][1]}-{run[-1][1]}, removed", "harder"
 
 
 def widen_gap(st: Stage, sec: dict, path: list, own, width: int = 2) -> tuple | str:
     """The ledge the route jumps from, cut back by two tiles."""
     for i in middle_out(len(path) - 1, margin=2):
         (c, r), (nc, nr) = path[i], path[i + 1]
-        s = nc - c
+        s = (nc > c) - (nc < c)
         if not s or not st.solid(c, r + 1) or st.char(c, r + 1) != SOLID or st.solid(c + s, r + 1):
             continue                                            # not the last tile of a floor before open space
         cells = {}
@@ -220,37 +294,40 @@ def widen_gap(st: Stage, sec: dict, path: list, own, width: int = 2) -> tuple | 
 
 
 def add_hazard(st: Stage, sec: dict, path: list, own) -> tuple | str:
-    """Spikes standing on a floor tile the route walks over: they have to be jumped."""
+    """The game's lethal tile standing on a floor tile the route walks over: it has to be jumped."""
     fallback = None
     for i in middle_out(len(path), margin=4):
         c, r = path[i]
         flat = all(st.char(x, r + 1) == SOLID and st.open(x, r) and st.ld.grid[r][x] == AIR for x in (c - 1, c, c + 1))
-        if not flat or not own(c, r) or st.char(c, r) in KEEP or (c, r) == tuple(sec["start"]):
+        if not flat or not own(c, r) or st.char(c, r) in st.game.keep or (c, r) == tuple(sec["start"]):
             continue
-        cells = {(c, r): SPIKE}
-        made = (cells, {"col": c, "row": r, "glyph": SPIKE}, f"Spikes on the floor at ({c}, {r})", "harder")
+        cells = {(c, r): st.game.hazard}
+        made = (cells, {"col": c, "row": r, "glyph": st.game.hazard}, f"{st.game.hazard_name} on the floor at ({c}, {r})", "harder")
         if st.reachable(st.edit(cells))[0]:
             return made
         fallback = fallback or made
     return fallback or "the route crosses no flat floor three tiles wide here"
 
 
-def add_enemy(st: Stage, sec: dict, path: list, own, glyph: str = "b") -> tuple | str:
-    """A Blader (it flies, so it needs no wall or floor) placed above the route."""
+def add_enemy(st: Stage, sec: dict, path: list, own) -> tuple | str:
+    """One more enemy on the route: Mega Man's Blader (it flies, so it needs no floor) above it,
+    Castlevania's panther sitting on it."""
+    glyph, name, floor = st.game.enemy
     spawns = [(c, r) for _, c, r in st.ld.spawns]
     for i in middle_out(len(path), margin=6):
         c, r = path[i]
-        for y in (r - 2, r - 1, r):
+        for y in ((r,) if floor else (r - 2, r - 1, r)):
             if st.ld.grid[y][c] == AIR and st.char(c, y) in (AIR, VOID) and own(c, y) \
+                    and (not floor or st.char(c, y + 1) == SOLID) \
                     and all(abs(c - sc) + abs(y - sr) >= 4 for sc, sr in spawns):
-                return {(c, y): glyph}, {"col": c, "row": y, "glyph": glyph, "enemy": "Blader"}, \
-                    f"A Blader added at ({c}, {y}), on the route", "harder"
+                return {(c, y): glyph}, {"col": c, "row": y, "glyph": glyph, "enemy": name}, \
+                    f"A {name} added at ({c}, {y}), on the route", "harder"
     return "no open cell on the route at least four tiles from every other enemy"
 
 
 def remove_enemy(st: Stage, sec: dict, path: list, own) -> tuple | str:
     """The enemy closest to the route, removed."""
-    mine = [(g, c, r) for g, c, r in st.ld.spawns if g in en.ENEMY_GLYPHS and own(c, r)]
+    mine = [(g, c, r) for g, c, r in st.ld.spawns if g in st.game.enemy_glyphs and own(c, r)]
     if not mine or not path:
         return "no enemy in this section"
     g, c, r = min(mine, key=lambda s: (min(abs(s[1] - pc) + abs(s[2] - pr) for pc, pr in path), s[2], s[1]))
@@ -290,6 +367,7 @@ def off_route(st: Stage, sec: dict, path: list, own) -> tuple | str:
 
 OPERATORS = {f.__name__: f for f in (seal_route, remove_ladder, widen_gap, add_hazard, add_enemy, remove_enemy,
                                      cosmetic_tile, off_route)}
+OPERATORS["remove_stairs"] = remove_ladder
 NEUTRAL_BY_DESIGN = {"cosmetic_tile", "off_route"}
 
 
@@ -312,7 +390,7 @@ def classify(st: Stage, operator: str, text: list[str]) -> tuple[str, dict]:
     return "degrading", checks
 
 
-def jump_reach(player: dict) -> tuple[int, int]:
+def jump_reach(player: dict, air_speed: str = "air_speed") -> tuple[int, int]:
     """(cells a jump lifts the feet, cells it carries sideways) for these movement values."""
     v, g = float(player["jump_velocity"]), float(player["gravity"])
     height, frames = 0.0, 0
@@ -320,12 +398,14 @@ def jump_reach(player: dict) -> tuple[int, int]:
         height += v
         v -= g
         frames += 1
-    return int(height // 16), int(2 * frames * float(player["air_speed"]) // 16)
+    return int(height // 16), int(2 * frames * float(player[air_speed]) // 16)
 
 
 # ── generating ───────────────────────────────────────────────────────────────────────────────
-def generate(stage: str = "CutMan", out: str = OUT) -> dict:
-    st = Stage(stage)
+def generate(stage: str | None = None, out: str | None = None, game_name: str = "megaman") -> dict:
+    g = game(game_name)
+    stage, out = stage or g.stage, out or g.out
+    st = Stage(stage, game_name)
     mutants, skipped = [], []
     for n, (name, sec) in enumerate(st.sections, 1):
         screens = {tuple(s) for s in sec["screens"]}
@@ -334,7 +414,7 @@ def generate(stage: str = "CutMan", out: str = OUT) -> dict:
             return (c // st.sc, r // st.sr) in screens
 
         path = route(st, sec)
-        for op in LEVEL_OPERATORS:
+        for op in g.level_operators:
             made = OPERATORS[op](st, sec, path, own)
             if isinstance(made, str):
                 skipped.append({"section": name, "operator": op, "reason": made})
@@ -343,26 +423,26 @@ def generate(stage: str = "CutMan", out: str = OUT) -> dict:
             text = st.edit(cells)
             cls, checks = classify(st, op, text)
             changed = sorted(cells)
-            record = {"id": f"s{n}-{op}", "game": GAME, "stage": stage, "section": name, "family": "level", "operator": op,
+            record = {"id": f"s{n}-{op}", "game": g.name, "stage": stage, "section": name, "family": "level", "operator": op,
                       "class": cls, "direction": direction, "description": description, "parameter": parameter,
                       "location": {"col": changed[len(changed) // 2][0], "row": changed[len(changed) // 2][1]},
                       "cells": [[c, r, st.char(c, r), cells[(c, r)]] for c, r in changed],     # col, row, before, after
                       "base_file": st.file, "level_file": "level.txt", "config": None, "checks": checks}
             mutants.append((record, text))
-    base_jump = jump_reach(st.cfg["player"])
-    for mid, key, change, direction in MECHANICS:
+    base_jump = jump_reach(st.cfg["player"], g.air_speed)
+    for mid, key, change, direction in g.mechanics:
         node = st.cfg
         *parents, leaf = key.split(".")
         for k in parents:
             node = node[k]
         old, new = node[leaf], change(node[leaf])
         player = dict(st.cfg["player"], **({leaf: new} if parents == ["player"] else {}))
-        jump, drift = jump_reach(player)
+        jump, drift = jump_reach(player, g.air_speed)
         # the field's own reach where the values leave the jump as it was; the mutated reach where they do not
-        jump, drift = (JUMP_CELLS if jump == base_jump[0] else jump), (DRIFT_CELLS if drift == base_jump[1] else drift)
-        ok, start, _ = st.reachable(st.text, jump, drift)
+        jump, drift = (g.jump_cells if jump == base_jump[0] else jump), (g.drift_cells if drift == base_jump[1] else drift)
+        ok, start, _ = st.reachable(st.text, jump, drift, player=player)
         before = float(st.cost[st.ld.start[1], st.ld.start[0]])
-        record = {"id": f"m-{mid}", "game": GAME, "stage": stage, "section": None, "family": "mechanics", "operator": mid,
+        record = {"id": f"m-{mid}", "game": g.name, "stage": stage, "section": None, "family": "mechanics", "operator": mid,
                   "class": "breaking" if not ok else "degrading", "direction": direction,
                   "description": f"{key} changed from {old} to {new}", "parameter": {"key": key, "from": old, "to": new},
                   "location": None, "cells": [], "base_file": st.file, "level_file": None, "config": {key: new},
@@ -378,13 +458,14 @@ def generate(stage: str = "CutMan", out: str = OUT) -> dict:
                 f.write("\n".join(text) + "\n")
         with open(os.path.join(folder, "mutant.json"), "w", encoding="utf-8") as f:
             json.dump(record, f, indent=2)
-    index = {"game": GAME, "stage": stage, "base_file": st.file, "mutants": [r for r, _ in mutants], "skipped": skipped}
+    index = {"game": g.name, "stage": stage, "base_file": st.file, "mutants": [r for r, _ in mutants], "skipped": skipped}
     with open(os.path.join(out, "mutants.json"), "w", encoding="utf-8") as f:
         json.dump(index, f, indent=2)
     return index
 
 
-def load(out: str = OUT) -> dict | None:
+def load(out: str | None = None, game_name: str = "megaman") -> dict | None:
+    out = out or game(game_name).out
     try:
         with open(os.path.join(out, "mutants.json"), encoding="utf-8") as f:
             return json.load(f)
@@ -407,17 +488,19 @@ def table(index: dict) -> str:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Generate game mutants of a Mega Man stage")
-    ap.add_argument("--stage", default="CutMan", help="the full-stage level id")
-    ap.add_argument("--out", default=OUT, help="where the mutants go (default: runs/megaman/mutants)")
+    ap = argparse.ArgumentParser(description="Generate game mutants of a stage")
+    ap.add_argument("--game", default="megaman", choices=sorted(_MAKERS))
+    ap.add_argument("--stage", default=None, help="the full-stage level id (default: the game's stage)")
+    ap.add_argument("--out", default=None, help="where the mutants go (default: runs/<game>/mutants)")
     ap.add_argument("--list", action="store_true", help="print the mutants already generated and exit")
     args = ap.parse_args()
-    index = load(args.out) if args.list else generate(args.stage, args.out)
+    out = args.out or game(args.game).out
+    index = load(out) if args.list else generate(args.stage, out, args.game)
     if index is None:
-        raise SystemExit(f"no mutants in {args.out} — run without --list first")
+        raise SystemExit(f"no mutants in {out} — run without --list first")
     print(table(index))
     if not args.list:
-        print(f"\nwrote {args.out}/<mutant>/mutant.json (+ level.txt) and {args.out}/mutants.json")
+        print(f"\nwrote {out}/<mutant>/mutant.json (+ level.txt) and {out}/mutants.json")
 
 
 if __name__ == "__main__":

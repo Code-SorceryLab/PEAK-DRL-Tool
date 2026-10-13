@@ -91,9 +91,9 @@ list is `paper-ast/TODO.md`; this file is only the queue for the `megaman` game 
 
 ### 2026-10-12: mutant generator (paper section 3.7)
 
-`python -m code.games.megaman_mutants` writes 63 mutants of the Cut Man stage to
+`python -m code.games.mutants` writes 63 mutants of the Cut Man stage to
 `runs/megaman/mutants/<id>/` (`mutant.json`, plus `level.txt` for level mutants) and an index,
-`mutants.json` (`code/games/megaman_mutants.py`, tests in `code/tests/test_mutants.py`).
+`mutants.json` (`code/games/mutants.py`, tests in `code/tests/test_mutants.py`).
 
 - **One change each.** Each level operator is applied once in every section where it has
   something to act on; otherwise the section is skipped and the reason recorded (10 skips).
@@ -236,7 +236,7 @@ python -m code.neuro.relay --section CutMan-3-Ledges --watch --seed 1237    # a 
 python -m code.pipeline --open
 
 # Mutants: generate (or --list), then play one with the trained agents
-python -m code.games.megaman_mutants
+python -m code.games.mutants
 PEAK_MM1_MUTANT=runs/megaman/mutants/s3-seal_route python -m code.neuro.relay --episodes 20 \
   --out runs/megaman/mutants/s3-seal_route/relay
 

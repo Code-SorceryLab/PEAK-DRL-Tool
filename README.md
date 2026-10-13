@@ -187,7 +187,7 @@ flowchart LR
 
 | Layer | Where | What it does |
 |---|---|---|
-| Engines | `code/games/*_core.py` | Five deterministic Pygame games — four platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling. Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`) are the active roster; Sonic is archived (`ARCHIVED_GAMES`): off the menus and sweeps, still runnable with `--game sonic` |
+| Engines | `code/games/*_core.py` | Six deterministic Pygame games — five platformers (Castlevania is the newest: [docs/CASTLEVANIA.md](docs/CASTLEVANIA.md)) and a top-down Bomberman — sharing ASCII level loading and debug tooling. Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`) are the active roster; Sonic is archived (`ARCHIVED_GAMES`): off the menus and sweeps, still runnable with `--game sonic` |
 | Adapters | `code/neuro/adapters.py` | One `GameAdapter` face per engine: reset, step, solid/hazard queries, fitness, episode stats |
 | Sensors | `code/neuro/sensors.py` | Raycast marching + scalar senses → 14 floats; or a 3 × 11 × 11 tile window + body senses → 368 |
 | Evolution | `code/neuro/evolution.py` | `GAConfig` + `Population`: flat weight vectors, elitism, tournament, uniform crossover, gaussian mutation, checkpoints with RNG state |

@@ -39,7 +39,7 @@ DIMENSIONS = {
 TIERS = {"novice": "novice", "expert": "experienced", "speedrunner": "speedrunner"}
 
 SCROLLERS = frozenset({"mario", "sonic"})
-ALL_GAMES = frozenset({"mario", "sonic", "meatboy", "bomberman", "megaman"})
+ALL_GAMES = frozenset({"mario", "sonic", "meatboy", "bomberman", "megaman", "castlevania"})
 FAILED = ("DEAD", "STUCK")
 ENTROPY_BINS = 10
 ROUTE_BINS = 50        # side-scroller route profile: mean height in 50 slices across the level
@@ -340,7 +340,7 @@ def completion_rate_per_skill(by_tier):
 # ── the registry ─────────────────────────────────────────────────────────────
 
 _M, _MB, _BM = frozenset({"mario"}), frozenset({"meatboy"}), frozenset({"bomberman"})
-_MM1 = frozenset({"megaman"})
+_MM1 = frozenset({"megaman", "castlevania"})   # stages cut into sections, progress along a route
 _PROGRESS = SCROLLERS | _MB | _MM1
 _ROUTES = _M | _MB | _MM1
 

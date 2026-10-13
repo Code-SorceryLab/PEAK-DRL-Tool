@@ -1,0 +1,100 @@
+# Castlevania (NES, 1986), stage 1 — standalone game: castlevania_core.py reads only this file.
+# World pixels are NES pixels x (tile_size / 16), as in megaman_config.yaml.
+#
+# The numbers come from a C++ remake of block 1 (github.com/NearHuscarl/Castlevania, kept locally
+# in castlevania-data/code), not from the ROM: its speeds are px/s at 2x and are written here as
+# NES px/frame (value / 120). Timings the remake leaves to its animations are marked approximate.
+tile_size: 32              # one NES tile (16 px) at 2x
+fps: 60
+time_limit: 300            # seconds per attempt, the stage clock
+screen: {cols: 16, rows: 12}   # the play field of one NES screen, 256 x 192 px (the status bar is not part of it)
+scroll_speed: 4.0          # NES px/frame the camera moves between rooms and screens
+
+player:
+  width: 12                # hitbox; the sprite is 16 x 32
+  height: 30
+  duck_height: 22          # the box enemies can touch while ducking
+  hp: 16
+  walk_speed: 1.0417       # 125 px/s
+  stair_speed: 0.5208      # half the walking speed, on each axis
+  jump_velocity: 3.9167    # 470 px/s: about 2.5 tiles up, and no steering once in the air
+  gravity: 0.1917          # 23 px/s per frame
+  max_fall_speed: 8.0      # approximate
+  stair_reach: 16          # px from a flight's foot or head within which up / down walks him to it and on
+  hurt_invulnerable_frames: 120   # 2000 ms
+  knockback_speed: 1.0417  # thrown back at walking speed until landing
+  knockback_hop: 3.0       # 360 px/s upward
+whip:
+  windup_frames: 14        # approximate: the two frames of the swing before the lash is out
+  active_frames: 8         # approximate: the lash can hit during these
+  reach: [26, 26, 42]      # px beyond the body, by whip level (the third is the long chain)
+  damage: [1, 2, 2]        # by whip level
+  height: 8                # the lash's box
+  shoulder: 21             # px above the feet standing; 13 when ducking
+
+# Enemies: [half width, half height, hit points, contact damage, score]
+enemies:
+  zombie: {box: [6, 15], hp: 1, damage: 2, score: 100, speed: 0.9583}
+  panther: {box: [14, 7], hp: 1, damage: 2, score: 200, speed: 2.9167, jump_velocity: 1.6667,
+            wake_x: 62, wake_y: 100}                       # it runs when the player is this close
+  bat: {box: [7, 7], hp: 1, damage: 2, score: 200, speed: 1.125, wave: 8, wave_frames: 64}
+  fishman: {box: [7, 15], hp: 1, damage: 2, score: 300, speed: 0.625, launch_velocity: 6.6667,
+            fire_every: 150, fireball_speed: 2.5}
+  boss: {box: [22, 10], hp: 16, damage: 2, score: 3000, speed: 2.5, dive_speed: 2.2917,
+         rest_frames: 20, blink_frames: 24,                # approximate; whipped, it cannot bite until the blink ends
+         swoop_from: 80, swoop_past: 56}                   # px to the side it comes down at, and flies on past the player
+# The enemies that arrive in waves. A spawner (Z, B, F in the stage file) works while the player
+# is in its room and within `reach` tiles of it sideways.
+spawners:
+  zombie: {reach: 13, group: 3, group_every: 210, member_every: 33, from_right: 0.8}
+  bat: {reach: 16, group: 1, group_every: 330, member_every: 0, from_right: 0.75}
+  fishman: {reach: 16, group: 2, group_every: 240, member_every: 60}
+items:
+  ttl: 300                 # frames a dropped item lasts
+  heart: 1                 # hearts a small heart is worth
+  big_heart: 5
+  money: 400               # points
+
+# How fast an agent may work the pad: see megaman_config.yaml.
+agent_input:
+  fire_period: 8
+  jump_period: 8
+  turn_period: 6
+
+# How a genome is scored on a stage section while training: see megaman_config.yaml.
+training:
+  attempts: 3                # PEAK_CV_ATTEMPTS overrides it (the tests use 1)
+  min_start_energy: 6        # later attempts start with between this much and full energy,
+                             # and with any of the three whips (the first attempt has the leather one)
+  stall_frames: 240
+  sticky_actions: 0.25
+
+# Optional art and sound. The folder is git-ignored; without it the game draws flat placeholder
+# shapes and is silent.
+assets:
+  enabled: true
+  dir: castlevania-data      # relative to the repository root; PEAK_CV_ASSETS overrides it
+  maps: code/src/GameCuaTao/Castlevania/Content/TiledMaps/Stage_01
+  sprites: code/src/GameCuaTao/Castlevania/Content      # the reference sprite sheets and their atlases
+  sounds:                    # event -> .wav under the sprites folder; heard only by a person playing
+    whip: Sounds/SoundEffects/Using_Weapon.wav
+    hit: Sounds/SoundEffects/Hitting_Something.wav
+    hurt: Sounds/SoundEffects/Being_Hit.wav
+    heart: Sounds/SoundEffects/Getting_Heart.wav
+    money: Sounds/SoundEffects/Getting_Money_Bag.wav
+    powerup: Sounds/SoundEffects/Getting_Powerup.wav
+    land: Sounds/SoundEffects/Landing.wav
+    door: Sounds/SoundEffects/Using_Door.wav
+    fishman: Sounds/SoundEffects/Fishman_Launching.wav
+    splash: Sounds/SoundEffects/Hitting_Water_Surface.wav
+    death: Sounds/SoundEffects/Live_Lost_.wav
+    clear: Sounds/SoundEffects/Stage_Clear_.wav
+  music:                     # looped while a person plays; remove a line to go without it
+    stage: Sounds/Musics/Stage_01_Vampire_Killer.wav
+    boss: Sounds/Musics/Boss_Battle_Poison_Mind.wav
+  backdrops:                 # each reference map's tile layer, drawn at this cell of the stage
+    - {file: Courtyard.tmx, col: 0, row: 1, rows: 11}
+    - {file: Great_Hall.tmx, col: 48, row: 0}
+    - {file: Underground.tmx, col: 146, row: 12}
+
+# The level list lives in castlevania_levels.yaml.
