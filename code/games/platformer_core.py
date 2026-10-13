@@ -10,7 +10,6 @@ import pygame
 import time
 import gymnasium
 from gymnasium import spaces
-import random
 
 # FIX: Import the Class 'EntityType' explicitly so EntityType.GOAL works
 from .modules.System.EntityType import EntityType
@@ -336,7 +335,7 @@ class JumpArcComputer:
 # Screen / Tile geometry
 # =============================================================================
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 32, 32
+PLATFORMER_WIDTH, PLATFORMER_HEIGHT = 24, 32
 DEBUG_PANEL_WIDTH = 350  # Width of the side debug panel (shown only in human mode)
 
 # MultiDiscrete action axes — [move, jump, fire]
@@ -473,7 +472,7 @@ class PlatformerCore(gymnasium.Env):
         # generalization without the solver-derived navigational prior (paper Req. note).
         self.dijkstra_enabled = bool(kwargs.pop("dijkstra_enabled", True))
 
-        self.speed_mult = float(kwargs.pop("speed_mult", 2.0))
+        self.speed_mult = float(kwargs.pop("speed_mult", 1.0))
         self.physics_manager.speed_mult = self.speed_mult
 
         self.max_steps = kwargs.pop("max_steps", None)
@@ -679,14 +678,8 @@ class PlatformerCore(gymnasium.Env):
             dead_obs = None if self.skip_obs else self._obs()
             return dead_obs, 0.0, True, False, {"episode_end": True, "won": self.reached_goal}
 
-        # Time Calculation
-        if self.render_mode != "human":
-            self.dt = 1 / 60.0
-        else:
-            time_curr_step = time.time()
-            raw_dt = time_curr_step - self.time_last_step
-            self.time_last_step = time_curr_step
-            self.dt = min(raw_dt, 0.05)
+        # Fixed physics step: humans and agents play the same physics.
+        self.dt = 1 / 60.0
 
         if self.debug_manager.slow_motion:
             self.dt *= 0.5
@@ -876,8 +869,8 @@ class PlatformerCore(gymnasium.Env):
             # Keeps skills sharp on mastered levels, distributes visits,
             # prevents catastrophic forgetting. Results don't count for batch.
             if (self._curriculum_position > 0
-                    and random.random() < self._review_prob):
-                review_idx = random.randint(0, self._curriculum_position - 1)
+                    and self.np_random.random() < self._review_prob):
+                review_idx = int(self.np_random.integers(0, self._curriculum_position))
                 self.current_index_world = review_idx
                 self._is_review_episode = True
             else:
@@ -971,6 +964,7 @@ class PlatformerCore(gymnasium.Env):
             self.player.coyote       = 0
             self.player.jump_hold    = 0
             self.player.jump_buffer  = 0
+            self.player.last_jump_pressed = False
             self.player.input_dir    = 0
             self.player.run_held     = False
             self.player.jump_pressed = False

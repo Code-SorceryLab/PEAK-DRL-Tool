@@ -17,7 +17,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--game", default="platformer", help="game key")
-parser.add_argument("--fps", type=int, default=30, help="target FPS")
+parser.add_argument("--fps", type=int, default=60, help="target FPS")
 parser.add_argument("--level", default=None, help="Level ID from game_config (e.g. Mario1-2; meatboy: level index)")
 parser.add_argument("--file", default=None, help="Absolute path to a .txt level file (unlisted)")
 parser.add_argument("--random", action="store_true", help="random actions instead of keyboard")
@@ -36,10 +36,6 @@ INDEXED_GAMES = {"meatboy", "bomberman"}   # levels are list indices, not named 
 if level_id and not level_file and args.game not in INDEXED_GAMES:
     from code.neuro.adapters import validate_level
     validate_level("mario" if args.game == "platformer" else args.game, level_id)
-
-# Enable manual play mode for platformer-like games
-if args.game in {"platformer", "megaman"}:
-    os.environ["MARIO_MANUAL_PLAY"] = "1"
 
 # --- Load game core class dynamically
 game_mod = importlib.import_module(f"code.games.{args.game}_core")
@@ -192,7 +188,7 @@ if args.game == "platformer":
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
     core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
-substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixed-dt cores keep real-time pace
+substeps = max(1, round(60 / args.fps))  # every core steps a fixed 1/60 s; keep real-time pace
 # Meatboy draws onto whatever surface it is given; the other cores own a window.
 screen = core_game._surf if hasattr(core_game, "_surf") else \
     pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))

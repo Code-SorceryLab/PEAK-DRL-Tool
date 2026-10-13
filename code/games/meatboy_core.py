@@ -399,7 +399,7 @@ if __name__ == "__main__":
     core = MeatboyCore(render_mode="none")
     obs, info = core.reset()
     assert set(obs.keys()) == {"grids", "scalars"}
-    assert obs["grids"].shape == (4, 21, 21)
+    assert obs["grids"].shape == (4, 11, 11)
     assert obs["scalars"].shape == (core.n_scalars,)
 
     landed = False

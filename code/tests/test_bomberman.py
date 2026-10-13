@@ -123,6 +123,24 @@ def test_exit_only_opens_on_a_clear_arena():
     assert core.won
 
 
+@pytest.mark.parametrize("level_idx", [0, 5, 11])
+def test_no_diagonal_movement(level_idx):
+    """Holding two directions moves on one axis per frame, never faster than walk speed."""
+    core = BombermanCore(render_mode="none", level_idx=level_idx)
+    step = core.player.speed * core.dt
+    moved_x = moved_y = False
+    for t in range(600):
+        x, y = core.player.x, core.player.y
+        core.step((1, 1, 0) if t % 200 < 150 else (-1, 1, 0))
+        if not core.alive:
+            break
+        ddx, ddy = abs(core.player.x - x), abs(core.player.y - y)
+        assert ddx == 0 or ddy == 0, f"diagonal step at frame {t}"
+        assert ddx + ddy <= step + 1e-9
+        moved_x, moved_y = moved_x or ddx > 0, moved_y or ddy > 0
+    assert moved_x and moved_y, "both axes stay usable while two keys are held"
+
+
 def test_determinism():
     a, b = (BombermanCore(render_mode="none", level_idx=11) for _ in range(2))
     for _ in range(240):

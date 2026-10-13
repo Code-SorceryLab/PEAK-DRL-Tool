@@ -143,7 +143,9 @@ class Player():
 
         # 5. Physics & gravity
         self.apply_physics(dt, context)
-        grav = context.FAST_FALL_GRAV if self.vy > 0 else context.GRAVITY
+        # Variable jump: light gravity only while rising with jump held;
+        # releasing early (or falling) switches to the heavy gravity.
+        grav = context.GRAVITY if (self.vy < 0 and self.jump_pressed) else context.FAST_FALL_GRAV
         self.vy = min(self.vy + (grav * dt), context.MAX_FALL_SPEED)
 
         self.gObj.x += self.vx * dt
@@ -214,8 +216,10 @@ class Player():
         elif is_right:           self.input_dir = 1
         else:                    self.input_dir = 0
 
-        if self.jump_pressed:
+        # Buffer a jump on the press edge only, so holding jump does not re-jump.
+        if self.jump_pressed and not self.last_jump_pressed:
             self.jump_buffer = 6
+        self.last_jump_pressed = self.jump_pressed
 
         # Fire input — try_fire() enforces cooldown and power state internally.
         # fire_requested is consumed by platformer_core.step() to spawn the projectile.
@@ -281,15 +285,12 @@ class Player():
         self.handle_jump(dt, ctx)
 
     def handle_jump(self, dt: float, ctx: PhysicsContext):
-        if self.jump_pressed:
-            self.jump_buffer = ctx.JUMP_BUFFER_FRAMES
-
         self.coyote = ctx.COYOTE_FRAMES if self.on_ground else max(0, self.coyote - 1)
         if self.jump_buffer > 0: self.jump_buffer -= 1
 
         if self.coyote > 0 and self.jump_hold == 0 and self.jump_buffer > 0:
             base  = ctx.JUMP_VEL_MIN
-            bonus = min(2.2, abs(self.vx) * ctx.SPEED_JUMP_BONUS)
+            bonus = abs(self.vx) * ctx.SPEED_JUMP_BONUS
             self.vy        = base - bonus
             self.on_ground = False
             self.coyote    = 0
@@ -297,9 +298,6 @@ class Player():
             self.jump_buffer = 0
 
         if self.jump_hold > 0:
-            if self.jump_pressed:
-                # Variable jump height — hold for high, tap for short
-                self.vy -= ctx.GRAVITY * 0.12 * dt
             self.jump_hold -= 1
 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = True):
