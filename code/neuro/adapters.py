@@ -294,7 +294,12 @@ class MarioAdapter(_EventWeights):
             g = e.gObj
             if g.active:
                 out.append((g.x + g.width / 2.0, g.y + g.height / 2.0))
+        for bar in self.core.level_data.firebars:   # sensed like enemies, but cannot be killed
+            out.extend(bar.balls())
         return out
+
+    def _count_enemies(self) -> int:
+        return sum(1 for e in self.core.level_data.enemies if e.gObj.active)
 
     def qblock_count_near(self, r_tiles: int) -> int:
         r = r_tiles * self.tile_size

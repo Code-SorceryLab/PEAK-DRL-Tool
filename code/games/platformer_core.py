@@ -767,6 +767,7 @@ class PlatformerCore(gymnasium.Env):
 
         self.physics_manager.update_system(self.dt, self)
         self.physics_manager.resolve_collisions(self)
+        self._update_firebars()
 
         # Cleanup Inactive Entities
         self.level_data.enemies[:]  = [e for e in self.level_data.enemies  if e.gObj.active]
@@ -1981,8 +1982,25 @@ class PlatformerCore(gymnasium.Env):
             if plat.gObj.active:
                 plat.render(surface, plat.gObj.x - self.camera_x, plat.gObj.y - self.camera_y)
 
+    def _update_firebars(self):
+        """Spin the fire bars; touching a fireball is a hit (star and i-frames absorb it)."""
+        firebars = self.level_data.firebars
+        if not firebars:
+            return
+        for bar in firebars:
+            bar.update(self.dt)
+        if not (self.player and self.alive):
+            return
+        rect = self.player.gObj.get_rect()
+        if any(bar.hits_rect(rect) for bar in firebars):
+            if not self.player.power_machine.take_hit():
+                self._handle_death("Fire")
+
     def _draw_entities(self, surface: pygame.Surface):
         cx, cy, cw, ch = self.camera_x, self.camera_y, self.WIDTH, self.HEIGHT
+
+        for bar in self.level_data.firebars:
+            bar.render(surface, cx, cy)
 
         visible_hazards = self.physics_manager.hazard_hash.query_rect(cx, cy, cw, ch)
         for entity in visible_hazards:

@@ -29,6 +29,7 @@ from ..Objects.Ladder import Ladder
 from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
 from ..Objects.Spring import Spring
 from ..Objects.Saw import Saw
+from ..Objects.FireBar import FireBar
 from .SpatialHash import SpatialHash
 
 @dataclass
@@ -55,6 +56,7 @@ class LevelData:
     springs:          List[Spring]             = field(default_factory=list)
     pits:             List[Any]               = field(default_factory=list)
     saws:             List[Saw]               = field(default_factory=list)
+    firebars:         List[FireBar]           = field(default_factory=list)
     moving_platforms: List[MovingPlatform]     = field(default_factory=list)
     projectiles:      List[Any]              = field(default_factory=list)
     player_start:     Tuple[float, float]      = (100.0, 350.0)
@@ -429,6 +431,17 @@ class LevelLoader:
                     period=float(s.get('period', 4.0)),
                 )
                 data.saws.append(saw)
+
+        if 'firebars' in dynamics:
+            for fb in dynamics['firebars']:
+                data.firebars.append(FireBar(
+                    cx=float(fb.get('x', 0)),
+                    cy=float(fb.get('y', 0)),
+                    length=int(fb.get('length', 6)),
+                    period=float(fb.get('period', 3.4)),
+                    clockwise=bool(fb.get('clockwise', True)),
+                    angle=float(fb.get('angle', 0.0)),
+                ))
 
         if 'moving_platforms' in dynamics:
             for mp_data in dynamics['moving_platforms']:
