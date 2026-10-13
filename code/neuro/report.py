@@ -31,6 +31,7 @@ from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
+from .personas import COLORS as PERSONA_COLORS
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -1181,7 +1182,7 @@ def _overview(personas: dict[str, dict]) -> str:
 
 CONFIG_COLORS = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316", "#14b8a6", "#ec4899"]
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
-PERSONA_COLOR = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#22c55e"}
+PERSONA_COLOR = PERSONA_COLORS
 
 
 def _persona_chip(persona: str) -> str:
@@ -1380,8 +1381,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
         f'<span class="chip" style="--c:{col}"><b>{p.name}</b> '
         f'{"sprint" if p.sprint else "walk"} · senses every {p.sensor_period} frame{"s" if p.sensor_period > 1 else ""}'
         f'{" · +" + format(p.time_rate, "g") + " fitness / s left" if p.time_rate else ""}</span>'
-        for (n, p), col in ((kv, {"experienced": "#ef4444", "novice": "#4a9eff",
-                                  "speedrunner": "#eab308"}.get(kv[0], "#a855f7"))
+        for (n, p), col in ((kv, PERSONA_COLORS.get(kv[0], "#a855f7"))
                             for kv in PERSONAS.items()) if n in personas)
     return f"""
     <dialog class="detail brain" id="brain_{sec_id}" aria-labelledby="brain_{sec_id}_t">

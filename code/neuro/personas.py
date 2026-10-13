@@ -54,9 +54,9 @@ PERSONAS: dict[str, Persona] = {
         name="good", sprint=True, sensor_period=1, time_rate=0.0,
         description="good player: sprint, full reactions, clean inputs",
     ),
-    "bad": Persona(
-        name="bad", sprint=False, sensor_period=4, time_rate=0.0, mistake_rate=0.03, slip_frames=12,
-        description="bad player: walk only, reacts every 4th frame, a 0.2 s mis-press about every 0.5 s",
+    "clumsy": Persona(
+        name="clumsy", sprint=False, sensor_period=4, time_rate=0.0, mistake_rate=0.03, slip_frames=12,
+        description="clumsy player: walk only, reacts every 4th frame, a 0.2 s mis-press about every 0.5 s",
     ),
     # play-style axis: same hands, different event weights
     "killer": Persona(
@@ -69,6 +69,9 @@ PERSONAS: dict[str, Persona] = {
     ),
 }
 
+# one colour per persona for every report page and paper figure
+COLORS = {"experienced": "#ef4444", "novice": "#4a9eff", "speedrunner": "#22c55e", "clumsy": "#f97316",
+          "good": "#a855f7", "killer": "#ec4899", "collector": "#eab308"}
 
 
 def get_persona(name: str) -> Persona:

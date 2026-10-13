@@ -152,7 +152,7 @@ class Trainer:
             for _ in range(cfg.pop_size)
         ]
         self._surfaces: list[pygame.Surface] | None = None
-        slip_rng = np.random.default_rng(cfg.seed)  # bad-persona input slips, apart from the GA's rng
+        slip_rng = np.random.default_rng(cfg.seed)  # clumsy-persona input slips, apart from the GA's rng
         for slot in self.slots:
             slot.hands = Hands(self.persona, slip_rng)
         self._warned_levels: set = set()
@@ -501,6 +501,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None, l
         print(f"replay: '{path}' not found — train first, or pass a valid best.npz", flush=True)
         return
     persona = PERSONAS["experienced"]
+    seed = 0  # clumsy slips must repeat between replays: seed them like the training run
     net_cfg: dict = {}  # sensors / hidden / action_feedback / memory the run was trained with
     state_path = os.path.join(os.path.dirname(path), "state.json")
     if os.path.exists(state_path):
@@ -508,6 +509,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None, l
             meta = json.load(f)
         persona = PERSONAS.get(meta.get("persona") or "", persona)
         saved = meta.get("config") or {}
+        seed = int(saved.get("seed", seed))
         net_cfg = {k: saved[k] for k in ("sensors", "hidden", "action_feedback", "memory") if k in saved}
         if level is None and meta.get("best_level"):  # default to the record's level
             level = meta["best_level"]
@@ -532,7 +534,7 @@ def replay(path: str, game: str, level: str | None, state: SharedState | None, l
     trainer.slots[0].net = net
     all_levels = list_levels(game)
     cur_level = level if level is not None else (all_levels[0] if all_levels else None)
-    hands = Hands(persona, np.random.default_rng())
+    hands = Hands(persona, np.random.default_rng(seed))
     while True:
         adapter.reset()
         net.reset()

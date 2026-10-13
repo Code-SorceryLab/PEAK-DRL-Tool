@@ -219,7 +219,7 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 - Full determinism from one seed
 
 **Player personas** (`code/neuro/personas.py`)
-- Seven player types on two axes — skill (novice · bad · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
+- Seven player types on two axes — skill (novice · clumsy · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
 
 </td>
 <td width="50%" valign="top">
@@ -258,7 +258,7 @@ or at the persona prompt in the TRAIN menus. Every persona plays the same game w
 | Persona | Hands | Paid for | Use it to ask |
 |---|---|---|---|
 | `novice` | walk only, senses every 3rd frame | reaching the goal | can a new player finish this? |
-| `bad` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
+| `clumsy` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
 | `experienced` | walk, senses every frame (the default) | reaching the goal | the baseline |
 | `good` | sprint, senses every frame, clean inputs | reaching the goal | how far does skill carry? |
 | `killer` | as `experienced` | goal **+ enemies killed** | does fighting pay, or is it a detour? |
@@ -283,7 +283,7 @@ Bomberman ladder has no power-ups. The trainer prints
 | `experienced` | 100 | 2.7 |
 | `killer` | 100 | **7.0** |
 | `good` | 100 | 4.7 |
-| `bad` | **20** | 2.1 |
+| `clumsy` | **20** | 2.1 |
 
 The killer kills 2.6× as many enemies and still wins every time; weights 0.5, 1.0 and 2.0 gave the
 same kill count, so 1.0 is the default. On Mario 1-2 (17 coins) the collector picked up 1.5–2.5

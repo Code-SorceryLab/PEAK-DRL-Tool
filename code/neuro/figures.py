@@ -19,6 +19,7 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 
 from .balance import BALANCE_DIR, mean_ci
 from .gasweep import AXES, paired_delta
+from .personas import COLORS
 from .report import GA_DOC, _ablation_pairs, _gasweep_groups, _gs_baseline_label, _load_json_glob, _sweep_point
 
 IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img")
@@ -26,8 +27,8 @@ README = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "R
 MARK_OPEN, MARK_CLOSE = "<!-- figures:auto -->", "<!-- /figures:auto -->"
 
 BG, PANEL, TXT, DIM, FAINT, GRID = "#070708", "#101012", "#e8e8ea", "#9a9aa0", "#606066", "#232326"
-PCOL = {"novice": "#4a9eff", "experienced": "#ef4444", "speedrunner": "#22c55e"}
-PORDER = ["novice", "experienced", "speedrunner"]
+PCOL = COLORS
+PORDER = ["novice", "clumsy", "experienced", "good", "speedrunner", "killer", "collector"]
 GNAME = {"mario": "Mario", "meatboy": "Meat Boy", "sonic": "Sonic", "bomberman": "Bomberman", "megaman": "Mega Man"}
 
 plt.rcParams.update({

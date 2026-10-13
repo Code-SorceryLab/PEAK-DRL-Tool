@@ -210,7 +210,7 @@ in menu Train Single / Full Sweep). A persona is a *capability + objective* prof
 | Persona | Capabilities | Objective |
 |---|---|---|
 | `novice` | walk speed only, fresh senses every **3rd** frame (reaction lag) | reach the goal |
-| `bad` | walk speed only, senses every **4th** frame, input slips (3 %/frame start, held 12 frames) | reach the goal |
+| `clumsy` | walk speed only, senses every **4th** frame, input slips (3 %/frame start, held 12 frames) | reach the goal |
 | `experienced` | walk speed, full reactions — the default | reach the goal |
 | `good` | **sprint unlocked**, full reactions, clean inputs | reach the goal |
 | `killer` | as `experienced` | goal **+ share of enemies killed** (all = one goal) |
