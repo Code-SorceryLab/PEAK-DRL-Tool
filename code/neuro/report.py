@@ -830,6 +830,7 @@ CSS = """
     letter-spacing:.08em;text-transform:uppercase;transition:background .15s}
   .watchbtn:hover{background:var(--red)}
   html.file .watchbtn{opacity:.35;pointer-events:none;cursor:not-allowed}
+  html.file nav a.wall{display:none}
   html.file .served-only,html:not(.file) .file-only{display:none}
   .cmdrow code.cmd{flex:1;min-width:260px;margin:6px 0}
   canvas.routes{display:block;border-radius:4px;margin:0 auto}
@@ -1979,9 +1980,11 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
               + '>GA sweep</a>')
     links += ('<a class="doc" href="instructions.html"' + (' aria-current="page"' if page == "instructions" else "")
               + '>Instructions</a>')
+    links += '<a class="doc wall" href="/wall" target="_top">▶ Replay wall</a>'   # served only: menu 12 starts it
     if page == "report":
         links += '<button class="navbtn" id="toggleAll" type="button">Collapse all</button>'
     return f"""
+  <script>if (location.protocol === 'file:') document.documentElement.classList.add('file');</script>
   <a class="skip" href="#main">Skip to content</a>
   <nav aria-label="Pages">{img}<h1 class="brand">PEAK <em>BALANCE COMMAND</em></h1>
     <div class="links">{links}</div>
@@ -2813,6 +2816,9 @@ def _load_json_glob(pattern: str) -> list[dict]:
     return out
 
 
+WALL_PORT = 8010   # code/neuro/cameras.py default
+
+
 def serve(balance_dir: str, port: int, open_browser: bool) -> None:
     """Serve the command center locally so its ▶ Watch buttons can launch replays.
     GET /watch?game=G&npz=runs/... starts `trainer --replay` (one at a time) and forwards
@@ -2846,8 +2852,28 @@ def serve(balance_dir: str, port: int, open_browser: bool) -> None:
             self.end_headers()
             self.wfile.write(body)
 
+        def _wall(self) -> None:
+            """Start the replay wall (code/neuro/cameras.py) unless it runs, then forward the tab to it."""
+            wall = state.get("wall")
+            if wall is None or wall.poll() is not None:
+                state["wall"] = subprocess.Popen([sys.executable, "-m", "code.neuro.cameras", "--port", str(WALL_PORT)])
+                print("replay wall: starting", flush=True)
+            url = f"http://127.0.0.1:{WALL_PORT}/"
+            script = f"""
+const url = {json.dumps(url)}, t0 = Date.now(), st = document.getElementById('st');
+(async function poll(){{
+  try {{ await fetch(url, {{mode: 'no-cors', cache: 'no-store'}}); location.replace(url); return; }} catch {{}}
+  st.textContent = `Loading the models… ${{Math.round((Date.now() - t0) / 1000)}} s`;
+  setTimeout(poll, 700);
+}})();"""
+            self._page(200, "PEAK — replay wall", "<h1>Starting the replay wall</h1><p id='st'>Loading the models…</p>"
+                       "<p>Every game and persona plays its saved models. Ctrl+C in the menu-12 terminal stops it.</p>"
+                       "<div class='row'><a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>", script)
+
         def do_GET(self) -> None:
             u = urllib.parse.urlparse(self.path)
+            if u.path == "/wall":
+                return self._wall()
             if u.path != "/watch":
                 return super().do_GET()
             q = urllib.parse.parse_qs(u.query)
@@ -2911,8 +2937,9 @@ const dash = {json.dumps(dash)}, t0 = Date.now(), st = document.getElementById('
         pass
     finally:
         srv.server_close()
-        if state["proc"] is not None and state["proc"].poll() is None:
-            state["proc"].terminate()
+        for key in ("proc", "wall"):
+            if state.get(key) is not None and state[key].poll() is None:
+                state[key].terminate()
 
 
 def main() -> None:

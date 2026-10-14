@@ -875,6 +875,7 @@ class MegamanAdapter(_EventWeights):
         tr = self.core.cfg.get("training") or {}
         self.attempts = max(1, int(os.environ.get("PEAK_MM1_ATTEMPTS") or tr.get("attempts", 1)))
         self.min_start_energy = int(tr.get("min_start_energy", 10))
+        self.energy_bonus = float(tr.get("energy_bonus", 0.0))
         self.attempt_stall = int(tr.get("stall_frames", 240))
         self.sticky = float(tr.get("sticky_actions", 0.0))
         self._episode = 0               # how many times this adapter has been reset: varies the seeds
@@ -1177,8 +1178,10 @@ class MegamanAdapter(_EventWeights):
 
     def _attempt_fitness(self, won: bool) -> float:
         kills = self.KILL_BONUS * min(self.core.kills_total, self._level_enemies)
-        if won:
-            return self._FIT_SCALE + kills + self.win_bonus + _win_time_bonus(self)
+        if won:  # energy left pays only on a win: the relay carries it into the next section
+            p = self.core.player
+            energy = self.energy_bonus * max(p.hp, 0) / p.hp_max
+            return self._FIT_SCALE + kills + self.win_bonus + _win_time_bonus(self) + energy
         return self._attempt_progress() * self._FIT_SCALE + kills
 
     @property

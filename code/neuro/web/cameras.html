@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEAK Replay Wall</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2309090b'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style type="text/tailwindcss">
+  @layer base {
+    html, body { @apply h-full; }
+    body { @apply bg-[#09090b] text-zinc-300 font-sans antialiased; }
+    canvas { image-rendering: pixelated; }
+    :focus-visible { @apply outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-[#09090b]; }
+  }
+  @layer components {
+    .eyebrow { @apply text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-400; }
+    .tab { @apply whitespace-nowrap px-3 py-2 text-[11px] font-bold tracking-widest uppercase text-zinc-500 border-b-2 border-transparent hover:text-zinc-200 transition-colors; }
+    .tab[aria-selected="true"] { @apply text-zinc-100 border-red-500; }
+    .cam { @apply relative flex flex-col rounded overflow-hidden bg-[#050505] ring-1 ring-white/5 hover:ring-white/30 transition-shadow text-left min-w-0; }
+    .cam canvas { @apply w-full h-auto block bg-black; }
+    .cam .strip { @apply h-[3px] w-full; }
+    .cam .meta { @apply flex items-center justify-between gap-2 px-2 py-1 whitespace-nowrap overflow-hidden font-mono text-[10px] text-zinc-400; }
+    .cam .flash { @apply absolute inset-x-0 top-1/3 mx-auto w-fit px-2 py-0.5 rounded font-mono text-[11px] font-bold tracking-widest uppercase bg-black/80 hidden; }
+    .cam.empty { @apply opacity-40 cursor-default; }
+    .cam.rec::after { content:""; @apply absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse; }
+  }
+  body.offline #wall { filter: grayscale(1) brightness(.6); }
+  dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(2px); }
+</style>
+</head>
+<body class="flex flex-col">
+
+<header class="flex items-center gap-6 px-5 border-b border-white/10 bg-[#09090b] sticky top-0 z-20">
+  <div class="flex items-center gap-2 py-2">
+    <span class="font-bold tracking-widest text-zinc-100">PEAK</span>
+    <span class="eyebrow">replay wall</span>
+  </div>
+  <nav class="flex" role="tablist" aria-label="Pages">
+    <button class="tab" role="tab" aria-selected="true" data-src="">Cameras</button>
+    <button class="tab" role="tab" aria-selected="false" data-src="/balance/report.html">Balance report</button>
+    <button class="tab" role="tab" aria-selected="false" data-src="/balance/ablation.html">Sensor ablation</button>
+    <button class="tab" role="tab" aria-selected="false" data-src="/balance/gasweep.html">GA sweep</button>
+  </nav>
+  <div class="ml-auto flex items-center gap-2 font-mono text-[10px]" aria-live="polite">
+    <span id="dot" class="w-2 h-2 rounded-full bg-zinc-600"></span><span id="conn">connecting</span>
+  </div>
+</header>
+
+<main id="wallpage" class="flex-1 overflow-auto px-5 py-4">
+  <div id="wall" class="grid gap-3" style="grid-template-columns: 90px repeat(7, minmax(0, 1fr))"></div>
+  <p class="mt-4 font-mono text-[10px] text-zinc-500">Each view replays the saved models of one game and persona, level after level, with the best of three seeds per level. Click a view to watch it with its rays; Esc or a click outside closes it.</p>
+</main>
+<iframe id="frame" title="Balance pages" class="flex-1 w-full border-0 hidden bg-[#09090b]"></iframe>
+
+<dialog id="big" class="bg-[#09090b] text-zinc-300 rounded-lg ring-1 ring-white/10 p-0 max-w-[96vw] max-h-[94vh] w-[1200px]" aria-labelledby="bigtitle">
+  <div class="flex items-center gap-3 px-4 py-2 border-b border-white/10">
+    <span id="bigchip" class="w-2.5 h-2.5 rounded-full"></span>
+    <h2 id="bigtitle" class="font-semibold text-zinc-100"></h2>
+    <span id="biglevel" class="font-mono text-xs text-zinc-400"></span>
+    <span id="bigscore" class="font-mono text-xs text-zinc-400"></span>
+    <button id="bigclose" class="ml-auto px-2 text-zinc-400 hover:text-white text-lg" aria-label="Close">✕</button>
+  </div>
+  <div class="flex gap-4 p-4 items-start">
+    <div class="flex-1 min-w-0 flex justify-center"><canvas id="bigcv" width="800" height="600" class="max-w-full max-h-[80vh] w-auto h-auto rounded bg-black"></canvas></div>
+    <aside class="w-56 shrink-0 max-h-[80vh] overflow-auto">
+      <div class="eyebrow mb-2">Sensors</div>
+      <div id="sensors" class="flex flex-col gap-1.5"></div>
+    </aside>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const GAME_NAMES = {mario:"Mario", meatboy:"Meat Boy", bomberman:"Bomberman", megaman:"Mega Man"};
+const ORDER = ["novice","clumsy","experienced","good","speedrunner","killer","collector"];
+const RAY_COLORS = {0:"rgba(255,255,255,.10)", 1:"#ef4444", 2:"#ec4899"};
+const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}};
+const SENSORS = [   // the platformers' 14-slot ray vector (same layout as the trainer dashboard)
+  {g:"Proximity rays", color:"bg-zinc-300", rows:[
+    {i:0,l:"FWD",d:"Ray straight ahead"},{i:1,l:"U30",d:"Ray 30° up"},{i:2,l:"U60",d:"Ray 60° up"},
+    {i:3,l:"D30",d:"Ray 30° down"},{i:4,l:"D60",d:"Ray 60° down"},{i:5,l:"BCK",d:"Ray straight back"}]},
+  {g:"Threats", color:"bg-red-500", rows:[{i:6,l:"NMY",d:"Enemy ahead"},{i:7,l:"PIT",d:"Gap in the floor ahead"}]},
+  {g:"Kinematics", color:"bg-sky-400", rows:[{i:9,l:"VX",center:true,d:"Horizontal velocity"},
+    {i:10,l:"VY",center:true,d:"Vertical velocity"},{i:8,l:"GND",d:"On the ground"},{i:11,l:"JMP",d:"Jump held"}]},
+  {g:"Objectives", color:"bg-amber-400", rows:[{i:12,l:"BLK",d:"Question blocks ahead"}]},
+];
+const INVERT = new Set([0,1,2,3,4,5,6]);
+const $ = id => document.getElementById(id);
+let ws, colors = {}, cams = {}, watching = -1, paused = false, senseKey = "", senseEls = [];
+const lvlName = l => /^\d+$/.test(l) ? `Level ${+l + 1}` : l;   // meatboy / bomberman levels are indices
+const send = o => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+
+// ── the wall ──
+function buildWall(list){
+  const wall = $("wall"); wall.innerHTML = ""; cams = {};
+  wall.appendChild(document.createElement("div"));
+  for (const p of ORDER){
+    const h = document.createElement("div");
+    h.className = "flex items-center gap-1.5 eyebrow min-w-0 overflow-hidden whitespace-nowrap";
+    h.innerHTML = `<i class="w-2 h-2 rounded-full" style="background:${colors[p]}"></i>${p}`;
+    wall.appendChild(h);
+  }
+  let game = null;
+  for (const c of list){
+    if (c.game !== game){
+      game = c.game;
+      const g = document.createElement("div");
+      g.className = "self-center font-semibold text-zinc-200 text-sm";
+      g.textContent = GAME_NAMES[game] || game;
+      wall.appendChild(g);
+    }
+    const b = document.createElement("button");
+    b.className = "cam" + (c.levels.length ? "" : " empty");
+    if (c.game === "megaman") b.style.gridColumn = "span 2";
+    const col = colors[c.persona] || "#71717a";
+    b.innerHTML = `<i class="strip" style="background:${col}"></i><canvas width="280" height="210"></canvas>
+      <span class="flash"></span>
+      <span class="meta"><span class="lvl truncate">${c.levels.length ? lvlName(c.levels[0]) : "no model"}</span><span class="score tabular-nums"></span></span>`;
+    b.setAttribute("aria-label", `${GAME_NAMES[c.game]} · ${c.persona}`);
+    if (c.levels.length) b.onclick = () => openCam(c.id);
+    else b.disabled = true;
+    wall.appendChild(b);
+    cams[c.id] = {...c, el:b, cv:b.querySelector("canvas"), lvl:b.querySelector(".lvl"),
+                  score:b.querySelector(".score"), flash:b.querySelector(".flash")};
+  }
+}
+
+function drawImg(cv, src, then){
+  const img = new Image();
+  img.onload = () => {
+    if (cv.width !== img.width || cv.height !== img.height){ cv.width = img.width; cv.height = img.height; }
+    const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0);
+    if (then) then(ctx);
+  };
+  img.src = "data:image/jpeg;base64," + src;
+}
+
+function onFrame(f){
+  const c = cams[f.id]; if (!c) return;
+  if (f.rays){                                   // the watched camera at full size
+    if (f.id !== watching) return;
+    drawImg($("bigcv"), f.jpg, ctx => drawOverlay(ctx, f.rays, f.tiles));
+    $("biglevel").textContent = lvlName(f.level);
+    $("bigscore").textContent = `won ${f.wins} of ${f.attempts}`;
+    updateSensors(f);
+    return;
+  }
+  drawImg(c.cv, f.jpg);
+  c.lvl.textContent = lvlName(f.level);
+  c.score.textContent = f.attempts ? `W ${f.wins}/${f.attempts}` : "";
+  c.flash.textContent = f.status;
+  c.flash.style.display = f.status ? "block" : "none";
+  c.flash.style.color = f.status === "WON" ? "#38bdf8" : "#f87171";
+}
+
+function drawOverlay(ctx, rays, tiles){
+  for (const [tx,ty,ts,kind] of (tiles || [])){
+    const st = TILE_STYLES[kind]; if (!st) continue;
+    ctx.fillStyle = st.fill; ctx.strokeStyle = st.line; ctx.lineWidth = kind === 1 ? 2 : 1;
+    ctx.fillRect(tx, ty, ts, ts); ctx.strokeRect(tx, ty, ts, ts);
+  }
+  for (const [x1,y1,x2,y2,hit] of (rays || [])){
+    ctx.strokeStyle = RAY_COLORS[hit] || RAY_COLORS[0]; ctx.lineWidth = hit ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    if (hit){ ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x2,y2,2.5,0,7); ctx.fill(); }
+  }
+}
+
+// ── the large view ──
+function openCam(id){
+  const c = cams[id]; watching = id;
+  $("bigtitle").textContent = `${GAME_NAMES[c.game]} · ${c.persona}`;
+  $("bigchip").style.background = colors[c.persona] || "#71717a";
+  $("biglevel").textContent = ""; $("bigscore").textContent = "";
+  $("bigcv").getContext("2d").clearRect(0, 0, $("bigcv").width, $("bigcv").height);
+  senseKey = null;
+  send({cmd:"watch", id});
+  c.el.classList.add("rec");
+  $("big").showModal();
+}
+function closeCam(){ if ($("big").open) $("big").close(); }
+$("big").addEventListener("close", () => {
+  if (cams[watching]) cams[watching].el.classList.remove("rec");
+  watching = -1; send({cmd:"close"});
+});
+$("big").addEventListener("click", e => { if (e.target === $("big")) closeCam(); });   // a click on the backdrop
+$("bigclose").onclick = closeCam;
+
+function buildSensors(groups){
+  const root = $("sensors"); root.innerHTML = ""; senseEls = [];
+  for (const grp of groups){
+    const h = document.createElement("div");
+    h.className = "text-[10px] font-bold tracking-widest uppercase text-zinc-500 mt-2 first:mt-0";
+    h.textContent = grp.g; root.appendChild(h);
+    for (const r of grp.rows){
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-2";
+      row.innerHTML = `<abbr title="${r.d}" class="w-9 text-right font-mono text-[10px] font-bold text-zinc-400 no-underline">${r.l}</abbr>
+        <div class="relative h-1 flex-1 bg-zinc-900 rounded-full overflow-hidden">${r.center ? '<div class="absolute left-1/2 inset-y-0 w-px bg-white/20"></div>' : ""}
+        <i class="absolute inset-y-0 left-0 rounded-full ${grp.color}"></i></div>
+        <output class="w-9 font-mono text-[10px] text-zinc-400 tabular-nums">–</output>`;
+      root.appendChild(row);
+      senseEls.push({idx:r.i, bar:row.querySelector("i"), out:row.querySelector("output"), center:!!r.center,
+                     inv: r.inv !== undefined ? !!r.inv : INVERT.has(r.i)});
+    }
+  }
+}
+function updateSensors(f){
+  const key = JSON.stringify(f.sensor_labels || null);
+  if (key !== senseKey){ senseKey = key; buildSensors(f.sensor_labels || SENSORS); }
+  for (const s of senseEls){
+    let v = f.sensors[s.idx]; if (v === undefined) continue;
+    const shown = v; if (s.inv) v = 1 - v;
+    if (s.center){ const half = Math.min(Math.abs(v),1) * 50; s.bar.style.left = v < 0 ? (50-half)+"%" : "50%"; s.bar.style.width = half+"%"; }
+    else { s.bar.style.left = "0%"; s.bar.style.width = Math.max(0, Math.min(v,1))*100 + "%"; }
+    s.out.value = (+shown).toFixed(2);
+  }
+}
+
+// ── tabs: the balance pages load in a frame under the tab bar; the wall stops sending meanwhile ──
+function setPaused(on){ paused = on; send({cmd:"pause", on}); }
+for (const t of document.querySelectorAll(".tab")){
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
+    const src = t.dataset.src;
+    $("wallpage").classList.toggle("hidden", !!src);
+    $("frame").classList.toggle("hidden", !src);
+    if (src && $("frame").getAttribute("src") !== src) $("frame").src = src;
+    setPaused(!!src || document.hidden);
+  };
+}
+document.addEventListener("visibilitychange", () => setPaused(document.hidden || !$("frame").classList.contains("hidden")));
+
+// ── connection ──
+function setConn(state){
+  $("conn").textContent = state;
+  $("dot").className = "w-2 h-2 rounded-full " + (state === "live" ? "bg-red-500 animate-pulse" : "bg-zinc-600");
+  document.body.classList.toggle("offline", state !== "live");
+}
+function connect(){
+  ws = new WebSocket(`ws://${location.hostname || "127.0.0.1"}:${(+location.port || 8010) + 765}`);
+  ws.onopen = () => { setConn("live"); if (paused) send({cmd:"pause", on:true}); if (watching >= 0) send({cmd:"watch", id:watching}); };
+  ws.onclose = () => { setConn("offline"); setTimeout(connect, 2000); };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "layout"){ colors = m.colors; if (!Object.keys(cams).length) buildWall(m.cams); }
+    else if (m.type === "frames") m.frames.forEach(onFrame);
+  };
+}
+connect();
+</script>
+</body>
+</html>
