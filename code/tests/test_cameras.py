@@ -75,3 +75,14 @@ def test_encoding_frames_does_not_keep_them_in_memory():
     grown = tracemalloc.get_traced_memory()[0] - before
     tracemalloc.stop()
     assert grown < 200_000          # pygame.image.save into a BytesIO kept every frame: about 5 MB here
+
+
+def test_the_balance_route_cannot_leave_runs_balance():
+    from code.neuro.balance import BALANCE_DIR
+    from code.neuro.cameras import _Handler
+    h = _Handler.__new__(_Handler)
+    h.directory = "."
+    root = os.path.abspath(BALANCE_DIR)
+    assert h.translate_path("/balance/report.html") == os.path.join(root, "report.html")
+    for evil in ("/balance/../../code/neuro/personas.py", "/balance/%2e%2e/%2e%2e/menu.py"):
+        assert h.translate_path(evil).startswith(root + os.sep)

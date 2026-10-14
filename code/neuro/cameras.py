@@ -21,6 +21,7 @@ import os
 import queue
 import threading
 import time
+import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -296,7 +297,9 @@ class _Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path: str) -> str:
         clean = path.split("?", 1)[0].split("#", 1)[0]
         if clean.startswith("/balance/"):
-            return os.path.join(os.path.abspath(BALANCE_DIR), clean[len("/balance/"):])
+            root = os.path.abspath(BALANCE_DIR)
+            target = os.path.abspath(os.path.join(root, urllib.parse.unquote(clean[len("/balance/"):])))
+            return target if target.startswith(root + os.sep) else os.path.join(root, "404")   # no ../ out of it
         return super().translate_path("/cameras.html" if clean in ("", "/") else path)
 
     def do_GET(self) -> None:
@@ -350,16 +353,17 @@ async def _serve_ws(wall: Wall, port: int) -> None:
         finally:
             task.cancel()
 
+    import signal
+
+    stop = asyncio.get_running_loop().create_future()
+    for sig in (signal.SIGTERM, signal.SIGINT):        # wakes the loop even with no page connected
+        asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
     async with websockets.serve(handler, "127.0.0.1", port, max_size=None):
-        await asyncio.Future()
+        await stop
 
 
 def main() -> None:
     import asyncio
-    import signal
-    import sys
-
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))   # pkill / menu-12 shutdown: exit cleanly, workers follow
 
     ap = argparse.ArgumentParser(description="Replay wall: every trained game x persona, live")
     ap.add_argument("--port", type=int, default=8010, help="HTTP port; the websocket uses port + 765")
