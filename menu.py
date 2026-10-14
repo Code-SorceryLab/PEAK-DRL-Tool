@@ -1199,7 +1199,7 @@ def main():
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
-        print(_menu_item("12", "Balance Command",      "open the command center (all runs + probes)"))
+        print(_menu_item("12", "Balance Command",      "command center (all runs + probes) + ▶ replay wall"))
 
         _section("BALANCE")
         print(_menu_item("13", "Full Sweep",           "games × personas × seeds, parallel"))

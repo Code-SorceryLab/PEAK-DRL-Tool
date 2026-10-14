@@ -53,6 +53,8 @@ training:
   attempts: 3                # PEAK_MM1_ATTEMPTS overrides it (the tests use 1)
   min_start_energy: 10       # later attempts start with between this much and full energy
   stall_frames: 240          # an attempt with no progress for this long is over
+  energy_bonus: 2000         # paid on a win, scaled by energy left / max: a full stage costs more energy than
+                             # Mega Man has, so a section must be cleared cheaply, not just cleared
   sticky_actions: 0.25       # on later attempts, each frame has this chance of repeating the last frame's
                              # buttons: the game is mostly not random, so this is what makes attempts differ
 

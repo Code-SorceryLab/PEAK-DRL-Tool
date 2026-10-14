@@ -104,11 +104,11 @@ def _encode(surface: pygame.Surface, scale: float = 1.0) -> bytes:
     if scale != 1.0:
         w, h = surface.get_size()
         surface = pygame.transform.smoothscale(surface, (int(w * scale), int(h * scale)))
+    # Pillow, not pygame.image.save: saving to a BytesIO through pygame keeps every buffer alive
+    # (about 4 GB in 3 hours on the replay wall, and the machine ran out of memory)
+    from PIL import Image
     buf = io.BytesIO()
-    try:
-        pygame.image.save(surface, buf, "frame.jpg")
-    except pygame.error:
-        pygame.image.save(surface, buf, "frame.png")
+    Image.frombytes("RGB", surface.get_size(), pygame.image.tobytes(surface, "RGB")).save(buf, "JPEG", quality=85)
     return buf.getvalue()
 
 

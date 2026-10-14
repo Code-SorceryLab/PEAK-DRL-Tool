@@ -200,3 +200,17 @@ def test_a_section_is_scored_over_several_varied_attempts():
     full.attempts = 3
     full.reset()
     assert full._n_attempts == 1
+
+
+def test_a_win_pays_for_energy_left():
+    a = make_adapter("megaman", "CutMan-7-Corridor", 600, 5000.0)
+    hp_max = a.core.player.hp_max
+    a.core.player.hp = hp_max
+    full = a._attempt_fitness(True)
+    a.core.player.hp = hp_max // 4
+    low = a._attempt_fitness(True)
+    assert full - low == pytest.approx(a.energy_bonus * (hp_max - hp_max // 4) / hp_max)
+    assert low > a._FIT_SCALE + a.win_bonus           # winning still beats any loss
+    loss = a._attempt_fitness(False)
+    a.core.player.hp = hp_max
+    assert a._attempt_fitness(False) == loss          # a loss is not paid for energy: no reward for hiding
