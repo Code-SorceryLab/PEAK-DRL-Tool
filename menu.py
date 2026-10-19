@@ -682,7 +682,7 @@ def run_manual_play():
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
     cmd = [sys.executable, "-m", "code.games.tools.manual_play",
-           "--game", CONFIG_KEY.get(game, game), "--fps", "30"]
+           "--game", CONFIG_KEY.get(game, game), "--fps", "60"]
     if level:
         cmd += ["--level", level]
     print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
@@ -759,7 +759,7 @@ def watch_random_agent():
     print(_DIM(f"\n    Launching {game} with random actions... (ESC to quit)\n"))
     subprocess.run(
         [sys.executable, "-m", "code.games.tools.manual_play",
-         "--game", CONFIG_KEY.get(game, game), "--fps", "30", "--random"],
+         "--game", CONFIG_KEY.get(game, game), "--fps", "60", "--random"],
         env=proc_env
     )
 
