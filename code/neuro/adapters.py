@@ -263,11 +263,15 @@ class MarioAdapter(_EventWeights):
         self._level_coins = _count_coins(self.core)
         self._level_enemies = self._count_enemies()
         self.kills = 0
+        self._sent_jump = False
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
             return
-        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
+        # the core jumps only on a fresh press (8faff6ef): a held jump re-presses on landing, as a human taps again
+        landed_holding = jump and self._sent_jump and self.core.player.on_ground
+        self._sent_jump = bool(jump) and not landed_holding
+        _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(self._sent_jump), 0])
         self.kills += int(getattr(self.core, "kills_step", 0) or 0)
         if terminated or truncated:
             self.alive = False
