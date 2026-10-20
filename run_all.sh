@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# PEAK runs: ./run_all.sh sweeps | megaman | test   (inside a Slurm job)
+# PEAK runs: ./run_all.sh sweeps | megaman | test   (inside a Slurm job, or locally: WORKERS=4 ./run_all.sh ...)
 cd "$(dirname "$0")"
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
-PY=.venv/bin/python; W=${SLURM_CPUS_PER_TASK:-4}
-GAMES=(mario meatboy bomberman)
+PY=.venv/bin/python; [[ -x $PY ]] || PY=.venv/Scripts/python.exe  # Windows venv layout
+W=${WORKERS:-${SLURM_CPUS_PER_TASK:-4}}
+GAMES=(${GAMES:-mario meatboy bomberman})  # GAMES=meatboy ./run_all.sh sweeps: one game per job
 PERSONAS=(novice clumsy experienced good speedrunner killer collector)
 SEEDS=(1234 2025 31337); GENS=40
 SECTIONS=(CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss)
