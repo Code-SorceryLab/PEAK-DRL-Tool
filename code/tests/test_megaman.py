@@ -214,3 +214,18 @@ def test_a_win_pays_for_energy_left():
     loss = a._attempt_fitness(False)
     a.core.player.hp = hp_max
     assert a._attempt_fitness(False) == loss          # a loss is not paid for energy: no reward for hiding
+
+
+def test_practice_section_is_playable_but_not_a_stage_leg():
+    from code.games.megaman_mutants import Stage
+    from code.neuro.relay import stage_legs
+    core = MegamanCore(level="CutMan-4-Shaft-Gap")
+    ts = core.tile_size
+    assert (int((core.player.x + core.player.width / 2) // ts), int((core.player.y + core.player.height - 1) // ts)) == (86, 42)
+    assert "CutMan-4-Shaft-Gap" not in [leg.level for leg in stage_legs("CutMan")]
+    assert "CutMan-4-Shaft-Gap" not in [name for name, _ in Stage("CutMan").sections]
+    assert "CutMan-4-Shaft-Gap" not in list_levels("megaman")
+    assert "CutMan-4-Shaft-Gap" in list_levels("megaman", include_disabled=True)
+    core.won = True
+    core.reset()                                     # a won practice section does not advance into the campaign
+    assert core.level_entry()["id"] == "CutMan-4-Shaft-Gap"

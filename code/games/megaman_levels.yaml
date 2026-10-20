@@ -114,3 +114,19 @@ levels:
       screens:
       - [12, 3]
   CutMan: {file: megaman/01_cutman.txt, stage: cutman}
+disabled_levels:
+  # practice sections: playable and trainable by name, never a relay leg or mutant target
+  CutMan-4-Shaft-Gap:          # Shaft from its stall tile: jump the 2-tile gap past the Octopus Battery
+    file: megaman/01_cutman.txt
+    stage: cutman
+    section:
+      start: [86, 42]
+      climbing: false
+      screens:
+      - [5, 2]
+      - [5, 1]
+      goal_screens:
+      - [5, 0]
+      - [6, 0]
+      - [7, 0]
+      end: [83, 14]

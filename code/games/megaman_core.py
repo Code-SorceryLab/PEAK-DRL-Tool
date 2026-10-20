@@ -146,7 +146,10 @@ class MegamanCore:
                 node = node[k]
             node[leaf] = value
         with open(LEVELS_PATH, encoding="utf-8") as f:   # {id: {file: ...}} in campaign order
-            self.levels = list(((yaml.safe_load(f) or {}).get("levels") or {}).items())
+            data = yaml.safe_load(f) or {}
+        self.levels = list((data.get("levels") or {}).items())
+        self._n_campaign = len(self.levels)              # disabled ones (practice sections) follow, playable by name
+        self.levels += list((data.get("disabled_levels") or {}).items())
         self._level_file = level_file                    # an unlisted file (the editor's Play button)
         self.invincible = invincible                     # debug: enemies, shots and spikes do no damage
         ac = self.cfg.get("assets") or {}
@@ -210,8 +213,8 @@ class MegamanCore:
         return parse_level(rows, self.screen_cols, self.screen_rows, self.tile_size, self.level_file())
 
     def reset(self, *, seed=None, options=None):
-        if self.won and not self._level_file:  # beating a level advances to the next (wrapping)
-            self._level_idx = (self._level_idx + 1) % len(self.levels)
+        if self.won and not self._level_file and self._level_idx < self._n_campaign:
+            self._level_idx = (self._level_idx + 1) % self._n_campaign  # beating a level advances to the next (wrapping)
         if seed is not None:
             self._seed = seed
         self.rng = random.Random(self._seed)
