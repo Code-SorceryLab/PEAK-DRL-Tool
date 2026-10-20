@@ -258,7 +258,7 @@ class BombermanCore:
                         if not self._blocked(p.x, ny, p.width, p.height):
                             p.y = ny; p.vy = sgn * p.speed
                         break
-        if dy:
+        if dy and not (p.vx or p.vy):  # one axis per frame, as on the NES: vertical only when horizontal could not move
             ny = p.y + dy * step
             if not self._blocked(p.x, ny, p.width, p.height):
                 p.y = ny; p.vy = dy * p.speed
