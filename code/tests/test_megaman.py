@@ -10,7 +10,7 @@ os.environ["PEAK_MM1_ATTEMPTS"] = "1"              # one attempt per episode, ex
 
 from code.games import megaman_enemies as en
 from code.games.megaman_core import MegamanCore
-from code.neuro.adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter
+from code.neuro.adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter, validate_level
 from code.neuro.evolution import GAConfig
 from code.neuro.net import make_net
 from code.neuro.sensors import read_sensors, sensor_dim
@@ -226,6 +226,7 @@ def test_practice_section_is_playable_but_not_a_stage_leg():
     assert "CutMan-4-Shaft-Gap" not in [name for name, _ in Stage("CutMan").sections]
     assert "CutMan-4-Shaft-Gap" not in list_levels("megaman")
     assert "CutMan-4-Shaft-Gap" in list_levels("megaman", include_disabled=True)
+    validate_level("megaman", "CutMan-4-Shaft-Gap")  # the trainer accepts it by name
     core.won = True
     core.reset()                                     # a won practice section does not advance into the campaign
     assert core.level_entry()["id"] == "CutMan-4-Shaft-Gap"

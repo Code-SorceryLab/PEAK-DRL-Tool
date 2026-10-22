@@ -96,6 +96,8 @@ def validate_level(game: str, level: str) -> None:
     if level in enabled:
         return
     if level in list_levels(game, include_disabled=True):
+        if game in OWN_LEVEL_FILES:  # this core loads disabled levels (practice sections) by name
+            return
         raise SystemExit(f"level '{level}' exists but is DISABLED in the config — "
                          f"enable it first (menu 10: Toggle Levels)")
     raise SystemExit(f"unknown level '{level}' for game '{game}' "
