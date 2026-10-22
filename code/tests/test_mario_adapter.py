@@ -32,6 +32,18 @@ def test_step_and_fitness_progress(adapter):
     assert adapter.fitness() > 0.0
 
 
+def test_held_jump_jumps_again_after_landing(adapter):
+    """The core jumps only on a fresh press, so the adapter re-presses a held jump on landing."""
+    adapter.reset()
+    takeoffs, was_on_ground = 0, adapter.core.player.on_ground
+    for _ in range(180):
+        adapter.step(0, True)
+        on_ground = adapter.core.player.on_ground
+        takeoffs += was_on_ground and not on_ground
+        was_on_ground = on_ground
+    assert takeoffs >= 2
+
+
 def test_sensors_on_real_level(adapter):
     adapter.reset()
     vec, rays, _tiles = read_sensors(adapter)
