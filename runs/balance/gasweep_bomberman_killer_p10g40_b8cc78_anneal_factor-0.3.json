@@ -1,0 +1,6845 @@
+{
+  "game": "bomberman",
+  "persona": "killer",
+  "tag": "p10g40_b8cc78_anneal_factor-0.3",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 2414.6,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.3,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.7,
+      "first_win_ci": 3.8,
+      "best_gen_mean": 3.7,
+      "best_gen_ci": 3.8,
+      "win_rate_mean": 0.82,
+      "win_rate_ci": 0.05,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.64,
+      "causes": {
+        "Bomb": 103,
+        "Stall": 39,
+        "Timeout": 18
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.096,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1742,
+      "train_time_s": 67.7,
+      "completion_rate_mean": 0.616,
+      "mean_completion_time": 11.1,
+      "completion_time_stddev": 4.4,
+      "progress_at_death_mean": 0.592,
+      "deaths_per_run_mean": 3.84,
+      "death_hist": [
+        22,
+        0,
+        5,
+        5,
+        7,
+        40,
+        3,
+        0,
+        17,
+        61
+      ],
+      "death_cluster_entropy_mean": 0.608,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.795
+    },
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 15.0,
+      "best_gen_ci": 40.9,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.49,
+      "causes": {
+        "Stall": 350,
+        "Bomb": 589,
+        "Timeout": 261
+      },
+      "best_x_mean": 604.9,
+      "stuck_frac_mean": 0.292,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0253,
+      "train_time_s": 343.0,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.481,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        33,
+        28,
+        30,
+        111,
+        465,
+        291,
+        61,
+        181,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.516,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 29.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 24.7,
+      "best_gen_ci": 44.5,
+      "win_rate_mean": 0.15,
+      "win_rate_ci": 0.645,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.84,
+      "causes": {
+        "Bomb": 964,
+        "Stall": 78,
+        "Timeout": 102
+      },
+      "best_x_mean": 950.6,
+      "stuck_frac_mean": 0.065,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0443,
+      "train_time_s": 358.9,
+      "completion_rate_mean": 0.039,
+      "mean_completion_time": 29.4,
+      "completion_time_stddev": 8.1,
+      "progress_at_death_mean": 0.655,
+      "deaths_per_run_mean": 9.61,
+      "death_hist": [
+        45,
+        9,
+        10,
+        148,
+        21,
+        170,
+        369,
+        26,
+        34,
+        312
+      ],
+      "death_cluster_entropy_mean": 0.646,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.118
+    },
+    {
+      "level": "3",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 5.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 16.0,
+      "best_gen_ci": 43.1,
+      "win_rate_mean": 0.25,
+      "win_rate_ci": 1.076,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.89,
+      "causes": {
+        "Bomb": 779,
+        "Stall": 38,
+        "Timeout": 56
+      },
+      "best_x_mean": 839.5,
+      "stuck_frac_mean": 0.041,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.034,
+      "train_time_s": 160.7,
+      "completion_rate_mean": 0.171,
+      "mean_completion_time": 20.3,
+      "completion_time_stddev": 4.6,
+      "progress_at_death_mean": 0.505,
+      "deaths_per_run_mean": 8.29,
+      "death_hist": [
+        48,
+        42,
+        10,
+        385,
+        37,
+        48,
+        67,
+        198,
+        7,
+        31
+      ],
+      "death_cluster_entropy_mean": 0.624,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.267
+    },
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.0,
+      "first_win_ci": 6.6,
+      "best_gen_mean": 4.3,
+      "best_gen_ci": 12.3,
+      "win_rate_mean": 0.697,
+      "win_rate_ci": 0.231,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.48,
+      "causes": {
+        "Stall": 63,
+        "Bomb": 86,
+        "Timeout": 29
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.16,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1606,
+      "train_time_s": 62.7,
+      "completion_rate_mean": 0.562,
+      "mean_completion_time": 10.5,
+      "completion_time_stddev": 2.8,
+      "progress_at_death_mean": 0.558,
+      "deaths_per_run_mean": 4.38,
+      "death_hist": [
+        35,
+        0,
+        0,
+        3,
+        0,
+        37,
+        26,
+        2,
+        17,
+        58
+      ],
+      "death_cluster_entropy_mean": 0.579,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.749
+    },
+    {
+      "level": "5",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 31.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 13.0,
+      "best_gen_ci": 39.0,
+      "win_rate_mean": 0.213,
+      "win_rate_ci": 0.918,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.77,
+      "causes": {
+        "Bomb": 879,
+        "Stall": 99,
+        "Timeout": 158
+      },
+      "best_x_mean": 950.0,
+      "stuck_frac_mean": 0.083,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1393,
+      "train_time_s": 349.4,
+      "completion_rate_mean": 0.053,
+      "mean_completion_time": 30.4,
+      "completion_time_stddev": 1.1,
+      "progress_at_death_mean": 0.824,
+      "deaths_per_run_mean": 9.47,
+      "death_hist": [
+        21,
+        1,
+        2,
+        30,
+        4,
+        68,
+        9,
+        40,
+        218,
+        743
+      ],
+      "death_cluster_entropy_mean": 0.452,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.164
+    },
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.3,
+      "first_win_ci": 5.2,
+      "best_gen_mean": 3.3,
+      "best_gen_ci": 5.2,
+      "win_rate_mean": 0.843,
+      "win_rate_ci": 0.137,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.73,
+      "causes": {
+        "Bomb": 105,
+        "Stall": 28,
+        "Timeout": 6,
+        "Enemy": 5
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.071,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.05,
+      "train_time_s": 39.5,
+      "completion_rate_mean": 0.647,
+      "mean_completion_time": 6.3,
+      "completion_time_stddev": 0.9,
+      "progress_at_death_mean": 0.603,
+      "deaths_per_run_mean": 3.53,
+      "death_hist": [
+        23,
+        3,
+        0,
+        1,
+        7,
+        37,
+        18,
+        10,
+        25,
+        20
+      ],
+      "death_cluster_entropy_mean": 0.718,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.903
+    },
+    {
+      "level": "7",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 21.3,
+      "best_gen_ci": 29.0,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.61,
+      "causes": {
+        "Enemy": 224,
+        "Stall": 144,
+        "Bomb": 727,
+        "Timeout": 105
+      },
+      "best_x_mean": 878.8,
+      "stuck_frac_mean": 0.12,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0481,
+      "train_time_s": 237.2,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.486,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        67,
+        314,
+        30,
+        85,
+        164,
+        157,
+        78,
+        34,
+        55,
+        216
+      ],
+      "death_cluster_entropy_mean": 0.644,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "8",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 22.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 21.3,
+      "best_gen_ci": 47.2,
+      "win_rate_mean": 0.23,
+      "win_rate_ci": 0.99,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.7,
+      "causes": {
+        "Bomb": 740,
+        "Stall": 52,
+        "Enemy": 258
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.048,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0833,
+      "train_time_s": 184.4,
+      "completion_rate_mean": 0.073,
+      "mean_completion_time": 8.7,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.881,
+      "deaths_per_run_mean": 9.27,
+      "death_hist": [
+        29,
+        8,
+        5,
+        20,
+        5,
+        44,
+        30,
+        53,
+        62,
+        794
+      ],
+      "death_cluster_entropy_mean": 0.424,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.23
+    },
+    {
+      "level": "9",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 1,
+      "first_win_mean": 29.0,
+      "first_win_ci": 0.0,
+      "best_gen_mean": 18.7,
+      "best_gen_ci": 36.2,
+      "win_rate_mean": 0.197,
+      "win_rate_ci": 0.846,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.58,
+      "causes": {
+        "Stall": 91,
+        "Bomb": 651,
+        "Enemy": 321,
+        "Timeout": 67
+      },
+      "best_x_mean": 864.2,
+      "stuck_frac_mean": 0.076,
+      "trends": [
+        "FLAT",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.003,
+      "train_time_s": 263.6,
+      "completion_rate_mean": 0.051,
+      "mean_completion_time": 29.9,
+      "completion_time_stddev": 4.1,
+      "progress_at_death_mean": 0.669,
+      "deaths_per_run_mean": 9.49,
+      "death_hist": [
+        41,
+        18,
+        2,
+        2,
+        73,
+        100,
+        118,
+        526,
+        204,
+        46
+      ],
+      "death_cluster_entropy_mean": 0.574,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.154
+    },
+    {
+      "level": "10",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 15.3,
+      "best_gen_ci": 20.8,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.89,
+      "causes": {
+        "Stall": 129,
+        "Bomb": 1070,
+        "Timeout": 1
+      },
+      "best_x_mean": 730.8,
+      "stuck_frac_mean": 0.107,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1426,
+      "train_time_s": 198.2,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.583,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        65,
+        29,
+        23,
+        48,
+        95,
+        298,
+        2,
+        640,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.515,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "11",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 30.3,
+      "best_gen_ci": 28.8,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.86,
+      "causes": {
+        "Bomb": 1031,
+        "Stall": 95,
+        "Enemy": 71,
+        "Timeout": 3
+      },
+      "best_x_mean": 385.4,
+      "stuck_frac_mean": 0.079,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0208,
+      "train_time_s": 149.3,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.21,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        444,
+        165,
+        48,
+        374,
+        169,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.431,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.82,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07333333333333333,
+        "causes": {
+          "Bomb": 39,
+          "Stall": 11,
+          "Timeout": 16
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0409,
+        "train_time_s": 33.3,
+        "completion_rate": 0.56,
+        "mean_completion_time": 13.7,
+        "completion_time_stddev": 2.3,
+        "progress_at_death": 0.728,
+        "deaths_per_run": 4.4,
+        "death_hist": [
+          7,
+          0,
+          1,
+          1,
+          3,
+          5,
+          2,
+          0,
+          12,
+          35
+        ],
+        "death_cluster_entropy": 0.631,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.86,
+        "curve": [
+          [
+            878.2,
+            328.5
+          ],
+          [
+            969.1,
+            707.1
+          ],
+          [
+            969.1,
+            831.3
+          ],
+          [
+            1014.5,
+            835.8
+          ],
+          [
+            6060.0,
+            1941.8
+          ],
+          [
+            6060.0,
+            3014.5
+          ],
+          [
+            6060.0,
+            5041.8
+          ],
+          [
+            6060.0,
+            4028.2
+          ],
+          [
+            6060.0,
+            5500.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            5041.8
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 4,
+        "win_rate": 0.8,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.10714285714285714,
+        "causes": {
+          "Bomb": 42,
+          "Stall": 15,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0273,
+        "train_time_s": 19.1,
+        "completion_rate": 0.579,
+        "mean_completion_time": 8.4,
+        "completion_time_stddev": 5.1,
+        "progress_at_death": 0.659,
+        "deaths_per_run": 4.21,
+        "death_hist": [
+          6,
+          0,
+          2,
+          3,
+          1,
+          16,
+          0,
+          0,
+          5,
+          26
+        ],
+        "death_cluster_entropy": 0.648,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.925,
+        "curve": [
+          [
+            969.1,
+            349.8
+          ],
+          [
+            1014.5,
+            520.9
+          ],
+          [
+            1014.5,
+            661.6
+          ],
+          [
+            6060.0,
+            1446.4
+          ],
+          [
+            6060.0,
+            1905.5
+          ],
+          [
+            6060.0,
+            4505.5
+          ],
+          [
+            6060.0,
+            4496.4
+          ],
+          [
+            6060.0,
+            4523.6
+          ],
+          [
+            6060.0,
+            5550.9
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5555.5
+          ],
+          [
+            6060.0,
+            5550.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.84,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.10833333333333334,
+        "causes": {
+          "Stall": 13,
+          "Bomb": 22
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4545,
+        "train_time_s": 15.3,
+        "completion_rate": 0.708,
+        "mean_completion_time": 11.1,
+        "completion_time_stddev": 5.9,
+        "progress_at_death": 0.388,
+        "deaths_per_run": 2.92,
+        "death_hist": [
+          9,
+          0,
+          2,
+          1,
+          3,
+          19,
+          1,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.546,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.6,
+        "curve": [
+          [
+            605.5,
+            228.7
+          ],
+          [
+            6060.0,
+            1055.8
+          ],
+          [
+            6060.0,
+            2785.8
+          ],
+          [
+            6060.0,
+            4973.6
+          ],
+          [
+            6060.0,
+            5528.2
+          ],
+          [
+            6060.0,
+            4946.4
+          ],
+          [
+            6060.0,
+            5454.0
+          ],
+          [
+            6060.0,
+            5454.0
+          ],
+          [
+            6060.0,
+            5505.5
+          ],
+          [
+            6060.0,
+            5519.1
+          ],
+          [
+            6060.0,
+            5454.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/0_31337"
+      }
+    ],
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 5,
+        "win_rate": 0.0,
+        "best": 504.4,
+        "best_x": 444.4,
+        "stuck_frac": 0.0275,
+        "causes": {
+          "Stall": 11,
+          "Bomb": 389
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0148,
+        "train_time_s": 45.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.411,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          16,
+          3,
+          2,
+          69,
+          310,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.301,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            179.6
+          ],
+          [
+            430.4,
+            334.6
+          ],
+          [
+            430.4,
+            381.3
+          ],
+          [
+            430.4,
+            391.0
+          ],
+          [
+            504.4,
+            452.6
+          ],
+          [
+            504.4,
+            435.5
+          ],
+          [
+            504.4,
+            405.9
+          ],
+          [
+            504.4,
+            467.4
+          ],
+          [
+            504.4,
+            467.4
+          ],
+          [
+            504.4,
+            482.2
+          ],
+          [
+            504.4,
+            388.7
+          ],
+          [
+            504.4,
+            489.6
+          ],
+          [
+            504.4,
+            457.7
+          ],
+          [
+            504.4,
+            457.7
+          ],
+          [
+            504.4,
+            474.8
+          ],
+          [
+            504.4,
+            457.7
+          ],
+          [
+            504.4,
+            497.0
+          ],
+          [
+            504.4,
+            493.3
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            497.0
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            500.7
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            489.6
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            489.6
+          ],
+          [
+            504.4,
+            500.7
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            489.6
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            497.0
+          ],
+          [
+            504.4,
+            493.3
+          ],
+          [
+            504.4,
+            504.4
+          ],
+          [
+            504.4,
+            504.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 863.7,
+        "best_x": 703.7,
+        "stuck_frac": 0.0425,
+        "causes": {
+          "Bomb": 139,
+          "Stall": 17,
+          "Timeout": 244
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0582,
+        "train_time_s": 218.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.579,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          6,
+          2,
+          1,
+          28,
+          77,
+          70,
+          35,
+          181,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.645,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            504.4,
+            203.2
+          ],
+          [
+            504.4,
+            337.4
+          ],
+          [
+            504.4,
+            425.8
+          ],
+          [
+            578.5,
+            504.4
+          ],
+          [
+            766.7,
+            571.7
+          ],
+          [
+            863.7,
+            607.6
+          ],
+          [
+            863.7,
+            630.1
+          ],
+          [
+            863.7,
+            675.2
+          ],
+          [
+            863.7,
+            665.8
+          ],
+          [
+            863.7,
+            704.3
+          ],
+          [
+            863.7,
+            691.5
+          ],
+          [
+            863.7,
+            767.0
+          ],
+          [
+            863.7,
+            723.7
+          ],
+          [
+            863.7,
+            713.7
+          ],
+          [
+            863.7,
+            677.8
+          ],
+          [
+            863.7,
+            716.3
+          ],
+          [
+            863.7,
+            684.1
+          ],
+          [
+            863.7,
+            710.0
+          ],
+          [
+            863.7,
+            698.9
+          ],
+          [
+            863.7,
+            788.1
+          ],
+          [
+            863.7,
+            717.7
+          ],
+          [
+            863.7,
+            732.5
+          ],
+          [
+            863.7,
+            732.5
+          ],
+          [
+            863.7,
+            702.6
+          ],
+          [
+            863.7,
+            691.5
+          ],
+          [
+            863.7,
+            713.7
+          ],
+          [
+            863.7,
+            744.8
+          ],
+          [
+            863.7,
+            736.5
+          ],
+          [
+            863.7,
+            749.9
+          ],
+          [
+            863.7,
+            738.5
+          ],
+          [
+            863.7,
+            818.1
+          ],
+          [
+            863.7,
+            844.3
+          ],
+          [
+            863.7,
+            791.9
+          ],
+          [
+            863.7,
+            716.3
+          ],
+          [
+            863.7,
+            752.2
+          ],
+          [
+            863.7,
+            720.0
+          ],
+          [
+            863.7,
+            821.8
+          ],
+          [
+            863.7,
+            700.3
+          ],
+          [
+            863.7,
+            806.7
+          ],
+          [
+            863.7,
+            753.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 34,
+        "win_rate": 0.0,
+        "best": 789.6,
+        "best_x": 666.7,
+        "stuck_frac": 0.805,
+        "causes": {
+          "Stall": 322,
+          "Bomb": 61,
+          "Timeout": 17
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.003,
+        "train_time_s": 79.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.453,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          11,
+          23,
+          27,
+          14,
+          78,
+          221,
+          26,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.602,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            152.7
+          ],
+          [
+            504.4,
+            335.1
+          ],
+          [
+            578.5,
+            479.0
+          ],
+          [
+            578.5,
+            520.7
+          ],
+          [
+            578.5,
+            479.0
+          ],
+          [
+            578.5,
+            452.6
+          ],
+          [
+            578.5,
+            541.5
+          ],
+          [
+            578.5,
+            419.8
+          ],
+          [
+            578.5,
+            548.9
+          ],
+          [
+            578.5,
+            571.1
+          ],
+          [
+            578.5,
+            537.8
+          ],
+          [
+            578.5,
+            550.3
+          ],
+          [
+            578.5,
+            494.7
+          ],
+          [
+            578.5,
+            525.8
+          ],
+          [
+            578.5,
+            437.4
+          ],
+          [
+            578.5,
+            501.3
+          ],
+          [
+            578.5,
+            475.3
+          ],
+          [
+            578.5,
+            514.7
+          ],
+          [
+            578.5,
+            514.7
+          ],
+          [
+            578.5,
+            507.3
+          ],
+          [
+            578.5,
+            485.9
+          ],
+          [
+            578.5,
+            550.3
+          ],
+          [
+            578.5,
+            523.0
+          ],
+          [
+            578.5,
+            502.1
+          ],
+          [
+            578.5,
+            557.7
+          ],
+          [
+            578.5,
+            508.1
+          ],
+          [
+            578.5,
+            497.0
+          ],
+          [
+            578.5,
+            474.8
+          ],
+          [
+            578.5,
+            508.7
+          ],
+          [
+            578.5,
+            503.6
+          ],
+          [
+            578.5,
+            548.9
+          ],
+          [
+            578.5,
+            534.1
+          ],
+          [
+            578.5,
+            511.9
+          ],
+          [
+            789.6,
+            518.1
+          ],
+          [
+            789.6,
+            507.0
+          ],
+          [
+            789.6,
+            582.6
+          ],
+          [
+            789.6,
+            577.8
+          ],
+          [
+            789.6,
+            724.0
+          ],
+          [
+            789.6,
+            643.3
+          ],
+          [
+            789.6,
+            635.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/1_31337"
+      }
+    ],
+    "2": [
+      {
+        "level": "2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 1025.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.0775,
+        "causes": {
+          "Bomb": 316,
+          "Stall": 31,
+          "Timeout": 53
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0012,
+        "train_time_s": 138.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.566,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          15,
+          5,
+          5,
+          56,
+          11,
+          56,
+          251,
+          0,
+          0,
+          1
+        ],
+        "death_cluster_entropy": 0.517,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            652.6,
+            246.2
+          ],
+          [
+            726.7,
+            491.0
+          ],
+          [
+            726.7,
+            534.1
+          ],
+          [
+            726.7,
+            479.9
+          ],
+          [
+            726.7,
+            545.2
+          ],
+          [
+            726.7,
+            567.4
+          ],
+          [
+            726.7,
+            578.5
+          ],
+          [
+            726.7,
+            634.1
+          ],
+          [
+            726.7,
+            619.3
+          ],
+          [
+            726.7,
+            623.0
+          ],
+          [
+            726.7,
+            604.4
+          ],
+          [
+            726.7,
+            660.0
+          ],
+          [
+            726.7,
+            565.1
+          ],
+          [
+            726.7,
+            646.6
+          ],
+          [
+            726.7,
+            682.2
+          ],
+          [
+            726.7,
+            660.0
+          ],
+          [
+            726.7,
+            667.4
+          ],
+          [
+            726.7,
+            642.9
+          ],
+          [
+            726.7,
+            648.9
+          ],
+          [
+            726.7,
+            641.5
+          ],
+          [
+            726.7,
+            689.6
+          ],
+          [
+            726.7,
+            697.0
+          ],
+          [
+            726.7,
+            660.0
+          ],
+          [
+            726.7,
+            639.2
+          ],
+          [
+            726.7,
+            726.7
+          ],
+          [
+            726.7,
+            719.3
+          ],
+          [
+            726.7,
+            652.6
+          ],
+          [
+            726.7,
+            708.1
+          ],
+          [
+            726.7,
+            693.3
+          ],
+          [
+            726.7,
+            671.1
+          ],
+          [
+            726.7,
+            648.9
+          ],
+          [
+            726.7,
+            663.7
+          ],
+          [
+            726.7,
+            715.6
+          ],
+          [
+            726.7,
+            726.7
+          ],
+          [
+            726.7,
+            512.4
+          ],
+          [
+            726.7,
+            642.9
+          ],
+          [
+            726.7,
+            588.7
+          ],
+          [
+            726.7,
+            591.0
+          ],
+          [
+            726.7,
+            583.6
+          ],
+          [
+            1025.9,
+            667.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/2_1234"
+      },
+      {
+        "level": "2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 39,
+        "first_win_gen": 29,
+        "best_gen": 29,
+        "win_rate": 0.45,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.04358974358974359,
+        "causes": {
+          "Bomb": 278,
+          "Stall": 17,
+          "Timeout": 49
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0132,
+        "train_time_s": 127.4,
+        "completion_rate": 0.118,
+        "mean_completion_time": 29.4,
+        "completion_time_stddev": 8.1,
+        "progress_at_death": 0.703,
+        "deaths_per_run": 8.82,
+        "death_hist": [
+          7,
+          0,
+          2,
+          38,
+          1,
+          66,
+          79,
+          7,
+          34,
+          110
+        ],
+        "death_cluster_entropy": 0.737,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.354,
+        "curve": [
+          [
+            652.6,
+            251.3
+          ],
+          [
+            652.6,
+            361.9
+          ],
+          [
+            652.6,
+            440.6
+          ],
+          [
+            652.6,
+            619.3
+          ],
+          [
+            726.7,
+            660.0
+          ],
+          [
+            726.7,
+            704.4
+          ],
+          [
+            763.7,
+            689.6
+          ],
+          [
+            763.7,
+            682.2
+          ],
+          [
+            1011.9,
+            744.1
+          ],
+          [
+            1011.9,
+            692.2
+          ],
+          [
+            1025.9,
+            798.8
+          ],
+          [
+            1025.9,
+            851.3
+          ],
+          [
+            1025.9,
+            745.0
+          ],
+          [
+            1025.9,
+            815.6
+          ],
+          [
+            1025.9,
+            779.7
+          ],
+          [
+            1025.9,
+            776.0
+          ],
+          [
+            1025.9,
+            826.7
+          ],
+          [
+            1025.9,
+            843.0
+          ],
+          [
+            1025.9,
+            794.5
+          ],
+          [
+            1025.9,
+            844.1
+          ],
+          [
+            1025.9,
+            839.3
+          ],
+          [
+            1025.9,
+            834.4
+          ],
+          [
+            1025.9,
+            787.4
+          ],
+          [
+            1025.9,
+            824.4
+          ],
+          [
+            1085.9,
+            896.0
+          ],
+          [
+            1085.9,
+            845.0
+          ],
+          [
+            1085.9,
+            973.9
+          ],
+          [
+            1085.9,
+            943.9
+          ],
+          [
+            6160.0,
+            1432.5
+          ],
+          [
+            6160.0,
+            1563.7
+          ],
+          [
+            6160.0,
+            1571.1
+          ],
+          [
+            6160.0,
+            2042.6
+          ],
+          [
+            6160.0,
+            2557.4
+          ],
+          [
+            6160.0,
+            3608.1
+          ],
+          [
+            6160.0,
+            4123.0
+          ],
+          [
+            6160.0,
+            4601.9
+          ],
+          [
+            6160.0,
+            4594.4
+          ],
+          [
+            6160.0,
+            4594.4
+          ],
+          [
+            6160.0,
+            3964.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/2_2025"
+      },
+      {
+        "level": "2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 5,
+        "win_rate": 0.0,
+        "best": 1025.9,
+        "best_x": 925.9,
+        "stuck_frac": 0.075,
+        "causes": {
+          "Stall": 30,
+          "Bomb": 370
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1185,
+        "train_time_s": 93.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.697,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          23,
+          4,
+          3,
+          54,
+          9,
+          48,
+          39,
+          19,
+          0,
+          201
+        ],
+        "death_cluster_entropy": 0.684,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            430.4,
+            165.3
+          ],
+          [
+            652.6,
+            349.9
+          ],
+          [
+            689.6,
+            509.6
+          ],
+          [
+            726.7,
+            637.8
+          ],
+          [
+            1025.9,
+            643.2
+          ],
+          [
+            1025.9,
+            598.7
+          ],
+          [
+            1025.9,
+            592.7
+          ],
+          [
+            1025.9,
+            516.4
+          ],
+          [
+            1025.9,
+            687.9
+          ],
+          [
+            1025.9,
+            774.0
+          ],
+          [
+            1025.9,
+            861.8
+          ],
+          [
+            1025.9,
+            801.9
+          ],
+          [
+            1025.9,
+            858.1
+          ],
+          [
+            1025.9,
+            831.9
+          ],
+          [
+            1025.9,
+            817.3
+          ],
+          [
+            1025.9,
+            759.2
+          ],
+          [
+            1025.9,
+            895.1
+          ],
+          [
+            1025.9,
+            809.9
+          ],
+          [
+            1025.9,
+            716.7
+          ],
+          [
+            1025.9,
+            638.1
+          ],
+          [
+            1025.9,
+            787.4
+          ],
+          [
+            1025.9,
+            813.3
+          ],
+          [
+            1025.9,
+            778.0
+          ],
+          [
+            1025.9,
+            932.7
+          ],
+          [
+            1025.9,
+            871.2
+          ],
+          [
+            1025.9,
+            825.0
+          ],
+          [
+            1025.9,
+            793.1
+          ],
+          [
+            1025.9,
+            951.3
+          ],
+          [
+            1025.9,
+            825.0
+          ],
+          [
+            1025.9,
+            876.6
+          ],
+          [
+            1025.9,
+            817.3
+          ],
+          [
+            1025.9,
+            988.6
+          ],
+          [
+            1025.9,
+            932.4
+          ],
+          [
+            1025.9,
+            869.5
+          ],
+          [
+            1025.9,
+            865.5
+          ],
+          [
+            1025.9,
+            947.6
+          ],
+          [
+            1025.9,
+            791.1
+          ],
+          [
+            1025.9,
+            966.4
+          ],
+          [
+            1025.9,
+            869.5
+          ],
+          [
+            1025.9,
+            921.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/2_31337"
+      }
+    ],
+    "3": [
+      {
+        "level": "3",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.75,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.04666666666666667,
+        "causes": {
+          "Bomb": 37,
+          "Stall": 7,
+          "Timeout": 29
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0222,
+        "train_time_s": 45.3,
+        "completion_rate": 0.513,
+        "mean_completion_time": 20.3,
+        "completion_time_stddev": 4.6,
+        "progress_at_death": 0.592,
+        "deaths_per_run": 4.87,
+        "death_hist": [
+          11,
+          5,
+          3,
+          13,
+          2,
+          0,
+          0,
+          1,
+          7,
+          31
+        ],
+        "death_cluster_entropy": 0.718,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            1048.9,
+            245.4
+          ],
+          [
+            1085.9,
+            444.1
+          ],
+          [
+            1085.9,
+            651.6
+          ],
+          [
+            1085.9,
+            885.9
+          ],
+          [
+            6160.0,
+            1830.3
+          ],
+          [
+            6160.0,
+            2479.6
+          ],
+          [
+            6160.0,
+            3462.5
+          ],
+          [
+            6160.0,
+            4585.9
+          ],
+          [
+            6160.0,
+            5656.3
+          ],
+          [
+            6160.0,
+            5656.3
+          ],
+          [
+            6160.0,
+            4637.8
+          ],
+          [
+            6160.0,
+            6160.0
+          ],
+          [
+            6160.0,
+            5145.2
+          ],
+          [
+            6160.0,
+            5094.7
+          ],
+          [
+            6160.0,
+            5652.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/3_1234"
+      },
+      {
+        "level": "3",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 36,
+        "win_rate": 0.0,
+        "best": 937.8,
+        "best_x": 777.8,
+        "stuck_frac": 0.045,
+        "causes": {
+          "Bomb": 355,
+          "Stall": 18,
+          "Timeout": 27
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0083,
+        "train_time_s": 63.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.355,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          16,
+          27,
+          4,
+          295,
+          4,
+          15,
+          21,
+          18,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.454,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            470.4,
+            211.2
+          ],
+          [
+            470.4,
+            376.8
+          ],
+          [
+            493.3,
+            468.7
+          ],
+          [
+            493.3,
+            446.1
+          ],
+          [
+            493.3,
+            443.6
+          ],
+          [
+            493.3,
+            466.2
+          ],
+          [
+            493.3,
+            475.3
+          ],
+          [
+            493.3,
+            435.4
+          ],
+          [
+            493.3,
+            424.3
+          ],
+          [
+            493.3,
+            441.7
+          ],
+          [
+            493.3,
+            481.3
+          ],
+          [
+            493.3,
+            456.5
+          ],
+          [
+            493.3,
+            369.0
+          ],
+          [
+            493.3,
+            481.3
+          ],
+          [
+            493.3,
+            481.3
+          ],
+          [
+            493.3,
+            405.5
+          ],
+          [
+            493.3,
+            481.3
+          ],
+          [
+            493.3,
+            441.7
+          ],
+          [
+            493.3,
+            487.3
+          ],
+          [
+            493.3,
+            487.3
+          ],
+          [
+            493.3,
+            443.1
+          ],
+          [
+            493.3,
+            455.1
+          ],
+          [
+            493.3,
+            485.0
+          ],
+          [
+            493.3,
+            491.0
+          ],
+          [
+            493.3,
+            441.7
+          ],
+          [
+            493.3,
+            487.3
+          ],
+          [
+            493.3,
+            460.2
+          ],
+          [
+            493.3,
+            439.4
+          ],
+          [
+            493.3,
+            485.0
+          ],
+          [
+            678.5,
+            454.8
+          ],
+          [
+            863.7,
+            572.5
+          ],
+          [
+            863.7,
+            410.5
+          ],
+          [
+            863.7,
+            437.6
+          ],
+          [
+            863.7,
+            661.1
+          ],
+          [
+            863.7,
+            652.0
+          ],
+          [
+            937.8,
+            651.4
+          ],
+          [
+            937.8,
+            694.7
+          ],
+          [
+            937.8,
+            662.6
+          ],
+          [
+            937.8,
+            713.3
+          ],
+          [
+            937.8,
+            689.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/3_2025"
+      },
+      {
+        "level": "3",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 7,
+        "win_rate": 0.0,
+        "best": 840.7,
+        "best_x": 740.7,
+        "stuck_frac": 0.0325,
+        "causes": {
+          "Stall": 13,
+          "Bomb": 387
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0714,
+        "train_time_s": 51.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.568,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          21,
+          10,
+          3,
+          77,
+          31,
+          33,
+          46,
+          179,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.701,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            470.4,
+            149.3
+          ],
+          [
+            470.4,
+            319.8
+          ],
+          [
+            470.4,
+            357.2
+          ],
+          [
+            470.4,
+            470.4
+          ],
+          [
+            766.7,
+            455.0
+          ],
+          [
+            766.7,
+            445.0
+          ],
+          [
+            840.7,
+            437.3
+          ],
+          [
+            840.7,
+            515.0
+          ],
+          [
+            840.7,
+            581.4
+          ],
+          [
+            840.7,
+            618.7
+          ],
+          [
+            840.7,
+            643.0
+          ],
+          [
+            840.7,
+            762.4
+          ],
+          [
+            840.7,
+            777.5
+          ],
+          [
+            840.7,
+            754.7
+          ],
+          [
+            840.7,
+            549.2
+          ],
+          [
+            840.7,
+            711.9
+          ],
+          [
+            840.7,
+            717.6
+          ],
+          [
+            840.7,
+            685.7
+          ],
+          [
+            840.7,
+            777.5
+          ],
+          [
+            840.7,
+            825.9
+          ],
+          [
+            840.7,
+            659.5
+          ],
+          [
+            840.7,
+            721.6
+          ],
+          [
+            840.7,
+            770.1
+          ],
+          [
+            840.7,
+            728.7
+          ],
+          [
+            840.7,
+            721.3
+          ],
+          [
+            840.7,
+            702.5
+          ],
+          [
+            840.7,
+            762.4
+          ],
+          [
+            840.7,
+            688.0
+          ],
+          [
+            840.7,
+            770.1
+          ],
+          [
+            840.7,
+            699.1
+          ],
+          [
+            840.7,
+            777.5
+          ],
+          [
+            840.7,
+            702.8
+          ],
+          [
+            840.7,
+            676.6
+          ],
+          [
+            840.7,
+            680.6
+          ],
+          [
+            840.7,
+            755.0
+          ],
+          [
+            840.7,
+            792.3
+          ],
+          [
+            840.7,
+            751.3
+          ],
+          [
+            840.7,
+            710.2
+          ],
+          [
+            840.7,
+            736.1
+          ],
+          [
+            840.7,
+            751.3
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/3_31337"
+      }
+    ],
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 10,
+        "win_rate": 0.62,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.175,
+        "causes": {
+          "Stall": 28,
+          "Bomb": 41,
+          "Timeout": 28
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0273,
+        "train_time_s": 41.5,
+        "completion_rate": 0.394,
+        "mean_completion_time": 17.0,
+        "completion_time_stddev": 4.0,
+        "progress_at_death": 0.701,
+        "deaths_per_run": 6.06,
+        "death_hist": [
+          14,
+          0,
+          0,
+          2,
+          0,
+          4,
+          16,
+          2,
+          13,
+          46
+        ],
+        "death_cluster_entropy": 0.648,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.68,
+        "curve": [
+          [
+            923.6,
+            255.8
+          ],
+          [
+            963.6,
+            491.5
+          ],
+          [
+            1069.1,
+            873.5
+          ],
+          [
+            1069.1,
+            850.7
+          ],
+          [
+            1069.1,
+            749.8
+          ],
+          [
+            6060.0,
+            1320.0
+          ],
+          [
+            6060.0,
+            2540.0
+          ],
+          [
+            6060.0,
+            3549.1
+          ],
+          [
+            6060.0,
+            3996.4
+          ],
+          [
+            6160.0,
+            4552.7
+          ],
+          [
+            6160.0,
+            4460.9
+          ],
+          [
+            6160.0,
+            6080.0
+          ],
+          [
+            6160.0,
+            4036.4
+          ],
+          [
+            6160.0,
+            4525.5
+          ],
+          [
+            6160.0,
+            4063.6
+          ],
+          [
+            6160.0,
+            3472.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.67,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.16363636363636364,
+        "causes": {
+          "Stall": 18,
+          "Bomb": 24
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 9.5,
+        "completion_rate": 0.618,
+        "mean_completion_time": 6.6,
+        "completion_time_stddev": 0.8,
+        "progress_at_death": 0.596,
+        "deaths_per_run": 3.82,
+        "death_hist": [
+          7,
+          0,
+          0,
+          1,
+          0,
+          11,
+          7,
+          0,
+          4,
+          12
+        ],
+        "death_cluster_entropy": 0.703,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.867,
+        "curve": [
+          [
+            6060.0,
+            781.6
+          ],
+          [
+            6060.0,
+            1077.1
+          ],
+          [
+            6060.0,
+            1237.5
+          ],
+          [
+            6060.0,
+            1923.6
+          ],
+          [
+            6060.0,
+            4019.1
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5032.7
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5554.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.8,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.14166666666666666,
+        "causes": {
+          "Stall": 17,
+          "Bomb": 21,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4545,
+        "train_time_s": 11.7,
+        "completion_rate": 0.675,
+        "mean_completion_time": 7.8,
+        "completion_time_stddev": 3.6,
+        "progress_at_death": 0.376,
+        "deaths_per_run": 3.25,
+        "death_hist": [
+          14,
+          0,
+          0,
+          0,
+          0,
+          22,
+          3,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.386,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.7,
+        "curve": [
+          [
+            605.5,
+            178.7
+          ],
+          [
+            6060.0,
+            963.5
+          ],
+          [
+            6060.0,
+            1608.5
+          ],
+          [
+            6060.0,
+            3355.5
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            4913.1
+          ],
+          [
+            6060.0,
+            5528.2
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5514.5
+          ],
+          [
+            6060.0,
+            4978.2
+          ],
+          [
+            6060.0,
+            5460.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/4_31337"
+      }
+    ],
+    "5": [
+      {
+        "level": "5",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 31,
+        "best_gen": 31,
+        "win_rate": 0.64,
+        "best": 6260.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1325,
+        "causes": {
+          "Bomb": 161,
+          "Stall": 53,
+          "Timeout": 122
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0028,
+        "train_time_s": 165.0,
+        "completion_rate": 0.16,
+        "mean_completion_time": 30.4,
+        "completion_time_stddev": 1.1,
+        "progress_at_death": 0.812,
+        "deaths_per_run": 8.4,
+        "death_hist": [
+          8,
+          1,
+          1,
+          16,
+          1,
+          6,
+          3,
+          20,
+          86,
+          194
+        ],
+        "death_cluster_entropy": 0.536,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.492,
+        "curve": [
+          [
+            760.0,
+            279.0
+          ],
+          [
+            960.0,
+            582.0
+          ],
+          [
+            960.0,
+            784.0
+          ],
+          [
+            960.0,
+            865.0
+          ],
+          [
+            1060.0,
+            814.0
+          ],
+          [
+            1110.0,
+            825.0
+          ],
+          [
+            1160.0,
+            940.0
+          ],
+          [
+            1160.0,
+            999.0
+          ],
+          [
+            1160.0,
+            940.0
+          ],
+          [
+            1160.0,
+            985.0
+          ],
+          [
+            1160.0,
+            904.0
+          ],
+          [
+            1160.0,
+            1030.0
+          ],
+          [
+            1160.0,
+            880.0
+          ],
+          [
+            1160.0,
+            990.0
+          ],
+          [
+            1160.0,
+            980.0
+          ],
+          [
+            1160.0,
+            969.0
+          ],
+          [
+            1160.0,
+            1010.0
+          ],
+          [
+            1160.0,
+            1029.0
+          ],
+          [
+            1160.0,
+            1014.0
+          ],
+          [
+            1160.0,
+            1040.0
+          ],
+          [
+            1160.0,
+            980.0
+          ],
+          [
+            1160.0,
+            990.0
+          ],
+          [
+            1160.0,
+            990.0
+          ],
+          [
+            1160.0,
+            1005.0
+          ],
+          [
+            1160.0,
+            954.0
+          ],
+          [
+            1160.0,
+            1058.0
+          ],
+          [
+            1160.0,
+            975.0
+          ],
+          [
+            1210.0,
+            807.0
+          ],
+          [
+            1210.0,
+            939.0
+          ],
+          [
+            1210.0,
+            1044.0
+          ],
+          [
+            6260.0,
+            1584.0
+          ],
+          [
+            6260.0,
+            2633.0
+          ],
+          [
+            6260.0,
+            4704.0
+          ],
+          [
+            6260.0,
+            4650.0
+          ],
+          [
+            6260.0,
+            4670.0
+          ],
+          [
+            6260.0,
+            5205.0
+          ],
+          [
+            6260.0,
+            4144.0
+          ],
+          [
+            6260.0,
+            5720.0
+          ],
+          [
+            6260.0,
+            5205.0
+          ],
+          [
+            6260.0,
+            5200.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/5_1234"
+      },
+      {
+        "level": "5",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 1210.0,
+        "best_x": 950.0,
+        "stuck_frac": 0.045,
+        "causes": {
+          "Bomb": 346,
+          "Stall": 18,
+          "Timeout": 36
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.015,
+        "train_time_s": 118.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.834,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          6,
+          0,
+          0,
+          4,
+          0,
+          27,
+          5,
+          18,
+          123,
+          217
+        ],
+        "death_cluster_entropy": 0.512,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            1000.0,
+            327.0
+          ],
+          [
+            1000.0,
+            478.0
+          ],
+          [
+            1000.0,
+            656.0
+          ],
+          [
+            1150.0,
+            892.0
+          ],
+          [
+            1150.0,
+            936.0
+          ],
+          [
+            1210.0,
+            999.0
+          ],
+          [
+            1210.0,
+            1043.0
+          ],
+          [
+            1210.0,
+            1033.0
+          ],
+          [
+            1210.0,
+            974.0
+          ],
+          [
+            1210.0,
+            972.0
+          ],
+          [
+            1210.0,
+            991.0
+          ],
+          [
+            1210.0,
+            982.0
+          ],
+          [
+            1210.0,
+            996.0
+          ],
+          [
+            1210.0,
+            938.0
+          ],
+          [
+            1210.0,
+            990.0
+          ],
+          [
+            1210.0,
+            918.0
+          ],
+          [
+            1210.0,
+            952.0
+          ],
+          [
+            1210.0,
+            922.0
+          ],
+          [
+            1210.0,
+            972.0
+          ],
+          [
+            1210.0,
+            952.0
+          ],
+          [
+            1210.0,
+            913.0
+          ],
+          [
+            1210.0,
+            997.0
+          ],
+          [
+            1210.0,
+            991.0
+          ],
+          [
+            1210.0,
+            1007.0
+          ],
+          [
+            1210.0,
+            1029.0
+          ],
+          [
+            1210.0,
+            1020.0
+          ],
+          [
+            1210.0,
+            1002.0
+          ],
+          [
+            1210.0,
+            987.0
+          ],
+          [
+            1210.0,
+            987.0
+          ],
+          [
+            1210.0,
+            1044.0
+          ],
+          [
+            1210.0,
+            1061.0
+          ],
+          [
+            1210.0,
+            1010.0
+          ],
+          [
+            1210.0,
+            980.0
+          ],
+          [
+            1210.0,
+            1045.0
+          ],
+          [
+            1210.0,
+            1010.0
+          ],
+          [
+            1210.0,
+            1016.0
+          ],
+          [
+            1210.0,
+            987.0
+          ],
+          [
+            1210.0,
+            1040.0
+          ],
+          [
+            1210.0,
+            970.0
+          ],
+          [
+            1210.0,
+            1034.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/5_2025"
+      },
+      {
+        "level": "5",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 1000.0,
+        "best_x": 900.0,
+        "stuck_frac": 0.07,
+        "causes": {
+          "Stall": 28,
+          "Bomb": 372
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4,
+        "train_time_s": 66.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.826,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          7,
+          0,
+          1,
+          10,
+          3,
+          35,
+          1,
+          2,
+          9,
+          332
+        ],
+        "death_cluster_entropy": 0.308,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            560.0,
+            207.0
+          ],
+          [
+            1000.0,
+            524.0
+          ],
+          [
+            1000.0,
+            662.0
+          ],
+          [
+            1000.0,
+            859.0
+          ],
+          [
+            1000.0,
+            956.0
+          ],
+          [
+            1000.0,
+            714.0
+          ],
+          [
+            1000.0,
+            897.0
+          ],
+          [
+            1000.0,
+            834.0
+          ],
+          [
+            1000.0,
+            833.0
+          ],
+          [
+            1000.0,
+            908.0
+          ],
+          [
+            1000.0,
+            942.0
+          ],
+          [
+            1000.0,
+            892.0
+          ],
+          [
+            1000.0,
+            907.0
+          ],
+          [
+            1000.0,
+            942.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            942.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            868.0
+          ],
+          [
+            1000.0,
+            986.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            956.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            986.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            956.0
+          ],
+          [
+            1000.0,
+            916.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            986.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ],
+          [
+            1000.0,
+            1000.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/5_31337"
+      }
+    ],
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 14,
+        "first_win_gen": 4,
+        "best_gen": 4,
+        "win_rate": 0.87,
+        "best": 7120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.09285714285714286,
+        "causes": {
+          "Bomb": 37,
+          "Stall": 13,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0429,
+        "train_time_s": 11.4,
+        "completion_rate": 0.629,
+        "mean_completion_time": 4.5,
+        "completion_time_stddev": 0.8,
+        "progress_at_death": 0.673,
+        "deaths_per_run": 3.71,
+        "death_hist": [
+          7,
+          0,
+          0,
+          0,
+          4,
+          3,
+          9,
+          1,
+          17,
+          11
+        ],
+        "death_cluster_entropy": 0.741,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.95,
+        "curve": [
+          [
+            2288.6,
+            735.7
+          ],
+          [
+            2324.3,
+            1591.3
+          ],
+          [
+            2324.3,
+            2231.4
+          ],
+          [
+            7120.0,
+            2757.4
+          ],
+          [
+            7120.0,
+            4718.6
+          ],
+          [
+            7120.0,
+            6153.7
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            6160.9
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            6640.4
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.78,
+        "best": 7120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07272727272727272,
+        "causes": {
+          "Stall": 8,
+          "Bomb": 21,
+          "Enemy": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 8.4,
+        "completion_rate": 0.718,
+        "mean_completion_time": 4.4,
+        "completion_time_stddev": 0.5,
+        "progress_at_death": 0.638,
+        "deaths_per_run": 2.82,
+        "death_hist": [
+          3,
+          3,
+          0,
+          0,
+          1,
+          9,
+          0,
+          1,
+          5,
+          9
+        ],
+        "death_cluster_entropy": 0.732,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.8,
+        "curve": [
+          [
+            7120.0,
+            1119.7
+          ],
+          [
+            7120.0,
+            2133.4
+          ],
+          [
+            7120.0,
+            3327.4
+          ],
+          [
+            7120.0,
+            4700.7
+          ],
+          [
+            7120.0,
+            6143.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.88,
+        "best": 7120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.04666666666666667,
+        "causes": {
+          "Enemy": 3,
+          "Stall": 7,
+          "Bomb": 47,
+          "Timeout": 4
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1072,
+        "train_time_s": 19.7,
+        "completion_rate": 0.593,
+        "mean_completion_time": 10.1,
+        "completion_time_stddev": 1.5,
+        "progress_at_death": 0.498,
+        "deaths_per_run": 4.07,
+        "death_hist": [
+          13,
+          0,
+          0,
+          1,
+          2,
+          25,
+          9,
+          8,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.682,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.96,
+        "curve": [
+          [
+            2145.7,
+            309.4
+          ],
+          [
+            2145.7,
+            562.1
+          ],
+          [
+            2181.4,
+            1366.7
+          ],
+          [
+            2252.9,
+            2163.6
+          ],
+          [
+            7120.0,
+            2678.9
+          ],
+          [
+            7120.0,
+            4164.0
+          ],
+          [
+            7120.0,
+            6139.4
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            6626.1
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            6636.9
+          ],
+          [
+            7120.0,
+            7120.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/6_31337"
+      }
+    ],
+    "7": [
+      {
+        "level": "7",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 34,
+        "win_rate": 0.0,
+        "best": 2321.8,
+        "best_x": 1000.0,
+        "stuck_frac": 0.15,
+        "causes": {
+          "Enemy": 31,
+          "Stall": 60,
+          "Bomb": 204,
+          "Timeout": 105
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0111,
+        "train_time_s": 129.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.537,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          27,
+          29,
+          8,
+          6,
+          47,
+          135,
+          69,
+          23,
+          51,
+          5
+        ],
+        "death_cluster_entropy": 0.832,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            287.3,
+            118.8
+          ],
+          [
+            310.0,
+            211.8
+          ],
+          [
+            310.0,
+            285.8
+          ],
+          [
+            310.0,
+            235.2
+          ],
+          [
+            310.0,
+            263.1
+          ],
+          [
+            310.0,
+            288.9
+          ],
+          [
+            310.0,
+            252.5
+          ],
+          [
+            332.7,
+            301.7
+          ],
+          [
+            332.7,
+            314.5
+          ],
+          [
+            332.7,
+            305.5
+          ],
+          [
+            332.7,
+            303.2
+          ],
+          [
+            423.6,
+            344.1
+          ],
+          [
+            521.8,
+            326.6
+          ],
+          [
+            521.8,
+            334.3
+          ],
+          [
+            521.8,
+            372.1
+          ],
+          [
+            521.8,
+            372.1
+          ],
+          [
+            521.8,
+            334.3
+          ],
+          [
+            2230.9,
+            546.0
+          ],
+          [
+            2230.9,
+            683.5
+          ],
+          [
+            2230.9,
+            918.8
+          ],
+          [
+            2230.9,
+            1055.6
+          ],
+          [
+            2230.9,
+            1298.3
+          ],
+          [
+            2230.9,
+            1626.5
+          ],
+          [
+            2230.9,
+            1246.3
+          ],
+          [
+            2230.9,
+            1294.6
+          ],
+          [
+            2230.9,
+            1288.6
+          ],
+          [
+            2230.9,
+            1246.9
+          ],
+          [
+            2230.9,
+            1216.6
+          ],
+          [
+            2230.9,
+            1110.2
+          ],
+          [
+            2230.9,
+            1023.8
+          ],
+          [
+            2299.1,
+            1259.8
+          ],
+          [
+            2299.1,
+            1049.6
+          ],
+          [
+            2299.1,
+            1451.2
+          ],
+          [
+            2321.8,
+            1313.5
+          ],
+          [
+            2321.8,
+            1457.2
+          ],
+          [
+            2321.8,
+            1462.5
+          ],
+          [
+            2321.8,
+            1115.5
+          ],
+          [
+            2321.8,
+            1040.5
+          ],
+          [
+            2321.8,
+            1324.2
+          ],
+          [
+            2321.8,
+            1290.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/7_1234"
+      },
+      {
+        "level": "7",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 11,
+        "win_rate": 0.0,
+        "best": 2330.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.1125,
+        "causes": {
+          "Enemy": 138,
+          "Bomb": 217,
+          "Stall": 45
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0955,
+        "train_time_s": 58.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.714,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          8,
+          10,
+          3,
+          62,
+          84,
+          3,
+          4,
+          11,
+          4,
+          211
+        ],
+        "death_cluster_entropy": 0.603,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            400.9,
+            157.5
+          ],
+          [
+            423.6,
+            243.0
+          ],
+          [
+            423.6,
+            275.5
+          ],
+          [
+            590.0,
+            315.5
+          ],
+          [
+            620.0,
+            443.3
+          ],
+          [
+            620.0,
+            429.6
+          ],
+          [
+            620.0,
+            383.5
+          ],
+          [
+            620.0,
+            475.8
+          ],
+          [
+            620.0,
+            381.3
+          ],
+          [
+            650.0,
+            428.9
+          ],
+          [
+            2330.0,
+            706.4
+          ],
+          [
+            2330.0,
+            761.5
+          ],
+          [
+            2330.0,
+            638.3
+          ],
+          [
+            2330.0,
+            655.7
+          ],
+          [
+            2330.0,
+            652.7
+          ],
+          [
+            2330.0,
+            894.6
+          ],
+          [
+            2330.0,
+            836.5
+          ],
+          [
+            2330.0,
+            722.5
+          ],
+          [
+            2330.0,
+            766.3
+          ],
+          [
+            2330.0,
+            937.3
+          ],
+          [
+            2330.0,
+            881.4
+          ],
+          [
+            2330.0,
+            1144.5
+          ],
+          [
+            2330.0,
+            1333.8
+          ],
+          [
+            2330.0,
+            1255.9
+          ],
+          [
+            2330.0,
+            1091.7
+          ],
+          [
+            2330.0,
+            1052.5
+          ],
+          [
+            2330.0,
+            1027.5
+          ],
+          [
+            2330.0,
+            1007.0
+          ],
+          [
+            2330.0,
+            1283.8
+          ],
+          [
+            2330.0,
+            1359.4
+          ],
+          [
+            2330.0,
+            1260.5
+          ],
+          [
+            2330.0,
+            1163.5
+          ],
+          [
+            2330.0,
+            1289.2
+          ],
+          [
+            2330.0,
+            1124.2
+          ],
+          [
+            2330.0,
+            1138.5
+          ],
+          [
+            2330.0,
+            1397.1
+          ],
+          [
+            2330.0,
+            1421.4
+          ],
+          [
+            2330.0,
+            1336.0
+          ],
+          [
+            2330.0,
+            1107.5
+          ],
+          [
+            2330.0,
+            1076.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/7_2025"
+      },
+      {
+        "level": "7",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 19,
+        "win_rate": 0.0,
+        "best": 1920.9,
+        "best_x": 636.4,
+        "stuck_frac": 0.0975,
+        "causes": {
+          "Enemy": 55,
+          "Stall": 39,
+          "Bomb": 306
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0377,
+        "train_time_s": 48.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.207,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          32,
+          275,
+          19,
+          17,
+          33,
+          19,
+          5,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.497,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            227.3,
+            98.4
+          ],
+          [
+            227.3,
+            188.5
+          ],
+          [
+            385.5,
+            221.8
+          ],
+          [
+            385.5,
+            227.2
+          ],
+          [
+            385.5,
+            149.1
+          ],
+          [
+            1898.2,
+            437.3
+          ],
+          [
+            1898.2,
+            421.8
+          ],
+          [
+            1898.2,
+            638.8
+          ],
+          [
+            1898.2,
+            594.6
+          ],
+          [
+            1898.2,
+            715.9
+          ],
+          [
+            1898.2,
+            896.6
+          ],
+          [
+            1898.2,
+            1203.0
+          ],
+          [
+            1898.2,
+            1540.4
+          ],
+          [
+            1898.2,
+            1385.3
+          ],
+          [
+            1898.2,
+            1206.6
+          ],
+          [
+            1898.2,
+            1562.2
+          ],
+          [
+            1898.2,
+            1213.5
+          ],
+          [
+            1898.2,
+            1050.2
+          ],
+          [
+            1920.9,
+            1562.2
+          ],
+          [
+            1920.9,
+            1568.3
+          ],
+          [
+            1920.9,
+            1210.5
+          ],
+          [
+            1920.9,
+            1568.4
+          ],
+          [
+            1920.9,
+            1374.0
+          ],
+          [
+            1920.9,
+            1197.7
+          ],
+          [
+            1920.9,
+            1909.5
+          ],
+          [
+            1920.9,
+            1562.4
+          ],
+          [
+            1920.9,
+            1021.5
+          ],
+          [
+            1920.9,
+            1209.0
+          ],
+          [
+            1920.9,
+            1404.9
+          ],
+          [
+            1920.9,
+            1180.5
+          ],
+          [
+            1920.9,
+            1062.3
+          ],
+          [
+            1920.9,
+            891.9
+          ],
+          [
+            1920.9,
+            1571.3
+          ],
+          [
+            1920.9,
+            1411.8
+          ],
+          [
+            1920.9,
+            1739.4
+          ],
+          [
+            1920.9,
+            1204.5
+          ],
+          [
+            1920.9,
+            1387.6
+          ],
+          [
+            1920.9,
+            1564.6
+          ],
+          [
+            1920.9,
+            1409.5
+          ],
+          [
+            1920.9,
+            1230.8
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/7_31337"
+      }
+    ],
+    "8": [
+      {
+        "level": "8",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 1552.2,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0325,
+        "causes": {
+          "Bomb": 308,
+          "Stall": 13,
+          "Enemy": 79
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1389,
+        "train_time_s": 58.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.85,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          10,
+          1,
+          1,
+          4,
+          0,
+          34,
+          4,
+          32,
+          47,
+          267
+        ],
+        "death_cluster_entropy": 0.498,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            481.1,
+            118.4
+          ],
+          [
+            1552.2,
+            428.7
+          ],
+          [
+            1552.2,
+            600.6
+          ],
+          [
+            1552.2,
+            571.7
+          ],
+          [
+            1552.2,
+            704.4
+          ],
+          [
+            1552.2,
+            840.7
+          ],
+          [
+            1552.2,
+            797.2
+          ],
+          [
+            1552.2,
+            819.2
+          ],
+          [
+            1552.2,
+            834.0
+          ],
+          [
+            1552.2,
+            834.9
+          ],
+          [
+            1552.2,
+            779.9
+          ],
+          [
+            1552.2,
+            804.7
+          ],
+          [
+            1552.2,
+            912.9
+          ],
+          [
+            1552.2,
+            890.4
+          ],
+          [
+            1552.2,
+            881.7
+          ],
+          [
+            1552.2,
+            929.6
+          ],
+          [
+            1552.2,
+            924.2
+          ],
+          [
+            1552.2,
+            907.3
+          ],
+          [
+            1552.2,
+            1051.4
+          ],
+          [
+            1552.2,
+            1017.4
+          ],
+          [
+            1552.2,
+            1085.4
+          ],
+          [
+            1552.2,
+            929.8
+          ],
+          [
+            1552.2,
+            1014.9
+          ],
+          [
+            1552.2,
+            884.4
+          ],
+          [
+            1552.2,
+            898.6
+          ],
+          [
+            1552.2,
+            941.1
+          ],
+          [
+            1552.2,
+            913.8
+          ],
+          [
+            1552.2,
+            1061.1
+          ],
+          [
+            1552.2,
+            952.0
+          ],
+          [
+            1552.2,
+            939.4
+          ],
+          [
+            1552.2,
+            916.6
+          ],
+          [
+            1552.2,
+            989.9
+          ],
+          [
+            1552.2,
+            1043.3
+          ],
+          [
+            1552.2,
+            1159.4
+          ],
+          [
+            1552.2,
+            926.1
+          ],
+          [
+            1552.2,
+            1014.4
+          ],
+          [
+            1552.2,
+            1090.8
+          ],
+          [
+            1552.2,
+            1069.7
+          ],
+          [
+            1552.2,
+            844.9
+          ],
+          [
+            1552.2,
+            903.7
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/8_1234"
+      },
+      {
+        "level": "8",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 1640.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.045,
+        "causes": {
+          "Enemy": 64,
+          "Stall": 18,
+          "Bomb": 318
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.1111,
+        "train_time_s": 70.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.93,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          6,
+          1,
+          2,
+          11,
+          0,
+          5,
+          15,
+          16,
+          6,
+          338
+        ],
+        "death_cluster_entropy": 0.311,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            448.9,
+            227.2
+          ],
+          [
+            448.9,
+            279.8
+          ],
+          [
+            620.0,
+            414.7
+          ],
+          [
+            620.0,
+            453.8
+          ],
+          [
+            620.0,
+            511.1
+          ],
+          [
+            620.0,
+            611.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            571.9
+          ],
+          [
+            620.0,
+            617.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            614.0
+          ],
+          [
+            620.0,
+            608.4
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            608.4
+          ],
+          [
+            620.0,
+            617.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            605.0
+          ],
+          [
+            620.0,
+            579.8
+          ],
+          [
+            620.0,
+            583.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            614.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            620.0,
+            614.0
+          ],
+          [
+            620.0,
+            611.0
+          ],
+          [
+            620.0,
+            620.0
+          ],
+          [
+            710.0,
+            620.4
+          ],
+          [
+            710.0,
+            623.2
+          ],
+          [
+            710.0,
+            566.3
+          ],
+          [
+            710.0,
+            578.6
+          ],
+          [
+            710.0,
+            517.0
+          ],
+          [
+            710.0,
+            435.6
+          ],
+          [
+            710.0,
+            563.8
+          ],
+          [
+            710.0,
+            603.8
+          ],
+          [
+            710.0,
+            600.6
+          ],
+          [
+            1640.0,
+            737.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/8_2025"
+      },
+      {
+        "level": "8",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 32,
+        "first_win_gen": 22,
+        "best_gen": 22,
+        "win_rate": 0.69,
+        "best": 7120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.065625,
+        "causes": {
+          "Stall": 21,
+          "Bomb": 114,
+          "Enemy": 115
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 55.8,
+        "completion_rate": 0.219,
+        "mean_completion_time": 8.7,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.864,
+        "deaths_per_run": 7.81,
+        "death_hist": [
+          13,
+          6,
+          2,
+          5,
+          5,
+          5,
+          11,
+          5,
+          9,
+          189
+        ],
+        "death_cluster_entropy": 0.462,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.69,
+        "curve": [
+          [
+            620.0,
+            191.1
+          ],
+          [
+            710.0,
+            299.6
+          ],
+          [
+            770.0,
+            359.0
+          ],
+          [
+            770.0,
+            647.0
+          ],
+          [
+            1640.0,
+            849.8
+          ],
+          [
+            1640.0,
+            799.0
+          ],
+          [
+            1640.0,
+            944.2
+          ],
+          [
+            1640.0,
+            907.7
+          ],
+          [
+            1640.0,
+            919.9
+          ],
+          [
+            1640.0,
+            1052.4
+          ],
+          [
+            1640.0,
+            960.4
+          ],
+          [
+            1640.0,
+            1124.0
+          ],
+          [
+            1640.0,
+            1029.3
+          ],
+          [
+            1640.0,
+            999.0
+          ],
+          [
+            1640.0,
+            929.4
+          ],
+          [
+            1640.0,
+            906.8
+          ],
+          [
+            1640.0,
+            1031.9
+          ],
+          [
+            1640.0,
+            1069.9
+          ],
+          [
+            1640.0,
+            1102.2
+          ],
+          [
+            1640.0,
+            1068.7
+          ],
+          [
+            1640.0,
+            1055.4
+          ],
+          [
+            7120.0,
+            1755.7
+          ],
+          [
+            7120.0,
+            1549.1
+          ],
+          [
+            7120.0,
+            3622.9
+          ],
+          [
+            7120.0,
+            6569.0
+          ],
+          [
+            7120.0,
+            6479.0
+          ],
+          [
+            7120.0,
+            4532.0
+          ],
+          [
+            7120.0,
+            5838.0
+          ],
+          [
+            7120.0,
+            5838.0
+          ],
+          [
+            7120.0,
+            4649.0
+          ],
+          [
+            7120.0,
+            5838.0
+          ],
+          [
+            7120.0,
+            7120.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/8_31337"
+      }
+    ],
+    "9": [
+      {
+        "level": "9",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 833.7,
+        "best_x": 703.7,
+        "stuck_frac": 0.13,
+        "causes": {
+          "Stall": 52,
+          "Bomb": 348
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 64.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.648,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          10,
+          0,
+          2,
+          0,
+          26,
+          47,
+          0,
+          315,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.32,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            803.7,
+            228.0
+          ],
+          [
+            833.7,
+            516.6
+          ],
+          [
+            833.7,
+            787.2
+          ],
+          [
+            833.7,
+            718.9
+          ],
+          [
+            833.7,
+            776.7
+          ],
+          [
+            833.7,
+            773.7
+          ],
+          [
+            833.7,
+            773.0
+          ],
+          [
+            833.7,
+            750.4
+          ],
+          [
+            833.7,
+            746.7
+          ],
+          [
+            833.7,
+            798.5
+          ],
+          [
+            833.7,
+            798.5
+          ],
+          [
+            833.7,
+            782.7
+          ],
+          [
+            833.7,
+            773.0
+          ],
+          [
+            833.7,
+            802.2
+          ],
+          [
+            833.7,
+            749.7
+          ],
+          [
+            833.7,
+            801.5
+          ],
+          [
+            833.7,
+            746.7
+          ],
+          [
+            833.7,
+            743.0
+          ],
+          [
+            833.7,
+            757.1
+          ],
+          [
+            833.7,
+            769.3
+          ],
+          [
+            833.7,
+            776.0
+          ],
+          [
+            833.7,
+            802.2
+          ],
+          [
+            833.7,
+            833.7
+          ],
+          [
+            833.7,
+            776.7
+          ],
+          [
+            833.7,
+            827.7
+          ],
+          [
+            833.7,
+            808.2
+          ],
+          [
+            833.7,
+            754.1
+          ],
+          [
+            833.7,
+            748.1
+          ],
+          [
+            833.7,
+            668.5
+          ],
+          [
+            833.7,
+            751.0
+          ],
+          [
+            833.7,
+            827.7
+          ],
+          [
+            833.7,
+            808.2
+          ],
+          [
+            833.7,
+            805.2
+          ],
+          [
+            833.7,
+            805.2
+          ],
+          [
+            833.7,
+            776.0
+          ],
+          [
+            833.7,
+            808.2
+          ],
+          [
+            833.7,
+            688.1
+          ],
+          [
+            833.7,
+            827.7
+          ],
+          [
+            833.7,
+            805.2
+          ],
+          [
+            833.7,
+            779.0
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/9_1234"
+      },
+      {
+        "level": "9",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 39,
+        "first_win_gen": 29,
+        "best_gen": 29,
+        "win_rate": 0.59,
+        "best": 6260.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.05384615384615385,
+        "causes": {
+          "Bomb": 134,
+          "Stall": 21,
+          "Enemy": 108,
+          "Timeout": 67
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0023,
+        "train_time_s": 134.3,
+        "completion_rate": 0.154,
+        "mean_completion_time": 29.9,
+        "completion_time_stddev": 4.1,
+        "progress_at_death": 0.639,
+        "deaths_per_run": 8.46,
+        "death_hist": [
+          12,
+          18,
+          0,
+          1,
+          40,
+          31,
+          48,
+          119,
+          15,
+          46
+        ],
+        "death_cluster_entropy": 0.798,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.462,
+        "curve": [
+          [
+            766.7,
+            257.6
+          ],
+          [
+            766.7,
+            415.5
+          ],
+          [
+            766.7,
+            495.7
+          ],
+          [
+            1085.9,
+            643.7
+          ],
+          [
+            1085.9,
+            682.5
+          ],
+          [
+            1085.9,
+            712.4
+          ],
+          [
+            1085.9,
+            671.4
+          ],
+          [
+            1085.9,
+            837.0
+          ],
+          [
+            1085.9,
+            827.3
+          ],
+          [
+            1085.9,
+            831.9
+          ],
+          [
+            1085.9,
+            859.2
+          ],
+          [
+            1893.7,
+            1013.4
+          ],
+          [
+            1893.7,
+            1016.0
+          ],
+          [
+            1893.7,
+            1047.3
+          ],
+          [
+            1893.7,
+            998.1
+          ],
+          [
+            1893.7,
+            1101.3
+          ],
+          [
+            1893.7,
+            1183.9
+          ],
+          [
+            1893.7,
+            1169.1
+          ],
+          [
+            1893.7,
+            1069.9
+          ],
+          [
+            1893.7,
+            1120.0
+          ],
+          [
+            1893.7,
+            1030.1
+          ],
+          [
+            1893.7,
+            1226.0
+          ],
+          [
+            1893.7,
+            1197.8
+          ],
+          [
+            1893.7,
+            1222.6
+          ],
+          [
+            1893.7,
+            1169.0
+          ],
+          [
+            1893.7,
+            1141.8
+          ],
+          [
+            1893.7,
+            1174.4
+          ],
+          [
+            1893.7,
+            1163.4
+          ],
+          [
+            6260.0,
+            1720.6
+          ],
+          [
+            6260.0,
+            2804.9
+          ],
+          [
+            6260.0,
+            4758.3
+          ],
+          [
+            6260.0,
+            3549.5
+          ],
+          [
+            6260.0,
+            4136.0
+          ],
+          [
+            6260.0,
+            3148.4
+          ],
+          [
+            6260.0,
+            4614.2
+          ],
+          [
+            6260.0,
+            4023.3
+          ],
+          [
+            6260.0,
+            4676.4
+          ],
+          [
+            6260.0,
+            4161.6
+          ],
+          [
+            6260.0,
+            5178.2
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/9_2025"
+      },
+      {
+        "level": "9",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 25,
+        "win_rate": 0.0,
+        "best": 1048.9,
+        "best_x": 888.9,
+        "stuck_frac": 0.045,
+        "causes": {
+          "Stall": 18,
+          "Bomb": 169,
+          "Enemy": 213
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0066,
+        "train_time_s": 65.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.72,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          19,
+          0,
+          0,
+          1,
+          7,
+          22,
+          70,
+          92,
+          189,
+          0
+        ],
+        "death_cluster_entropy": 0.603,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            578.5,
+            175.0
+          ],
+          [
+            886.7,
+            410.4
+          ],
+          [
+            937.8,
+            672.1
+          ],
+          [
+            974.8,
+            706.9
+          ],
+          [
+            974.8,
+            766.1
+          ],
+          [
+            974.8,
+            875.0
+          ],
+          [
+            974.8,
+            860.9
+          ],
+          [
+            974.8,
+            877.0
+          ],
+          [
+            1011.9,
+            943.6
+          ],
+          [
+            1011.9,
+            866.7
+          ],
+          [
+            1011.9,
+            934.8
+          ],
+          [
+            1011.9,
+            899.7
+          ],
+          [
+            1011.9,
+            860.0
+          ],
+          [
+            1011.9,
+            877.9
+          ],
+          [
+            1011.9,
+            913.8
+          ],
+          [
+            1011.9,
+            921.2
+          ],
+          [
+            1011.9,
+            924.9
+          ],
+          [
+            1011.9,
+            940.6
+          ],
+          [
+            1011.9,
+            895.0
+          ],
+          [
+            1011.9,
+            947.0
+          ],
+          [
+            1011.9,
+            908.7
+          ],
+          [
+            1011.9,
+            907.8
+          ],
+          [
+            1011.9,
+            917.5
+          ],
+          [
+            1011.9,
+            939.2
+          ],
+          [
+            1048.9,
+            930.2
+          ],
+          [
+            1048.9,
+            874.4
+          ],
+          [
+            1048.9,
+            902.0
+          ],
+          [
+            1048.9,
+            945.9
+          ],
+          [
+            1048.9,
+            900.0
+          ],
+          [
+            1048.9,
+            927.2
+          ],
+          [
+            1048.9,
+            865.0
+          ],
+          [
+            1048.9,
+            913.8
+          ],
+          [
+            1048.9,
+            911.9
+          ],
+          [
+            1048.9,
+            921.8
+          ],
+          [
+            1048.9,
+            765.0
+          ],
+          [
+            1048.9,
+            928.1
+          ],
+          [
+            1048.9,
+            900.4
+          ],
+          [
+            1048.9,
+            718.6
+          ],
+          [
+            1048.9,
+            959.1
+          ],
+          [
+            1048.9,
+            824.6
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/9_31337"
+      }
+    ],
+    "10": [
+      {
+        "level": "10",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 25,
+        "win_rate": 0.0,
+        "best": 970.8,
+        "best_x": 730.8,
+        "stuck_frac": 0.02,
+        "causes": {
+          "Stall": 8,
+          "Bomb": 392
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0046,
+        "train_time_s": 51.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.556,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          13,
+          8,
+          0,
+          2,
+          53,
+          203,
+          0,
+          121,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.517,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            521.5,
+            193.2
+          ],
+          [
+            521.5,
+            328.3
+          ],
+          [
+            521.5,
+            513.8
+          ],
+          [
+            600.0,
+            517.8
+          ],
+          [
+            600.0,
+            481.1
+          ],
+          [
+            600.0,
+            407.8
+          ],
+          [
+            600.0,
+            468.2
+          ],
+          [
+            638.5,
+            580.3
+          ],
+          [
+            638.5,
+            605.0
+          ],
+          [
+            698.5,
+            643.2
+          ],
+          [
+            698.5,
+            607.2
+          ],
+          [
+            698.5,
+            664.6
+          ],
+          [
+            698.5,
+            653.8
+          ],
+          [
+            698.5,
+            671.8
+          ],
+          [
+            698.5,
+            670.6
+          ],
+          [
+            698.5,
+            657.6
+          ],
+          [
+            698.5,
+            654.9
+          ],
+          [
+            698.5,
+            668.6
+          ],
+          [
+            698.5,
+            623.2
+          ],
+          [
+            698.5,
+            630.3
+          ],
+          [
+            698.5,
+            663.9
+          ],
+          [
+            698.5,
+            630.5
+          ],
+          [
+            698.5,
+            672.6
+          ],
+          [
+            698.5,
+            668.5
+          ],
+          [
+            970.8,
+            688.2
+          ],
+          [
+            970.8,
+            729.4
+          ],
+          [
+            970.8,
+            848.2
+          ],
+          [
+            970.8,
+            827.3
+          ],
+          [
+            970.8,
+            859.1
+          ],
+          [
+            970.8,
+            906.3
+          ],
+          [
+            970.8,
+            970.8
+          ],
+          [
+            970.8,
+            970.8
+          ],
+          [
+            970.8,
+            933.7
+          ],
+          [
+            970.8,
+            933.7
+          ],
+          [
+            970.8,
+            943.5
+          ],
+          [
+            970.8,
+            933.5
+          ],
+          [
+            970.8,
+            902.3
+          ],
+          [
+            970.8,
+            929.8
+          ],
+          [
+            970.8,
+            936.5
+          ],
+          [
+            970.8,
+            943.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/10_1234"
+      },
+      {
+        "level": "10",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 11,
+        "win_rate": 0.0,
+        "best": 1030.8,
+        "best_x": 730.8,
+        "stuck_frac": 0.0425,
+        "causes": {
+          "Bomb": 382,
+          "Stall": 17,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1154,
+        "train_time_s": 74.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.6,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          8,
+          12,
+          23,
+          38,
+          29,
+          34,
+          0,
+          256,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.546,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            560.0,
+            210.3
+          ],
+          [
+            651.5,
+            350.7
+          ],
+          [
+            930.8,
+            529.0
+          ],
+          [
+            930.8,
+            578.7
+          ],
+          [
+            930.8,
+            669.2
+          ],
+          [
+            930.8,
+            626.8
+          ],
+          [
+            930.8,
+            675.8
+          ],
+          [
+            930.8,
+            629.2
+          ],
+          [
+            930.8,
+            691.8
+          ],
+          [
+            930.8,
+            654.8
+          ],
+          [
+            1030.8,
+            786.8
+          ],
+          [
+            1030.8,
+            800.5
+          ],
+          [
+            1030.8,
+            903.8
+          ],
+          [
+            1030.8,
+            756.6
+          ],
+          [
+            1030.8,
+            765.1
+          ],
+          [
+            1030.8,
+            667.8
+          ],
+          [
+            1030.8,
+            940.2
+          ],
+          [
+            1030.8,
+            859.8
+          ],
+          [
+            1030.8,
+            897.2
+          ],
+          [
+            1030.8,
+            766.6
+          ],
+          [
+            1030.8,
+            731.5
+          ],
+          [
+            1030.8,
+            840.6
+          ],
+          [
+            1030.8,
+            834.3
+          ],
+          [
+            1030.8,
+            802.5
+          ],
+          [
+            1030.8,
+            902.9
+          ],
+          [
+            1030.8,
+            724.0
+          ],
+          [
+            1030.8,
+            932.2
+          ],
+          [
+            1030.8,
+            764.8
+          ],
+          [
+            1030.8,
+            792.5
+          ],
+          [
+            1030.8,
+            858.5
+          ],
+          [
+            1030.8,
+            895.2
+          ],
+          [
+            1030.8,
+            962.8
+          ],
+          [
+            1030.8,
+            871.4
+          ],
+          [
+            1030.8,
+            832.6
+          ],
+          [
+            1030.8,
+            894.8
+          ],
+          [
+            1030.8,
+            970.5
+          ],
+          [
+            1030.8,
+            1004.8
+          ],
+          [
+            1030.8,
+            982.8
+          ],
+          [
+            1030.8,
+            935.7
+          ],
+          [
+            1030.8,
+            961.5
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/10_2025"
+      },
+      {
+        "level": "10",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 10,
+        "win_rate": 0.0,
+        "best": 1060.8,
+        "best_x": 730.8,
+        "stuck_frac": 0.26,
+        "causes": {
+          "Stall": 104,
+          "Bomb": 296
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3077,
+        "train_time_s": 72.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.593,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          44,
+          9,
+          0,
+          8,
+          13,
+          61,
+          2,
+          263,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.481,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            483.1,
+            154.3
+          ],
+          [
+            970.8,
+            412.0
+          ],
+          [
+            1030.8,
+            668.9
+          ],
+          [
+            1030.8,
+            675.5
+          ],
+          [
+            1030.8,
+            626.5
+          ],
+          [
+            1030.8,
+            731.2
+          ],
+          [
+            1030.8,
+            787.8
+          ],
+          [
+            1030.8,
+            993.8
+          ],
+          [
+            1030.8,
+            779.7
+          ],
+          [
+            1060.8,
+            1014.8
+          ],
+          [
+            1060.8,
+            860.8
+          ],
+          [
+            1060.8,
+            867.8
+          ],
+          [
+            1060.8,
+            927.1
+          ],
+          [
+            1060.8,
+            934.3
+          ],
+          [
+            1060.8,
+            903.5
+          ],
+          [
+            1060.8,
+            837.7
+          ],
+          [
+            1060.8,
+            1002.5
+          ],
+          [
+            1060.8,
+            879.9
+          ],
+          [
+            1060.8,
+            791.4
+          ],
+          [
+            1060.8,
+            484.2
+          ],
+          [
+            1060.8,
+            873.8
+          ],
+          [
+            1060.8,
+            909.8
+          ],
+          [
+            1060.8,
+            697.0
+          ],
+          [
+            1060.8,
+            876.0
+          ],
+          [
+            1060.8,
+            777.5
+          ],
+          [
+            1060.8,
+            893.5
+          ],
+          [
+            1060.8,
+            707.7
+          ],
+          [
+            1060.8,
+            743.6
+          ],
+          [
+            1060.8,
+            877.5
+          ],
+          [
+            1060.8,
+            722.7
+          ],
+          [
+            1060.8,
+            843.8
+          ],
+          [
+            1060.8,
+            969.3
+          ],
+          [
+            1060.8,
+            883.5
+          ],
+          [
+            1060.8,
+            728.9
+          ],
+          [
+            1060.8,
+            990.5
+          ],
+          [
+            1060.8,
+            923.2
+          ],
+          [
+            1060.8,
+            966.3
+          ],
+          [
+            1060.8,
+            920.1
+          ],
+          [
+            1060.8,
+            986.5
+          ],
+          [
+            1060.8,
+            861.1
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/10_31337"
+      }
+    ],
+    "11": [
+      {
+        "level": "11",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 36,
+        "win_rate": 0.0,
+        "best": 1585.0,
+        "best_x": 406.2,
+        "stuck_frac": 0.1525,
+        "causes": {
+          "Bomb": 323,
+          "Stall": 61,
+          "Enemy": 13,
+          "Timeout": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 55.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.315,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          20,
+          52,
+          43,
+          122,
+          163,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.601,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            796.2,
+            249.1
+          ],
+          [
+            796.2,
+            396.5
+          ],
+          [
+            796.2,
+            466.9
+          ],
+          [
+            796.2,
+            679.5
+          ],
+          [
+            796.2,
+            709.6
+          ],
+          [
+            796.2,
+            725.9
+          ],
+          [
+            796.2,
+            672.2
+          ],
+          [
+            796.2,
+            752.6
+          ],
+          [
+            796.2,
+            679.1
+          ],
+          [
+            796.2,
+            749.2
+          ],
+          [
+            796.2,
+            783.1
+          ],
+          [
+            796.2,
+            741.9
+          ],
+          [
+            796.2,
+            706.2
+          ],
+          [
+            1242.5,
+            793.9
+          ],
+          [
+            1242.5,
+            787.8
+          ],
+          [
+            1302.5,
+            911.1
+          ],
+          [
+            1302.5,
+            1090.4
+          ],
+          [
+            1302.5,
+            1012.8
+          ],
+          [
+            1302.5,
+            1013.8
+          ],
+          [
+            1302.5,
+            1114.2
+          ],
+          [
+            1302.5,
+            1116.6
+          ],
+          [
+            1302.5,
+            1039.6
+          ],
+          [
+            1302.5,
+            1114.4
+          ],
+          [
+            1302.5,
+            895.6
+          ],
+          [
+            1302.5,
+            1146.0
+          ],
+          [
+            1302.5,
+            1023.1
+          ],
+          [
+            1302.5,
+            1050.8
+          ],
+          [
+            1302.5,
+            933.0
+          ],
+          [
+            1302.5,
+            1051.4
+          ],
+          [
+            1302.5,
+            1016.4
+          ],
+          [
+            1376.2,
+            1218.2
+          ],
+          [
+            1376.2,
+            1008.6
+          ],
+          [
+            1376.2,
+            1005.4
+          ],
+          [
+            1376.2,
+            1111.9
+          ],
+          [
+            1476.2,
+            1276.0
+          ],
+          [
+            1585.0,
+            979.4
+          ],
+          [
+            1585.0,
+            938.1
+          ],
+          [
+            1585.0,
+            1117.6
+          ],
+          [
+            1585.0,
+            976.1
+          ],
+          [
+            1585.0,
+            976.4
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/11_1234"
+      },
+      {
+        "level": "11",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 17,
+        "win_rate": 0.0,
+        "best": 1343.8,
+        "best_x": 343.8,
+        "stuck_frac": 0.0125,
+        "causes": {
+          "Bomb": 384,
+          "Stall": 5,
+          "Enemy": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 55.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.243,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          96,
+          65,
+          0,
+          239,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.411,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            443.8,
+            160.6
+          ],
+          [
+            443.8,
+            251.9
+          ],
+          [
+            443.8,
+            284.0
+          ],
+          [
+            593.8,
+            452.5
+          ],
+          [
+            593.8,
+            438.4
+          ],
+          [
+            593.8,
+            373.9
+          ],
+          [
+            593.8,
+            439.2
+          ],
+          [
+            593.8,
+            469.2
+          ],
+          [
+            593.8,
+            531.5
+          ],
+          [
+            593.8,
+            440.2
+          ],
+          [
+            593.8,
+            578.8
+          ],
+          [
+            653.8,
+            569.8
+          ],
+          [
+            1243.8,
+            717.1
+          ],
+          [
+            1243.8,
+            679.6
+          ],
+          [
+            1243.8,
+            646.4
+          ],
+          [
+            1243.8,
+            794.0
+          ],
+          [
+            1343.8,
+            894.2
+          ],
+          [
+            1343.8,
+            792.0
+          ],
+          [
+            1343.8,
+            869.9
+          ],
+          [
+            1343.8,
+            777.5
+          ],
+          [
+            1343.8,
+            841.2
+          ],
+          [
+            1343.8,
+            672.0
+          ],
+          [
+            1343.8,
+            707.6
+          ],
+          [
+            1343.8,
+            796.4
+          ],
+          [
+            1343.8,
+            802.9
+          ],
+          [
+            1343.8,
+            698.0
+          ],
+          [
+            1343.8,
+            779.8
+          ],
+          [
+            1343.8,
+            1062.0
+          ],
+          [
+            1343.8,
+            978.9
+          ],
+          [
+            1343.8,
+            753.0
+          ],
+          [
+            1343.8,
+            867.5
+          ],
+          [
+            1343.8,
+            855.6
+          ],
+          [
+            1343.8,
+            760.8
+          ],
+          [
+            1343.8,
+            726.2
+          ],
+          [
+            1343.8,
+            913.5
+          ],
+          [
+            1343.8,
+            886.1
+          ],
+          [
+            1343.8,
+            897.5
+          ],
+          [
+            1343.8,
+            841.2
+          ],
+          [
+            1343.8,
+            962.1
+          ],
+          [
+            1343.8,
+            704.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/11_2025"
+      },
+      {
+        "level": "11",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 38,
+        "win_rate": 0.0,
+        "best": 1077.5,
+        "best_x": 406.2,
+        "stuck_frac": 0.0725,
+        "causes": {
+          "Stall": 29,
+          "Enemy": 47,
+          "Bomb": 324
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0624,
+        "train_time_s": 38.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.071,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          328,
+          48,
+          5,
+          13,
+          6,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.281,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            771.2,
+            280.6
+          ],
+          [
+            771.2,
+            432.1
+          ],
+          [
+            771.2,
+            364.4
+          ],
+          [
+            771.2,
+            446.6
+          ],
+          [
+            771.2,
+            508.4
+          ],
+          [
+            801.2,
+            454.8
+          ],
+          [
+            801.2,
+            639.6
+          ],
+          [
+            801.2,
+            588.0
+          ],
+          [
+            801.2,
+            680.4
+          ],
+          [
+            801.2,
+            502.0
+          ],
+          [
+            801.2,
+            508.8
+          ],
+          [
+            801.2,
+            603.9
+          ],
+          [
+            801.2,
+            449.2
+          ],
+          [
+            801.2,
+            505.4
+          ],
+          [
+            801.2,
+            724.1
+          ],
+          [
+            801.2,
+            526.1
+          ],
+          [
+            801.2,
+            576.0
+          ],
+          [
+            801.2,
+            446.0
+          ],
+          [
+            922.5,
+            511.0
+          ],
+          [
+            922.5,
+            440.1
+          ],
+          [
+            952.5,
+            618.6
+          ],
+          [
+            952.5,
+            492.4
+          ],
+          [
+            952.5,
+            433.9
+          ],
+          [
+            952.5,
+            716.8
+          ],
+          [
+            952.5,
+            454.2
+          ],
+          [
+            952.5,
+            605.6
+          ],
+          [
+            952.5,
+            599.8
+          ],
+          [
+            952.5,
+            738.1
+          ],
+          [
+            952.5,
+            675.8
+          ],
+          [
+            952.5,
+            518.6
+          ],
+          [
+            952.5,
+            602.6
+          ],
+          [
+            952.5,
+            540.9
+          ],
+          [
+            952.5,
+            652.0
+          ],
+          [
+            952.5,
+            775.1
+          ],
+          [
+            1015.0,
+            620.9
+          ],
+          [
+            1015.0,
+            636.1
+          ],
+          [
+            1015.0,
+            645.1
+          ],
+          [
+            1077.5,
+            663.9
+          ],
+          [
+            1077.5,
+            611.1
+          ],
+          [
+            1077.5,
+            897.9
+          ]
+        ],
+        "dir": "runs/gasweep/bomberman/killer/p10g40_b8cc78_anneal_factor-0.3/11_31337"
+      }
+    ]
+  }
+}
