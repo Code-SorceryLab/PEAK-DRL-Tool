@@ -40,7 +40,7 @@ from .sensors import read_sensors
 from .trainer import THUMB_SCALE, _encode
 
 GAMES = ["mario", "meatboy", "bomberman"]
-ORDER = ["novice", "clumsy", "experienced", "good", "speedrunner", "killer", "collector"]
+ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
 TAG = "p10g40"              # the full sweep's run tag (rays, pop 10, 40 generations)
 FPS = 30
 THUMB_EVERY = 4             # a small view refreshes every 4th frame (about 7 per second)

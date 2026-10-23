@@ -41,7 +41,7 @@ def test_meatboy_has_no_kill_events():
 
 def test_only_the_bad_player_slips_and_slips_last():
     act = (1, False, 0)
-    good = Hands(PERSONAS["good"], np.random.default_rng(0))
+    good = Hands(PERSONAS["experienced"], np.random.default_rng(0))
     assert all(good(act) == act for _ in range(500))
     clumsy = Hands(PERSONAS["clumsy"], np.random.default_rng(0))
     out = [clumsy(act) != act for _ in range(6000)]
