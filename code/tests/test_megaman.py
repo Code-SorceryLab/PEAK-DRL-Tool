@@ -10,7 +10,7 @@ os.environ["PEAK_MM1_ATTEMPTS"] = "1"              # one attempt per episode, ex
 
 from code.games import megaman_enemies as en
 from code.games.megaman_core import MegamanCore
-from code.neuro.adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter
+from code.neuro.adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter, validate_level
 from code.neuro.evolution import GAConfig
 from code.neuro.net import make_net
 from code.neuro.sensors import read_sensors, sensor_dim
@@ -214,3 +214,21 @@ def test_a_win_pays_for_energy_left():
     loss = a._attempt_fitness(False)
     a.core.player.hp = hp_max
     assert a._attempt_fitness(False) == loss          # a loss is not paid for energy: no reward for hiding
+
+
+@pytest.mark.parametrize("name, start", [("CutMan-4-Shaft-Gap", (86, 42)), ("CutMan-1-Street-Hole", (54, 123))])
+def test_practice_section_is_playable_but_not_a_stage_leg(name, start):
+    from code.games.megaman_mutants import Stage
+    from code.neuro.relay import stage_legs
+    core = MegamanCore(level=name)
+    ts = core.tile_size
+    assert (int((core.player.x + core.player.width / 2) // ts), int((core.player.y + core.player.height - 1) // ts)) == start
+    assert name not in [n for n, _ in core.levels]  # telemetry names sections from core.levels
+    assert name not in [leg.level for leg in stage_legs("CutMan")]
+    assert name not in [n for n, _ in Stage("CutMan").sections]
+    assert name not in list_levels("megaman")
+    assert name in list_levels("megaman", include_disabled=True)
+    validate_level("megaman", name)                 # the trainer accepts it by name
+    core.won = True
+    core.reset()                                     # a won practice section does not advance into the campaign
+    assert core.level_entry()["id"] == name

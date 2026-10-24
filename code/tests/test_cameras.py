@@ -50,13 +50,13 @@ def test_the_camera_loops_through_the_levels(tmp_path):
 
 def test_a_frame_carries_the_picture_and_for_the_watched_camera_the_rays(tmp_path):
     root = str(tmp_path)
-    _run(root, "mario", "good", "Mario1-1", 1, wins=1)
-    cam = Camera("mario", "good", pick_models("mario", "good", root))
+    _run(root, "mario", "experienced", "Mario1-1", 1, wins=1)
+    cam = Camera("mario", "experienced", pick_models("mario", "experienced", root))
     for _ in range(5):
         cam.step()
     thumb = frame_message(cam, full=False)
     full = frame_message(cam, full=True)
-    assert thumb["jpg"] and thumb["level"] == "Mario1-1" and thumb["persona"] == "good" and "rays" not in thumb
+    assert thumb["jpg"] and thumb["level"] == "Mario1-1" and thumb["persona"] == "experienced" and "rays" not in thumb
     assert len(full["jpg"]) > len(thumb["jpg"]) and full["rays"] and len(full["sensors"]) > 0
 
 

@@ -1,0 +1,3062 @@
+{
+  "game": "megaman",
+  "stage": "CutMan",
+  "base_file": "megaman/01_cutman.txt",
+  "mutants": [
+    {
+      "id": "s1-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 8-tile wall across the route at (38, 125)",
+      "parameter": {
+        "tiles": 8,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 38,
+        "row": 124
+      },
+      "cells": [
+        [
+          38,
+          120,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          121,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          122,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          123,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          124,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          125,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          126,
+          ".",
+          "#"
+        ],
+        [
+          38,
+          127,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s1-remove_ladder",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "remove_ladder",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "The 6-tile ladder in column 53, rows 124-129, removed",
+      "parameter": {
+        "col": 53,
+        "top": 124,
+        "bottom": 129,
+        "tiles": 6
+      },
+      "location": {
+        "col": 53,
+        "row": 127
+      },
+      "cells": [
+        [
+          53,
+          124,
+          "H",
+          "."
+        ],
+        [
+          53,
+          125,
+          "H",
+          "."
+        ],
+        [
+          53,
+          126,
+          "H",
+          "."
+        ],
+        [
+          53,
+          127,
+          "H",
+          "."
+        ],
+        [
+          53,
+          128,
+          "H",
+          "."
+        ],
+        [
+          53,
+          129,
+          "H",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s1-widen_gap",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The ledge at (31, 126) cut back by 2 tiles, widening the gap to its right",
+      "parameter": {
+        "col": 31,
+        "row": 126,
+        "width": 2,
+        "side": "right",
+        "tiles": 2
+      },
+      "location": {
+        "col": 31,
+        "row": 126
+      },
+      "cells": [
+        [
+          30,
+          126,
+          "#",
+          "."
+        ],
+        [
+          31,
+          126,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s1-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (24, 125)",
+      "parameter": {
+        "col": 24,
+        "row": 125,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 24,
+        "row": 125
+      },
+      "cells": [
+        [
+          24,
+          125,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 454.0
+      }
+    },
+    {
+      "id": "s1-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (38, 123), on the route",
+      "parameter": {
+        "col": 38,
+        "row": 123,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 38,
+        "row": 123
+      },
+      "cells": [
+        [
+          38,
+          123,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s1-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'b' at (21, 125) removed",
+      "parameter": {
+        "col": 21,
+        "row": 125,
+        "glyph": "b"
+      },
+      "location": {
+        "col": 21,
+        "row": 125
+      },
+      "cells": [
+        [
+          21,
+          125,
+          "b",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s1-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (38, 125) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 38,
+        "row": 125,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 38,
+        "row": 125
+      },
+      "cells": [
+        [
+          38,
+          125,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s1-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-1-Street",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (38, 132), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 38,
+        "row": 132,
+        "depth": 2
+      },
+      "location": {
+        "col": 38,
+        "row": 132
+      },
+      "cells": [
+        [
+          38,
+          132,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s2-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 14-tile wall across the route at (57, 99)",
+      "parameter": {
+        "tiles": 14,
+        "wall": "horizontal"
+      },
+      "location": {
+        "col": 55,
+        "row": 99
+      },
+      "cells": [
+        [
+          48,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          49,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          50,
+          99,
+          "H",
+          "#"
+        ],
+        [
+          51,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          52,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          53,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          54,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          55,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          56,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          57,
+          99,
+          "H",
+          "#"
+        ],
+        [
+          58,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          59,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          60,
+          99,
+          ".",
+          "#"
+        ],
+        [
+          61,
+          99,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s2-remove_ladder",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "remove_ladder",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "The 5-tile ladder in column 50, rows 113-117, removed",
+      "parameter": {
+        "col": 50,
+        "top": 113,
+        "bottom": 117,
+        "tiles": 5
+      },
+      "location": {
+        "col": 50,
+        "row": 115
+      },
+      "cells": [
+        [
+          50,
+          113,
+          "H",
+          "."
+        ],
+        [
+          50,
+          114,
+          "H",
+          "."
+        ],
+        [
+          50,
+          115,
+          "H",
+          "."
+        ],
+        [
+          50,
+          116,
+          "H",
+          "."
+        ],
+        [
+          50,
+          117,
+          "H",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s2-widen_gap",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "widen_gap",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "The ledge at (57, 88) cut back by 2 tiles, widening the gap to its left",
+      "parameter": {
+        "col": 57,
+        "row": 88,
+        "width": 2,
+        "side": "left",
+        "tiles": 4
+      },
+      "location": {
+        "col": 58,
+        "row": 88
+      },
+      "cells": [
+        [
+          57,
+          88,
+          "#",
+          "."
+        ],
+        [
+          57,
+          89,
+          "#",
+          "."
+        ],
+        [
+          58,
+          88,
+          "#",
+          "."
+        ],
+        [
+          58,
+          89,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s2-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (59, 87)",
+      "parameter": {
+        "col": 59,
+        "row": 87,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 59,
+        "row": 87
+      },
+      "cells": [
+        [
+          59,
+          87,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 453.0
+      }
+    },
+    {
+      "id": "s2-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (57, 95), on the route",
+      "parameter": {
+        "col": 57,
+        "row": 95,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 57,
+        "row": 95
+      },
+      "cells": [
+        [
+          57,
+          95,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s2-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'j' at (57, 108) removed",
+      "parameter": {
+        "col": 57,
+        "row": 108,
+        "glyph": "j"
+      },
+      "location": {
+        "col": 57,
+        "row": 108
+      },
+      "cells": [
+        [
+          57,
+          108,
+          "j",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s2-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (57, 96) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 57,
+        "row": 96,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 57,
+        "row": 96
+      },
+      "cells": [
+        [
+          57,
+          96,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s2-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-2-Climb",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (60, 110), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 60,
+        "row": 110,
+        "depth": 2
+      },
+      "location": {
+        "col": 60,
+        "row": 110
+      },
+      "cells": [
+        [
+          60,
+          110,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s3-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 15-tile wall across the route at (74, 67)",
+      "parameter": {
+        "tiles": 15,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 74,
+        "row": 67
+      },
+      "cells": [
+        [
+          74,
+          60,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          61,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          62,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          63,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          64,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          65,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          66,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          67,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          68,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          69,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          70,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          71,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          72,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          73,
+          ".",
+          "#"
+        ],
+        [
+          74,
+          74,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s3-remove_ladder",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "remove_ladder",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "The 6-tile ladder in column 85, rows 64-69, removed",
+      "parameter": {
+        "col": 85,
+        "top": 64,
+        "bottom": 69,
+        "tiles": 6
+      },
+      "location": {
+        "col": 85,
+        "row": 67
+      },
+      "cells": [
+        [
+          85,
+          64,
+          "H",
+          "."
+        ],
+        [
+          85,
+          65,
+          "H",
+          "."
+        ],
+        [
+          85,
+          66,
+          "H",
+          "."
+        ],
+        [
+          85,
+          67,
+          "H",
+          "."
+        ],
+        [
+          85,
+          68,
+          "H",
+          "."
+        ],
+        [
+          85,
+          69,
+          "H",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s3-widen_gap",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The ledge at (73, 68) cut back by 2 tiles, widening the gap to its right",
+      "parameter": {
+        "col": 73,
+        "row": 68,
+        "width": 2,
+        "side": "right",
+        "tiles": 14
+      },
+      "location": {
+        "col": 73,
+        "row": 68
+      },
+      "cells": [
+        [
+          72,
+          68,
+          "#",
+          "."
+        ],
+        [
+          72,
+          69,
+          "#",
+          "."
+        ],
+        [
+          72,
+          70,
+          "#",
+          "."
+        ],
+        [
+          72,
+          71,
+          "#",
+          "."
+        ],
+        [
+          72,
+          72,
+          "#",
+          "."
+        ],
+        [
+          72,
+          73,
+          "#",
+          "."
+        ],
+        [
+          72,
+          74,
+          "#",
+          "."
+        ],
+        [
+          73,
+          68,
+          "#",
+          "."
+        ],
+        [
+          73,
+          69,
+          "#",
+          "."
+        ],
+        [
+          73,
+          70,
+          "#",
+          "."
+        ],
+        [
+          73,
+          71,
+          "#",
+          "."
+        ],
+        [
+          73,
+          72,
+          "#",
+          "."
+        ],
+        [
+          73,
+          73,
+          "#",
+          "."
+        ],
+        [
+          73,
+          74,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s3-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (72, 67)",
+      "parameter": {
+        "col": 72,
+        "row": 67,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 72,
+        "row": 67
+      },
+      "cells": [
+        [
+          72,
+          67,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 454.0
+      }
+    },
+    {
+      "id": "s3-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (75, 65), on the route",
+      "parameter": {
+        "col": 75,
+        "row": 65,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 75,
+        "row": 65
+      },
+      "cells": [
+        [
+          75,
+          65,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s3-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'f' at (71, 67) removed",
+      "parameter": {
+        "col": 71,
+        "row": 67,
+        "glyph": "f"
+      },
+      "location": {
+        "col": 71,
+        "row": 67
+      },
+      "cells": [
+        [
+          71,
+          67,
+          "f",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s3-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (75, 67) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 75,
+        "row": 67,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 75,
+        "row": 67
+      },
+      "cells": [
+        [
+          75,
+          67,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s3-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-3-Ledges",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (71, 72), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 71,
+        "row": 72,
+        "depth": 2
+      },
+      "location": {
+        "col": 71,
+        "row": 72
+      },
+      "cells": [
+        [
+          71,
+          72,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s4-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 2-tile wall across the route at (91, 42)",
+      "parameter": {
+        "tiles": 2,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 91,
+        "row": 42
+      },
+      "cells": [
+        [
+          91,
+          41,
+          ".",
+          "#"
+        ],
+        [
+          91,
+          42,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s4-remove_ladder",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "remove_ladder",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "The 5-tile ladder in column 84, rows 52-56, removed",
+      "parameter": {
+        "col": 84,
+        "top": 52,
+        "bottom": 56,
+        "tiles": 5
+      },
+      "location": {
+        "col": 84,
+        "row": 54
+      },
+      "cells": [
+        [
+          84,
+          52,
+          "H",
+          "."
+        ],
+        [
+          84,
+          53,
+          "H",
+          "."
+        ],
+        [
+          84,
+          54,
+          "H",
+          "."
+        ],
+        [
+          84,
+          55,
+          "H",
+          "."
+        ],
+        [
+          84,
+          56,
+          "H",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s4-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (87, 56)",
+      "parameter": {
+        "col": 87,
+        "row": 56,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 87,
+        "row": 56
+      },
+      "cells": [
+        [
+          87,
+          56,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s4-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (91, 42), on the route",
+      "parameter": {
+        "col": 91,
+        "row": 42,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 91,
+        "row": 42
+      },
+      "cells": [
+        [
+          91,
+          42,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s4-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'v' at (83, 22) removed",
+      "parameter": {
+        "col": 83,
+        "row": 22,
+        "glyph": "v"
+      },
+      "location": {
+        "col": 83,
+        "row": 22
+      },
+      "cells": [
+        [
+          83,
+          22,
+          "v",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s4-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (90, 42) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 90,
+        "row": 42,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 90,
+        "row": 42
+      },
+      "cells": [
+        [
+          90,
+          42,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s4-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-4-Shaft",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (83, 42), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 83,
+        "row": 42,
+        "depth": 2
+      },
+      "location": {
+        "col": 83,
+        "row": 42
+      },
+      "cells": [
+        [
+          83,
+          42,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s5-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 6-tile wall across the route at (105, 5)",
+      "parameter": {
+        "tiles": 6,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 105,
+        "row": 3
+      },
+      "cells": [
+        [
+          105,
+          0,
+          ".",
+          "#"
+        ],
+        [
+          105,
+          1,
+          ".",
+          "#"
+        ],
+        [
+          105,
+          2,
+          ".",
+          "#"
+        ],
+        [
+          105,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          105,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          105,
+          5,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s5-widen_gap",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The ledge at (111, 6) cut back by 2 tiles, widening the gap to its right",
+      "parameter": {
+        "col": 111,
+        "row": 6,
+        "width": 2,
+        "side": "right",
+        "tiles": 18
+      },
+      "location": {
+        "col": 111,
+        "row": 6
+      },
+      "cells": [
+        [
+          110,
+          6,
+          "#",
+          "."
+        ],
+        [
+          110,
+          7,
+          "#",
+          "."
+        ],
+        [
+          110,
+          8,
+          "#",
+          "."
+        ],
+        [
+          110,
+          9,
+          "#",
+          "."
+        ],
+        [
+          110,
+          10,
+          "#",
+          "."
+        ],
+        [
+          110,
+          11,
+          "#",
+          "."
+        ],
+        [
+          110,
+          12,
+          "#",
+          "."
+        ],
+        [
+          110,
+          13,
+          "#",
+          "."
+        ],
+        [
+          110,
+          14,
+          "#",
+          "."
+        ],
+        [
+          111,
+          6,
+          "#",
+          "."
+        ],
+        [
+          111,
+          7,
+          "#",
+          "."
+        ],
+        [
+          111,
+          8,
+          "#",
+          "."
+        ],
+        [
+          111,
+          9,
+          "#",
+          "."
+        ],
+        [
+          111,
+          10,
+          "#",
+          "."
+        ],
+        [
+          111,
+          11,
+          "#",
+          "."
+        ],
+        [
+          111,
+          12,
+          "#",
+          "."
+        ],
+        [
+          111,
+          13,
+          "#",
+          "."
+        ],
+        [
+          111,
+          14,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s5-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (106, 5)",
+      "parameter": {
+        "col": 106,
+        "row": 5,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 106,
+        "row": 5
+      },
+      "cells": [
+        [
+          106,
+          5,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 454.0
+      }
+    },
+    {
+      "id": "s5-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (106, 3), on the route",
+      "parameter": {
+        "col": 106,
+        "row": 3,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 106,
+        "row": 3
+      },
+      "cells": [
+        [
+          106,
+          3,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s5-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'b' at (118, 4) removed",
+      "parameter": {
+        "col": 118,
+        "row": 4,
+        "glyph": "b"
+      },
+      "location": {
+        "col": 118,
+        "row": 4
+      },
+      "cells": [
+        [
+          118,
+          4,
+          "b",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s5-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (106, 5) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 106,
+        "row": 5,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 106,
+        "row": 5
+      },
+      "cells": [
+        [
+          106,
+          5,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s5-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-5-Rooftop",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (106, 8), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 106,
+        "row": 8,
+        "depth": 2
+      },
+      "location": {
+        "col": 106,
+        "row": 8
+      },
+      "cells": [
+        [
+          106,
+          8,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s6-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 12-tile wall across the route at (116, 45)",
+      "parameter": {
+        "tiles": 12,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 116,
+        "row": 51
+      },
+      "cells": [
+        [
+          116,
+          45,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          46,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          47,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          48,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          49,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          50,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          51,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          52,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          53,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          54,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          55,
+          ".",
+          "#"
+        ],
+        [
+          116,
+          56,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s6-remove_ladder",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "remove_ladder",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The 6-tile ladder in column 114, rows 43-48, removed",
+      "parameter": {
+        "col": 114,
+        "top": 43,
+        "bottom": 48,
+        "tiles": 6
+      },
+      "location": {
+        "col": 114,
+        "row": 46
+      },
+      "cells": [
+        [
+          114,
+          43,
+          "H",
+          "."
+        ],
+        [
+          114,
+          44,
+          "H",
+          "."
+        ],
+        [
+          114,
+          45,
+          "H",
+          "."
+        ],
+        [
+          114,
+          46,
+          "H",
+          "."
+        ],
+        [
+          114,
+          47,
+          "H",
+          "."
+        ],
+        [
+          114,
+          48,
+          "H",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s6-widen_gap",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The ledge at (115, 43) cut back by 2 tiles, widening the gap to its left",
+      "parameter": {
+        "col": 115,
+        "row": 43,
+        "width": 2,
+        "side": "left",
+        "tiles": 4
+      },
+      "location": {
+        "col": 116,
+        "row": 43
+      },
+      "cells": [
+        [
+          115,
+          43,
+          "#",
+          "."
+        ],
+        [
+          115,
+          44,
+          "#",
+          "."
+        ],
+        [
+          116,
+          43,
+          "#",
+          "."
+        ],
+        [
+          116,
+          44,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 449.6
+      }
+    },
+    {
+      "id": "s6-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (116, 45), on the route",
+      "parameter": {
+        "col": 116,
+        "row": 45,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 116,
+        "row": 45
+      },
+      "cells": [
+        [
+          116,
+          45,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s6-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'e' at (126, 55) removed",
+      "parameter": {
+        "col": 126,
+        "row": 55,
+        "glyph": "e"
+      },
+      "location": {
+        "col": 126,
+        "row": 55
+      },
+      "cells": [
+        [
+          126,
+          55,
+          "e",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s6-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (116, 45) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 116,
+        "row": 45,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 116,
+        "row": 45
+      },
+      "cells": [
+        [
+          116,
+          45,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s6-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-6-Descent",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (115, 33), 2 tiles deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 115,
+        "row": 33,
+        "depth": 2
+      },
+      "location": {
+        "col": 115,
+        "row": 33
+      },
+      "cells": [
+        [
+          115,
+          33,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s7-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-7-Corridor",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 4-tile wall across the route at (168, 54)",
+      "parameter": {
+        "tiles": 4,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 168,
+        "row": 53
+      },
+      "cells": [
+        [
+          168,
+          51,
+          ".",
+          "#"
+        ],
+        [
+          168,
+          52,
+          ".",
+          "#"
+        ],
+        [
+          168,
+          53,
+          ".",
+          "#"
+        ],
+        [
+          168,
+          54,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s7-add_hazard",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-7-Corridor",
+      "family": "level",
+      "operator": "add_hazard",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Spikes on the floor at (168, 54)",
+      "parameter": {
+        "col": 168,
+        "row": 54,
+        "glyph": "^"
+      },
+      "location": {
+        "col": 168,
+        "row": 54
+      },
+      "cells": [
+        [
+          168,
+          54,
+          ".",
+          "^"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 453.2
+      }
+    },
+    {
+      "id": "s7-add_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-7-Corridor",
+      "family": "level",
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Blader added at (168, 52), on the route",
+      "parameter": {
+        "col": 168,
+        "row": 52,
+        "glyph": "b",
+        "enemy": "Blader"
+      },
+      "location": {
+        "col": 168,
+        "row": 52
+      },
+      "cells": [
+        [
+          168,
+          52,
+          ".",
+          "b"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s7-remove_enemy",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-7-Corridor",
+      "family": "level",
+      "operator": "remove_enemy",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "The enemy 'w' at (157, 54) removed",
+      "parameter": {
+        "col": 157,
+        "row": 54,
+        "glyph": "w"
+      },
+      "location": {
+        "col": 157,
+        "row": 54
+      },
+      "cells": [
+        [
+          157,
+          54,
+          "w",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4
+      }
+    },
+    {
+      "id": "s7-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-7-Corridor",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (168, 54) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 168,
+        "row": 54,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 168,
+        "row": 54
+      },
+      "cells": [
+        [
+          168,
+          54,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s8-seal_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-8-Boss",
+      "family": "level",
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A 10-tile wall across the route at (198, 54)",
+      "parameter": {
+        "tiles": 10,
+        "wall": "vertical"
+      },
+      "location": {
+        "col": 198,
+        "row": 52
+      },
+      "cells": [
+        [
+          198,
+          47,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          48,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          49,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          50,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          51,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          52,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          53,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          54,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          55,
+          ".",
+          "#"
+        ],
+        [
+          198,
+          56,
+          ".",
+          "#"
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null
+      }
+    },
+    {
+      "id": "s8-cosmetic_tile",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-8-Boss",
+      "family": "level",
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at (199, 54) written as ' ' instead of '.': the same tile",
+      "parameter": {
+        "col": 199,
+        "row": 54,
+        "from": ".",
+        "to": " "
+      },
+      "location": {
+        "col": 199,
+        "row": 54
+      },
+      "cells": [
+        [
+          199,
+          54,
+          ".",
+          " "
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": true,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "s8-off_route",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": "CutMan-8-Boss",
+      "family": "level",
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The solid tile at (199, 58), 1 tile deep inside a wall, hollowed out",
+      "parameter": {
+        "col": 199,
+        "row": 58,
+        "depth": 1
+      },
+      "location": {
+        "col": 199,
+        "row": 58
+      },
+      "cells": [
+        [
+          199,
+          58,
+          "#",
+          "."
+        ]
+      ],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": "level.txt",
+      "config": null,
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "same_game": false,
+        "same_routes": true
+      }
+    },
+    {
+      "id": "m-jump_velocity_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.jump_velocity changed from 4.871 to 4.14",
+      "parameter": {
+        "key": "player.jump_velocity",
+        "from": 4.871,
+        "to": 4.14
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.jump_velocity": 4.14
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 458.4,
+        "jump_cells": 2,
+        "drift_cells": 2
+      }
+    },
+    {
+      "id": "m-jump_velocity_low",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "jump_velocity_low",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "player.jump_velocity changed from 4.871 to 3.41",
+      "parameter": {
+        "key": "player.jump_velocity",
+        "from": 4.871,
+        "to": 3.41
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.jump_velocity": 3.41
+      },
+      "checks": {
+        "exit_reachable": false,
+        "route_cost_before": 452.4,
+        "route_cost_after": null,
+        "jump_cells": 1,
+        "drift_cells": 2
+      }
+    },
+    {
+      "id": "m-jump_velocity_up",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "jump_velocity_up",
+      "class": "degrading",
+      "direction": "easier",
+      "description": "player.jump_velocity changed from 4.871 to 5.358",
+      "parameter": {
+        "key": "player.jump_velocity",
+        "from": 4.871,
+        "to": 5.358
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.jump_velocity": 5.358
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    },
+    {
+      "id": "m-gravity_up",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "gravity_up",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.gravity changed from 0.25 to 0.3125",
+      "parameter": {
+        "key": "player.gravity",
+        "from": 0.25,
+        "to": 0.3125
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.gravity": 0.3125
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 458.4,
+        "jump_cells": 2,
+        "drift_cells": 2
+      }
+    },
+    {
+      "id": "m-run_speed_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "run_speed_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.run_speed changed from 1.375 to 1.1",
+      "parameter": {
+        "key": "player.run_speed",
+        "from": 1.375,
+        "to": 1.1
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.run_speed": 1.1
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    },
+    {
+      "id": "m-air_speed_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "air_speed_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.air_speed changed from 1.3125 to 1.05",
+      "parameter": {
+        "key": "player.air_speed",
+        "from": 1.3125,
+        "to": 1.05
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.air_speed": 1.05
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 453.0,
+        "jump_cells": 3,
+        "drift_cells": 2
+      }
+    },
+    {
+      "id": "m-ladder_speed_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "ladder_speed_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.ladder_speed changed from 0.75 to 0.5",
+      "parameter": {
+        "key": "player.ladder_speed",
+        "from": 0.75,
+        "to": 0.5
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.ladder_speed": 0.5
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    },
+    {
+      "id": "m-energy_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "energy_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "player.hp changed from 28 to 20",
+      "parameter": {
+        "key": "player.hp",
+        "from": 28,
+        "to": 20
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "player.hp": 20
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    },
+    {
+      "id": "m-max_shots_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "max_shots_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "buster.max_shots changed from 3 to 1",
+      "parameter": {
+        "key": "buster.max_shots",
+        "from": 3,
+        "to": 1
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "buster.max_shots": 1
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    },
+    {
+      "id": "m-time_limit_down",
+      "game": "megaman",
+      "stage": "CutMan",
+      "section": null,
+      "family": "mechanics",
+      "operator": "time_limit_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "time_limit changed from 300 to 240",
+      "parameter": {
+        "key": "time_limit",
+        "from": 300,
+        "to": 240
+      },
+      "location": null,
+      "cells": [],
+      "base_file": "megaman/01_cutman.txt",
+      "level_file": null,
+      "config": {
+        "time_limit": 240
+      },
+      "checks": {
+        "exit_reachable": true,
+        "route_cost_before": 452.4,
+        "route_cost_after": 452.4,
+        "jump_cells": 3,
+        "drift_cells": 3
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "section": "CutMan-4-Shaft",
+      "operator": "widen_gap",
+      "reason": "the route crosses no gap here"
+    },
+    {
+      "section": "CutMan-5-Rooftop",
+      "operator": "remove_ladder",
+      "reason": "the only ladders on the route here are shared with the next section or the one before"
+    },
+    {
+      "section": "CutMan-6-Descent",
+      "operator": "add_hazard",
+      "reason": "the route crosses no flat floor three tiles wide here"
+    },
+    {
+      "section": "CutMan-7-Corridor",
+      "operator": "remove_ladder",
+      "reason": "the route uses no ladder here"
+    },
+    {
+      "section": "CutMan-7-Corridor",
+      "operator": "widen_gap",
+      "reason": "the route crosses no gap here"
+    },
+    {
+      "section": "CutMan-7-Corridor",
+      "operator": "off_route",
+      "reason": "no wall thick enough to hide a change in"
+    },
+    {
+      "section": "CutMan-8-Boss",
+      "operator": "remove_ladder",
+      "reason": "the route uses no ladder here"
+    },
+    {
+      "section": "CutMan-8-Boss",
+      "operator": "widen_gap",
+      "reason": "the route crosses no gap here"
+    },
+    {
+      "section": "CutMan-8-Boss",
+      "operator": "add_hazard",
+      "reason": "the route crosses no flat floor three tiles wide here"
+    },
+    {
+      "section": "CutMan-8-Boss",
+      "operator": "add_enemy",
+      "reason": "no open cell on the route at least four tiles from every other enemy"
+    },
+    {
+      "section": "CutMan-8-Boss",
+      "operator": "remove_enemy",
+      "reason": "no enemy in this section"
+    }
+  ]
+}
