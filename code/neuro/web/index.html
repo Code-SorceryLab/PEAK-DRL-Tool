@@ -38,7 +38,7 @@
       background: var(--deck-2); background-clip: padding-box;
     }
 
-    #h_game { padding: 3px 8px 3px 12px; font: 700 13px/1.2 var(--pixel); text-transform: capitalize; }
+    #h_game { padding: 3px 8px 3px 12px; font: 700 18px/1.2 var(--pixel); text-transform: capitalize; }
     /* the feed is a black screen in a frame; the script's manual-mode glow is dropped, the frame lights instead */
     #bezel { background-color: #000; box-shadow: none; }
     #feedwrap:has(#b_manual[aria-pressed="true"]) #bezel { border-image-source: var(--frame-hi); }
@@ -52,18 +52,19 @@
     #f_status, .status-text, #census div span { text-transform: lowercase; }
     #f_status { font: 600 14px/1 var(--ui); }
     #connlabel { font: 600 12.5px/1 var(--ui); }
-    #census b { font: 700 14px/1 var(--pixel); font-variant-numeric: tabular-nums; }
+    #census b { font: 700 18px/1 var(--pixel); font-variant-numeric: tabular-nums; }
     #census div span { font: 500 12.5px/1.3 var(--ui); color: var(--dim); }
-    #census b.c-WON::before, #census b.c-DEAD::before {          /* a coin per win, a broken heart per death */
-      content: ""; display: inline-block; height: 13px; margin-right: 4px; vertical-align: -2px;
+    #census b.c-WON::before, #census b.c-DEAD::before, #census b.c-STUCK::before {   /* coin, skull, hourglass */
+      content: ""; display: inline-block; height: 14px; margin-right: 5px; vertical-align: -2px;
       background: center / contain no-repeat; image-rendering: pixelated; }
     #census b.c-WON::before { aspect-ratio: 1; background-image: var(--i-coin); }
-    #census b.c-DEAD::before { aspect-ratio: 13 / 12; background-image: var(--i-heartbreak); }
+    #census b.c-DEAD::before { aspect-ratio: 12 / 11; background-image: var(--i-skull); }
+    #census b.c-STUCK::before { aspect-ratio: 10 / 13; background-image: var(--i-hourglass); }
     #sensors > div:not(.flex) { font: 600 12.5px/1.3 var(--ui); color: var(--dim); }
     #sensors abbr, #sensors output { font-size: 12px; }
     .spec .canvas-wrap { border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; background-color: #000; box-shadow: none; }
     .spec.watched .canvas-wrap { border-image-source: var(--frame-hi); }
-    .spec b { font: 700 13px/1 var(--pixel); }
+    .spec b { font: 700 18px/1 var(--pixel); }
     .spec .status-text, .spec .nx, .spec .nf { font-size: 12px; }
     .spec .frozen { font: 600 12px/1.2 var(--ui); }
   }
@@ -136,24 +137,24 @@
       </h1>
 
       <div class="metric-group items-center pr-8 border-r-2 border-zinc-700">
-        <span class="label">Generation</span>
-        <b id="s_gen" class="live-num num text-[32px] text-red-500">0</b>
+        <span class="label"><i class="ico dna"></i> Generation</span>
+        <b id="s_gen" class="live-num num text-[36px] text-red-500">0</b>
       </div>
 
       <div class="flex flex-wrap items-center gap-6">
-        <div class="metric-group"><span class="label"><i class="ico up"></i> Level best</span><b class="live-num num text-[18px]" id="s_lvb">–</b></div>
-        <div class="metric-group"><span class="label">Last gen</span><b class="live-num num text-[18px]" id="s_lgb">–</b></div>
+        <div class="metric-group"><span class="label"><i class="ico star"></i> Level best</span><b class="live-num num text-[18px]" id="s_lvb">–</b></div>
+        <div class="metric-group"><span class="label"><i class="ico up"></i> Last gen</span><b class="live-num num text-[18px]" id="s_lgb">–</b></div>
         <div class="metric-group"><span class="label">Average</span><b class="live-num num text-[18px] text-zinc-400" id="s_avg">–</b></div>
         <div class="metric-group hidden md:flex" title="Share of the last 10 generations' episodes that reached the goal">
           <span class="label"><i class="ico coin"></i> Win rate · 10 gens</span><b class="live-num num text-[18px] text-zinc-400" id="s_wr">–</b></div>
         <div class="metric-group hidden sm:flex" title="Simulation steps per second across the whole population">
-          <span class="label">Steps / s</span><b class="live-num num text-[18px] text-zinc-400" id="s_sps">–</b></div>
+          <span class="label"><i class="ico bolt"></i> Steps / s</span><b class="live-num num text-[18px] text-zinc-400" id="s_sps">–</b></div>
       </div>
     </div>
 
     <div class="flex items-center gap-2 flex-wrap" role="group" aria-label="View toggles">
-      <button id="b_turbo" class="btn" aria-pressed="false" title="Max speed: only the watched specimen keeps streaming frames">Turbo <kbd>T</kbd></button>
-      <button id="b_sensors" class="btn on" aria-pressed="true" title="Draw the agent's raycasts on the feed">Sensors <kbd>S</kbd></button>
+      <button id="b_turbo" class="btn" aria-pressed="false" title="Max speed: only the watched specimen keeps streaming frames"><i class="ico bolt"></i>Turbo <kbd>T</kbd></button>
+      <button id="b_sensors" class="btn on" aria-pressed="true" title="Draw the agent's raycasts on the feed"><i class="ico eye"></i>Sensors <kbd>S</kbd></button>
       <button id="b_hitboxes" class="btn" aria-pressed="false" title="Show collision boxes">Hitboxes <kbd>H</kbd></button>
       <button id="b_grid" class="btn" aria-pressed="false" title="Show the tile grid">Grid <kbd>G</kbd></button>
 
@@ -172,7 +173,7 @@
       <section id="feedwrap" class="frame flex flex-col relative p-4">
         <div class="flex items-end justify-between mb-3 gap-4 flex-wrap">
           <div class="flex items-baseline gap-3 flex-wrap">
-            <h2>Watched specimen</h2>
+            <h2><i class="ico eye"></i>Watched specimen</h2>
             <b id="f_env" class="num text-[18px]">#01</b>
             <b id="f_status" class="c-RUNNING" role="status" aria-live="polite">RUNNING</b>
             <span id="f_firstwin" class="hidden banner"><i class="ico coin"></i>First win · gen <span></span></span>
@@ -197,7 +198,7 @@
             <i id="p_fill" class="absolute inset-y-0 left-0 bg-red-500 transition-[width] duration-300" style="width:0%"></i>
             <i id="p_best" class="absolute inset-y-0 w-[3px] bg-sky-400" style="left:0%"></i>
           </div>
-          <b id="p_pct" class="live-num num text-[16px] w-16 text-right">0 %</b>
+          <b id="p_pct" class="live-num num text-[18px] w-16 text-right">0 %</b>
           <span class="label hidden sm:inline">of level</span>
         </div>
         <div id="f_meta" class="mt-2 font-mono text-[13px] text-zinc-400 tabular-nums flex flex-wrap gap-x-4 gap-y-1">
@@ -215,7 +216,7 @@
       <section id="wallwrap" class="frame flex flex-col p-4">
         <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div class="flex items-baseline gap-3 flex-wrap">
-            <h2>Population</h2>
+            <h2><i class="ico dna"></i>Population</h2>
             <span class="font-mono text-[13px] text-zinc-400">gen <span id="wallgen" class="text-zinc-200">0</span></span>
             <span id="turbonote" class="hidden text-[13px] font-semibold text-amber-400">Turbo: only the watched specimen streams</span>
           </div>
@@ -228,7 +229,7 @@
       <!-- Results ledger -->
       <section id="resultswrap" class="frame flex flex-col pb-2">
         <div class="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2>Results ledger</h2>
+          <h2><i class="ico trophy"></i>Results ledger</h2>
           <span id="census2" class="label"></span>
         </div>
         <div id="resultsbox" class="max-h-[300px] overflow-auto">
@@ -257,7 +258,7 @@
       <!-- Telemetry -->
       <section id="sensorcard" class="frame p-4">
         <div class="flex items-center justify-between mb-4">
-          <h2>Telemetry</h2>
+          <h2><i class="ico gamepad"></i>Telemetry</h2>
           <small id="sensewho" class="label">specimen 01</small>
         </div>
         <div id="sensors" class="flex flex-col gap-1.5"></div>
@@ -266,7 +267,7 @@
       <!-- Fitness -->
       <section class="frame p-4">
         <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <h2>Fitness trajectory</h2>
+          <h2><i class="ico star"></i>Fitness trajectory</h2>
           <!-- swatches match the colours the chart script draws with -->
           <div class="flex items-center gap-3 label">
             <span class="flex items-center gap-1.5"><i class="w-2 h-2 bg-[#ef4444]"></i> Best</span>
@@ -282,7 +283,7 @@
 
       <!-- Run configuration -->
       <section class="frame p-4">
-        <div class="mb-4"><h2>Run configuration</h2></div>
+        <div class="mb-4"><h2><i class="ico gear"></i>Run configuration</h2></div>
         <div class="grid grid-cols-2 gap-y-4 gap-x-4">
           <div class="flex flex-col gap-1"><label for="k_levelsel" class="label">Level</label><select id="k_levelsel"></select></div>
           <div class="flex flex-col gap-1"><span class="label">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-200">real-time</b></div>
@@ -812,5 +813,6 @@ function connect(){
 }
 connect();
 </script>
+  <div class="bricks" aria-hidden="true"></div>
 </body>
 </html>

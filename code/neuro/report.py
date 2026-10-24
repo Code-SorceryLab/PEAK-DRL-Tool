@@ -503,7 +503,7 @@ CSS = THEME_CSS + """
     background:var(--night);border-bottom:3px solid var(--line);
     padding:12px clamp(12px,3vw,32px);margin:0 calc(-1 * clamp(12px,3vw,32px)) 20px}
   nav .brand{display:flex;align-items:baseline;gap:14px}
-  nav .brand em{font:700 1.15rem/1 var(--pixel);font-style:normal;color:var(--dim)}
+  nav .brand em{font:700 18px/1 var(--pixel);font-style:normal;color:var(--dim)}
   nav .links{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
   nav a .gicon{height:1.3em;margin:0;vertical-align:middle}
 
@@ -620,9 +620,9 @@ CSS = THEME_CSS + """
   .cardhead:focus-visible{outline:none}
   .cardfoot{display:flex;align-items:center;gap:10px;padding:8px 16px 10px;border-top:2px solid var(--deck-3)}
   .cardfoot small{font:400 .78rem var(--ui);color:var(--dim)}
-  .lvlname{font:700 1.05rem/1.2 var(--pixel);color:var(--ink);margin-bottom:8px;display:flex;
+  .lvlname{font:700 18px/1.2 var(--pixel);color:var(--ink);margin-bottom:8px;display:flex;
     justify-content:space-between;align-items:center;gap:8px}
-  .bignum{font:700 2.1rem/1 var(--pixel)}
+  .bignum{font:700 36px/1 var(--pixel)}
   .bignum .ico{--ico:.8em;margin-right:8px;vertical-align:0}
   .stat .lbl .ico{--ico:13px;vertical-align:-2px}
   .lvlsub{font:400 .8rem var(--ui);color:var(--dim);margin-top:6px}
@@ -634,7 +634,7 @@ CSS = THEME_CSS + """
   .dhead{display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:2;background:var(--deck);
     padding:12px 0 10px;border-bottom:2px solid var(--line)}
   .dhead .lvlname{margin:0;flex:1;font-size:1.15rem;justify-content:flex-start;flex-wrap:wrap}
-  .dhead .bignum{font-size:1.6rem}
+  .dhead .bignum{font-size:27px}
   .dhead em.mode{font:600 .75rem/1.3 var(--ui);font-style:normal;padding:0 6px;border:2px solid currentColor;
     vertical-align:middle}
   .dhead em.rays{color:#f87858} .dhead em.grid{color:var(--blue)}   /* MODE_COLOR */
@@ -650,7 +650,7 @@ CSS = THEME_CSS + """
   .stats.headline .stat .val{font-size:1.3rem}
   .stat{padding:10px 12px;min-width:0}
   .stat .lbl{font:500 .83rem/1.3 var(--ui);color:var(--dim)}
-  .stat .val{font:700 1.1rem/1.25 var(--pixel);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .val{font:700 18px/1.25 var(--pixel);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .stat .sub{font:400 .78rem var(--ui);color:var(--mute);margin-top:2px}
   .viz{padding:12px 14px;margin-top:10px}
   .viz .vt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:600 .9rem/1.35 var(--ui);
@@ -735,7 +735,7 @@ CSS = THEME_CSS + """
   .ablmode h3{font-size:1.3rem;color:var(--c)}
   .ablmode p{font:400 .9rem/1.5 var(--ui);color:var(--dim);margin:6px 0 10px}
   .ablscore{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:0 0 22px;font:500 .9rem var(--ui);color:var(--dim)}
-  .ablscore b{font:700 1.6rem/1 var(--pixel);color:var(--c)}
+  .ablscore b{font:700 27px/1 var(--pixel);color:var(--c)}
   .ablscore .sep{color:var(--mute);font-weight:400}
   .dual{display:grid;grid-template-columns:minmax(110px,160px) 1fr;gap:4px 14px;align-items:center}
   .dual .lv{font:600 .88rem var(--dense);color:var(--ink);grid-row:span 2;align-self:center}
@@ -975,7 +975,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         _stat("Dominant cause", _cause_name(row["dominant_cause"]), icon="heartbreak", sub=
               f"{row['dominant_cause_frac']:.0%} of deaths"),
         _stat("Death spread", f"{row.get('death_cluster_entropy_mean', 0):.2f}",
-              "0 = one hotspot · 1 = everywhere"),
+              "0 = one hotspot · 1 = everywhere", icon="skull"),
     ]
     stats = [
         _stat("Best gen", bg_full, "where the record genome appeared"),
@@ -1147,7 +1147,8 @@ PERSONA_COLOR = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", THEME_CSS))
 
 
 def _persona_chip(persona: str) -> str:
-    return f'<span class="pchip" style="--c:{PERSONA_COLOR.get(persona, "var(--dim)")}">{persona.capitalize()}</span>'
+    return (f'<span class="pchip" style="--c:{PERSONA_COLOR.get(persona, "var(--dim)")}">'
+            f'<i class="ico p-{persona}"></i> {persona.capitalize()}</span>')
 
 
 def _tag_label(tag: str | None, data: dict) -> str:
@@ -1386,7 +1387,7 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
         for pi, (pname, pdata) in enumerate(personas.items()):
             vid = f"{cid}_{pi}"
             tabs.append(f'<button class="tab" role="tab" aria-selected="false" aria-controls="{vid}" data-view="{vid}" '
-                        f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--dim)")}">{pname.capitalize()}</button>')
+                        f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--dim)")}"><i class="ico p-{pname}"></i>{pname.capitalize()}</button>')
             cell_map = pdata.get("cells", {})
             cards = "".join(_card(game, pname, r, cell_map.get(r["level"], []), th, tag)
                             for r in pdata["levels"])
@@ -1932,16 +1933,16 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
     links = "" if page != "report" else "".join(
         f'<a href="report.html#g_{g}">{_game_icon(g)}{g.capitalize()}</a>' for g in games)
     if has_runs and page == "report":
-        links += '<a href="report.html#g_runs">Runs</a>'
+        links += '<a href="report.html#g_runs"><i class="ico dna"></i>Runs</a>'
     if page != "report":
         links += '<a class="doc" href="report.html">Balance report</a>'
     links += ('<a class="doc" href="ablation.html"' + (' aria-current="page"' if page == "ablation" else "")
-              + '>Sensor ablation</a>')
+              + '><i class="ico eye"></i>Sensor ablation</a>')
     links += ('<a class="doc" href="gasweep.html"' + (' aria-current="page"' if page == "gasweep" else "")
-              + '>GA sweep</a>')
+              + '><i class="ico gear"></i>GA sweep</a>')
     links += ('<a class="doc" href="instructions.html"' + (' aria-current="page"' if page == "instructions" else "")
-              + '>Instructions</a>')
-    links += '<a class="doc wall" href="/wall" target="_top">▶ Replay wall</a>'   # served only: menu 12 starts it
+              + '><i class="ico qblock"></i>Instructions</a>')
+    links += '<a class="doc wall" href="/wall" target="_top"><i class="ico gamepad"></i>Replay wall</a>'   # served only: menu 12 starts it
     if page == "report":
         links += '<button class="navbtn" id="toggleAll" type="button">Collapse all</button>'
     return f"""
@@ -2052,6 +2053,7 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
   same GA settings, so numbers are comparable across sweeps as long as the GA config is unchanged.</p>
 </main>
 <footer style="max-width:860px;margin:22px auto">PEAK engine · instructions</footer>
+<div class="bricks" aria-hidden="true"></div>
 </body></html>"""
 
 
@@ -2329,7 +2331,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
   {score}
   {sections}
   <footer>Generated by PEAK from the sensor-ablation probes on disk. Regenerate from the menu (12) after a new ablation.</footer>
-</main><script>{JS}</script></body></html>"""
+</main><div class="bricks" aria-hidden="true"></div><script>{JS}</script></body></html>"""
 
 
 
@@ -2717,7 +2719,7 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
     <p class="caption" style="margin-top:8px">One-factor-at-a-time isolates each knob's effect but ignores interactions —
     the recommended config is the per-axis composite; <code>--confirm</code> probes it once to check.</p></details>
   <footer>Generated by PEAK from the GA-sweep cells on disk. Regenerate from the menu (12) after a new sweep.</footer>
-</main><script>{JS}</script></body></html>"""
+</main><div class="bricks" aria-hidden="true"></div><script>{JS}</script></body></html>"""
 
 
 def build(balance_dir: str) -> dict[str, str]:
@@ -2757,7 +2759,7 @@ def build(balance_dir: str) -> dict[str, str]:
   {GLOSSARY}
   {body}
   <footer>Generated by PEAK from the balance probes on disk. Regenerate from the menu (12) after a new sweep.</footer>
-</main><script>{JS}</script></body></html>"""
+</main><div class="bricks" aria-hidden="true"></div><script>{JS}</script></body></html>"""
     pages = {"report.html": report,
              "instructions.html": _instructions_page(list(games), logo),
              "ablation.html": _ablation_page(flat_abl, logo, stamp),

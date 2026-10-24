@@ -33,7 +33,7 @@
     .cam.empty:hover { border-image-source: var(--frame); }
   }
   /* the script tints a flash inline with Tailwind's old sky (won) or red (any other end): show them as the theme's */
-  #wall > div:not(.eyebrow) { font: 700 14px/1.2 var(--pixel); color: var(--ink); }   /* the game names down the side */
+  #wall > div:not(.eyebrow) { font: 700 18px/1.2 var(--pixel); color: var(--ink); }   /* the game names down the side */
   #sensors > div:not(.flex) { font: 600 12.5px/1.3 var(--ui); color: var(--dim); }
   #sensors abbr, #sensors output { font-size: 12px; }
   #sensors .bg-zinc-900 { background-color: var(--deck-2); }   /* the script's tracks are the panel colour now: raise them */
@@ -88,7 +88,7 @@
 </header>
 
 <main id="wallpage" class="flex-1 overflow-auto px-5 py-4">
-  <div id="wall" class="grid gap-3" style="grid-template-columns: 90px repeat(6, minmax(0, 1fr))"></div>
+  <div id="wall" class="grid gap-3" style="grid-template-columns: 116px repeat(6, minmax(0, 1fr))"></div>
   <p class="mt-4 max-w-[80ch] text-[13.5px] text-zinc-400">Each view replays the saved models of one game and persona, level after level, with the best of three seeds per level. Click a view to watch it with its rays; Esc or a click outside closes it.</p>
 </main>
 <iframe id="frame" title="Balance pages" class="flex-1 w-full border-0 hidden bg-zinc-950"></iframe>
@@ -138,7 +138,7 @@ function buildWall(list){
   for (const p of ORDER){
     const h = document.createElement("div");
     h.className = "flex items-center gap-1.5 eyebrow min-w-0 overflow-hidden whitespace-nowrap";
-    h.innerHTML = `<i class="w-2 h-2 rounded-full" style="background:${colors[p]}"></i>${p}`;
+    h.innerHTML = `<i class="ico p-${p}"></i><span style="color:${colors[p]}">${p}</span>`;
     wall.appendChild(h);
   }
   let game = null;
@@ -291,5 +291,6 @@ function connect(){
 }
 connect();
 </script>
+  <div class="bricks" aria-hidden="true"></div>
 </body>
 </html>

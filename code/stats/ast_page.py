@@ -102,15 +102,15 @@ def _game_section(game: str, res: dict) -> str:
     order = [v for v in ["base"] + sorted(k for k in res if k.startswith("base @")) + [m["id"] for m in ms] if v in res]
     if not order:
         return (f'<section class="frame stripe g-{game} game" id="{game}"><h2>{esc(title)}</h2>'
-                f'<p class="empty">No playtests yet. Run Agent Playtest (menu 20) or '
+                f'<p class="empty"><i class="ico qblock"></i> No playtests yet. Run Agent Playtest (menu 20) or '
                 f'<code>python -m code.neuro.ast_eval play --game {game}</code>.</p></section>')
     effort = sorted({k for v in order for k in ((res[v].get("agents") or {}).get("effort") or {})})
-    head = "".join(f'<th class="n">{esc(k)}</th>' for k in effort)
+    head = "".join(f'<th class="n">{_ICON_OF.get(k, "")}{esc(k)}</th>' for k in effort)
     body = [_row(v, res[v]["agents"], by_id.get(v), verdict(by_id[v], res[v])[1] if v in by_id else "none",
                  effort, _signals(res[v])) for v in order if res[v].get("agents")]
     personas = sorted({p for v in order for p in ((res[v].get("agents") or {}).get("win_rate") or {}) if p != "pooled"})
     grid = "".join(
-        f'<tr><td>{esc(p)}</td>' + "".join(_pips(((res[v].get("agents") or {}).get("win_rate") or {}).get(p)) for v in order) + "</tr>"
+        f'<tr><td><i class="ico p-{esc(p)}"></i> {esc(p)}</td>' + "".join(_pips(((res[v].get("agents") or {}).get("win_rate") or {}).get(p)) for v in order) + "</tr>"
         for p in personas)
     humans = [(v, res[v]["humans"]) for v in order if res[v].get("humans")]
     human_html = ""
@@ -132,8 +132,8 @@ def _game_section(game: str, res: dict) -> str:
             '<i class="k-clu"></i>death cluster (3 tiles) <i class="k-cell"></i>the mutated tiles</p>'
             f'<script type="application/json" id="data-{game}">{json.dumps(data, separators=(",", ":"))}</script>'
             f'<div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
-            f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n">Time to finish</th><th>Death cluster</th><th>Top cause</th>'
-            f'<th class="n">Tiles covered</th>{head}<th>Signals</th></tr>{"".join(body)}</table></div>'
+            f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n"><i class="ico hourglass"></i> Time to finish</th><th><i class="ico skull"></i> Death cluster</th>'
+            f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Signals</th></tr>{"".join(body)}</table></div>'
             + (f'<h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips"><tr><th>Persona</th>'
                + "".join(f"<th>{esc(v)}</th>" for v in order) + f"</tr>{grid}</table></div>" if personas and game != "megaman" else "")
             + human_html + seg_html + "</section>")
@@ -145,6 +145,10 @@ def _human_row(v: str, h: dict) -> str:
     return (f'<tr><td>{esc(v)}</td><td class="n">{h["attempts"]}</td><td class="n">{w}/{n}</td><td>{esc(players)}</td>'
             f'<td class="n">{_pct(h["progress_median"])}</td><td>{_where(h["death_cluster"])}</td>'
             f"<td>{esc(next(iter(h['causes']), ''))}</td></tr>")
+
+
+_ICON_OF = {k: f'<i class="ico {v}"></i> ' for k, v in {"jumps": "up", "kills": "sword", "pickups": "gem",
+             "bombs placed": "bomb", "wall jumps": "up", "damage taken": "heartbreak"}.items()}
 
 
 def _pips(wn) -> str:
@@ -177,7 +181,7 @@ def _segments(order: list[str], res: dict) -> str:
                        f'<td><b>{ended}</b> ended here<div class="label">{_num(per["time_median"], ".0f", " s")}, '
                        f'damage {_num(per["damage_median"])}</div></td>')
         rows.append(f"<tr><td>{esc(s)}</td>{''.join(tds)}</tr>")
-    return (f'<h3>Segments</h3><div class="scroll"><table class="data"><tr><th>Segment</th>{head}</tr>'
+    return (f'<h3><i class="ico flag"></i>Segments</h3><div class="scroll"><table class="data"><tr><th>Segment</th>{head}</tr>'
             f'{"".join(rows)}</table></div>')
 
 
@@ -211,14 +215,14 @@ header.top nav { margin-left: auto; display: flex; gap: 8px; }
 .lede { color: var(--dim); max-width: 70ch; margin: 6px 0 0; }
 .board { border-collapse: separate; border-spacing: 6px; width: 100%; table-layout: fixed; }
 .board th { font: 600 12.5px/1.3 var(--ui); color: var(--dim); text-align: left; padding: 0 4px 2px; }
-.board th.g { font: 700 15px/1.2 var(--pixel); padding: 0 10px; box-shadow: inset 4px 0 0 var(--stripe); width: 17%; }
+.board th.g { font: 700 18px/1.2 var(--pixel); padding: 0 10px; box-shadow: inset 4px 0 0 var(--stripe); width: 17%; }
 .board th.g a { color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
 .gicon { height: 24px; image-rendering: pixelated; flex: none; }
-.gletter { display: inline-grid; place-items: center; width: 22px; height: 22px; background: var(--stripe); color: var(--night); font: 700 14px/1 var(--pixel); }
+.gletter { display: inline-grid; place-items: center; width: 22px; height: 22px; background: var(--stripe); color: var(--night); font: 700 18px/1 var(--pixel); }
 .board td.cell { padding: 0; background: var(--deck); }
 .board td.cell a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-decoration: none;
   border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; }
-.board .v { font: 700 17px/1.1 var(--pixel); display: flex; align-items: center; gap: 7px; }
+.board .v { font: 700 18px/1.1 var(--pixel); display: flex; align-items: center; gap: 7px; }
 .board .v .ico { --ico: 18px; }
 .board td.good .v { color: var(--won); }
 .board td.bad .v { color: var(--dead); }
@@ -240,6 +244,7 @@ td.sig.good { color: var(--won); } td.sig.bad { color: var(--dead); } td.sig.non
 .pips td { white-space: nowrap; }
 .pips .ico { --ico: 15px; margin-right: 3px; }
 .empty { color: var(--dim); }
+.empty .ico, td .ico { --ico: 15px; vertical-align: -3px; }
 """
 
 JS = r"""
@@ -298,7 +303,7 @@ def render(results: dict) -> str:
             '<div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
             'or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must play out identically.</p></div>'
-            f'{board(results)}{sections}</main><script>{JS}</script></body></html>')
+            f'{board(results)}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
 
 
 def write(results: dict, path: str) -> str:
