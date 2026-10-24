@@ -216,17 +216,18 @@ def test_a_win_pays_for_energy_left():
     assert a._attempt_fitness(False) == loss          # a loss is not paid for energy: no reward for hiding
 
 
-def test_practice_section_is_playable_but_not_a_stage_leg():
+@pytest.mark.parametrize("name, start", [("CutMan-4-Shaft-Gap", (86, 42)), ("CutMan-1-Street-Hole", (54, 123))])
+def test_practice_section_is_playable_but_not_a_stage_leg(name, start):
     from code.games.megaman_mutants import Stage
     from code.neuro.relay import stage_legs
-    core = MegamanCore(level="CutMan-4-Shaft-Gap")
+    core = MegamanCore(level=name)
     ts = core.tile_size
-    assert (int((core.player.x + core.player.width / 2) // ts), int((core.player.y + core.player.height - 1) // ts)) == (86, 42)
-    assert "CutMan-4-Shaft-Gap" not in [leg.level for leg in stage_legs("CutMan")]
-    assert "CutMan-4-Shaft-Gap" not in [name for name, _ in Stage("CutMan").sections]
-    assert "CutMan-4-Shaft-Gap" not in list_levels("megaman")
-    assert "CutMan-4-Shaft-Gap" in list_levels("megaman", include_disabled=True)
-    validate_level("megaman", "CutMan-4-Shaft-Gap")  # the trainer accepts it by name
+    assert (int((core.player.x + core.player.width / 2) // ts), int((core.player.y + core.player.height - 1) // ts)) == start
+    assert name not in [leg.level for leg in stage_legs("CutMan")]
+    assert name not in [n for n, _ in Stage("CutMan").sections]
+    assert name not in list_levels("megaman")
+    assert name in list_levels("megaman", include_disabled=True)
+    validate_level("megaman", name)                 # the trainer accepts it by name
     core.won = True
     core.reset()                                     # a won practice section does not advance into the campaign
-    assert core.level_entry()["id"] == "CutMan-4-Shaft-Gap"
+    assert core.level_entry()["id"] == name
