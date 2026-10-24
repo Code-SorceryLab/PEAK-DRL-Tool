@@ -51,7 +51,7 @@ def test_indexed_entry_handles_both_entry_shapes():
     Reading only the bare form silently dropped the route/config panels for 6 onward."""
     from code.neuro.report import _indexed_entry, _level_file, _level_grid
     from code.neuro.adapters import list_levels
-    for lvl in list_levels("bomberman"):
+    for lvl in list_levels("bomberman", include_disabled=True):
         entry = _indexed_entry("bomberman", lvl)
         assert entry.get("file", "").endswith(".txt"), f"level {lvl} has no file: {entry}"
         assert _level_file("bomberman", lvl), f"level {lvl} resolved to no path"

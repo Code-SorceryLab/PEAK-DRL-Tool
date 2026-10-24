@@ -54,7 +54,7 @@ def pick_models(game: str, persona: str, root: str = PROBES_ROOT) -> list[tuple[
     """[(level, run dir)] in level order: per level, the seed with the best training record.
     A level without a saved model is left out."""
     out = []
-    for level in list_levels(game):
+    for level in list_levels(game, include_disabled=True):  # every level that has trained agents
         runs = [s for s in map(relay.run_summary, sorted(glob.glob(os.path.join(root, game, persona, TAG, f"{level}_*"))))
                 if s]
         if runs:

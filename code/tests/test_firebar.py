@@ -53,7 +53,7 @@ def test_fire_bar_out_of_reach_is_harmless(tmp_path):
 
 
 def test_world_1_4_is_listed_and_has_fire_bars():
-    assert "Mario1-4" in list_levels("mario")
+    assert "Mario1-4" in list_levels("mario", include_disabled=True)
     adapter = make_adapter("mario", "Mario1-4", max_frames=600, win_bonus=0.0)
     adapter.reset()
     assert len(adapter.core.level_data.firebars) == 7

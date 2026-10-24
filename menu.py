@@ -204,7 +204,8 @@ def get_levels_for_game(game: str) -> list:
         try:
             import yaml
             data = yaml.safe_load(Path(f"code/games/{game}_config.yaml").read_text(encoding="utf-8")) or {}
-            return [str(i) for i in range(len(data.get("levels", [])))]
+            active = data.get("active_levels")  # the AST evaluation level; the others stay loadable by index
+            return [str(i) for i in range(len(data.get("levels", []))) if active is None or i in active]
         except Exception:
             return []
     if game in OWN_LEVEL_FILES:

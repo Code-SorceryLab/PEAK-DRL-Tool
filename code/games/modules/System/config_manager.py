@@ -92,8 +92,9 @@ class ConfigManager:
         if 'defaults' in self.yaml_data:
             self._deep_update(final_config, self.yaml_data['defaults'])
         levels = self.yaml_data.get('levels') or {}
-        if resolved_id in levels and levels[resolved_id]:
-            self._deep_update(final_config, levels[resolved_id])
+        entry = levels.get(resolved_id) or (self.yaml_data.get('disabled_levels') or {}).get(resolved_id)
+        if entry:  # a disabled level still loads by name, it is only off the training list
+            self._deep_update(final_config, entry)
         return final_config
 
     def _deep_update(self, d, u):
