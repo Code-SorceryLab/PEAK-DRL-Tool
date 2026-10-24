@@ -147,9 +147,8 @@ class MegamanCore:
             node[leaf] = value
         with open(LEVELS_PATH, encoding="utf-8") as f:   # {id: {file: ...}} in campaign order
             data = yaml.safe_load(f) or {}
-        self.levels = list((data.get("levels") or {}).items())
-        self._n_campaign = len(self.levels)              # disabled ones (practice sections) follow, playable by name
-        self.levels += list((data.get("disabled_levels") or {}).items())
+        self.levels = list((data.get("levels") or {}).items())   # the stage and its sections (telemetry reads these)
+        self._all_levels = self.levels + list((data.get("disabled_levels") or {}).items())  # + practice, by name only
         self._level_file = level_file                    # an unlisted file (the editor's Play button)
         self.invincible = invincible                     # debug: enemies, shots and spikes do no damage
         ac = self.cfg.get("assets") or {}
@@ -176,14 +175,14 @@ class MegamanCore:
     def level_entry(self, idx: int | None = None) -> dict:
         """Levels are addressed by position in megaman_levels.yaml (menu / --level N)."""
         idx = self._level_idx if idx is None else idx
-        if not 0 <= idx < len(self.levels):
-            raise IndexError(f"megaman level {idx} out of range (0..{len(self.levels) - 1})")
-        name, entry = self.levels[idx]
+        if not 0 <= idx < len(self._all_levels):
+            raise IndexError(f"megaman level {idx} out of range (0..{len(self._all_levels) - 1})")
+        name, entry = self._all_levels[idx]
         return {"id": name, **(entry if isinstance(entry, dict) else {"file": entry})}
 
     def level_index(self, level) -> int:
         """A level id (its name in megaman_levels.yaml) or its position in that list."""
-        names = [name for name, _ in self.levels]
+        names = [name for name, _ in self._all_levels]
         if str(level) in names:
             return names.index(str(level))
         if str(level).isdigit() and int(level) < len(names):
@@ -213,8 +212,8 @@ class MegamanCore:
         return parse_level(rows, self.screen_cols, self.screen_rows, self.tile_size, self.level_file())
 
     def reset(self, *, seed=None, options=None):
-        if self.won and not self._level_file and self._level_idx < self._n_campaign:
-            self._level_idx = (self._level_idx + 1) % self._n_campaign  # beating a level advances to the next (wrapping)
+        if self.won and not self._level_file and self._level_idx < len(self.levels):
+            self._level_idx = (self._level_idx + 1) % len(self.levels)  # beating a level advances to the next (wrapping)
         if seed is not None:
             self._seed = seed
         self.rng = random.Random(self._seed)

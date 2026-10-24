@@ -223,6 +223,7 @@ def test_practice_section_is_playable_but_not_a_stage_leg(name, start):
     core = MegamanCore(level=name)
     ts = core.tile_size
     assert (int((core.player.x + core.player.width / 2) // ts), int((core.player.y + core.player.height - 1) // ts)) == start
+    assert name not in [n for n, _ in core.levels]  # telemetry names sections from core.levels
     assert name not in [leg.level for leg in stage_legs("CutMan")]
     assert name not in [n for n, _ in Stage("CutMan").sections]
     assert name not in list_levels("megaman")
