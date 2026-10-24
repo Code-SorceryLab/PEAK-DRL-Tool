@@ -237,6 +237,8 @@ def main() -> None:
     r.add_argument("--persona", nargs="*", default=None, help="default: all six (Mega Man: each section's own)")
     r.add_argument("--gens", type=int, default=GENS)
     r.add_argument("--workers", type=int, default=None)
+    r.add_argument("--level", nargs="*", default=None,
+                   help="Mega Man: only these sections (default: every section the mutant changes)")
     p = sub.add_parser("play", help="one attempt per agent on the original level and the mutants")
     p.add_argument("--game", required=True, choices=list(EVAL_LEVELS))
     p.add_argument("--variant", nargs="*", default=None, help="base and/or mutant ids (default: all)")
@@ -250,7 +252,7 @@ def main() -> None:
             m = mutant("megaman", args.mutant)
             jobs: dict = {}
             for leg in load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE):
-                if leg.level in (m or {}).get("retrain_levels", []):
+                if leg.level in (m or {}).get("retrain_levels", []) and (not args.level or leg.level in args.level):
                     jobs.setdefault(leg.persona.name, []).append(leg.level)
         else:
             jobs = {p: None for p in args.persona or PERSONA_ORDER}
