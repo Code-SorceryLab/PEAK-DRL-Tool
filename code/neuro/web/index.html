@@ -54,6 +54,11 @@
     #connlabel { font: 600 12.5px/1 var(--ui); }
     #census b { font: 700 14px/1 var(--pixel); font-variant-numeric: tabular-nums; }
     #census div span { font: 500 12.5px/1.3 var(--ui); color: var(--dim); }
+    #census b.c-WON::before, #census b.c-DEAD::before {          /* a coin per win, a broken heart per death */
+      content: ""; display: inline-block; height: 13px; margin-right: 4px; vertical-align: -2px;
+      background: center / contain no-repeat; image-rendering: pixelated; }
+    #census b.c-WON::before { aspect-ratio: 1; background-image: var(--i-coin); }
+    #census b.c-DEAD::before { aspect-ratio: 13 / 12; background-image: var(--i-heartbreak); }
     #sensors > div:not(.flex) { font: 600 12.5px/1.3 var(--ui); color: var(--dim); }
     #sensors abbr, #sensors output { font-size: 12px; }
     .spec .canvas-wrap { border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; background-color: #000; box-shadow: none; }
@@ -136,11 +141,11 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-6">
-        <div class="metric-group"><span class="label">Level best</span><b class="live-num num text-[18px]" id="s_lvb">–</b></div>
+        <div class="metric-group"><span class="label"><i class="ico up"></i> Level best</span><b class="live-num num text-[18px]" id="s_lvb">–</b></div>
         <div class="metric-group"><span class="label">Last gen</span><b class="live-num num text-[18px]" id="s_lgb">–</b></div>
         <div class="metric-group"><span class="label">Average</span><b class="live-num num text-[18px] text-zinc-400" id="s_avg">–</b></div>
         <div class="metric-group hidden md:flex" title="Share of the last 10 generations' episodes that reached the goal">
-          <span class="label">Win rate · 10 gens</span><b class="live-num num text-[18px] text-zinc-400" id="s_wr">–</b></div>
+          <span class="label"><i class="ico coin"></i> Win rate · 10 gens</span><b class="live-num num text-[18px] text-zinc-400" id="s_wr">–</b></div>
         <div class="metric-group hidden sm:flex" title="Simulation steps per second across the whole population">
           <span class="label">Steps / s</span><b class="live-num num text-[18px] text-zinc-400" id="s_sps">–</b></div>
       </div>
@@ -170,9 +175,9 @@
             <h2>Watched specimen</h2>
             <b id="f_env" class="num text-[18px]">#01</b>
             <b id="f_status" class="c-RUNNING" role="status" aria-live="polite">RUNNING</b>
-            <span id="f_firstwin" class="hidden text-[13px] font-semibold text-sky-400">First win in gen <span></span></span>
+            <span id="f_firstwin" class="hidden banner"><i class="ico coin"></i>First win · gen <span></span></span>
           </div>
-          <button id="b_manual" class="btn" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD (turbo pauses while you drive; Esc releases)">Take control <kbd>M</kbd></button>
+          <button id="b_manual" class="btn" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD (turbo pauses while you drive; Esc releases)"><i class="ico cursor"></i>Take control <kbd>M</kbd></button>
         </div>
 
         <div id="bezel" class="frame relative overflow-hidden">

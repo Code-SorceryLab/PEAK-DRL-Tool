@@ -623,6 +623,8 @@ CSS = THEME_CSS + """
   .lvlname{font:700 1.05rem/1.2 var(--pixel);color:var(--ink);margin-bottom:8px;display:flex;
     justify-content:space-between;align-items:center;gap:8px}
   .bignum{font:700 2.1rem/1 var(--pixel)}
+  .bignum .ico{--ico:.8em;margin-right:8px;vertical-align:0}
+  .stat .lbl .ico{--ico:13px;vertical-align:-2px}
   .lvlsub{font:400 .8rem var(--ui);color:var(--dim);margin-top:6px}
   .mini{height:6px;background:var(--deck-3);margin-top:12px;overflow:hidden}
   .mini i{display:block;height:100%}
@@ -891,9 +893,10 @@ def _causebar(causes: dict[str, int]) -> str:
             f'<div class="causekey">{" · ".join(key)}</div>')
 
 
-def _stat(label: str, value: str, sub: str = "") -> str:
+def _stat(label: str, value: str, sub: str = "", icon: str = "") -> str:
     tip = TIPS.get(label, "")
-    return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}" tabindex="0" aria-label="{label}: {tip}">{label} ⓘ</div>'
+    ico = f'<i class="ico {icon}"></i> ' if icon else ""
+    return (f'<div class="stat"><div class="lbl tip" data-tip="{tip}" tabindex="0" aria-label="{label}: {tip}">{ico}{label} ⓘ</div>'
             f'<div class="val">{value}</div>'
             + (f'<div class="sub">{sub}</div>' if sub else "") + "</div>")
 
@@ -967,9 +970,9 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     cfg_html = _config_html(_level_config(game, row["level"], grid))
 
     headline = [  # the four a designer reads first; the rest sit behind "all metrics"
-        _stat("Win rate", f"{wr:.0%} ± {_ci(row):.0%}", "measured 10 gens after first win"),
-        _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved"),
-        _stat("Dominant cause", _cause_name(row["dominant_cause"]),
+        _stat("Win rate", f"{wr:.0%} ± {_ci(row):.0%}", "measured 10 gens after first win", icon="coin"),
+        _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved", icon="up"),
+        _stat("Dominant cause", _cause_name(row["dominant_cause"]), icon="heartbreak", sub=
               f"{row['dominant_cause_frac']:.0%} of deaths"),
         _stat("Death spread", f"{row.get('death_cluster_entropy_mean', 0):.2f}",
               "0 = one hotspot · 1 = everywhere"),
@@ -1022,7 +1025,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     <div class="lvlcard">
       <button class="cardhead" type="button" aria-haspopup="dialog" aria-controls="{did}" data-dialog="{did}">
         <div class="lvlname">{row['level']} {_pill(row)}</div>
-        <div class="bignum" style="color:{color}">{wr:.0%}</div>
+        <div class="bignum" style="color:{color}"><i class="ico coin"></i>{wr:.0%}</div>
         <div class="lvlsub">win rate · {fw}</div>
         <div class="mini"><i style="width:{max(2, wr * 100):.0f}%;background:{color}"></i></div>
       </button>

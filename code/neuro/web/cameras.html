@@ -42,6 +42,9 @@
   #bigcv { background-color: #000; }
   body.offline #wall { filter: grayscale(1) brightness(.6); }
   dialog::backdrop { background: rgba(0, 0, 0, .85); }
+  .cam .score:not(:empty)::before, #bigscore:not(:empty)::before {   /* wins: a coin */
+    content: ""; display: inline-block; height: 12px; aspect-ratio: 1; margin-right: 4px; vertical-align: -2px;
+    background: var(--i-coin) center / contain no-repeat; image-rendering: pixelated; }
 </style>
 <script>
   // Tailwind's colour names, the theme's black and red (same map as index.html), so the classes the script and the
@@ -186,7 +189,7 @@ function onFrame(f){
   }
   drawImg(c.cv, f.jpg);
   c.lvl.textContent = lvlName(f.level);
-  c.score.textContent = f.attempts ? `W ${f.wins}/${f.attempts}` : "";
+  c.score.textContent = f.attempts ? `${f.wins}/${f.attempts}` : "";
   c.flash.textContent = f.status;
   c.flash.style.display = f.status ? "block" : "none";
   c.flash.style.color = f.status === "WON" ? "#f8d878" : "#e40058";

@@ -115,7 +115,7 @@ def _game_section(game: str, res: dict) -> str:
     humans = [(v, res[v]["humans"]) for v in order if res[v].get("humans")]
     human_html = ""
     if humans:
-        human_html = ('<h3>People at the keyboard</h3><table class="data"><tr><th>Variant</th><th class="n">Attempts</th>'
+        human_html = ('<h3><i class="ico cursor"></i> People at the keyboard</h3><table class="data"><tr><th>Variant</th><th class="n">Attempts</th>'
                       '<th class="n">Wins</th><th>Per player</th><th class="n">Progress</th><th>Death cluster</th><th>Top cause</th></tr>'
                       + "".join(_human_row(v, h) for v, h in humans) + "</table>")
     seg_html = _segments(order, res) if game == "megaman" else ""
@@ -131,10 +131,10 @@ def _game_section(game: str, res: dict) -> str:
             '<p class="legend"><i class="k-cov"></i>tiles the routes covered <i class="k-end"></i>where a failed attempt ended '
             '<i class="k-clu"></i>death cluster (3 tiles) <i class="k-cell"></i>the mutated tiles</p>'
             f'<script type="application/json" id="data-{game}">{json.dumps(data, separators=(",", ":"))}</script>'
-            f'<div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n">Wins</th><th class="n">Solved</th>'
-            f'<th class="n">Progress (median / max)</th><th class="n">Time to finish</th><th>Death cluster</th><th>Top cause</th>'
+            f'<div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
+            f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n">Time to finish</th><th>Death cluster</th><th>Top cause</th>'
             f'<th class="n">Tiles covered</th>{head}<th>Signals</th></tr>{"".join(body)}</table></div>'
-            + (f'<h3>Wins per persona</h3><div class="scroll"><table class="data pips"><tr><th>Persona</th>'
+            + (f'<h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips"><tr><th>Persona</th>'
                + "".join(f"<th>{esc(v)}</th>" for v in order) + f"</tr>{grid}</table></div>" if personas and game != "megaman" else "")
             + human_html + seg_html + "</section>")
 
@@ -148,13 +148,13 @@ def _human_row(v: str, h: dict) -> str:
 
 
 def _pips(wn) -> str:
-    """Wins out of attempts as pixel squares (a persona's three agents)."""
+    """Wins out of attempts as coins: gold for a win, grey for a loss (a persona's three agents)."""
     if not wn:
         return "<td></td>"
     w, n = wn
     if n > 6:
         return f'<td class="n">{w}/{n}</td>'
-    return f'<td title="{w}/{n}">' + '<i class="pip on"></i>' * w + '<i class="pip"></i>' * (n - w) + "</td>"
+    return f'<td title="{w}/{n}">' + '<i class="ico coin"></i>' * w + '<i class="ico coin off"></i>' * (n - w) + "</td>"
 
 
 def _segments(order: list[str], res: dict) -> str:
@@ -195,7 +195,8 @@ def board(results: dict) -> str:
         cells = ["<td></td>"] * len(SLOTS)
         for m in eval_mutants.eval_set(game):
             word, tone = verdict(m, res.get(m["id"]))
-            cells[_slot(m["id"])] = (f'<td class="cell {tone}"><a href="#{game}"><span class="v">{esc(word)}</span>'
+            icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
+            cells[_slot(m["id"])] = (f'<td class="cell {tone}"><a href="#{game}"><span class="v">{icon}{esc(word)}</span>'
                                      f'<span class="label">{esc(m["class"])}</span></a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
                     f'{"".join(cells)}</tr>')
@@ -217,10 +218,13 @@ header.top nav { margin-left: auto; display: flex; gap: 8px; }
 .board td.cell { padding: 0; background: var(--deck); }
 .board td.cell a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-decoration: none;
   border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; }
-.board .v { font: 700 17px/1.1 var(--pixel); }
+.board .v { font: 700 17px/1.1 var(--pixel); display: flex; align-items: center; gap: 7px; }
+.board .v .ico { --ico: 18px; }
 .board td.good .v { color: var(--won); }
 .board td.bad .v { color: var(--dead); }
 .board td.none .v { color: var(--mute); }
+h3 .ico { --ico: 15px; margin-right: 4px; }
+th .ico { --ico: 13px; vertical-align: -2px; }
 section.game { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 12px; }
 .mapbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .map { overflow-x: auto; background: #000; padding: 8px; width: fit-content; max-width: 100%; box-sizing: border-box; }
@@ -234,8 +238,7 @@ section.game { padding: 18px 22px 22px; display: flex; flex-direction: column; g
 .cls.neutral { color: var(--run); } .cls.base { color: var(--dim); }
 td.sig.good { color: var(--won); } td.sig.bad { color: var(--dead); } td.sig.none { color: var(--dim); }
 .pips td { white-space: nowrap; }
-.pip { display: inline-block; width: 10px; height: 10px; margin-right: 3px; background: var(--deck-3); }
-.pip.on { background: var(--won); }
+.pips .ico { --ico: 15px; margin-right: 3px; }
 .empty { color: var(--dim); }
 """
 
@@ -290,7 +293,7 @@ def render(results: dict) -> str:
     sections = "".join(_game_section(g, res) for g, res in results.items())
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>PEAK mutations</title><style>{theme}{CSS}</style></head><body><main>'
-            '<header class="top"><span class="wordmark">PEAK</span><span class="label">Mutations</span>'
+            '<header class="top"><span class="wordmark">PEAK</span><span class="banner">Mutations</span>'
             '<nav><a class="btn" href="../balance/report.html">Balance Command</a></nav></header>'
             '<div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
