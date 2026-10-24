@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/agent-291%20weights-ef4444?style=flat-square" alt="291 weights">
   <img src="https://img.shields.io/badge/deterministic-seed%2042-22c55e?style=flat-square" alt="Deterministic">
   <img src="https://img.shields.io/badge/GPU-not%20required-9a9a9a?style=flat-square" alt="No GPU">
-  <img src="https://img.shields.io/badge/tests-80%20passing-22c55e?style=flat-square" alt="80 tests">
+  <img src="https://img.shields.io/badge/tests-154%20passing-22c55e?style=flat-square" alt="154 tests">
 </p>
 
 <p align="center">
@@ -68,39 +68,44 @@ same run — bit for bit.
 ## What the probes found
 
 <!-- figures:auto -->
-Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-08-22 from 9 sweep reports, 12 ablation arms and 144 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
+Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-10-24 from 45 sweep reports, 36 ablation arms and 438 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
 <!-- /figures:auto -->
 
 <p align="center">
-  <img src="docs/img/fig_difficulty.png" alt="Win rate per level per persona for Mario and Meat Boy" width="900">
+  <img src="docs/img/fig_difficulty.png" alt="Win rate per level per persona for Bomberman, Mario and Meat Boy at 200 generations" width="900">
 </p>
 
-**Levels rank themselves.** Mario 1-1 is solved by every seed and persona; 1-2 is cracked by one seed
-in three for novice and experienced, and its win rate collapses below 15 % for all three. Meat Boy's
-eleven levels spread from "every seed, every persona" (L3, L9) to a level only the speedrunner solves
-(L10) — and that sprinting persona is the *worst* on L0 yet the best on L1 and L2. That spread is the
-design signal the tool exists to produce.
+**Levels rank themselves.** At 200 generations every persona solves Mario 1-1 on all three seeds
+(experienced 91 %, speedrunner 81 %, clumsy 3 %), while 1-3 is nearly a wall: only novice and
+collector win it, on one seed each. Meat Boy's sprinting personas own L2 (77 %) and are the only ones
+to solve L10; L4 stays below 6 % for everyone. Bomberman's ladder is not a ladder: L6 (≈ 80–90 %) is
+as easy as L0, and L1, L9–L11 are the hard rungs. Clumsy is the weakest persona in every game. That
+spread is the design signal the tool exists to produce.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/img/fig_capacity.png" alt="Generations to first win vs network size: flat from 147 to 1155 weights" width="100%"></td>
-    <td width="50%"><img src="docs/img/fig_sensors.png" alt="Paired delta win rate grid minus rays: rays win in all six sweeps" width="100%"></td>
+    <td width="50%"><img src="docs/img/fig_capacity.png" alt="Generations to first win vs network size: flat across the network sizes swept" width="100%"></td>
+    <td width="50%"><img src="docs/img/fig_sensors.png" alt="Paired delta win rate grid minus rays: rays win in all 18 sweeps" width="100%"></td>
   </tr>
   <tr>
-    <td><sub><b>Bigger nets don't win sooner.</b> Hidden size 8 → 64 (147 → 1,155 weights) leaves generations-to-first-win flat in all six sweeps. The bottleneck is the level, not the brain.</sub></td>
-    <td><sub><b>Fourteen rays beat 368 grid cells.</b> The tile-grid sensor loses in all six sweeps (★ = clears its 95 % CI). More input is more weights to evolve, not more insight.</sub></td>
+    <td><sub><b>Bigger nets don't win sooner.</b> Across the network sizes swept, generations-to-first-win stays flat within the noise in all 18 sweeps (3 games × 6 personas). The bottleneck is the level, not the brain.</sub></td>
+    <td><sub><b>Fourteen rays beat 368 grid cells.</b> The tile-grid sensor loses in all 18 sweeps; the gap clears its 95 % CI for every persona except clumsy and Bomberman's novice. More input is more weights to evolve, not more insight.</sub></td>
   </tr>
 </table>
 
 <p align="center">
-  <img src="docs/img/fig_knobs.png" alt="Heat-map of paired win-rate change for every GA knob value vs the baseline, six sweeps" width="760">
+  <img src="docs/img/fig_knobs.png" alt="Heat-map of paired win-rate change for every GA knob value vs the baseline, 18 sweeps" width="760">
 </p>
 
-**One knob at a time.** 22 variants × 6 sweeps, each moved to its literature low or high bound
-(De Jong, Grefenstette, Miller & Goldberg, Such et al.). Only one change wins everywhere:
-annealing mutation ×0.5 after the first win — now the default. Population 100 is worse in 6/6
-(same budget in generations, ten times the compute); elite 6, σ 0.02 and no crossover each hurt a
-Meat Boy persona significantly; memory units only clear the noise for the sprinting speedrunner.
+**One knob at a time.** 22 variants × 18 sweeps, each moved to its literature low or high bound
+(De Jong, Grefenstette, Miller & Goldberg, Such et al.). Annealing mutation harder after the first
+win (×0.3 instead of ×0.5) helps almost everywhere and clears the noise in 8 of 18 sweeps. A bigger
+population (30 or 100) is the largest single gain for Meat Boy (+8 to +10 points, significant for
+every persona but clumsy) yet costs Mario's experienced player 13 points at 100. Action feedback
+hurts Mario's sprinting personas and every Bomberman persona but novice and clumsy; memory units hurt
+Mario's sprinters. The per-game winners are written to `code/neuro/ga_best.yaml`; at 200 generations
+they beat the defaults for every Bomberman persona tested and for Mario's killer and collector, but
+not for Meat Boy.
 
 ---
 
@@ -219,7 +224,7 @@ probe is a frozen, repeatable playtester you can diff level designs against.
 - Full determinism from one seed
 
 **Player personas** (`code/neuro/personas.py`)
-- Seven player types on two axes — skill (novice · clumsy · experienced · good) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
+- Six player types on two axes — skill (novice · clumsy · experienced) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
 
 </td>
 <td width="50%" valign="top">
@@ -259,10 +264,9 @@ or at the persona prompt in the TRAIN menus. Every persona plays the same game w
 |---|---|---|---|
 | `novice` | walk only, senses every 3rd frame | reaching the goal | can a new player finish this? |
 | `clumsy` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
-| `experienced` | walk, senses every frame (the default) | reaching the goal | the baseline |
-| `good` | sprint, senses every frame, clean inputs | reaching the goal | how far does skill carry? |
-| `killer` | as `experienced` | goal **+ enemies killed** | does fighting pay, or is it a detour? |
-| `collector` | as `experienced` | goal **+ coins / power-ups picked up** | are the pickups worth the risk? |
+| `experienced` | sprint, senses every frame, clean inputs (the default) | reaching the goal | the baseline: how far does skill carry? |
+| `killer` | walk, senses every frame | goal **+ enemies killed** | does fighting pay, or is it a detour? |
+| `collector` | walk, senses every frame | goal **+ coins / power-ups picked up** | are the pickups worth the risk? |
 | `speedrunner` | sprint, senses every frame | goal **+ 25 per second left** on a win | is there a fast route? |
 
 **Event weights are shares of the goal.** `weights={"kills": 1.0}` means that killing every enemy
@@ -274,20 +278,21 @@ different utility over game events per player archetype.
 
 **A level without the event gives a plain player.** Meat Boy has no enemies or pickups; most of the
 Bomberman ladder has no power-ups. The trainer prints
-`note: meatboy level [0] has no kills — persona [killer] plays like 'experienced' here`.
+`note: meatboy level [0] has no kills — persona [killer] plays for the goal alone here`.
 
-**Measured** (40 generations, 3 seeds × 20 test episodes, Mario 1-1, 21 enemies):
+**Measured** (40 generations, 3 seeds × 20 test episodes, Mario 1-1, 21 enemies; measured before
+`experienced` took over the old `good` settings, so the walk-only row is the old `experienced`):
 
-| Persona | Win % | Kills |
+| Player | Win % | Kills |
 |---|---|---|
-| `experienced` | 100 | 2.7 |
+| walk-only, no bonus | 100 | 2.7 |
 | `killer` | 100 | **7.0** |
-| `good` | 100 | 4.7 |
+| `experienced` (sprint) | 100 | 4.7 |
 | `clumsy` | **20** | 2.1 |
 
-The killer kills 2.6× as many enemies and still wins every time; weights 0.5, 1.0 and 2.0 gave the
-same kill count, so 1.0 is the default. On Mario 1-2 (17 coins) the collector picked up 1.5–2.5
-coins against 0 for `experienced`.
+The killer kills 2.6× as many enemies as a player with the same hands and no bonus, and still wins
+every time; weights 0.5, 1.0 and 2.0 gave the same kill count, so 1.0 is the default. On Mario 1-2
+(17 coins) the collector picked up 1.5–2.5 coins against 0 for the walk-only player.
 
 **Add a persona** — one entry in `PERSONAS`:
 

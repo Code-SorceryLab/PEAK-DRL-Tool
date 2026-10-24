@@ -299,7 +299,7 @@ class Trainer:
         dead = [e for e in self.persona.weights if not have.get(e)]
         if dead:
             print(f"  note: {self.game} level [{self.level}] has no {'/'.join(dead)} — persona "
-                  f"[{self.persona.name}] plays like 'experienced' here", flush=True)
+                  f"[{self.persona.name}] plays for the goal alone here", flush=True)
 
     def run_generation(self) -> list[float]:
         for i, slot in enumerate(self.slots):

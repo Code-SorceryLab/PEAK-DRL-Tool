@@ -19,7 +19,7 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 
 from .balance import BALANCE_DIR, mean_ci
 from .gasweep import AXES, paired_delta
-from .personas import COLORS
+from .personas import COLORS, PERSONAS
 from .report import GA_DOC, _ablation_pairs, _gasweep_groups, _gs_baseline_label, _load_json_glob, _sweep_point
 
 IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img")
@@ -256,9 +256,11 @@ def main() -> None:
     ap.add_argument("--readme", action="store_true", help="refresh the stamp between the README figure markers")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
-    reports = _load_json_glob(os.path.join(args.dir, "report_*.json"))
-    ablations = _load_json_glob(os.path.join(args.dir, "ablation_*.json"))
-    gasweeps = _load_json_glob(os.path.join(args.dir, "gasweep_*.json"))
+    def current(ds: list[dict]) -> list[dict]:  # results of removed personas stay on disk, not in the figures
+        return [d for d in ds if (d.get("persona") or "experienced") in PERSONAS]
+    reports = current(_load_json_glob(os.path.join(args.dir, "report_*.json")))
+    ablations = current(_load_json_glob(os.path.join(args.dir, "ablation_*.json")))
+    gasweeps = current(_load_json_glob(os.path.join(args.dir, "gasweep_*.json")))
     groups = _gasweep_groups(gasweeps)
     made = []
     for name, fn, data in (("difficulty", fig_difficulty, reports), ("capacity", fig_capacity, groups),
