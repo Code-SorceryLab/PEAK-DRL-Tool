@@ -627,6 +627,45 @@ def _train_batch(jobs, **summary):
         play_chime()
 
 
+def train_all_personas():
+    """Train All Personas — per game, one population per persona walks every enabled level in order (the
+    trainer's curriculum: a generation with 3 winners moves it to the next level, nets carry over), one seed."""
+    _refresh_screen()
+    _section("TRAIN  ›  All Personas (curriculum)")
+    games = toggle_select("GAMES", get_available_games(),
+                          default_indices=[i for i, g in enumerate(get_available_games())
+                                           if g in ("mario", "meatboy", "bomberman")])
+    if not games:
+        return
+    personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))
+    if not personas:
+        return
+    gens = _prompt_gens("total for all levels, e.g. 800 for Mario's 4")
+    if gens in ("invalid", None):
+        if gens is None:
+            print(_RED("  A generation count is required: a curriculum run stops at its budget."))
+        return
+    seed_raw = input(_DIM("    Seed [1234]: ")).strip()
+    seed = seed_raw if seed_raw.lstrip("-").isdigit() else "1234"
+    jobs = [(g, p) for g in games for p in personas]
+    if not _print_run_summary(Games=", ".join(games), Personas=", ".join(personas), Seed=seed,
+                              Generations=f"{gens} per persona, across all levels", **{"Total runs": len(jobs)}):
+        return
+
+    print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
+    successful = 0
+    for i, (game, persona) in enumerate(jobs, 1):
+        print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(persona)} | all levels")
+        ok = execute_training_run(
+            _trainer_cmd(game, None, gens, turbo=True, run_dir=_run_dir(game, None, persona, "rays", f"curriculum_seed{seed}"),
+                         extra=("--persona", persona, "--seed", seed)))
+        successful += int(ok)
+
+    print_training_summary(len(jobs), successful, len(jobs) - successful)
+    if successful == len(jobs):
+        play_chime()
+
+
 # ============================================================================
 # PLAY / WATCH
 # ============================================================================
@@ -1159,6 +1198,7 @@ def main():
         "2":  ("run_training",         run_training),
         "3":  ("train_all_game",       train_all_models_for_game),
         "4":  ("train_grid",           train_complete_grid),
+        "p":  ("train_all_personas",   train_all_personas),
         "5":  ("manual_play",          run_manual_play),
         "6":  ("watch_agent",          watch_trained_agent),
         "7":  ("watch_all",            watch_all_models),
@@ -1188,6 +1228,7 @@ def main():
         print(_menu_item("2",  "Train Single",        "pick game / level / generations"))
         print(_menu_item("3",  "Train All (1 game)",  "toggle levels, back-to-back runs"))
         print(_menu_item("4",  "Train Full Grid",     "all games × enabled levels"))
+        print(_menu_item(" P", "Train All Personas",  "one agent per persona carries on level after level"))
 
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
