@@ -118,7 +118,8 @@ pip install -r requirements.txt
 python menu.py
 ```
 
-The menu drives everything — train, watch, play, edit levels, run probes, open the command center:
+The menu drives everything — train, watch, play, edit levels, run probes, test mutants, open the command
+center. Every choice in it is the same checklist: type numbers to tick, Enter to confirm, 0 to go back.
 
 | | Train | | Play | | Tools & balance |
 |--:|---|--:|---|--:|---|
@@ -130,6 +131,11 @@ The menu drives everything — train, watch, play, edit levels, run probes, open
 | | | | | 14 | Sensor ablation (rays vs grid → `runs/ablation`) |
 | | | | | 15 | GA sweep (one knob at a time vs literature bounds) |
 | | | | | 16 | README figures (regenerate `docs/img/fig_*.png`, update README) |
+| | | | | 17 | Mutants: the five per game, checked against their spec cells |
+| | | | | 18 | Play a mutant yourself (each attempt logged under your name) |
+| | | | | 19 | Retrain on mutants (every persona's three seeds, the baseline's GA setting) |
+| | | | | 20 | Agent playtest: one attempt per agent, learning off, original vs mutants |
+| | | | | 21 | Mutation metrics + the mutation page (`runs/ast/index.html`) |
 | | | | | D | Delete runs (pick runs / probe trees, or everything) |
 
 <details>
@@ -160,6 +166,15 @@ python -m code.neuro.balance --game mario --gens 40 --best
 python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
 python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
 streamlit run code/stats/dashboard/app.py                              # B1/B2/B3 stats dashboard
+
+# Mutation testing (the AST evaluation, menu 17-21)
+python -m code.games.eval_mutants                                      # write Mario's, Meat Boy's, Bomberman's mutants
+python -m code.games.megaman_mutants                                   # Mega Man's (the evaluation uses five of them)
+python -m code.games.eval_mutants --list                               # the evaluation set of every game
+python -m code.neuro.ast_eval retrain --game mario --mutant widen_gap  # every persona's 3 seeds on the mutant
+python -m code.neuro.ast_eval play --game mario                        # one attempt per agent: original + mutants
+python -m code.stats.ast_metrics --page                                # metric tables + runs/ast/index.html
+PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 
 # Play
 python -m code.games.tools.manual_play --game platformer --level Mario1-2
@@ -437,6 +452,37 @@ or the fitness — not the GA.
 
 ---
 
+## Mutation testing
+
+Each game trains and is tested on one evaluation level, so a change to it is easy to make and to
+playtest: Super Mario Bros. 1-1, Super Meat Boy 1-3 The Gap, Bomberman 09 Two Balloms, and Mega Man's
+Cut Man stage (8 segments). The other levels stay loadable (`disabled_levels`, `active_levels`).
+
+Five one-change copies of each level ("mutants") test whether a playtest notices a change:
+
+| Operator | What it changes | Class | Agents |
+|---|---|---|---|
+| `seal_route` | a full-height wall across the route | breaking | retrained |
+| `widen_gap` (Bomberman `add_enemy`) | a wider gap, or one more enemy on the route | degrading | retrained |
+| `jump_velocity_down` (Bomberman `fuse_down`) | jump velocity ×0.85, or a shorter bomb fuse | degrading | retrained |
+| `off_route` | a tile no player can reach | neutral | retrained |
+| `cosmetic_tile` | `.` written as a space: the level parses the same | equivalent | replayed only (determinism) |
+
+The cells are fixed by hand in `code/games/eval_mutants.py`; each names the character it expects, so
+a level that changed since is refused rather than mutated in the wrong place, and every mutant is
+loaded in the game and checked before it is written (the change plays, a cosmetic copy parses the
+same, an off-route tile is walled in, a flood fill finds the exit only where it should). A mutant
+is a folder (`runs/<game>/mutants/<id>/`); name it in `PEAK_MUTANT` and any command plays it.
+
+A playtest gives each agent one attempt with learning off: the best genome of each of the three
+seeds per persona, so a persona's win rate moves in steps of 1/3 (Mega Man plays its relay of
+section agents). `code/stats/ast_metrics.py` reads the attempts, agents' and people's, and reports
+completion, win rate, progress, end location, death cluster, cause mix, time to finish, play
+coverage, effort counts and, for Mega Man, the segment reached. A mutant is caught when completion
+is lost, the win rate changes (Fisher's exact test, p < 0.05), the death cluster moves more than
+three tiles or the top cause of death changes; the cosmetic copy passes when every replay matches
+the original attempt for attempt.
+
 ## Research use
 
 | Question | What to run | What to read |
@@ -446,6 +492,7 @@ or the fitness — not the GA.
 | Did my edit help? | edit → menu 13 again | same seeds, same GA — the probe is frozen, so the diff is the level |
 | How much skill does the design reward? | menu 13, compare personas | novice vs speedrunner completion on the same level (`skill gap` tile) |
 | Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
+| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the mutation page: caught / missed per mutant, then where and how play changed |
 
 ---
 

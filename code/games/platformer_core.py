@@ -28,6 +28,7 @@ from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile
 from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager
+from . import mutants
 from .modules.System.debugging_mods.manager import DebugManager
 from .modules.Objects.Spike import Spike
 from .modules.Objects.MovingPlatform import MovingPlatform
@@ -392,6 +393,7 @@ class PlatformerCore(gymnasium.Env):
 
         # 1. Initialize Managers
         self.config_manager = ConfigManager("game_config.yaml")
+        self.mutant = mutants.active("mario")      # PEAK_MUTANT: play that copy of the level
         self.loader = LevelLoader()
         self.physics_manager = PhysicsManager()
         self.debug_manager = DebugManager(
@@ -926,6 +928,9 @@ class PlatformerCore(gymnasium.Env):
         self.reached_goal = False
 
         config = self.config_manager.get_level_config(self.world)
+        if self.mutant:
+            config["file"] = mutants.level_path(self.mutant, config.get("file")) or config.get("file")
+            mutants.apply_config(config, self.mutant)
         self.level_data = self.loader.load_level(config)
 
         # Clear any fireballs from the previous level.

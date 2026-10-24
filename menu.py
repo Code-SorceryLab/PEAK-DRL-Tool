@@ -318,52 +318,9 @@ def _section(title: str):
     print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}")
 
 
-def ask_index(prompt, options, add_back=True, default=None):
+def toggle_select(title, options, default_indices=None, min_select=1, show_desc=None, single=False):
     """
-    Simple numbered-list prompt — used for linear (non-toggle) selections.
-    Prints the option list, reads an integer, and returns the chosen item.
-    Returns None if the user selects the auto-appended "Back" entry.
-    Supports an optional default value selected by pressing Enter.
-    """
-    if not options:
-        print(_DIM("  No options available."))
-        return None
-
-    print(prompt)
-    for i, opt in enumerate(options, 1):
-        default_flag = " (default)" if opt == default else ""
-        print(f"  {i}. {opt}{default_flag}")
-
-    back_idx = len(options) + 1
-    if add_back:
-        print(f"  {back_idx}. Back")
-
-    prompt_text = f"Select (1-{back_idx if add_back else len(options)})"
-    if default:
-        prompt_text += f" or Enter for [{default}]"
-    prompt_text += ": "
-
-    choice = input(prompt_text).strip()
-
-    if choice == "" and default:
-        return default
-
-    try:
-        num = int(choice)
-        if add_back and num == back_idx:
-            return None
-        if 1 <= num <= len(options):
-            return options[num - 1]
-    except ValueError:
-        pass
-
-    print(_RED("  ✖  Invalid selection."))
-    return None
-
-
-def toggle_select(title, options, default_indices=None, min_select=1, show_desc=None):
-    """
-    Interactive toggle-style multi-select used throughout the training menus.
+    The checklist every menu choice goes through (Train All, sweeps, pickers).
 
     Renders a numbered checklist where each item can be toggled on/off.
     Supports comma-separated input ("1,3") and ranges ("1-3") in one go.
@@ -371,12 +328,18 @@ def toggle_select(title, options, default_indices=None, min_select=1, show_desc=
 
     Type a number to flip that item on/off.  Press Enter to confirm.
     show_desc: optional dict {option: description_string} for extra info per row.
+    single: a choice of one (pick_one): typing a number moves the one tick.
     """
     selected = set([0] if default_indices is None else default_indices)   # 0-based indices; [] = none ticked
+    if not options:
+        print(_DIM("    Nothing to choose from."))
+        return None
 
     while True:
-        print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}  {_DIM('(toggle · Enter to confirm)')}")
-        print(_DIM("    Type numbers to toggle  ·  Enter to confirm  ·  0 = Back"))
+        mode = "pick one" if single else "toggle"
+        print(f"\n    {_BOLD(_CYAN('▸'))} {_BOLD(title)}  {_DIM(f'({mode} · Enter to confirm)')}")
+        print(_DIM("    Type a number to choose" if single else "    Type numbers to toggle")
+              + _DIM("  ·  Enter to confirm  ·  0 = Back"))
         print()
 
         for i, opt in enumerate(options):
@@ -418,12 +381,21 @@ def toggle_select(title, options, default_indices=None, min_select=1, show_desc=
         for n in tokens:
             idx = n - 1
             if 0 <= idx < len(options):
-                if idx in selected:
+                if single:
+                    selected = {idx}
+                elif idx in selected:
                     selected.discard(idx)
                 else:
                     selected.add(idx)
             else:
                 print(_RED(f"    Invalid: {n}"))
+
+
+def pick_one(title, options, default=None, show_desc=None):
+    """A choice of one on the same checklist screen: the default starts ticked, a number moves the tick."""
+    start = options.index(default) if default in options else 0
+    picked = toggle_select(title, options, default_indices=[start], show_desc=show_desc, single=True)
+    return picked[0] if picked else None
 
 
 def _refresh_screen():
@@ -492,11 +464,11 @@ def _prompt_gens(default_hint="Enter = train until Ctrl+C"):
 
 def _prompt_persona_sensors_tag():
     """Shared by every TRAIN entry: (persona, sensors, tag) or None on back."""
-    persona = ask_index("\n  Player persona (who should the agents play like?):",
-                        PERSONA_CHOICES, default="experienced")
+    persona = pick_one("PERSONA  ·  who should the agents play like?", PERSONA_CHOICES,
+                       default="experienced", show_desc=PERSONA_DESC)
     if not persona:
         return None
-    sensors = ask_index("\n  Sensors (what the agents see):", SENSOR_CHOICES, default="rays")
+    sensors = pick_one("SENSORS  ·  what the agents see", SENSOR_CHOICES, default="rays", show_desc=SENSOR_DESC)
     if not sensors:
         return None
     raw = input(_DIM("\n    Run tag (optional, appended to the run dir name): ")).strip()
@@ -532,15 +504,14 @@ def run_training():
     _refresh_screen()
     _section("TRAIN  ›  Single Run")
 
-    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
+    game = pick_one("GAME", get_available_games(), default="mario")
     if not game:
         return
 
     levels = get_levels_for_game(game)
     level = None
     if levels:
-        level = ask_index("\n  Choose a level:", ["auto (first level)"] + levels,
-                          default="auto (first level)")
+        level = pick_one(f"LEVEL  ·  {game}", ["auto (first level)"] + levels, default="auto (first level)")
         if level is None:
             return
         if level.startswith("auto"):
@@ -553,7 +524,11 @@ def run_training():
     gens = _prompt_gens()
     if gens == "invalid":
         return
-    turbo = input(_DIM("    Start in turbo? [y/N]: ")).strip().lower().startswith("y")
+    mode = pick_one("SPEED", ["real-time", "turbo"], default="real-time",
+                    show_desc={"real-time": "game speed, every feed live", "turbo": "max speed, only the watched agent streams"})
+    if not mode:
+        return
+    turbo = mode == "turbo"
 
     run_dir = _run_dir(game, level, persona, sensors, tag)
     if not _print_run_summary(Game=game, Level=level or "auto", Persona=persona, Sensors=sensors,
@@ -576,7 +551,7 @@ def train_all_models_for_game():
     _refresh_screen()
     _section("TRAIN  ›  All Levels (1 game)")
 
-    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
+    game = pick_one("GAME", get_available_games(), default="mario")
     if not game:
         return
 
@@ -686,24 +661,7 @@ _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("
                ("F4", "Hitboxes"), ("F5", "Agent max view")]
 
 
-def run_manual_play():
-    """Play Manually — pick a game and level, drive it with the keyboard."""
-    _refresh_screen()
-    _section("PLAY  ›  Manual")
-
-    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
-    if not game:
-        return
-    levels = get_levels_for_game(game)
-    level = None
-    if levels:
-        level = ask_index("\n  Choose a level:", ["auto (first level)"] + levels,
-                          default="auto (first level)")
-        if level is None:
-            return
-        if level.startswith("auto"):
-            level = None
-
+def _print_controls(game, level):
     W = 50
     print()
     print(_DIM("    " + "─" * W))
@@ -718,6 +676,26 @@ def run_manual_play():
     print(_DIM("    " + "─" * W))
     print()
 
+
+def run_manual_play():
+    """Play Manually — pick a game and level, drive it with the keyboard."""
+    _refresh_screen()
+    _section("PLAY  ›  Manual")
+
+    game = pick_one("GAME", get_available_games(), default="mario")
+    if not game:
+        return
+    levels = get_levels_for_game(game)
+    level = None
+    if levels:
+        level = pick_one(f"LEVEL  ·  {game}", ["auto (first level)"] + levels, default="auto (first level)")
+        if level is None:
+            return
+        if level.startswith("auto"):
+            level = None
+
+    _print_controls(game, level)
+
     # Strip the dummy SDL driver so a real window opens.
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
@@ -729,7 +707,7 @@ def run_manual_play():
     subprocess.run(cmd, env=proc_env)
 
 
-def _pick_run(prompt="\n  Choose a run:"):
+def _pick_run(title="RUN  ·  strongest first"):
     runs = get_run_dirs()
     if not runs:
         print(_RED("  ✖  No trained populations under runs/. Train (2) or probe (13/14) first."))
@@ -742,7 +720,7 @@ def _pick_run(prompt="\n  Choose a run:"):
         info = " · ".join(str(m[k]) for k in ("level", "persona") if m.get(k))
         fit = f"fit {m['fitness']:,.0f}" if m.get("fitness") is not None else ""
         labels.append(f"{runs[i].relative_to(RUNS_DIR)}  {_DIM('[' + ' · '.join(x for x in (info, fit) if x) + ']')}")
-    name = ask_index(prompt, labels, default=labels[0])
+    name = pick_one(title, labels, default=labels[0])
     return runs[order[labels.index(name)]] if name else None
 
 
@@ -790,7 +768,7 @@ def watch_random_agent():
     _refresh_screen()
     _section("WATCH  ›  Random Agent")
 
-    game = ask_index("\n  Choose a game:", get_available_games(), default="mario")
+    game = pick_one("GAME", get_available_games(), default="mario")
     if not game:
         return
 
@@ -825,12 +803,7 @@ def run_level_editor():
         return
 
     game_choices = ["platformer", "sonic", "megaman"]
-    game = ask_index(
-        "\n  Choose which game to edit:",
-        game_choices,
-        add_back=True,
-        default=game_choices[0],
-    )
+    game = pick_one("GAME  ·  which game to edit", game_choices, default=game_choices[0])
     if not game:
         return
 
@@ -854,68 +827,27 @@ def run_toggle_levels():
         print("\n  Could not find a readable game_config.yaml")
         return
 
-    game_choices = ["platformer", "sonic"]
-    game = ask_index(
-        "\n  Choose which game's levels to manage:",
-        game_choices,
-        add_back=True,
-        default=game_choices[0],
-    )
+    game = pick_one("GAME  ·  whose levels to manage", ["platformer", "sonic"], default="platformer")
     if not game:
         return
-
-    while True:
-        try:
-            data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-        except Exception as e:
-            print(f"\n  Error reading config: {e}")
-            return
-
-        active, disabled = _game_level_maps(data, game, create=False)
-        active_ids = list(active.keys())
-        disabled_ids = list(disabled.keys())
-
-        print(_BOLD(f"\n  Level Toggle [{game}]"))
-        print(f"  Config: {_DIM(str(config_path))}\n")
-
-        if active_ids:
-            print(f"  {_GRN('ENABLED')}  ({len(active_ids)})")
-            for i, lid in enumerate(active_ids, 1):
-                fn = active[lid].get("file", "???") if isinstance(active[lid], dict) else "???"
-                print(f"    {_YEL(f'{i:>3}.')}  {_GRN('[ON ]')}  {_WHT(lid):<20}  {_DIM(fn)}")
-        else:
-            print(f"  {_DIM('(no active levels)')}")
-
-        start = len(active_ids)
-        if disabled_ids:
-            print(f"\n  {_RED('DISABLED')}  ({len(disabled_ids)})")
-            for j, lid in enumerate(disabled_ids, start + 1):
-                fn = disabled[lid].get("file", "???") if isinstance(disabled[lid], dict) else "???"
-                print(f"    {_YEL(f'{j:>3}.')}  {_RED('[OFF]')}  {_WHT(lid):<20}  {_DIM(fn)}")
-
-        all_ids = active_ids + disabled_ids
-        back_n = len(all_ids) + 1
-        print(f"\n    {_YEL(f'{back_n:>3}.')}  {_RED('Back')}")
-        print()
-
-        pick = input(_BOLD("    Toggle # ")).strip()
-        try:
-            n = int(pick)
-            if n == back_n:
-                return
-            if 1 <= n <= len(all_ids):
-                lid = all_ids[n - 1]
-                is_active = n <= len(active_ids)
-                ok = _toggle_game_level_in_config(game, lid, enable=not is_active)
-                if ok:
-                    state = _GRN("enabled") if not is_active else _RED("disabled")
-                    print(f"\n  '{lid}' {state}\n")
-                else:
-                    print(_RED(f"\n  Failed to toggle '{lid}'\n"))
-            else:
-                print(_RED("  Invalid selection."))
-        except ValueError:
-            print(_RED("  Invalid input."))
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        print(f"\n  Error reading config: {e}")
+        return
+    active, disabled = _game_level_maps(data, game, create=False)
+    ids = list(active) + list(disabled)
+    files = {lid: (e.get("file", "???") if isinstance(e, dict) else "???") for lid, e in {**active, **disabled}.items()}
+    chosen = toggle_select(f"LEVELS  ·  {game}  (ticked = enabled)", ids,
+                           default_indices=list(range(len(active))), show_desc=files)
+    if chosen is None:
+        return
+    for lid in ids:
+        on = lid in chosen
+        if on != (lid in active):
+            ok = _toggle_game_level_in_config(game, lid, enable=on)
+            state = _GRN("enabled") if on else _RED("disabled")
+            print(f"    '{lid}' {state}" if ok else _RED(f"    Failed to toggle '{lid}'"))
 
 
 def run_dashboard():
@@ -946,27 +878,32 @@ def run_readme_figures():
     _refresh_screen()
     _section("TOOLS  ›  README Figures")
     print(_DIM("    fig_difficulty · fig_capacity · fig_sensors · fig_knobs  ←  runs/balance/*.json"))
-    readme = input(_DIM("\n    Also update README.md (figure stamp between the <!-- figures --> markers)? [Y/n]: ")
-                   ).strip().lower() not in ("n", "no")
+    what = pick_one("WRITE", ["figures and README", "figures only"], default="figures and README",
+                    show_desc={"figures and README": "also the stamp between the <!-- figures --> markers"})
+    if not what:
+        return
+    readme = what == "figures and README"
     cmd = [sys.executable, "-m", "code.neuro.figures"] + (["--readme"] if readme else [])
     print(_DIM("  >>> " + " ".join(cmd) + "\n"))
     subprocess.run(cmd)
 
 
-SENSOR_CHOICES = ["rays", "grid"]  # rays = 6 raycasts + probes (14 inputs); grid = 3×11×11 tiles (368)
+SENSOR_CHOICES = ["rays", "grid"]
+SENSOR_DESC = {"rays": "6 raycasts + probes, 14 inputs", "grid": "3×11×11 tiles around the agent, 368 inputs"}
 
 
-def _persona_names() -> list[str]:
-    """Persona registry (code/neuro/personas.py) — read without importing numpy/pygame."""
+def _personas() -> dict[str, str]:
+    """Persona registry (code/neuro/personas.py): {name: description}, experienced first."""
     try:
         from code.neuro.personas import PERSONAS
-        names = list(PERSONAS)
+        found = {n: p.description for n, p in PERSONAS.items()}
     except Exception:
-        names = ["experienced", "novice", "speedrunner"]
-    return ["experienced"] + sorted(n for n in names if n != "experienced")
+        found = {n: "" for n in ("experienced", "novice", "speedrunner")}
+    return {n: found[n] for n in ["experienced"] + sorted(n for n in found if n != "experienced")}
 
 
-PERSONA_CHOICES = _persona_names()
+PERSONA_DESC = _personas()
+PERSONA_CHOICES = list(PERSONA_DESC)
 
 
 def _sweep_prompts(n_modes: int = 1, default_gens: str = "40", modes_label: str = "sensor modes",
@@ -1058,15 +995,18 @@ def run_ga_sweep():
                "    (hidden size, population, elite, tournament, crossover, mutation, anneal, init,\n"
                "    action feedback, memory units). Same coverage as Full Sweep; 23× the probes, ≈33× the episodes."))
     from code.neuro.gasweep import AXES, AXIS_DOC, cost_multiplier, sweep_configs  # lazy: numpy import
-    sensors = ask_index("\n  Sensors for every config:", SENSOR_CHOICES, default="rays")
+    sensors = pick_one("SENSORS  ·  for every config", SENSOR_CHOICES, default="rays", show_desc=SENSOR_DESC)
     if not sensors:
         return
     axes = toggle_select("GA AXES", list(AXES), default_indices=list(range(len(AXES))),
                          show_desc={a: f"{' · '.join(map(str, vs))}  —  {AXIS_DOC[a]}" for a, vs in AXES.items()})
     if not axes:
         return
-    confirm = input(_DIM("\n    Also probe the per-axis-winner composite afterwards (--confirm)? [Y/n]: ")
-                    ).strip().lower() not in ("n", "no")
+    after = pick_one("AFTERWARDS", ["probe the composite", "stop"], default="probe the composite",
+                     show_desc={"probe the composite": "every axis at its winner, probed together (--confirm)"})
+    if not after:
+        return
+    confirm = after == "probe the composite"
     configs = sweep_configs(axes)
     picked = _sweep_prompts(n_modes=len(configs), modes_label="GA configs",
                             cost_note=f"≈{cost_multiplier(configs):.0f}× the episodes of one Full Sweep "
@@ -1087,7 +1027,8 @@ def run_full_sweep():
     """Full Sweep — balance probes across games × personas × seeds, all parallel."""
     _refresh_screen()
     _section("BALANCE  ›  Full Sweep")
-    sensors = ask_index("\n  Sensors (what the probe agents see):", SENSOR_CHOICES, default="rays")
+    sensors = pick_one("SENSORS  ·  what the probe agents see", SENSOR_CHOICES, default="rays",
+                       show_desc=SENSOR_DESC)
     if not sensors:
         return
     picked = _sweep_prompts()
@@ -1099,6 +1040,166 @@ def run_full_sweep():
         return
     play_chime()
     _open_command_center()
+
+
+# ============================================================================
+# MUTATE — the AST evaluation (code/games/eval_mutants.py, code/neuro/ast_eval.py, code/stats/ast_metrics.py)
+# ============================================================================
+
+AST_GAMES = ["mario", "meatboy", "bomberman", "megaman"]
+AST_PAGE = RUNS_DIR / "ast" / "index.html"
+
+
+def _ast_games():
+    games = [g for g in AST_GAMES if g in get_available_games()]
+    return toggle_select("GAMES", games, default_indices=list(range(len(games))))
+
+
+def _eval_set(game):
+    from code.games.eval_mutants import eval_set  # lazy: the menu starts without numpy/pygame
+    return eval_set(game)
+
+
+def _variant_desc(game, retrained_only=False):
+    """{variant: what it is} for one game: the original level, then its mutants."""
+    out = {} if retrained_only else {"base": "the original level"}
+    for m in _eval_set(game):
+        if m["retrain"] or not retrained_only:
+            out[m["id"]] = f"{m['class']:<10} {m['description']}"
+    return out
+
+
+def run_mutants():
+    """Mutants — every game's evaluation set; write the ticked games' mutants again."""
+    _refresh_screen()
+    _section("MUTATE  ›  Mutants")
+    from code.games import eval_mutants
+    for g in AST_GAMES:
+        print("\n" + eval_mutants.table(g))
+    print(_DIM("\n    Writing checks every cell against the spec and loads the mutant in the game first."))
+    games = toggle_select("WRITE", AST_GAMES, min_select=0,
+                          default_indices=[i for i, g in enumerate(AST_GAMES) if not _eval_set(g)])
+    for g in games or []:
+        cmd = ([sys.executable, "-m", "code.games.megaman_mutants"] if g == "megaman" else
+               [sys.executable, "-m", "code.games.eval_mutants", "--game", g])
+        print(_DIM("  >>> " + " ".join(cmd)))
+        subprocess.run(cmd)
+
+
+def play_mutant():
+    """Play a Mutant — you at the keyboard on the evaluation level or one of its mutants; every
+    attempt is logged under your name (runs/ast/<game>/<variant>/human/)."""
+    _refresh_screen()
+    _section("MUTATE  ›  Play a Mutant  (human playtest)")
+    games = [g for g in AST_GAMES if g in get_available_games()]
+    game = pick_one("GAME", games, default=games[0])
+    if not game:
+        return
+    desc = _variant_desc(game)
+    variant = pick_one(f"VARIANT  ·  {game}", list(desc), default="base", show_desc=desc)
+    if not variant:
+        return
+    raw = input(_DIM("\n    Player name (attempts are logged under it) [human]: ")).strip()
+    player = "".join(c for c in raw if c.isalnum() or c in "-_") or "human"
+    from code.games.eval_mutants import EVAL_LEVELS
+    level = EVAL_LEVELS[game][0]
+    _print_controls(game, level)
+    env = os.environ.copy()
+    env.pop("SDL_VIDEODRIVER", None)       # a real window
+    env.pop("PEAK_MM1_MUTANT", None)
+    env.pop("PEAK_MUTANT", None)
+    if variant != "base":
+        env["PEAK_MUTANT"] = str(RUNS_DIR / game / "mutants" / variant)
+    record = RUNS_DIR / "ast" / game / variant / "human"
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
+           "--fps", "60", "--level", level, "--record", str(record), "--player", player]
+    print(_DIM(f"    Launching {game} · {variant}... (ESC to quit)\n"))
+    subprocess.run(cmd, env=env)
+
+
+def retrain_mutants():
+    """Retrain on Mutants — each persona's three seeds trained again on the ticked mutants, with the
+    baseline's GA setting and budget (the cosmetic mutant is replayed, never retrained)."""
+    _refresh_screen()
+    _section("MUTATE  ›  Retrain on Mutants")
+    print(_DIM("    3 seeds × the generation budget per persona and mutant: hours of CPU per game.\n"
+               "    On this PC keep the workers low; the full batch belongs on the cluster."))
+    games = _ast_games()
+    if not games:
+        return
+    jobs = []
+    for g in games:
+        desc = _variant_desc(g, retrained_only=True)
+        if not desc:
+            print(_RED(f"    {g}: no mutants yet — write them with [17]"))
+            continue
+        picked = toggle_select(f"MUTANTS  ·  {g}", list(desc), default_indices=list(range(len(desc))), show_desc=desc)
+        if picked is None:
+            return
+        jobs += [(g, mid) for mid in picked]
+    if not jobs:
+        return
+    personas = toggle_select("PERSONAS  ·  Mega Man retrains each section's own", PERSONA_CHOICES,
+                             default_indices=list(range(len(PERSONA_CHOICES))), show_desc=PERSONA_DESC)
+    if not personas:
+        return
+    gens = _prompt_gens("200 = the baseline's budget")
+    if gens in ("invalid", None):
+        if gens is None:
+            print(_RED("  A generation count is required."))
+        return
+    raw = input(_DIM("    Parallel workers [3]: ")).strip()
+    workers = raw if raw.isdigit() and int(raw) > 0 else "3"
+    if not _print_run_summary(Mutants=", ".join(f"{g}/{m}" for g, m in jobs), Personas=", ".join(personas),
+                              Generations=f"{gens} × 3 seeds", Workers=workers):
+        return
+    ok_runs = 0
+    for i, (g, mid) in enumerate(jobs, 1):
+        print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(g)} | {_WHT(mid)}")
+        cmd = [sys.executable, "-m", "code.neuro.ast_eval", "retrain", "--game", g, "--mutant", mid,
+               "--gens", str(gens), "--workers", workers] + ([] if g == "megaman" else ["--persona", *personas])
+        ok_runs += execute_training_run(cmd)
+    print_training_summary(len(jobs), ok_runs, len(jobs) - ok_runs)
+    if ok_runs == len(jobs):
+        play_chime()
+
+
+def playtest_agents():
+    """Agent Playtest — one attempt per agent with learning off, on the original level and the ticked
+    mutants; then the metric tables."""
+    _refresh_screen()
+    _section("MUTATE  ›  Agent Playtest")
+    games = _ast_games()
+    if not games:
+        return
+    plan = []
+    for g in games:
+        desc = _variant_desc(g)
+        picked = toggle_select(f"VARIANTS  ·  {g}", list(desc), default_indices=list(range(len(desc))), show_desc=desc)
+        if picked is None:
+            return
+        plan.append((g, picked))
+    personas = PERSONA_CHOICES
+    if any(g != "megaman" for g, _ in plan):
+        personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))),
+                                 show_desc=PERSONA_DESC)
+        if not personas:
+            return
+    for g, picked in plan:
+        if picked:
+            execute_training_run([sys.executable, "-m", "code.neuro.ast_eval", "play", "--game", g,
+                                  "--variant", *picked] + ([] if g == "megaman" else ["--persona", *personas]))
+    subprocess.run([sys.executable, "-m", "code.stats.ast_metrics"] + [a for g, _ in plan for a in ("--game", g)])
+    play_chime()
+
+
+def mutation_metrics():
+    """Mutation Metrics — the metric tables here, and the mutation dashboard in the browser."""
+    _refresh_screen()
+    _section("MUTATE  ›  Mutation Metrics")
+    subprocess.run([sys.executable, "-m", "code.stats.ast_metrics", "--page"])
+    if AST_PAGE.exists():
+        webbrowser.open(AST_PAGE.resolve().as_uri())
 
 
 _RUN_GROUPS = [  # label, dir — whole probe/sweep trees are deleted as one unit
@@ -1212,6 +1313,11 @@ def main():
         "14": ("sensor_ablation",      run_sensor_ablation),
         "15": ("ga_sweep",             run_ga_sweep),
         "16": ("readme_figures",       run_readme_figures),
+        "17": ("mutants",              run_mutants),
+        "18": ("play_mutant",          play_mutant),
+        "19": ("retrain_mutants",      retrain_mutants),
+        "20": ("playtest_agents",      playtest_agents),
+        "21": ("mutation_metrics",     mutation_metrics),
         "d":  ("delete_all",           delete_logs_and_models),
         "c":  ("clear_cli",            clear_cli),
         "0":  ("exit",                 None),
@@ -1248,6 +1354,13 @@ def main():
         print(_menu_item("14", "Sensor Ablation",      "same sweep with rays and tile grid, compared"))
         print(_menu_item("15", "GA Sweep",             "one GA knob at a time vs literature bounds; best config per game"))
         print(_menu_item("16", "README Figures",       "regenerate docs/img/fig_*.png from the JSONs, update README"))
+
+        _section("MUTATE  ·  AST evaluation")
+        print(_menu_item("17", "Mutants",              "5 per game, checked against the spec cells"))
+        print(_menu_item("18", "Play a Mutant",        "you at the keyboard, logged per player"))
+        print(_menu_item("19", "Retrain on Mutants",   "every persona's 3 seeds trained again on each mutant"))
+        print(_menu_item("20", "Agent Playtest",       "one attempt per agent, learning off: original vs mutants"))
+        print(_menu_item("21", "Mutation Metrics",     "completion, win rate, death cluster ... + the dashboard"))
 
         _section("SYSTEM")
         print(_menu_item(" D", "Delete Runs",          "pick runs / probe trees, or everything"))

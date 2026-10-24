@@ -1,0 +1,129 @@
+/* PEAK's look, shared by every dashboard (live training, Balance Command, the replay wall, the
+   mutation page): black and red, like the menu. Colors come from the NES 2C02 palette as they are;
+   pixel type names and counts things, Barlow carries everything read in quantity.
+   Served by code/neuro/server.py at /theme.css and inlined into the generated pages. */
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap');
+
+:root {
+  /* the deck */
+  --night: #000000;        /* page: NES $0F black */
+  --deck: #0e0e0e;         /* frames */
+  --deck-2: #1c1c1c;       /* raised: buttons, hover rows */
+  --deck-3: #3a0c06;       /* pressed, selected: a dark red */
+  --line: #a81000;         /* NES $06: frame and table rules */
+  --ink: #f8f8f8;          /* NES $20 */
+  --dim: #bcbcbc;          /* NES $10: secondary text */
+  --mute: #7c7c7c;         /* NES $00: tertiary text, axis labels */
+  --peak: #f83800;         /* NES $16: the red (wordmark, pressed buttons, accents) */
+
+  /* status (one meaning each) */
+  --run: #58d854;          /* $2A */
+  --stuck: #fca044;        /* $27 */
+  --dead: #e40058;         /* $15 */
+  --won: #f8d878;          /* $38: a coin */
+
+  /* games: one stripe each, on every page */
+  --g-mario: #f83800;      /* $16 */
+  --g-meatboy: #e40058;    /* $15 */
+  --g-bomberman: #f8f8f8;  /* $20: his suit */
+  --g-megaman: #f8b800;    /* $28 */
+  --g-sonic: #bcbcbc;      /* $10: archived */
+
+  /* personas: the chart series */
+  --p-novice: #58d854;     /* $2A */
+  --p-clumsy: #fca044;     /* $27 */
+  --p-experienced: #f8f8f8;/* $20: the default persona in white */
+  --p-speedrunner: #f878f8;/* $24 */
+  --p-killer: #f83800;     /* $16 */
+  --p-collector: #f8d878;  /* $38 */
+
+  --pixel: 'Pixelify Sans', 'Barlow', system-ui, sans-serif;
+  --ui: 'Barlow', system-ui, 'Segoe UI', sans-serif;
+  --dense: 'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
+  --code: ui-monospace, 'Cascadia Mono', Consolas, monospace;   /* commands only */
+
+  /* a 3-px pixel frame with notched corners: a 3x3 plus sliced into 9 (border-image) */
+  --frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23a81000'/%3E%3C/svg%3E");
+  --frame-hi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23f83800'/%3E%3C/svg%3E");
+}
+
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  background-color: var(--night);
+  background-image:                     /* the tile grid the levels are built on, barely there */
+    linear-gradient(rgba(248, 56, 0, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(248, 56, 0, .07) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--ink);
+  font: 400 15px/1.5 var(--ui);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+canvas, img.sprite { image-rendering: pixelated; }
+a { color: #f87858; }                /* NES $26 */
+:focus-visible { outline: 2px solid var(--won); outline-offset: 2px; }
+::selection { background: var(--deck-3); color: var(--ink); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--deck-3); border: 2px solid var(--night); }
+::-webkit-scrollbar-track { background: transparent; }
+code, pre, kbd { font-family: var(--code); font-size: .86em; }
+
+/* ── pixel type ─────────────────────────────────────────────────────────────── */
+.pixel { font-family: var(--pixel); font-weight: 700; letter-spacing: .02em; }
+.wordmark {
+  font-family: var(--pixel); font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: .06em;
+  color: var(--ink); text-shadow: 3px 3px 0 var(--peak);
+}
+h1, h2, h3 { font-family: var(--pixel); font-weight: 700; letter-spacing: .02em; line-height: 1.15; margin: 0; }
+h1 { font-size: 26px; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+
+/* ── frames ─────────────────────────────────────────────────────────────────── */
+.frame {
+  border: 3px solid transparent;
+  border-image: var(--frame) 1 / 3px stretch;
+  background: var(--deck);
+  background-clip: padding-box;
+}
+.frame.lit { border-image-source: var(--frame-hi); }
+.stripe { box-shadow: inset 4px 0 0 var(--stripe, var(--line)); }   /* a game's colour on its sections */
+.g-mario { --stripe: var(--g-mario); }
+.g-meatboy { --stripe: var(--g-meatboy); }
+.g-bomberman { --stripe: var(--g-bomberman); }
+.g-megaman { --stripe: var(--g-megaman); }
+.g-sonic { --stripe: var(--g-sonic); }
+
+/* ── controls ───────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px; cursor: pointer;
+  font: 600 13px/1.2 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink); text-decoration: none;
+  border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch;
+  background: var(--deck-2); background-clip: padding-box;
+}
+.btn:hover { background-color: var(--deck-3); }
+.btn:active { transform: translateY(2px); }
+.btn.on, .btn[aria-pressed="true"] { background-color: var(--peak); color: var(--ink); }
+.btn kbd { font: 600 11px/1 var(--ui); color: var(--mute); }
+.btn.on kbd, .btn[aria-pressed="true"] kbd { color: rgba(248, 248, 248, .75); }
+
+.label { font: 500 12.5px/1.3 var(--ui); font-variant-numeric: tabular-nums; color: var(--dim); }
+.num { font-family: var(--pixel); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* ── tables ─────────────────────────────────────────────────────────────────── */
+table.data { border-collapse: collapse; width: 100%; font: 500 14px/1.35 var(--dense); font-variant-numeric: tabular-nums; }
+table.data th {
+  text-align: left; font: 600 12.5px/1.3 var(--ui); color: var(--dim);
+  padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap;
+}
+table.data td { padding: 7px 10px; border-bottom: 1px solid rgba(248, 248, 248, .08); vertical-align: top; }
+table.data tr:hover td { background: rgba(248, 56, 0, .08); }
+table.data td.n, table.data th.n { text-align: right; }
+
+/* ── status words ───────────────────────────────────────────────────────────── */
+.c-RUNNING { color: var(--run); } .c-STUCK { color: var(--stuck); }
+.c-DEAD { color: var(--dead); }   .c-WON { color: var(--won); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

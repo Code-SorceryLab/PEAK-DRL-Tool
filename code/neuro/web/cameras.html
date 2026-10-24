@@ -4,70 +4,104 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Replay Wall</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2309090b'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<!-- theme.css styles the page (night tile grid, type, frames, .btn, .label); this only fits Tailwind to it -->
 <style type="text/tailwindcss">
   @layer base {
     html, body { @apply h-full; }
-    body { @apply bg-[#09090b] text-zinc-300 font-sans antialiased; }
-    canvas { image-rendering: pixelated; }
-    :focus-visible { @apply outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-[#09090b]; }
+    h2 { font-size: 16px; font-weight: 700; }   /* theme.css gives headings the pixel face; Tailwind's reset drops its size */
   }
   @layer components {
-    .eyebrow { @apply text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-400; }
-    .tab { @apply whitespace-nowrap px-3 py-2 text-[11px] font-bold tracking-widest uppercase text-zinc-500 border-b-2 border-transparent hover:text-zinc-200 transition-colors; }
-    .tab[aria-selected="true"] { @apply text-zinc-100 border-red-500; }
-    .cam { @apply relative flex flex-col rounded overflow-hidden bg-[#050505] ring-1 ring-white/5 hover:ring-white/30 transition-shadow text-left min-w-0; }
+    .eyebrow { font: 600 12.5px/1.3 var(--ui); color: var(--dim); text-transform: capitalize; }   /* the persona column heads */
+    .tab { white-space: nowrap; padding: 10px 12px 7px; font: 600 13px/1.2 var(--ui); color: var(--mute); border-bottom: 3px solid transparent; }
+    .tab:hover { color: var(--ink); }
+    .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--peak); }
+    .cam {
+      position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden; text-align: left;
+      border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; background: var(--deck); background-clip: padding-box;
+    }
+    .cam:hover, .cam.rec { border-image-source: var(--frame-hi); }   /* rec: the view open in the large window */
     .cam canvas { @apply w-full h-auto block bg-black; }
     .cam .strip { @apply h-[3px] w-full; }
-    .cam .meta { @apply flex items-center justify-between gap-2 px-2 py-1 whitespace-nowrap overflow-hidden font-mono text-[10px] text-zinc-400; }
-    .cam .flash { @apply absolute inset-x-0 top-1/3 mx-auto w-fit px-2 py-0.5 rounded font-mono text-[11px] font-bold tracking-widest uppercase bg-black/80 hidden; }
+    .cam .meta { @apply flex items-center justify-between gap-2 px-2 py-1 whitespace-nowrap overflow-hidden; font: 500 12px/1.3 var(--dense); color: var(--dim); }
+    .cam .flash { @apply absolute inset-x-0 top-1/3 mx-auto w-fit px-2 py-0.5 bg-black/80 hidden; font: 600 13px/1.2 var(--ui); text-transform: lowercase; }
     .cam.empty { @apply opacity-40 cursor-default; }
-    .cam.rec::after { content:""; @apply absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse; }
+    .cam.empty:hover { border-image-source: var(--frame); }
   }
+  /* the script tints a flash inline with Tailwind's old sky (won) or red (any other end): show them as the theme's */
+  #wall > div:not(.eyebrow) { font: 700 14px/1.2 var(--pixel); color: var(--ink); }   /* the game names down the side */
+  #sensors > div:not(.flex) { font: 600 12.5px/1.3 var(--ui); color: var(--dim); }
+  #sensors abbr, #sensors output { font-size: 12px; }
+  #sensors .bg-zinc-900 { background-color: var(--deck-2); }   /* the script's tracks are the panel colour now: raise them */
+  #conn::first-letter { text-transform: uppercase; }
+  #dot.bg-red-500 { background-color: var(--run); }   /* live reads green, as on the training dashboard */
+  #bigcv { background-color: #000; }
   body.offline #wall { filter: grayscale(1) brightness(.6); }
-  dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(2px); }
+  dialog::backdrop { background: rgba(0, 0, 0, .85); }
 </style>
+<script>
+  // Tailwind's colour names, the theme's black and red (same map as index.html), so the classes the script and the
+  // server's sensor layouts write keep working. Case, tracking, corners and the live pulse belong to the theme.
+  tailwind.config = {
+    corePlugins: { textTransform: false, letterSpacing: false, borderRadius: false, animation: false },
+    theme: { extend: {
+      colors: {
+        zinc: { 100: "#f8f8f8", 200: "#ececec", 300: "#d8d8d8", 400: "#bcbcbc", 500: "#7c7c7c",
+                600: "#4a4a4a", 700: "#2e2e2e", 800: "#1c1c1c", 900: "#0e0e0e", 950: "#000000" },
+        red: { 400: "#f87858", 500: "#f83800", 600: "#d82800", 900: "#3a0c06", 950: "#3a0c06" },
+        orange: { 400: "#e40058" },
+        amber: { 300: "#fce0a8", 400: "#fca044" },
+        emerald: { 400: "#58d854" },
+        sky: { 400: "#f8d878" },
+      },
+      fontFamily: {
+        sans: ["Barlow", "system-ui", "Segoe UI", "sans-serif"],
+        mono: ["Barlow Semi Condensed", "Barlow", "system-ui", "sans-serif"],
+      },
+    } },
+  };
+</script>
 </head>
 <body class="flex flex-col">
 
-<header class="flex items-center gap-6 px-5 border-b border-white/10 bg-[#09090b] sticky top-0 z-20">
-  <div class="flex items-center gap-2 py-2">
-    <span class="font-bold tracking-widest text-zinc-100">PEAK</span>
-    <span class="eyebrow">replay wall</span>
+<header class="flex flex-wrap items-center gap-x-6 px-5 border-b-2 border-zinc-700 bg-zinc-950 sticky top-0 z-20">
+  <div class="flex items-center gap-3 py-2.5">
+    <span class="wordmark">PEAK</span>
+    <span class="label">Replay wall</span>
   </div>
-  <nav class="flex" role="tablist" aria-label="Pages">
+  <nav class="flex self-stretch items-end" role="tablist" aria-label="Pages">
     <button class="tab" role="tab" aria-selected="true" data-src="">Cameras</button>
     <button class="tab" role="tab" aria-selected="false" data-src="/balance/report.html">Balance report</button>
     <button class="tab" role="tab" aria-selected="false" data-src="/balance/ablation.html">Sensor ablation</button>
     <button class="tab" role="tab" aria-selected="false" data-src="/balance/gasweep.html">GA sweep</button>
   </nav>
-  <div class="ml-auto flex items-center gap-2 font-mono text-[10px]" aria-live="polite">
-    <span id="dot" class="w-2 h-2 rounded-full bg-zinc-600"></span><span id="conn">connecting</span>
+  <div class="ml-auto flex items-center gap-2 text-[12.5px] font-semibold text-zinc-400" aria-live="polite">
+    <span id="dot" class="w-2 h-2 bg-zinc-600"></span><span id="conn">connecting</span>
   </div>
 </header>
 
 <main id="wallpage" class="flex-1 overflow-auto px-5 py-4">
-  <div id="wall" class="grid gap-3" style="grid-template-columns: 90px repeat(7, minmax(0, 1fr))"></div>
-  <p class="mt-4 font-mono text-[10px] text-zinc-500">Each view replays the saved models of one game and persona, level after level, with the best of three seeds per level. Click a view to watch it with its rays; Esc or a click outside closes it.</p>
+  <div id="wall" class="grid gap-3" style="grid-template-columns: 90px repeat(6, minmax(0, 1fr))"></div>
+  <p class="mt-4 max-w-[80ch] text-[13.5px] text-zinc-400">Each view replays the saved models of one game and persona, level after level, with the best of three seeds per level. Click a view to watch it with its rays; Esc or a click outside closes it.</p>
 </main>
-<iframe id="frame" title="Balance pages" class="flex-1 w-full border-0 hidden bg-[#09090b]"></iframe>
+<iframe id="frame" title="Balance pages" class="flex-1 w-full border-0 hidden bg-zinc-950"></iframe>
 
-<dialog id="big" class="bg-[#09090b] text-zinc-300 rounded-lg ring-1 ring-white/10 p-0 max-w-[96vw] max-h-[94vh] w-[1200px]" aria-labelledby="bigtitle">
-  <div class="flex items-center gap-3 px-4 py-2 border-b border-white/10">
-    <span id="bigchip" class="w-2.5 h-2.5 rounded-full"></span>
-    <h2 id="bigtitle" class="font-semibold text-zinc-100"></h2>
-    <span id="biglevel" class="font-mono text-xs text-zinc-400"></span>
-    <span id="bigscore" class="font-mono text-xs text-zinc-400"></span>
-    <button id="bigclose" class="ml-auto px-2 text-zinc-400 hover:text-white text-lg" aria-label="Close">✕</button>
+<dialog id="big" class="frame text-zinc-100 p-0 max-w-[96vw] max-h-[94vh] w-[1200px]" aria-labelledby="bigtitle">
+  <div class="flex items-center gap-3 px-4 py-2 border-b-2 border-zinc-700">
+    <span id="bigchip" class="w-2.5 h-2.5"></span>
+    <h2 id="bigtitle"></h2>
+    <span id="biglevel" class="font-mono text-[13px] text-zinc-400"></span>
+    <span id="bigscore" class="font-mono text-[13px] text-zinc-400"></span>
+    <button id="bigclose" class="btn ml-auto" aria-label="Close">✕</button>
   </div>
   <div class="flex gap-4 p-4 items-start">
-    <div class="flex-1 min-w-0 flex justify-center"><canvas id="bigcv" width="800" height="600" class="max-w-full max-h-[80vh] w-auto h-auto rounded bg-black"></canvas></div>
+    <div class="flex-1 min-w-0 flex justify-center"><canvas id="bigcv" width="800" height="600" class="frame max-w-full max-h-[80vh] w-auto h-auto"></canvas></div>
     <aside class="w-56 shrink-0 max-h-[80vh] overflow-auto">
-      <div class="eyebrow mb-2">Sensors</div>
+      <div class="label mb-2">Sensors</div>
       <div id="sensors" class="flex flex-col gap-1.5"></div>
     </aside>
   </div>
@@ -76,9 +110,9 @@
 <script>
 "use strict";
 const GAME_NAMES = {mario:"Mario", meatboy:"Meat Boy", bomberman:"Bomberman", megaman:"Mega Man"};
-const ORDER = ["novice","clumsy","experienced","good","speedrunner","killer","collector"];
+const ORDER = ["novice","clumsy","experienced","speedrunner","killer","collector"];   // = cameras.py ORDER
 const RAY_COLORS = {0:"rgba(255,255,255,.10)", 1:"#ef4444", 2:"#ec4899"};
-const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}};
+const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(248,216,120,.15)", line:"rgba(248,216,120,.5)"}};
 const SENSORS = [   // the platformers' 14-slot ray vector (same layout as the trainer dashboard)
   {g:"Proximity rays", color:"bg-zinc-300", rows:[
     {i:0,l:"FWD",d:"Ray straight ahead"},{i:1,l:"U30",d:"Ray 30° up"},{i:2,l:"U60",d:"Ray 60° up"},
@@ -155,7 +189,7 @@ function onFrame(f){
   c.score.textContent = f.attempts ? `W ${f.wins}/${f.attempts}` : "";
   c.flash.textContent = f.status;
   c.flash.style.display = f.status ? "block" : "none";
-  c.flash.style.color = f.status === "WON" ? "#38bdf8" : "#f87171";
+  c.flash.style.color = f.status === "WON" ? "#f8d878" : "#e40058";
 }
 
 function drawOverlay(ctx, rays, tiles){

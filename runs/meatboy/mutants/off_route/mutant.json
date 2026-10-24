@@ -1,0 +1,36 @@
+{
+  "id": "off_route",
+  "game": "meatboy",
+  "stage": "2",
+  "section": null,
+  "operator": "off_route",
+  "class": "neutral",
+  "direction": "none",
+  "description": "The floor tile at row 12, column 5 hollowed out, under the start ledge and closed on all four sides",
+  "retrain": true,
+  "base_file": "meatboy/world1_03_the_gap.txt",
+  "family": "level",
+  "level_file": "level.txt",
+  "config": null,
+  "cells": [
+    [
+      5,
+      12,
+      "#",
+      "."
+    ]
+  ],
+  "location": {
+    "col": 5,
+    "row": 12
+  },
+  "parameter": {
+    "tiles": 1
+  },
+  "note": "The spec's cell. On this layout it lies 1 tile under the surface (3 on the June one); the agents' rays and pit probe stop at the first solid tile, so they never reach it.",
+  "checks": {
+    "exit_reachable": true,
+    "same_level": false,
+    "walled_in": true
+  }
+}

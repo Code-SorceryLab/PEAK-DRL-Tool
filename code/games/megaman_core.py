@@ -26,6 +26,7 @@ import pygame
 import yaml
 
 from . import megaman_enemies as en
+from . import mutants
 from .megaman_assets import Assets
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -39,19 +40,10 @@ MUTANT_ENV = "PEAK_MM1_MUTANT"  # a mutant's folder or mutant.json (megaman_muta
 
 
 def active_mutant() -> dict | None:
-    """The game mutant this process plays, if PEAK_MM1_MUTANT names one: its record, with `dir`.
-    A mutant swaps the stage file for its own copy, or overrides values of megaman_config.yaml;
-    level names, sections and every command stay the same."""
-    path = os.environ.get(MUTANT_ENV)
-    if not path:
-        return None
-    if os.path.isdir(path):
-        path = os.path.join(path, "mutant.json")
-    import json
-    with open(path, encoding="utf-8") as f:
-        record = json.load(f)
-    record["dir"] = os.path.dirname(os.path.abspath(path))
-    return record
+    """The game mutant this process plays, if PEAK_MUTANT (or PEAK_MM1_MUTANT) names one: its
+    record, with `dir`. A mutant swaps the stage file for its own copy, or overrides values of
+    megaman_config.yaml; level names, sections and every command stay the same."""
+    return mutants.active("megaman")
 
 
 @dataclass

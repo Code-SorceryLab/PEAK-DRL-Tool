@@ -31,7 +31,6 @@ from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
 from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
-from .personas import COLORS as PERSONA_COLORS
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -477,404 +476,361 @@ def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, 
 
 # ── HTML pieces ──────────────────────────────────────────────────────────────
 
-CSS = """
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
-  :root{--bg:#070708;--panel:#101012;--panel2:#161618;--line:#232326;--line2:#2c2c30;
-    --txt:#e8e8ea;--dim:#9a9aa0;--faint:#606066;
-    --red:#ef4444;--red-dim:#b91c1c;--blue:#4a9eff;--yellow:#eab308;--green:#22c55e;
-    --mono:'IBM Plex Mono',Consolas,monospace;--ui:'IBM Plex Sans','Segoe UI',sans-serif}
+# The Night Cartridge look every PEAK page shares (code/neuro/web/theme.css), inlined so the pages stay standalone.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "theme.css"), encoding="utf-8") as _f:
+    THEME_CSS = _f.read()
+
+CSS = THEME_CSS + """
+  /* ── Balance Command on the Night Cartridge tokens above ─────────────────── */
+  :root{  /* the report's older names, kept so existing markup keeps working */
+    --bg:var(--night);--panel:var(--deck);--panel2:var(--deck-2);--line2:var(--line);
+    --txt:var(--ink);--faint:var(--mute);--mono:var(--ui);
+    --green:var(--run);--yellow:var(--stuck);--red:var(--dead);--red-dim:var(--deck-3);
+    --blue:#bcbcbc}   /* the second series (grid sensing, "bigger helps"): grey beside the red */
   *{box-sizing:border-box;margin:0}
   html{font-size:clamp(15px,1.05vw + 10px,17px);scroll-behavior:smooth}
-  body{background:var(--bg);color:var(--txt);font:1rem/1.55 var(--ui);
-    padding:0 clamp(12px,3vw,32px) clamp(12px,3vw,32px);caret-color:var(--red)}
-  ::selection{background:rgba(239,68,68,.3);color:#fff}
-  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
-  :focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:4px}
-  .skip{position:absolute;left:-999px;top:8px;background:var(--red);color:#fff;padding:8px 12px;border-radius:6px;z-index:99}
+  body{font-size:1rem;line-height:1.55;padding:0 clamp(12px,3vw,32px) clamp(12px,3vw,32px)}
+  canvas.chart,canvas.curve,canvas.scatter{image-rendering:auto}   /* scaled charts, not game frames */
+  .skip{position:absolute;left:-999px;top:8px;z-index:99;background:var(--ink);color:var(--night);
+    padding:8px 12px;font-weight:600}
   .skip:focus{left:8px}
   main{max-width:1280px;margin:0 auto}
-  h1,h2,h3{font-size:inherit;font-weight:inherit}
+  .faint{color:var(--mute)}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-  /* top navigation */
-  nav{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:14px;
-    background:rgba(7,7,8,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line2);
-    padding:10px clamp(12px,3vw,32px);margin:0 calc(-1 * clamp(12px,3vw,32px)) 20px}
-  nav img{height:34px;display:block}
-  nav .brand{font:700 1rem var(--mono);letter-spacing:.08em;color:#fff}
-  nav .brand em{font-style:normal;color:var(--red)}
+  /* top bar: the wordmark, the page name, every page as a pixel button */
+  nav{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;
+    background:var(--night);border-bottom:3px solid var(--line);
+    padding:12px clamp(12px,3vw,32px);margin:0 calc(-1 * clamp(12px,3vw,32px)) 20px}
+  nav .brand{display:flex;align-items:baseline;gap:14px}
+  nav .brand em{font:700 1.15rem/1 var(--pixel);font-style:normal;color:var(--dim)}
   nav .links{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
-  nav a,nav .navbtn{display:inline-flex;align-items:center;gap:6px;line-height:1;
-    font:600 .74rem var(--mono);letter-spacing:.08em;text-transform:uppercase;
-    color:var(--dim);text-decoration:none;border:1px solid var(--line2);border-radius:6px;
-    padding:0 12px;height:34px;transition:all .15s}
-  nav a:hover{color:#fff;border-color:var(--red)}
-  nav a.doc{color:var(--txt)}
-  nav a[aria-current]{color:#fff;border-color:var(--red)}
-  a.navbtn{text-decoration:none}
+  nav a .gicon{height:1.3em;margin:0;vertical-align:middle}
+
+  /* pixel buttons: theme .btn, on the controls the report already has */
+  nav a,.navbtn,.brainbtn,.tab,.cfgbtn,.watchbtn,.close,.fsbtn,.copybtn,details.more summary{
+    display:inline-flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;white-space:nowrap;
+    font:600 .87rem/1.2 var(--ui);color:var(--ink);text-decoration:none;
+    border:3px solid transparent;border-image:var(--frame) 1 / 3px stretch;
+    background:var(--deck-2);background-clip:padding-box}
+  nav a:hover,.navbtn:hover,.brainbtn:hover,.tab:hover,.cfgbtn:hover,.watchbtn:hover,.close:hover,
+  .fsbtn:hover,.copybtn:hover,details.more summary:hover{background-color:var(--deck-3)}
+  nav a:active,.navbtn:active,.brainbtn:active,.tab:active,.cfgbtn:active,.watchbtn:active,
+  .close:active,.fsbtn:active,.copybtn:active{transform:translateY(2px)}
+  nav a[aria-current],.tab.active{background-color:var(--ink);color:var(--night)}
+  .tab[style*="--c"]::before{content:"";width:8px;height:8px;background:var(--c);flex:none}  /* persona colour */
+  .brainbtn svg,.navbtn svg{color:var(--blue)}
+  .fsbtn,.copybtn{padding:2px 9px;font-size:.78rem}
+  .close{padding:3px 10px}
+  .watchbtn{flex:none;color:var(--run)}
+  .cardfoot .watchbtn{padding:2px 9px;font-size:.8rem}
+  html.file .watchbtn{opacity:.35;pointer-events:none;cursor:not-allowed}
+  html.file nav a.wall{display:none}
+  html.file .served-only,html:not(.file) .file-only{display:none}
+
+  /* panels: pixel-notched frames (theme .frame). Containers sit on the deck, read-outs on the night */
+  .viz,.stat,.lvlcard,.gloss,details.cfg,.cfgblock,.axiscard,.dverdict,.ablmode,dialog.detail,.card{
+    border:3px solid transparent;border-image:var(--frame) 1 / 3px stretch;
+    background:var(--night);background-clip:padding-box}
+  .gloss,.ablmode,dialog.detail,.card{background-color:var(--deck)}
+
+  /* game sections: .frame .stripe .g-<game> in the markup */
+  section.game{padding:clamp(14px,2.5vw,24px);padding-left:calc(clamp(14px,2.5vw,24px) + 4px);
+    margin-bottom:26px;scroll-margin-top:84px}
+  .gamehead{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:16px}
+  .gametag{display:inline-flex;align-items:center;font-size:1.4rem;color:var(--ink)}
+  .gametag .gicon{margin-right:10px}
+  .pchip{font:600 .85rem/1.2 var(--ui);color:var(--c);border:2px solid var(--c);padding:2px 10px}
+  .gamemeta{font:400 .85rem var(--ui);color:var(--dim)}
+  .chev{background:none;border:0;color:var(--dim);font:400 1.1rem var(--ui);cursor:pointer;width:26px;
+    transition:transform .15s}
+  section.game.collapsed .chev{transform:rotate(-90deg)}
+  section.game.collapsed .body,section.game.collapsed .tabs{display:none}
+  section.game.collapsed .gamehead{margin-bottom:0}
+  code.cmd{display:block;font:500 .82rem/1.4 var(--code);color:var(--ink);background:var(--deck);
+    border:2px solid var(--line);padding:7px 10px;margin:6px 0;user-select:all;overflow-x:auto;white-space:nowrap}
+
+  /* persona tabs, config buttons */
+  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 12px}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+  .toolbar .tabs{margin-left:0}
+  .toolbar .brainbtn{margin-left:auto}
+  .view{display:none} .view.active{display:block}
+  .cfgview{display:none} .cfgview.active{display:block}
+  .cfgbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+  .cfglbl{font:600 .85rem var(--ui);color:var(--dim);margin-right:4px}
+  .cfgbtn{align-items:baseline;text-align:left;color:var(--dim);padding:6px 12px}
+  .cfgbtn::before{content:"";width:8px;height:8px;background:var(--c);align-self:center;flex:none}
+  .cfgbtn b{font:600 .9rem var(--dense);color:var(--ink)}
+  .cfgbtn small{font:400 .78rem var(--ui)}
+  .cfgbtn.active{border-image-source:var(--frame-hi);background-color:var(--deck-3);color:var(--ink)}
+
+  /* tables: table.data's look, numbers right-aligned in tabular figures */
+  .ovwrap{overflow-x:auto;background:var(--night)}
+  table{border-collapse:collapse;width:100%;font:500 .93rem/1.35 var(--dense);font-variant-numeric:tabular-nums}
+  th{font:600 .83rem/1.3 var(--ui);color:var(--dim);text-align:right;padding:9px 12px;
+    border-bottom:2px solid var(--line);white-space:nowrap}
+  td{text-align:right;padding:8px 12px;border-bottom:1px solid var(--deck-3);white-space:nowrap;color:var(--dim)}
+  th:first-child,td:first-child{text-align:left}
+  td:first-child{color:var(--ink);font-weight:600}
+  tr:hover td{background:var(--deck-2)}
+  table.metrics th:first-child,table.metrics td:first-child{position:sticky;left:0;z-index:1;background:var(--night)}
+  table.metrics tr:hover td:first-child{background:var(--deck-2)}
+  table.metrics th[data-sort]{cursor:pointer;user-select:none}
+  table.metrics th[data-sort]:hover{color:var(--ink)}
+  table.metrics th[aria-sort="ascending"]::after{content:" ▴";color:var(--won)}
+  table.metrics th[aria-sort="descending"]::after{content:" ▾";color:var(--won)}
+  table.metrics tbody tr{cursor:pointer}
+  table.metrics tbody tr:focus-visible td{background:var(--deck-3)}
+  .wr-good{color:var(--run);font-weight:700}.wr-mid{color:var(--stuck);font-weight:700}
+  .wr-bad{color:var(--dead);font-weight:700}.wr-na{color:var(--mute)}
+  .ovnote{font:400 .8rem var(--ui);color:var(--mute);margin-top:8px}
+  .tbltitle{font:600 .95rem var(--ui);color:var(--ink);margin:20px 0 8px}
+
+  /* status words and verdicts */
+  .pill{display:inline-block;font:600 .75rem/1.3 var(--ui);padding:0 6px;border:2px solid currentColor;white-space:nowrap}
+  .pill-ok{color:var(--run)}.pill-warn{color:var(--stuck)}.pill-bad{color:var(--dead)}
+  .verdicts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
+  .verdict{display:inline-flex;align-items:center;gap:8px;font:600 .85rem/1.2 var(--ui);color:var(--c);
+    border:2px solid var(--c);padding:3px 10px}
+  .verdict::before{content:"";width:8px;height:8px;background:var(--c);flex:none}
+  .vsent{font:400 .95rem/1.5 var(--ui);color:var(--ink);margin-top:10px}
+  .vsent b{color:var(--c)}
+  .dverdict{--c:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:start;
+    padding:12px 14px 12px 18px;margin:12px 0 0;box-shadow:inset 4px 0 0 var(--c)}
+  .dverdict .verdict{align-self:center}
+  .dverdict .vsent{margin:0}
+  .dverdict .verdicts{grid-column:1/-1;margin:2px 0 0}
+
+  /* info bubbles: hover, keyboard focus, or tap */
+  .tip{position:relative;cursor:help}
+  .tip:hover::after,.tip:focus-visible::after,.tip.open::after{content:attr(data-tip);position:absolute;left:0;
+    bottom:calc(100% + 8px);z-index:60;width:min(300px,70vw);padding:8px 11px;
+    border:3px solid transparent;border-image:var(--frame-hi) 1 / 3px stretch;
+    background:var(--night);background-clip:padding-box;color:var(--ink);
+    font:400 .8rem/1.5 var(--ui);white-space:normal;text-align:left}
+
+  /* level cards and their windows */
+  .lvlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .lvlcard{display:flex;flex-direction:column;background-color:var(--deck-2)}
+  .lvlcard:hover,.lvlcard:has(dialog[open]){border-image-source:var(--frame-hi)}
+  .lvlcard:has(.cardhead:focus-visible){border-image-source:var(--frame-hi);outline:2px solid var(--won);outline-offset:2px}
+  .cardhead{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ink);
+    font:inherit;cursor:pointer;padding:14px 16px;flex:1}
+  .cardhead:focus-visible{outline:none}
+  .cardfoot{display:flex;align-items:center;gap:10px;padding:8px 16px 10px;border-top:2px solid var(--deck-3)}
+  .cardfoot small{font:400 .78rem var(--ui);color:var(--dim)}
+  .lvlname{font:700 1.05rem/1.2 var(--pixel);color:var(--ink);margin-bottom:8px;display:flex;
+    justify-content:space-between;align-items:center;gap:8px}
+  .bignum{font:700 2.1rem/1 var(--pixel)}
+  .lvlsub{font:400 .8rem var(--ui);color:var(--dim);margin-top:6px}
+  .mini{height:6px;background:var(--deck-3);margin-top:12px;overflow:hidden}
+  .mini i{display:block;height:100%}
+  dialog.detail{margin:auto;color:var(--ink);border-image-source:var(--frame-hi);
+    width:min(1180px,94vw);max-height:92vh;padding:6px 20px 20px}
+  dialog.detail::backdrop{background:rgba(9,12,30,.82)}
+  .dhead{display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:2;background:var(--deck);
+    padding:12px 0 10px;border-bottom:2px solid var(--line)}
+  .dhead .lvlname{margin:0;flex:1;font-size:1.15rem;justify-content:flex-start;flex-wrap:wrap}
+  .dhead .bignum{font-size:1.6rem}
+  .dhead em.mode{font:600 .75rem/1.3 var(--ui);font-style:normal;padding:0 6px;border:2px solid currentColor;
+    vertical-align:middle}
+  .dhead em.rays{color:#f87858} .dhead em.grid{color:var(--blue)}   /* MODE_COLOR */
+  details.more{margin:6px 0 10px}
+  details.more summary{list-style:none}
+  details.more summary::-webkit-details-marker{display:none}
+  details.more summary::before{content:"▸";color:var(--mute)}
+  details.more[open] summary::before{content:"▾"}
+
+  /* read-outs: stats, charts, maps */
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin:14px 0 16px}
+  .stats.headline{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin:12px 0 10px}
+  .stats.headline .stat .val{font-size:1.3rem}
+  .stat{padding:10px 12px;min-width:0}
+  .stat .lbl{font:500 .83rem/1.3 var(--ui);color:var(--dim)}
+  .stat .val{font:700 1.1rem/1.25 var(--pixel);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .sub{font:400 .78rem var(--ui);color:var(--mute);margin-top:2px}
+  .viz{padding:12px 14px;margin-top:10px}
+  .viz .vt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:600 .9rem/1.35 var(--ui);
+    color:var(--ink);margin-bottom:8px}
+  .vt .faint{font-weight:400}
+  .caption{font:400 .8rem/1.5 var(--ui);color:var(--mute);margin-top:6px}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font:400 .8rem var(--ui);color:var(--dim);margin-top:6px}
+  .legend .lg i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px}
+  .heat{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+  .heat i{height:20px;background:var(--deck-2)}
+  .heatlbl{display:flex;justify-content:space-between;font:400 .78rem var(--ui);color:var(--mute);margin-top:4px}
+  .causebar{display:flex;height:16px;gap:2px;overflow:hidden}
+  .causekey{font:400 .82rem var(--ui);color:var(--dim);margin-top:6px}
+  canvas.curve{width:100%;height:190px;display:block}
+  .routewrap{overflow:auto}
+  canvas.routes{display:block;margin:0 auto}
+  .fsbtn{margin-left:auto}
+  .viz:fullscreen{background:var(--night);border:0;border-image:none;padding:24px 24px 12px;overflow:auto;
+    display:flex;flex-direction:column}
+  .viz:fullscreen .routewrap{flex:1;display:flex;align-items:center;justify-content:safe center}
+  .cmdrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px}
+  .cmdrow code.cmd{flex:1;min-width:260px;margin:6px 0}
+  .chartbox{margin-top:0}
+  .chartwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,260px);gap:14px;align-items:center}
+  @media (max-width:820px){.chartwrap{grid-template-columns:1fr}}
+  canvas.chart{width:100%;max-width:720px;height:auto;display:block;margin:0 auto}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font:400 .82rem var(--ui);color:var(--dim);border:2px solid var(--c);padding:3px 10px}
+  .chip b{font-family:var(--pixel);font-weight:700;color:var(--c)}
+  .legend.chips{flex-direction:column;align-items:stretch;gap:4px}
+  .lchip{display:flex;align-items:center;gap:8px;background:none;border:2px solid var(--deck-3);
+    padding:4px 8px;color:var(--dim);font:500 .82rem var(--dense);cursor:pointer;text-align:left}
+  .lchip:hover{border-color:var(--c)}
+  .lchip.off{opacity:.35}
+  .lchip i{display:inline-block;width:22px;height:0;border-top:3px solid var(--c);flex:none}
+  .lchip i.novice{border-top-style:dashed}
+  .lchip i.speedrunner{border-top-style:dotted}
+  .lchip small{color:var(--mute);margin-left:auto}
+
+  /* level config */
+  details.cfg{margin-top:10px;padding:10px 14px}
+  details.cfg summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px;list-style:none}
+  details.cfg summary::-webkit-details-marker{display:none}
+  details.cfg summary::before{content:"▸";color:var(--mute);font:600 .9rem var(--ui);width:14px}
+  details.cfg[open] summary::before{content:"▾"}
+  .sumlbl{font:600 .9rem var(--ui);color:var(--ink);margin-right:4px}
+  .cfgchip{font:500 .75rem var(--ui);color:var(--dim);border:2px solid var(--deck-3);padding:0 8px}
+  .sumhint{margin-left:auto;font:400 .78rem var(--ui);color:var(--mute)}
+  details.cfg[open] .sumhint{display:none}
+  .cfggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:12px}
+  .cfgblock{padding:10px 12px;align-self:start}
+  .cfgtitle{display:flex;align-items:center;gap:8px;font:600 .85rem var(--ui);color:var(--ink);
+    padding-bottom:6px;border-bottom:2px solid var(--line);margin-bottom:4px}
+  .cfgtitle em{font:700 .8rem var(--pixel);font-style:normal;color:var(--mute);margin-left:auto}
+  .kv{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:3px 0;
+    border-bottom:1px solid var(--deck-3);font:500 .8rem var(--dense)}
+  .kv:last-child{border-bottom:0}
+  .kv b{font-weight:400;color:var(--mute);flex:none}
+  .kv span{color:var(--ink);text-align:right;overflow-wrap:anywhere}
+
+  /* the network window */
+  .brainrow{display:grid;grid-template-columns:minmax(300px,1.15fr) minmax(280px,1fr);gap:10px;margin-top:10px}
+  .brainrow>.viz{align-self:start}
+  @media (max-width:900px){.brainrow{grid-template-columns:1fr}}
+  svg.net{width:100%;height:auto;display:block;margin-top:4px}
+  svg.net .lbl{font:500 11px var(--dense);fill:var(--dim)}
+  svg.net .lbl.out{font-weight:600;font-size:12px}
+  svg.net .cap{font:600 11px var(--ui);fill:var(--mute)}
+  .gastats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin:0}
+  .gastats .val{font-size:1rem}
+  .pipe{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .pipe .step{display:flex;flex-direction:column;border:2px solid var(--line);padding:6px 12px;min-width:120px}
+  .pipe .step b{font:600 .88rem var(--ui);color:var(--ink)}
+  .pipe .step small{font:400 .78rem var(--ui);color:var(--dim)}
+  .pipe .arrow{color:var(--mute);font:600 1.1rem var(--ui)}
 
   /* sensor ablation page */
   .ablhero{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
-  .ablmode{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);
-    border-radius:10px;padding:12px 16px;display:grid;grid-template-columns:110px 1fr;gap:14px;align-items:center}
+  .ablmode{display:grid;grid-template-columns:110px 1fr;gap:14px;align-items:center;padding:12px 16px 12px 20px;
+    box-shadow:inset 4px 0 0 var(--c)}
   .ablmode svg{width:110px;height:110px;display:block}
-  .ablmode h3{font:700 .95rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--c)}
-  .ablmode p{font:400 .84rem/1.5 var(--ui);color:var(--dim);margin:6px 0 10px}
-  .ablscore{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 22px;
-    font:600 .8rem var(--mono);color:var(--dim)}
-  .ablscore b{font-size:1.4rem;color:var(--c)}
-  .ablscore .sep{color:var(--faint);font-weight:400}
+  .ablmode h3{font-size:1.3rem;color:var(--c)}
+  .ablmode p{font:400 .9rem/1.5 var(--ui);color:var(--dim);margin:6px 0 10px}
+  .ablscore{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:0 0 22px;font:500 .9rem var(--ui);color:var(--dim)}
+  .ablscore b{font:700 1.6rem/1 var(--pixel);color:var(--c)}
+  .ablscore .sep{color:var(--mute);font-weight:400}
   .dual{display:grid;grid-template-columns:minmax(110px,160px) 1fr;gap:4px 14px;align-items:center}
-  .dual .lv{font:600 .82rem var(--mono);color:var(--txt);grid-row:span 2;align-self:center}
-  .dual .bar{position:relative;height:16px;border-radius:3px;background:var(--line);overflow:hidden}
-  .dual .bar i{display:block;height:100%;background:var(--c);border-radius:3px}
-  .dual .bar em{position:absolute;inset:0;font:600 .66rem/16px var(--mono);font-style:normal;
-    color:#fff;padding-left:6px;white-space:nowrap;text-shadow:0 0 4px #000}
+  .dual .lv{font:600 .88rem var(--dense);color:var(--ink);grid-row:span 2;align-self:center}
+  .dual .bar{position:relative;height:16px;background:var(--deck-2);overflow:hidden}
+  .dual .bar i{display:block;height:100%;background:var(--c)}
+  .dual .bar em{position:absolute;inset:0;font:600 .72rem/16px var(--dense);font-style:normal;color:var(--ink);
+    padding-left:6px;white-space:nowrap;text-shadow:1px 1px 0 var(--night)}
   .dual .gap{height:8px;grid-column:1/-1}
-  .delta-r{color:var(--red);font-weight:700}.delta-g{color:var(--blue);font-weight:700}.delta-0{color:var(--faint)}
-  th.mr,td.mr{border-left:1px solid var(--line2)}
-  th.mg,td.mg{border-left:1px solid var(--line2)}
-  thead tr.modes th{text-align:center;color:#fff;background:var(--panel);letter-spacing:.16em}
+  .delta-r{color:var(--dead);font-weight:700}.delta-g{color:var(--blue);font-weight:700}.delta-0{color:var(--mute)}
+  th.mr,td.mr,th.mg,td.mg{border-left:2px solid var(--line)}
+  thead tr.modes th{text-align:center}
   .stats.ablstats{grid-template-columns:repeat(4,1fr)}
   .curvegrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
   .curvegrid .viz{margin-top:0}
   .curvegrid canvas.curve{height:170px}
-  @media (max-width:900px){.curvegrid{grid-template-columns:1fr}}
+  @media (max-width:900px){.curvegrid,.ablhero{grid-template-columns:1fr}}
   @media (max-width:700px){.stats.ablstats{grid-template-columns:1fr 1fr}}
-  @media (max-width:900px){.ablhero{grid-template-columns:1fr}.ablmode{grid-template-columns:110px 1fr}
-    .ablmode svg{width:110px;height:110px}}
 
   /* GA sweep page */
   .gshero{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:14px;align-items:stretch}
   .gshero .viz{margin-top:0}
   canvas.scatter{width:100%;height:auto;display:block;margin-top:4px}
-  .verdict{display:inline-flex;align-items:center;gap:8px;font:700 .72rem var(--mono);letter-spacing:.12em;
-    text-transform:uppercase;border:1px solid var(--c);color:var(--c);border-radius:999px;padding:4px 12px;
-    background:color-mix(in srgb,var(--c) 10%,transparent)}
-  .verdict::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
-  .vsent{font:400 .9rem/1.5 var(--ui);color:var(--txt);margin-top:10px}
-  .vsent b{color:var(--c)}
-  .dverdict{--c:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:start;
-    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0 0}
-  .dverdict .verdict{align-self:center}
-  .dverdict .vsent{margin:0;font-size:.95rem}
-  .dverdict .verdicts{grid-column:1/-1;margin:2px 0 0}
-  .gsrec{border-top:3px solid var(--green)}
+  .gsrec{box-shadow:inset 4px 0 0 var(--run);padding-left:18px}
   .gsrec .recrow{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
-  .recchip{display:inline-flex;align-items:baseline;gap:6px;font:400 .74rem var(--mono);color:var(--dim);
-    border:1px solid var(--line2);border-radius:6px;padding:5px 10px;background:var(--panel2)}
-  .recchip b{color:var(--txt);font-weight:600}
-  .recchip s{text-decoration:line-through;color:var(--faint)}
-  .recchip em{font-style:normal;color:var(--green);font-weight:600}
-  .recchip em.neg{color:var(--red)}
+  .recchip{display:inline-flex;align-items:baseline;gap:6px;font:400 .8rem var(--ui);color:var(--dim);
+    border:2px solid var(--line);padding:4px 10px}
+  .recchip b{color:var(--ink);font-weight:600}
+  .recchip s{color:var(--mute)}
+  .recchip em{font-style:normal;color:var(--run);font-weight:600}
+  .recchip em.neg{color:var(--dead)}
   .gsaxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;margin-top:12px}
-  .axiscard{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:12px 14px 10px;
-    display:flex;flex-direction:column}
-  .axiscard h4{font:700 .78rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--txt);
-    display:flex;align-items:center;gap:8px}
-  .axiscard h4 small{margin-left:auto;font:600 .62rem var(--mono);letter-spacing:.06em;color:var(--faint);text-transform:none}
-  .axiscard p{font:400 .7rem/1.45 var(--ui);color:var(--faint);margin:4px 0 0;min-height:2.9em}
+  .axiscard{padding:12px 14px 10px;display:flex;flex-direction:column}
+  .axiscard h4{font:600 .95rem var(--ui);color:var(--ink);display:flex;align-items:center;gap:8px}
+  .axiscard h4 small{margin-left:auto;font:500 .78rem var(--ui);color:var(--mute)}
+  .axiscard p{font:400 .8rem/1.45 var(--ui);color:var(--mute);margin:4px 0 0;min-height:2.9em}
   .rail{position:relative;height:96px;margin:14px 30px 4px}
-  .rail::before{content:"";position:absolute;left:-12px;right:-12px;top:44px;height:2px;background:var(--line2);border-radius:2px}
+  .rail::before{content:"";position:absolute;left:-12px;right:-12px;top:43px;height:3px;background:var(--line)}
   .mk{position:absolute;top:44px;left:var(--x);transform:translate(-50%,-50%);width:0;height:0}
-  .mk i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--s);height:var(--s);
-    border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent);
-    transition:width .4s cubic-bezier(.2,.7,.2,1),height .4s cubic-bezier(.2,.7,.2,1)}
-  .mk.best i{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 30%,transparent),0 0 18px var(--c)}
-  .mk.none i{background:none;border:1px dashed var(--faint);box-shadow:none}
-  .mk b{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);font:600 .72rem var(--mono);
+  .mk i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--s);height:var(--s);background:var(--c)}
+  .mk.best i{outline:2px solid var(--won);outline-offset:2px}
+  .mk.none i{background:none;border:2px dashed var(--mute)}
+  .mk b{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);font:600 .78rem var(--dense);
     color:var(--c);white-space:nowrap}
-  .mk.none b{color:var(--faint);font-weight:400}
-  .mk small{position:absolute;top:18px;left:50%;transform:translateX(-50%);font:400 .64rem var(--mono);
-    color:var(--dim);white-space:nowrap;text-align:center;line-height:1.3}
-  .mk small strong{display:block;color:var(--txt);font-weight:600}
-  .mk.best small strong::after{content:" ★";color:var(--yellow)}
-  .axisnote{font:400 .64rem var(--mono);color:var(--faint);margin-top:6px}
+  .mk.none b{color:var(--mute);font-weight:400}
+  .mk small{position:absolute;top:18px;left:50%;transform:translateX(-50%);font:500 .72rem/1.3 var(--dense);
+    color:var(--dim);white-space:nowrap;text-align:center}
+  .mk small strong{display:block;color:var(--ink);font-weight:600}
+  .mk.best small strong::after{content:" ★";color:var(--won)}
+  .axisnote{font:400 .75rem var(--ui);color:var(--mute);margin-top:6px}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 18px}
-  .kpis .stat .val{font-size:1.4rem}
-  .kpis .stat.accent{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,var(--panel))}
+  .kpis .stat .val{font-size:1.6rem}
+  .kpis .stat.accent{box-shadow:inset 4px 0 0 var(--c);padding-left:16px}
   .kpis .stat.accent .val{color:var(--c)}
-  table.gst td.base{color:var(--yellow)}
+  table.gst td.base{color:var(--stuck)}
   .gsov{margin-bottom:14px}
-  .gsov .gsjump{color:var(--txt);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:6px}
-  .gsov .gsjump:hover{color:var(--red)}
-  .gsov a.gsjump.navbtn{font-size:.62rem;height:26px;padding:0 9px}
-  .gsov .recchip{padding:3px 8px;font-size:.68rem}
+  .gsov .gsjump{color:var(--ink);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .gsov .gsjump:hover{text-decoration:underline;text-underline-offset:3px}
+  .gsov a.gsjump.navbtn{font-size:.78rem;padding:2px 9px}
+  .gsov a.gsjump.navbtn:hover{text-decoration:none}
+  .gsov .recchip{padding:2px 8px;font-size:.75rem}
   .gsov table.gst td{white-space:normal;vertical-align:middle}
-  .gsov td.knobs{min-width:360px;text-align:left}
-  .gsov td.knobs .recrow{justify-content:flex-start}
-  .recchip.sig{border-color:var(--green)}
-  table.mx td{font:400 .76rem var(--mono);white-space:nowrap;padding:7px 12px}
-  table.mx td.lbl{color:var(--dim);font-family:var(--ui);font-size:.74rem}
+  table.mx td{font:500 .85rem var(--dense);white-space:nowrap;padding:7px 12px}
+  table.mx td.lbl{font:500 .83rem var(--ui);color:var(--dim)}
   table.mx td b{font-weight:700}
-  table.mx td small{color:inherit;opacity:.8;margin-left:5px;font-size:.64rem}
+  table.mx td small{color:inherit;opacity:.8;margin-left:5px;font-size:.72rem}
   table.mx th{padding:8px 12px;vertical-align:bottom}
-  table.mx th a{color:var(--txt);display:inline-flex;flex-direction:column;align-items:flex-end;gap:2px;line-height:1.2}
-  table.mx th a small{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none}
-  table.mx tr.sum td{border-top:1px solid var(--line2);background:var(--panel2)}
-  table.mx tr.sum + tr td{border-top:1px solid var(--line2)}
+  table.mx th a{color:var(--ink);display:inline-flex;flex-direction:column;align-items:flex-end;gap:2px;line-height:1.2}
+  table.mx th a small{color:var(--mute);font-weight:400}
+  table.mx tr.sum td{border-top:2px solid var(--line);background:var(--deck)}
+  table.mx tr.sum + tr td{border-top:2px solid var(--line)}
   @media (max-width:900px){.gshero{grid-template-columns:1fr}}
 
-  section.game{border:1px solid var(--line);border-radius:10px;background:var(--panel);
-    padding:clamp(14px,2.5vw,24px);margin-bottom:26px;scroll-margin-top:70px}
-  .gamehead{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:16px}
-  .gametag{font:700 1.05rem var(--mono);letter-spacing:.14em;text-transform:uppercase;
-    color:#fff;background:var(--red-dim);border-radius:6px;padding:5px 14px}
-  .pchip{font:700 .8rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--c);
-    border:1px solid var(--c);border-radius:6px;padding:5px 12px;background:color-mix(in srgb,var(--c) 12%,transparent)}
-  .gamemeta{font:400 .78rem var(--mono);color:var(--dim)}
-  code.cmd{display:block;font:600 .8rem var(--mono);color:var(--yellow);background:#151517;
-    padding:8px 10px;border-radius:6px;margin:6px 0;user-select:all;overflow-x:auto;white-space:nowrap}
-  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
-  .tab{font:600 .78rem var(--mono);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-    color:var(--dim);background:var(--panel2);border:1px solid var(--line2);border-radius:6px;
-    padding:7px 14px;transition:all .15s}
-  .tab:hover{color:var(--txt);border-color:var(--faint)}
-  .tab.active{color:#fff;background:var(--red-dim);border-color:var(--red)}
-  .tab.active.t-overview{background:#1d3a5f;border-color:var(--blue)}
-  .view{display:none} .view.active{display:block}
-
-  .ovwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
-  table{border-collapse:collapse;font:400 .85rem var(--mono);font-variant-numeric:tabular-nums;width:100%}
-  th{font:600 .68rem var(--ui);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-     text-align:right;padding:10px 14px;border-bottom:1px solid var(--line2);white-space:nowrap;
-     background:var(--panel2)}
-  td{text-align:right;padding:9px 14px;border-bottom:1px solid #1b1b1e;white-space:nowrap;color:var(--dim)}
-  th:first-child,td:first-child{text-align:left}
-  td:first-child{color:var(--txt);font-weight:600}
-  tr:hover td{background:#141416}
-  table.metrics th:first-child,table.metrics td:first-child{position:sticky;left:0;z-index:1;background:var(--panel2)}
-  table.metrics th[data-sort]{cursor:pointer;user-select:none}
-  table.metrics th[data-sort]:hover{color:var(--txt)}
-  table.metrics th[aria-sort="ascending"]::after{content:" ▴";color:var(--red)}
-  table.metrics th[aria-sort="descending"]::after{content:" ▾";color:var(--red)}
-  table.metrics tbody tr{cursor:pointer}
-  table.metrics tbody tr:focus-visible td{background:#1a1a1e}
-  .wr-good{color:var(--green);font-weight:700}.wr-mid{color:var(--yellow);font-weight:700}
-  .wr-bad{color:var(--red);font-weight:700}.wr-na{color:var(--faint)}
-  .ovnote{font:400 .74rem var(--ui);color:var(--faint);margin-top:8px}
-
-  .pill{font:600 .66rem var(--mono);border-radius:4px;padding:2px 8px;white-space:nowrap}
-  .pill-ok{color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35)}
-  .pill-warn{color:var(--yellow);background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.35)}
-  .pill-bad{color:var(--red);background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4)}
-
-  /* info bubbles: hover, keyboard focus, or tap */
-  .tip{position:relative;cursor:help}
-  .tip:hover::after,.tip:focus-visible::after,.tip.open::after{content:attr(data-tip);position:absolute;left:0;
-    bottom:calc(100% + 8px);z-index:60;width:min(300px,70vw);background:#1b1b1f;color:var(--txt);
-    border:1px solid #2d3f5c;border-radius:6px;padding:9px 12px;
-    font:400 .74rem/1.5 var(--ui);letter-spacing:0;text-transform:none;white-space:normal;
-    text-align:left;box-shadow:0 10px 28px -6px rgba(0,0,0,.7)}
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-
-  .lvlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-  .lvlcard{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;overflow:hidden;
-    transition:border-color .15s;display:flex;flex-direction:column}
-  .lvlcard:hover{border-color:var(--faint)}
-  .lvlcard:has(dialog[open]),.lvlcard:has(.cardhead:focus-visible){border-color:var(--red)}
-  .cardhead{display:block;width:100%;text-align:left;background:none;border:0;color:var(--txt);
-    font:inherit;cursor:pointer;padding:14px 16px;flex:1}
-  .cardhead:focus-visible{outline:none}
-  .cardfoot{display:flex;align-items:center;gap:10px;padding:8px 16px 10px;border-top:1px solid var(--line)}
-  .cardfoot .watchbtn{padding:4px 10px;font-size:.66rem}
-  .cardfoot small{font:400 .68rem var(--mono);color:var(--dim)}
-  .lvlname{font:600 .9rem var(--mono);color:#e5e5e5;margin-bottom:8px;display:flex;
-    justify-content:space-between;align-items:center;gap:8px}
-  .bignum{font:700 1.9rem var(--mono)}
-  .lvlsub{font:400 .74rem var(--mono);color:var(--faint);margin-top:2px}
-  .mini{height:4px;border-radius:2px;background:var(--line);margin-top:10px;overflow:hidden}
-  .mini i{display:block;height:100%}
-
-  dialog.detail{margin:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line2);
-    border-radius:12px;width:min(1180px,94vw);max-height:92vh;padding:6px 20px 20px;
-    box-shadow:0 30px 80px rgba(0,0,0,.7)}
-  dialog.detail[open]{animation:slide .18s ease-out}
-  dialog.detail::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(3px)}
-  .dhead{display:flex;align-items:center;gap:14px;position:sticky;top:0;background:var(--panel2);
-    padding:12px 0 8px;border-bottom:1px solid var(--line2);z-index:2}
-  .dhead .lvlname{margin:0;flex:1;font-size:1rem;justify-content:flex-start}
-  .dhead .bignum{font-size:1.5rem}
-  .close{background:none;border:1px solid var(--line2);border-radius:6px;color:var(--dim);
-    font:600 .8rem var(--mono);padding:4px 9px;cursor:pointer}
-  .close:hover{color:#fff;border-color:var(--red)}
-  @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-  .chev{background:none;border:0;color:var(--dim);font:400 1.1rem var(--mono);cursor:pointer;
-    width:26px;transition:transform .15s}
-  section.game.collapsed .chev{transform:rotate(-90deg)}
-  section.game.collapsed .body,section.game.collapsed .tabs{display:none}
-  section.game.collapsed .gamehead{margin-bottom:0}
-  .brainbtn,.navbtn{display:inline-flex;align-items:center;gap:6px;background:none;cursor:pointer;
-    border:1px solid var(--line2);border-radius:6px;color:var(--dim);font:600 .72rem var(--mono);
-    letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;transition:all .15s}
-  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 12px}
-  .toolbar .tabs{margin-left:0}
-  .toolbar .brainbtn{margin-left:auto}
-  .cfgview{display:none} .cfgview.active{display:block}
-  .cfgbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
-  .cfglbl{align-self:center;font:600 .68rem var(--ui);letter-spacing:.1em;text-transform:uppercase;
-    color:var(--faint);margin-right:4px}
-  .cfgbtn{display:inline-flex;align-items:baseline;gap:8px;cursor:pointer;text-align:left;
-    background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
-    padding:8px 14px;color:var(--dim);transition:all .15s}
-  .cfgbtn::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c);align-self:center;flex:none}
-  .cfgbtn b{font:700 .8rem var(--mono);letter-spacing:.06em;color:var(--txt)}
-  .cfgbtn small{font:400 .68rem var(--mono);color:var(--faint)}
-  .cfgbtn:hover{border-color:var(--c)}
-  .cfgbtn.active{background:color-mix(in srgb,var(--c) 12%,var(--panel2));border-color:var(--c);color:#fff}
-  .chartbox{margin-top:0}
-  .chartwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,260px);gap:14px;align-items:center}
-  @media (max-width:820px){.chartwrap{grid-template-columns:1fr}}
-  canvas.chart{width:100%;max-width:720px;height:auto;display:block;margin:0 auto}
-  .legend.chips{flex-direction:column;align-items:stretch;gap:4px}
-  .lchip{display:flex;align-items:center;gap:8px;background:none;border:1px solid var(--line);border-radius:6px;
-    padding:4px 8px;color:var(--dim);font:400 .7rem var(--mono);cursor:pointer;text-align:left}
-  .lchip:hover{border-color:var(--c)}
-  .lchip.off{opacity:.35}
-  .lchip i{display:inline-block;width:22px;height:0;border-top:2.5px solid var(--c);flex:none}
-  .lchip i.novice{border-top-style:dashed}
-  .lchip i.speedrunner{border-top-style:dotted}
-  .lchip small{color:var(--faint);margin-left:auto}
-  .dhead em.mode{font-style:normal;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
-    padding:2px 8px;border-radius:999px;border:1px solid currentColor;vertical-align:middle}
-  .dhead em.rays{color:var(--red)} .dhead em.grid{color:var(--blue)}
-  .brainbtn:hover,.navbtn:hover{color:#fff;border-color:var(--blue)}
-  .brainbtn svg{color:var(--blue)}
-  details.cfg{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;
-    padding:10px 14px}
-  details.cfg summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px;list-style:none}
-  details.cfg summary::-webkit-details-marker{display:none}
-  details.cfg summary::before{content:"▸";color:var(--faint);font:600 .9rem var(--mono);width:14px}
-  details.cfg[open] summary::before{content:"▾"}
-  .sumlbl{font:600 .76rem var(--ui);color:var(--dim);margin-right:4px}
-  .cfgchip{font:400 .66rem var(--mono);color:var(--dim);border:1px solid var(--line2);border-radius:999px;padding:2px 9px}
-  .sumhint{margin-left:auto;font:400 .66rem var(--mono);color:var(--faint)}
-  details.cfg[open] .sumhint{display:none}
-  .cfggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:12px}
-  .cfgblock{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;align-self:start}
-  .cfgtitle{display:flex;align-items:center;gap:8px;font:600 .72rem var(--ui);letter-spacing:.08em;
-    text-transform:uppercase;color:var(--dim);padding-bottom:6px;border-bottom:1px solid var(--line2);margin-bottom:4px}
-  .cfgtitle em{font:600 .62rem var(--mono);font-style:normal;color:var(--faint);background:var(--panel);
-    border-radius:999px;padding:1px 7px;margin-left:auto}
-  .kv{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:3px 0;
-    border-bottom:1px solid var(--line);font:400 .72rem var(--mono)}
-  .kv:last-child{border-bottom:0}
-  .kv b{font-weight:400;color:var(--faint);flex:none}
-  .kv span{color:var(--txt);text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-  .cfgblock table{width:100%;table-layout:fixed;border-collapse:collapse;font:400 .72rem var(--mono)}
-  .cfgblock td{overflow-wrap:anywhere;white-space:normal}
-  .cfgblock td,.cfgblock th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;
-    vertical-align:top;word-break:break-word}
-  .cfgblock td:first-child,.cfgblock th:first-child{width:45%}
-  .cfgblock td:first-child{color:var(--faint)}
-  .cfgblock th{color:var(--dim);font-weight:600;white-space:normal}
-  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font:400 .68rem var(--mono);color:var(--dim);margin-top:6px}
-  .brainrow{display:grid;grid-template-columns:minmax(300px,1.15fr) minmax(280px,1fr);gap:10px;margin-top:10px}
-  .brainrow>.viz{align-self:start}
-  @media (max-width:900px){.brainrow{grid-template-columns:1fr}}
-  svg.net{width:100%;height:auto;display:block;margin-top:4px}
-  svg.net .lbl{font:400 11px var(--mono);fill:var(--dim)}
-  svg.net .lbl.out{font-weight:600;font-size:12px}
-  svg.net .cap{font:600 10px var(--ui);fill:var(--faint);letter-spacing:.08em;text-transform:uppercase}
-  .gastats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin:0}
-  .gastats .val{font-size:1rem}
-  .pipe{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-  .pipe .step{display:flex;flex-direction:column;background:var(--panel2);border:1px solid var(--line2);
-    border-radius:8px;padding:7px 12px;min-width:120px}
-  .pipe .step b{font:700 .74rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#fff}
-  .pipe .step small{font:400 .68rem var(--mono);color:var(--dim)}
-  .pipe .arrow{color:var(--red);font:700 1.1rem var(--mono)}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{font:400 .74rem var(--mono);color:var(--dim);border:1px solid var(--c);border-radius:999px;
-    padding:5px 12px;background:color-mix(in srgb,var(--c) 10%,transparent)}
-  .chip b{color:var(--c)}
-  .vt .faint{font-weight:400;color:var(--faint)}
-  .legend .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-  .verdicts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin:14px 0 16px}
-  .stats.headline{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin:12px 0 10px}
-  .stats.headline .stat .val{font-size:1.25rem}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
-  .stat .lbl{font:400 .66rem var(--ui);color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
-  .stat .val{font:600 1.05rem var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .stat .sub{font:400 .68rem var(--mono);color:var(--dim);margin-top:1px}
-  details.more{margin:4px 0 10px}
-  details.more summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:8px;
-    font:600 .74rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
-    border:1px solid var(--line2);border-radius:6px;padding:6px 12px}
-  details.more summary::-webkit-details-marker{display:none}
-  details.more summary::before{content:"▸";color:var(--faint)}
-  details.more[open] summary::before{content:"▾"}
-  details.more summary:hover{color:var(--txt);border-color:var(--faint)}
-  .viz{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px}
-  .viz .vt{font:600 .76rem var(--ui);color:var(--dim);margin-bottom:8px}
-  .caption{font:400 .72rem var(--ui);color:var(--faint);margin-top:6px;line-height:1.5}
-  .heat{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
-  .heat i{height:20px;border-radius:2px;background:var(--line)}
-  .heatlbl{display:flex;justify-content:space-between;font:400 .66rem var(--mono);color:var(--faint);margin-top:3px}
-  .causebar{display:flex;height:15px;gap:1px;border-radius:3px;overflow:hidden}
-  .causekey{font:400 .74rem var(--mono);color:var(--dim);margin-top:6px}
-  canvas.curve{width:100%;height:190px;display:block}
-  .routewrap{overflow:auto;border-radius:4px}
-  .viz .vt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .fsbtn{margin-left:auto}
-  .fsbtn,.copybtn{background:none;border:1px solid var(--line2);border-radius:5px;
-    color:var(--dim);font:600 .66rem var(--mono);letter-spacing:.06em;text-transform:uppercase;
-    padding:3px 8px;cursor:pointer}
-  .fsbtn:hover,.copybtn:hover{color:#fff;border-color:var(--blue)}
-  .viz:fullscreen{background:var(--bg);padding:24px 24px 12px;overflow:auto;border:0;border-radius:0;
-    display:flex;flex-direction:column}
-  .viz:fullscreen .routewrap{flex:1;display:flex;align-items:center;justify-content:safe center}
-  .cmdrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px}
-  .watchbtn{display:inline-flex;flex:none;align-items:center;gap:6px;background:var(--red-dim);
-    color:#fff;text-decoration:none;border-radius:6px;padding:6px 14px;font:700 .74rem var(--mono);
-    letter-spacing:.08em;text-transform:uppercase;transition:background .15s}
-  .watchbtn:hover{background:var(--red)}
-  html.file .watchbtn{opacity:.35;pointer-events:none;cursor:not-allowed}
-  html.file nav a.wall{display:none}
-  html.file .served-only,html:not(.file) .file-only{display:none}
-  .cmdrow code.cmd{flex:1;min-width:260px;margin:6px 0}
-  canvas.routes{display:block;border-radius:4px;margin:0 auto}
-
-  .tbltitle{font:600 .78rem var(--ui);letter-spacing:.1em;text-transform:uppercase;
-    color:var(--dim);margin:20px 0 8px}
-  .gloss{background:var(--panel);border:1px solid var(--line);
-    border-radius:8px;padding:12px 18px;margin:0 0 18px;font-size:.82rem;color:var(--dim);line-height:1.7}
-  .gloss b{color:var(--txt)}
-  .gloss summary{cursor:pointer;font-weight:600;color:var(--txt);list-style:none;display:flex;align-items:center;gap:8px}
+  /* how-to-read box, instructions page, footer */
+  .gloss{padding:12px 18px;margin:0 0 18px;font-size:.92rem;color:var(--dim);line-height:1.7}
+  .gloss b{color:var(--ink)}
+  .gloss summary{cursor:pointer;font-weight:600;color:var(--ink);list-style:none;display:flex;align-items:center;gap:8px}
   .gloss summary::-webkit-details-marker{display:none}
-  .gloss summary::before{content:"▸";color:var(--faint)}
+  .gloss summary::before{content:"▸";color:var(--mute)}
   .gloss[open] summary::before{content:"▾"}
   .gloss[open] summary{margin-bottom:6px}
-  footer{color:var(--dim);font:400 .74rem var(--ui);margin:22px 0 8px}
+  footer{color:var(--mute);font:400 .8rem var(--ui);margin:22px 0 8px}
   .doc-body{max-width:860px}
-  .doc-body h2{font:700 1.05rem var(--mono);color:var(--red);margin:26px 0 8px;letter-spacing:.06em}
-  .doc-body p,.doc-body li{color:var(--dim);font-size:.92rem}
-  .doc-body code{font:600 .84rem var(--mono);color:var(--yellow);background:#151517;
-    border-radius:4px;padding:1px 6px}
+  .doc-body h2{font-size:1.3rem;color:var(--ink);margin:30px 0 10px}
+  .doc-body p,.doc-body ul{max-width:72ch}
+  .doc-body p,.doc-body li{color:var(--dim);font-size:.95rem}
+  .doc-body code{color:var(--ink);background:var(--deck-2);padding:1px 6px}
   .doc-body ul{padding-left:22px;margin:8px 0}
-  .doc-body b{color:var(--txt)}
-  /* game icons */
+  .doc-body b:not([class]){color:var(--ink)}
+
+  /* game icons: the sprites stay pixel-crisp */
   .gicon{height:1.35em;width:auto;vertical-align:-0.28em;margin-right:8px;image-rendering:pixelated}
-  nav a .gicon{height:1.3em;margin:0;vertical-align:middle}
   .gletter{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;
-    border-radius:4px;background:#333;color:#fff;font:700 .8em var(--mono)}
+    background:var(--deck-3);color:var(--ink);font:700 .8em/1 var(--pixel)}
 
-  /* overview split: table + radar side by side, stacking on narrow screens */
-  .ovsplit{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr);gap:14px;align-items:start}
-  .radarbox{margin-top:0}
-  canvas.radar{width:100%;max-width:520px;height:auto;display:block;margin:0 auto}
-  @media (max-width:900px){.ovsplit{grid-template-columns:1fr}}
-
-  /* entrance + micro animations */
-  section.game{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
-  section.game.seen{opacity:1;transform:none}
-  .mini i{width:0;transition:width .8s cubic-bezier(.2,.7,.3,1)}
-  @media (prefers-reduced-motion:reduce){
-    *{transition:none !important;animation:none !important}
-    section.game{opacity:1;transform:none}
-  }
-
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
   @media (max-width:560px){
+    nav{position:static}
     .lvlgrid{grid-template-columns:1fr 1fr}
     .stats{grid-template-columns:1fr 1fr}
     .tabs{margin-left:0;width:100%}
@@ -882,8 +838,8 @@ CSS = """
   }
 """
 
-CAUSE_COLORS = {"Enemy": "#ef4444", "Pit": "#4a9eff", "OOB": "#eab308", "Spike": "#a855f7", "Bomb": "#f97316",
-                "Saw": "#a855f7", "Stall": "#eab308", "Timeout": "#9a9aa0", "?": "#606066"}
+CAUSE_COLORS = {"Enemy": "#f83800", "Pit": "#f8f8f8", "OOB": "#f8b800", "Spike": "#f878f8", "Bomb": "#e45c10",
+                "Saw": "#f878f8", "Stall": "#fca044", "Timeout": "#bcbcbc", "?": "#7c7c7c"}  # NES; Stall = --stuck
 
 
 def _pill(row: dict) -> str:
@@ -915,7 +871,7 @@ def _ci(row: dict) -> float:
 def _heat(hist: list[int]) -> str:
     mx = max(hist) or 1
     cells = "".join(
-        f'<i style="background:rgba(239,68,68,{0.15 + 0.85 * n / mx:.2f})" title="{n} deaths"></i>'
+        f'<i style="background:rgba(228,0,88,{0.15 + 0.85 * n / mx:.2f})" title="{n} deaths"></i>'
         if n else "<i></i>" for n in hist)
     return (f'<div class="heat">{cells}</div>'
             f'<div class="heatlbl"><span>start</span><span>goal</span></div>')
@@ -927,7 +883,7 @@ def _causebar(causes: dict[str, int]) -> str:
         return '<div class="causekey">no deaths recorded</div>'
     parts, key = [], []
     for name, n in sorted(causes.items(), key=lambda kv: -kv[1]):
-        color = CAUSE_COLORS.get(name, "#606066")
+        color = CAUSE_COLORS.get(name, "#7c7c7c")
         parts.append(f'<i style="width:{100 * n / total:.1f}%;background:{color}" '
                      f'title="{_cause_name(name)}: {n}"></i>')
         key.append(f'<span style="color:{color}">■</span> {_cause_name(name)} {100 * n / total:.0f}%')
@@ -974,7 +930,7 @@ def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> tuple[
             f'fitness {c["best"]:,.0f}</div>'
             f'<div class="cmdrow"><a class="watchbtn" href="{href}" target="_blank" rel="noopener">'
             f'▶ Watch replay</a><code class="cmd">python -m code.neuro.trainer --game {game} '
-            f'--replay {npz}</code><button class="copybtn" type="button">copy</button></div>'
+            f'--replay {npz}</code><button class="copybtn" type="button">Copy</button></div>'
             f'<div class="caption"><span class="served-only">Starts the replay and opens the live dashboard '
             f'in a new tab; a replay already running is replaced after you confirm.</span><span class="file-only">'
             f'Open the command center via <b>menu 12</b> for a one-click button; as a plain file, run the command '
@@ -1042,16 +998,16 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     if grid:
         payload = json.dumps({"grid": grid, "ts": 32, "routes": routes})
         legend = " ".join(f'<span class="lg"><i style="background:{c}"></i>{GLYPH_NAME[k]}</span>'
-                          for k, c in (("#", "#26262c"), ("?", "#b45309"), ("^", "#7f1d1d"),
-                                       ("E", "#ef4444"), ("C", "#eab308"), ("S", "#2563eb"),
-                                       ("H", "#7c3aed"), ("P", "#22c55e"), ("G", "#14532d"))
+                          for k, c in (("#", "#3a3a3a"), ("?", "#ac7c00"), ("^", "#a81000"),   # = drawRoutes
+                                       ("E", "#f83800"), ("C", "#f8d878"), ("S", "#f878f8"),
+                                       ("H", "#fca044"), ("P", "#58d854"), ("G", "#006800"))
                           if any(k in r for r in grid))
         n_win = sum(1 for r in routes if r["w"])
         route_viz = f"""
         <div class="viz"><div class="vt">Agent routes on the level
             <span style="color:var(--green)">— wins</span>
             <span style="color:var(--red)">— deaths</span>
-            <button class="fsbtn" type="button">⛶ full screen</button></div>
+            <button class="fsbtn" type="button">⛶ Full screen</button></div>
           <div class="routewrap"><canvas class="routes" width="1100" height="200" data-routes='{payload}' role="img"
             aria-label="{row['level']} drawn as tiles with {n_win} winning and {len(routes) - n_win} failed agent routes"></canvas></div>
           <div class="legend">{legend}</div>
@@ -1060,7 +1016,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
           {'' if routes else 'No route traces logged for this level yet.'}</div></div>"""
 
     foot = (f'<div class="cardfoot"><a class="watchbtn" href="{watch_href}" target="_blank" rel="noopener" '
-            f'aria-label="Watch the best {row["level"]} agent">▶ watch</a>'
+            f'aria-label="Watch the best {row["level"]} agent">▶ Watch</a>'
             f'<small>best seed replay · dashboard</small></div>' if watch_href else "")
     return f"""
     <div class="lvlcard">
@@ -1078,7 +1034,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
           <button class="close" type="button" aria-label="Close level details">✕</button>
         </div>
         <div class="dverdict" style="--c:{vcolor}">
-          <span class="verdict">{vword}</span>
+          <span class="verdict">{vword.capitalize()}</span>
           <p class="vsent">{vsent}</p>
           <div class="verdicts">{_verdicts(row, strat, th)}</div>
         </div>
@@ -1151,8 +1107,8 @@ def _overview(personas: dict[str, dict]) -> str:
             if r["level"] not in order:
                 order.append(r["level"])
     pnames = list(personas)
-    ths = "".join(f"<th scope='col' style='color:{PERSONA_COLOR.get(p, 'var(--dim)')}'>{p}<br>"
-                  f"<span style='letter-spacing:0;font-weight:400;color:var(--dim)'>win rate · first win</span></th>"
+    ths = "".join(f"<th scope='col' style='color:{PERSONA_COLOR.get(p, 'var(--dim)')}'>{p.capitalize()}<br>"
+                  f"<span style='font-weight:400;color:var(--dim)'>Win rate · first win</span></th>"
                   for p in pnames)
     trs = []
     for lvl in order:
@@ -1181,13 +1137,14 @@ def _overview(personas: dict[str, dict]) -> str:
     per-level breakdown — click a card for its window with routes, death maps, causes, and curves.</div>"""
 
 
-CONFIG_COLORS = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316", "#14b8a6", "#ec4899"]
+CONFIG_COLORS = ["#f83800", "#bcbcbc", "#f8d878", "#58d854", "#f878f8", "#fca044", "#e40058", "#f87858"]  # NES, red first
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
-PERSONA_COLOR = PERSONA_COLORS
+# chart series per persona: theme.css --p-* as hex (a canvas can't read CSS variables)
+PERSONA_COLOR = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", THEME_CSS))
 
 
 def _persona_chip(persona: str) -> str:
-    return f'<span class="pchip" style="--c:{PERSONA_COLOR.get(persona, "var(--dim)")}">{persona}</span>'
+    return f'<span class="pchip" style="--c:{PERSONA_COLOR.get(persona, "var(--dim)")}">{persona.capitalize()}</span>'
 
 
 def _tag_label(tag: str | None, data: dict) -> str:
@@ -1210,7 +1167,7 @@ def _game_chart(game: str, by_tag: dict, idx: int) -> str:
     by_persona = len(by_tag) == 1  # one config: persona is the only variable, so it owns the colour
     for ti, (tag, personas) in enumerate(by_tag.items()):
         for pname, data in personas.items():
-            color = PERSONA_COLOR.get(pname, "#9a9aa0") if by_persona else CONFIG_COLORS[ti % len(CONFIG_COLORS)]
+            color = PERSONA_COLOR.get(pname, "#bcbcbc") if by_persona else CONFIG_COLORS[ti % len(CONFIG_COLORS)]
             dash = [] if by_persona else PERSONA_DASH.get(pname, [4, 3])
             rows = {r["level"]: r for r in data["levels"]}
             series.append({"name": f"{tag or 'legacy'} · {pname}", "tag": tag or "legacy",
@@ -1261,51 +1218,51 @@ def _net_svg(mode: str = "rays", n_hidden: int = 16) -> str:
     if mode == "grid":
         # input side: a mini tile window (3 channels stacked) + the body scalars
         gx, gy, cell = 40, 24, 11
-        for ch, col in enumerate(("#4a9eff", "#eab308", "#ef4444")):
+        for ch, col in enumerate(("#bcbcbc", "#f8d878", "#f83800")):
             off = ch * 7
             out.append(f'<rect x="{gx + off}" y="{gy + off}" width="{GRID_N * cell}" height="{GRID_N * cell}" '
-                       f'rx="3" fill="#0c0c0e" stroke="{col}" stroke-opacity=".8"/>')
+                       f'fill="#000000" stroke="{col}" stroke-opacity=".8"/>')
         for r in range(GRID_N):
             for c in range(GRID_N):
                 solid = r >= 8 or (c >= 9 and r >= 5)
-                fill = "#fff" if (r, c) == (5, 5) else ("#2c2c30" if solid else "#121215")
+                fill = "#f8f8f8" if (r, c) == (5, 5) else ("#4a4a4a" if solid else "#0e0e0e")
                 out.append(f'<rect x="{gx + 14 + c * cell + 1}" y="{gy + 14 + r * cell + 1}" width="{cell - 2}" '
-                           f'height="{cell - 2}" rx="1" fill="{fill}"/>')
+                           f'height="{cell - 2}" fill="{fill}"/>')
         gcy = gy + 14 + GRID_N * cell / 2
         out.append(f'<text x="{gx}" y="{gy + 14 + GRID_N * cell + 26}" class="lbl">{GRID_CH} × {GRID_N} × {GRID_N} tiles'
                    f'</text><text x="{gx}" y="{gy + 14 + GRID_N * cell + 42}" class="lbl">'
-                   f'<tspan fill="#4a9eff">solid</tspan> · <tspan fill="#eab308">collectible</tspan> · '
-                   f'<tspan fill="#ef4444">hazard</tspan></text>')
-        out.append('<g stroke="#4a9eff" stroke-opacity=".16" stroke-width="1.2">')
+                   f'<tspan fill="#bcbcbc">solid</tspan> · <tspan fill="#f8d878">collectible</tspan> · '
+                   f'<tspan fill="#f83800">hazard</tspan></text>')
+        out.append('<g stroke="#bcbcbc" stroke-opacity=".16" stroke-width="1.2">')
         out += [f'<line x1="{gx + 14 + GRID_N * cell}" y1="{gcy:.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for j in range(n_hidden)]
         out.append('</g>')
         yb = lambda i: H - 118 + i * 22
-        out.append('<g stroke="#4a9eff" stroke-opacity=".13" stroke-width="1">')
+        out.append('<g stroke="#bcbcbc" stroke-opacity=".13" stroke-width="1">')
         out += [f'<line x1="{xi}" y1="{yb(i):.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for i in range(N_BODY) for j in range(n_hidden)]
         out.append('</g>')
         for i, name in enumerate(BODY):
             out.append(f'<text x="{xi - 12}" y="{yb(i) + 4:.0f}" text-anchor="end" class="lbl">{name}</text>'
-                       f'<circle cx="{xi}" cy="{yb(i):.0f}" r="5" fill="#0b1f33" stroke="#4a9eff" stroke-width="1.5"/>')
+                       f'<circle cx="{xi}" cy="{yb(i):.0f}" r="5" fill="#0e0e0e" stroke="#bcbcbc" stroke-width="1.5"/>')
         in_cap = f"{GRID_CH * GRID_N * GRID_N} grid + {N_BODY} body"
     else:
         yi = lambda i: 22 + i * (H - 44) / (len(SENSORS) - 1)
-        out.append('<g stroke="#4a9eff" stroke-opacity=".13" stroke-width="1">')
+        out.append('<g stroke="#bcbcbc" stroke-opacity=".13" stroke-width="1">')
         out += [f'<line x1="{xi}" y1="{yi(i):.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for i in range(len(SENSORS)) for j in range(n_hidden)]
         out.append('</g>')
         for i, name in enumerate(SENSORS):
             out.append(f'<text x="{xi - 12}" y="{yi(i) + 4:.0f}" text-anchor="end" class="lbl">{name}</text>'
-                       f'<circle cx="{xi}" cy="{yi(i):.0f}" r="5" fill="#0b1f33" stroke="#4a9eff" stroke-width="1.5"/>')
+                       f'<circle cx="{xi}" cy="{yi(i):.0f}" r="5" fill="#0e0e0e" stroke="#bcbcbc" stroke-width="1.5"/>')
         in_cap = f"{len(SENSORS)} ray sensors"
-    out.append('<g stroke="#ef4444" stroke-opacity=".22" stroke-width="1">')
+    out.append('<g stroke="#f83800" stroke-opacity=".22" stroke-width="1">')
     out += [f'<line x1="{xh}" y1="{yh(j):.0f}" x2="{xo}" y2="{yo(k):.0f}"/>'
             for j in range(n_hidden) for k in range(N_OUTPUTS)]
     out.append('</g>')
     for j in range(n_hidden):
-        out.append(f'<circle cx="{xh}" cy="{yh(j):.0f}" r="{5.5 if n_hidden <= 24 else 3.2}" fill="#1a1a1f" stroke="#9a9aa0" stroke-width="1.5"/>')
-    for k, (name, col) in enumerate((("left", "#eab308"), ("right", "#22c55e"), ("jump", "#ef4444"))):
+        out.append(f'<circle cx="{xh}" cy="{yh(j):.0f}" r="{5.5 if n_hidden <= 24 else 3.2}" fill="#1c1c1c" stroke="#bcbcbc" stroke-width="1.5"/>')
+    for k, (name, col) in enumerate((("left", "#f8d878"), ("right", "#58d854"), ("jump", "#f83800"))):
         out.append(f'<circle cx="{xo}" cy="{yo(k):.0f}" r="7" fill="{col}22" stroke="{col}" stroke-width="2"/>'
                    f'<text x="{xo + 14}" y="{yo(k) + 4:.0f}" class="lbl out" fill="{col}">{name}</text>')
     out.append(f'<text x="{xi if mode != "grid" else 110}" y="{H - 2}" text-anchor="middle" class="cap">{in_cap}</text>'
@@ -1370,24 +1327,24 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
     tiles = "".join(
         f'<div class="stat"><div class="lbl">{lbl}</div><div class="val">{fmt(ga[k])}</div>'
         f'<div class="sub">{sub}</div></div>' for k, (lbl, sub, fmt) in GA_DOC.items() if k in ga)
-    steps = [("evaluate", f"{ga['pop_size']} genomes play the level"),
-             ("elitism", f"top {ga['elite']} survive as-is"),
-             ("select", f"tournament of {ga['tournament_k']}"),
-             ("crossover", f"{ga['crossover_rate']:.0%} of children, uniform mask"),
-             ("mutate", f"{ga['mutation_rate']:.0%} of weights · σ {ga['mutation_sigma']:g}"),
-             ("anneal", f"×{ga['anneal_factor']:g} after first win")]
+    steps = [("Evaluate", f"{ga['pop_size']} genomes play the level"),
+             ("Elitism", f"top {ga['elite']} survive as-is"),
+             ("Select", f"tournament of {ga['tournament_k']}"),
+             ("Crossover", f"{ga['crossover_rate']:.0%} of children, uniform mask"),
+             ("Mutate", f"{ga['mutation_rate']:.0%} of weights · σ {ga['mutation_sigma']:g}"),
+             ("Anneal", f"×{ga['anneal_factor']:g} after first win")]
     pipe = '<span class="arrow">→</span>'.join(
         f'<span class="step"><b>{n}</b><small>{d}</small></span>' for n, d in steps)
     chips = "".join(
         f'<span class="chip" style="--c:{col}"><b>{p.name}</b> '
         f'{"sprint" if p.sprint else "walk"} · senses every {p.sensor_period} frame{"s" if p.sensor_period > 1 else ""}'
         f'{" · +" + format(p.time_rate, "g") + " fitness / s left" if p.time_rate else ""}</span>'
-        for (n, p), col in ((kv, PERSONA_COLORS.get(kv[0], "#a855f7"))
+        for (n, p), col in ((kv, PERSONA_COLOR.get(kv[0], "#bcbcbc"))
                             for kv in PERSONAS.items()) if n in personas)
     return f"""
     <dialog class="detail brain" id="brain_{sec_id}" aria-labelledby="brain_{sec_id}_t">
       <div class="dhead"><h3 class="lvlname" id="brain_{sec_id}_t"><span>{_BRAIN_SVG} Neuroevolution hyperparameters · {game}
-        · {data.get('tag') or 'legacy'} · <em class="mode {mode}">{mode}</em></span></h3>
+        · {data.get('tag') or 'legacy'} · <em class="mode {mode}">{mode.capitalize()}</em></span></h3>
         <button class="close" type="button" aria-label="Close hyperparameters">✕</button></div>
       {note}
       <div class="brainrow">
@@ -1426,7 +1383,7 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
         for pi, (pname, pdata) in enumerate(personas.items()):
             vid = f"{cid}_{pi}"
             tabs.append(f'<button class="tab" role="tab" aria-selected="false" aria-controls="{vid}" data-view="{vid}" '
-                        f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--red)")}">{pname}</button>')
+                        f'type="button" style="--c:{PERSONA_COLOR.get(pname, "var(--dim)")}">{pname.capitalize()}</button>')
             cell_map = pdata.get("cells", {})
             cards = "".join(_card(game, pname, r, cell_map.get(r["level"], []), th, tag)
                             for r in pdata["levels"])
@@ -1441,17 +1398,17 @@ def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | 
           <div class="toolbar">
             <div class="tabs" role="tablist" aria-label="Persona">{''.join(tabs)}</div>
             <button class="brainbtn tip" type="button" data-dialog="brain_{sid}"
-              data-tip="GA + network hyperparameters used for this config">{_BRAIN_SVG} hyperparameters</button>
+              data-tip="GA + network hyperparameters used for this config">{_BRAIN_SVG} Hyperparameters</button>
             {ga_link}
           </div>
           {''.join(pviews)}
           {_brain_dialog(sid, game, personas)}
         </div>""")
     return f"""
-  <section class="game" id="g_{game}" aria-labelledby="g_{game}_t">
+  <section class="game frame stripe g-{game}" id="g_{game}" aria-labelledby="g_{game}_t">
     <div class="gamehead">
       <button class="chev" type="button" aria-expanded="true" aria-controls="g_{game}_body" aria-label="Collapse {game}">▾</button>
-      <h2 class="gametag" id="g_{game}_t">{_game_icon(game)}{game}</h2>
+      <h2 class="gametag" id="g_{game}_t">{_game_icon(game)}{game.capitalize()}</h2>
       <span class="gamemeta">{len(by_tag)} config{'s' if len(by_tag) != 1 else ''} · {n_levels} levels
         · total train time {fmt_hms(total)}</span>
     </div>
@@ -1499,12 +1456,12 @@ def _runs_section() -> str:
     if not rows:
         return ""
     return f"""
-  <section class="game" id="g_runs" aria-labelledby="g_runs_t">
+  <section class="game frame stripe" id="g_runs" aria-labelledby="g_runs_t">
     <div class="gamehead">
       <button class="chev" type="button" aria-expanded="true" aria-label="Collapse training runs">▾</button>
-      <h2 class="gametag" id="g_runs_t" style="background:#1d3a5f">Training runs</h2>
+      <h2 class="gametag" id="g_runs_t">Training runs</h2>
       <span class="gamemeta">every run found under runs/ · resume with
-      <span style="color:var(--yellow)">--resume runs/&lt;name&gt;</span></span></div>
+      <code>--resume runs/&lt;name&gt;</code></span></div>
     <div class="body"><div class="ovwrap"><table>
       <thead><tr><th scope="col">Run</th><th scope="col">Persona</th><th scope="col">Gens</th><th scope="col">Best fitness</th>
         <th scope="col">Best level</th><th scope="col">Total wins</th><th scope="col">Train time</th></tr></thead>
@@ -1514,6 +1471,7 @@ def _runs_section() -> str:
 
 
 JS = """
+const FONT = '500 12px "Barlow Semi Condensed", Barlow, sans-serif';  // canvas labels: the theme's --dense
 for (const tab of document.querySelectorAll('.tab')){
   tab.addEventListener('click', () => {
     const scope = tab.closest('.cfgview') || tab.closest('section.game');
@@ -1656,26 +1614,26 @@ for (const cv of document.querySelectorAll('canvas.scatter')){
   const maxY = Math.max(...pts.map(p => p.y + (p.ci || 0)), 1) * 1.18;
   const px = v => L + (lx(v) - x0) / (x1 - x0) * (W - L - R);
   const py = v => H - B - (Math.max(v, 0) / maxY) * (H - T - B);
-  ctx.font = '400 12px "IBM Plex Mono", monospace'; ctx.lineWidth = 1;
+  ctx.font = FONT; ctx.lineWidth = 1;
   for (let q = 0; q <= 4; q++){
     const v = maxY * q / 4, y = py(v);
-    ctx.strokeStyle = '#222226'; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
-    ctx.fillStyle = '#77777d'; ctx.fillText(maxY < 10 ? v.toFixed(1) : v.toFixed(0), 8, y + 4);
+    ctx.strokeStyle = '#2e2e2e'; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
+    ctx.fillStyle = '#7c7c7c'; ctx.fillText(maxY < 10 ? v.toFixed(1) : v.toFixed(0), 8, y + 4);
   }
   let lastEnd = -1e9;
   for (const p of [...pts].sort((a, b) => a.x - b.x)){
     const x = px(p.x), t = p.x.toLocaleString(), w = ctx.measureText(t).width;
-    ctx.strokeStyle = '#19191c'; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, H - B); ctx.stroke();
-    if (x - w / 2 > lastEnd + 6){ ctx.fillStyle = '#77777d'; ctx.fillText(t, x - w / 2, H - B + 16); lastEnd = x + w / 2; }
+    ctx.strokeStyle = '#1c1c1c'; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, H - B); ctx.stroke();
+    if (x - w / 2 > lastEnd + 6){ ctx.fillStyle = '#7c7c7c'; ctx.fillText(t, x - w / 2, H - B + 16); lastEnd = x + w / 2; }
   }
-  ctx.fillStyle = '#77777d';
+  ctx.fillStyle = '#7c7c7c';
   const xl = 'weights (log scale)'; ctx.fillText(xl, W - R - ctx.measureText(xl).width, H - 6);
   ctx.save(); ctx.translate(14, (T + H - B) / 2); ctx.rotate(-Math.PI / 2);
   const yl = 'gens to first win'; ctx.fillText(yl, -ctx.measureText(yl).width / 2, 0); ctx.restore();
   if (fit){
     const hx = pts.filter(p => p.kind === 'hidden').map(p => p.x);
     const xa = Math.min(...hx), xb = Math.max(...hx);
-    ctx.setLineDash([6, 5]); ctx.strokeStyle = fit.color || '#22c55e99'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = fit.color || '#58d85499'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(px(xa), py(fit.m * lx(xa) + fit.b)); ctx.lineTo(px(xb), py(fit.m * lx(xb) + fit.b));
     ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
   }
@@ -1691,7 +1649,7 @@ for (const cv of document.querySelectorAll('canvas.scatter')){
     if (p.kind === 'arch'){ ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath(); }
     else ctx.arc(x, y, p.star ? 7 : 5.5, 0, Math.PI * 2);
     ctx.fill();
-    if (p.star){ ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1; }
+    if (p.star){ ctx.strokeStyle = '#f8f8f8'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1; }
   }
   // labels last, nudged apart when points sit on top of each other
   const placed = [];
@@ -1700,7 +1658,7 @@ for (const cv of document.querySelectorAll('canvas.scatter')){
     const w = ctx.measureText(p.label).width;
     for (let k = 0; k < 6 && placed.some(q => Math.abs(q.y - y) < 13 && x < q.x + q.w + 6 && x + w + 6 > q.x); k++) y -= 13;
     placed.push({x, y, w});
-    ctx.fillStyle = '#e8e8ea'; ctx.fillText(p.label, x, y);
+    ctx.fillStyle = '#f8f8f8'; ctx.fillText(p.label, x, y);
   }
 }
 for (const cv of document.querySelectorAll('canvas.curve')){
@@ -1712,8 +1670,8 @@ for (const cv of document.querySelectorAll('canvas.curve')){
   const maxX = Math.max(...seeds.map(c => c.length));
   const px = i => L + i * (W - L - R) / (maxX - 1);
   const py = v => H - B - (v / maxY) * (H - T - B);
-  ctx.font = '400 12px "IBM Plex Mono", monospace';
-  ctx.strokeStyle = '#222226'; ctx.fillStyle = '#77777d'; ctx.lineWidth = 1;
+  ctx.font = FONT;
+  ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#7c7c7c'; ctx.lineWidth = 1;
   for (let q = 0; q <= 4; q++){
     const v = maxY * q / 4, y = py(v);
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
@@ -1721,16 +1679,16 @@ for (const cv of document.querySelectorAll('canvas.curve')){
   }
   if (maxY > 5000){
     const y = py(5000);
-    ctx.setLineDash([5, 4]); ctx.strokeStyle = '#22c55e55';
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = '#58d85455';
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#22c55e99'; ctx.fillText('win bonus', W - R - 78, y - 5);
+    ctx.fillStyle = '#58d85499'; ctx.fillText('win bonus', W - R - 78, y - 5);
   }
-  ctx.fillStyle = '#77777d';
+  ctx.fillStyle = '#7c7c7c';
   ctx.fillText('gen 1', L, H - 9);
   const el = 'gen ' + maxX;
   ctx.fillText(el, W - R - ctx.measureText(el).width, H - 9);
-  const colors = JSON.parse(cv.dataset.colors || 'null') || ['#ef4444', '#4a9eff', '#eab308', '#a855f7'];
+  const colors = JSON.parse(cv.dataset.colors || 'null') || ['#f83800', '#f8d878', '#bcbcbc', '#f878f8'];
   seeds.forEach((c, si) => {
     for (const [j, w] of [[1, 1], [0, 2]]){
       ctx.strokeStyle = j ? colors[si % colors.length] + '44' : colors[si % colors.length];
@@ -1777,13 +1735,13 @@ function drawChart(cv, t){
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);
-  ctx.font = '400 12px "IBM Plex Mono", monospace';
+  ctx.font = FONT;
   const alpha = s => (focus && s.tag !== focus) ? 0.28 : 1;
   const visible = d.series.map((s, i) => !hidden.has(i));
   if (cv.dataset.kind === 'bars'){
     const L = 48, R = 12, T = 16, B = 34, n = d.axes.length;
     const plotW = W - L - R, plotH = H - T - B;
-    ctx.strokeStyle = '#222226'; ctx.fillStyle = '#77777d'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#7c7c7c'; ctx.lineWidth = 1;
     for (let q = 0; q <= 4; q++){
       const y = T + plotH - plotH * q / 4;
       ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
@@ -1801,13 +1759,13 @@ function drawChart(cv, t){
         ctx.fillStyle = s.color;
         ctx.fillRect(gx + bi * barW, T + plotH - h, barW - 1.5, h);
         if (s.dash.length){  // persona hatch on top of the bar
-          ctx.strokeStyle = '#070708'; ctx.lineWidth = 1; ctx.setLineDash(s.dash);
+          ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; ctx.setLineDash(s.dash);
           ctx.beginPath(); ctx.moveTo(gx + bi * barW + barW / 2, T + plotH - h); ctx.lineTo(gx + bi * barW + barW / 2, T + plotH); ctx.stroke();
           ctx.setLineDash([]);
         }
         ctx.globalAlpha = 1;
       });
-      ctx.fillStyle = '#9a9aa0'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#bcbcbc'; ctx.textAlign = 'center';
       ctx.fillText(ax, L + off + k * groupW + groupW / 2, H - 12);
       ctx.textAlign = 'left';
     });
@@ -1816,7 +1774,7 @@ function drawChart(cv, t){
   const cx = W / 2, cy = H / 2 + 6, R = Math.min(W, H) / 2 - 60, n = d.axes.length;
   const ang = i => -Math.PI / 2 + i * 2 * Math.PI / n;
   for (const frac of [0.25, 0.5, 0.75, 1]){
-    ctx.strokeStyle = frac === 0.5 ? '#33333a' : '#222226'; ctx.lineWidth = 1;
+    ctx.strokeStyle = frac === 0.5 ? '#4a4a4a' : '#2e2e2e'; ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i <= n; i++){
       const a = ang(i % n), r = R * frac;
@@ -1824,12 +1782,12 @@ function drawChart(cv, t){
     }
     ctx.stroke();
   }
-  ctx.fillStyle = '#606066'; ctx.fillText('50%', cx + 4, cy - R * 0.5 - 3);
+  ctx.fillStyle = '#7c7c7c'; ctx.fillText('50%', cx + 4, cy - R * 0.5 - 3);
   for (let i = 0; i < n; i++){
     const a = ang(i);
-    ctx.strokeStyle = '#222226';
+    ctx.strokeStyle = '#2e2e2e';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a)); ctx.stroke();
-    ctx.fillStyle = '#9a9aa0';
+    ctx.fillStyle = '#bcbcbc';
     ctx.textAlign = Math.abs(Math.cos(a)) < 0.3 ? 'center' : (Math.cos(a) > 0 ? 'left' : 'right');
     ctx.fillText(d.axes[i], cx + (R + 16) * Math.cos(a), cy + (R + 16) * Math.sin(a) + 4);
   }
@@ -1889,18 +1847,18 @@ function drawRoutes(cv, maxW, maxH){
   cv.width = Math.round(cols * d.ts * scale);
   cv.height = Math.max(90, Math.round(rows * d.ts * scale));
   const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#0c0c0e'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, cv.width, cv.height);
   const cell = d.ts * scale;
-  const BLOCK = {'#': '#26262c', '=': '#3a3a42', '?': '#b45309', '^': '#7f1d1d', 'G': '#14532d',
-                 'S': '#2563eb', 'H': '#7c3aed', 'D': '#475569'};
-  const MARK = {'E': '#ef4444', 'C': '#eab308', 'P': '#22c55e'};  // entities drawn as markers
+  const BLOCK = {'#': '#3a3a3a', '=': '#5a5a5a', '?': '#ac7c00', '^': '#a81000', 'G': '#006800',
+                 'S': '#f878f8', 'H': '#fca044', 'D': '#7c7c7c'};   // NES; the legend in _card matches
+  const MARK = {'E': '#f83800', 'C': '#f8d878', 'P': '#58d854'};  // entities drawn as markers
   const marks = [];
   d.grid.forEach((row, r) => {
     for (let c = 0; c < row.length; c++){
       const ch = row[c];
       if (ch === ' ') continue;
       if (MARK[ch]) { marks.push([c, r, ch]); continue; }
-      ctx.fillStyle = BLOCK[ch] || '#26262c';
+      ctx.fillStyle = BLOCK[ch] || '#2e2e2e';
       if (ch === '=') ctx.fillRect(c * cell, r * cell, cell + 0.5, Math.max(1, cell * 0.35));
       else ctx.fillRect(c * cell, r * cell, cell + 0.5, cell + 0.5);
     }
@@ -1908,7 +1866,7 @@ function drawRoutes(cv, maxW, maxH){
   for (const [c, r, ch] of marks){  // enemies: ring + dot, coins: dot, start: dot — always ≥ 2.5px
     const x = (c + 0.5) * cell, y = (r + 0.5) * cell, rad = Math.max(2.5, cell * 0.45);
     ctx.fillStyle = MARK[ch]; ctx.beginPath(); ctx.arc(x, y, ch === 'C' ? rad * 0.6 : rad, 0, 7); ctx.fill();
-    if (ch === 'E'){ ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, rad + 1.2, 0, 7); ctx.stroke(); }
+    if (ch === 'E'){ ctx.strokeStyle = '#f87858'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, rad + 1.2, 0, 7); ctx.stroke(); }
   }
   const draw = (route, color, width, alpha) => {
     ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = width;
@@ -1921,8 +1879,8 @@ function drawRoutes(cv, maxW, maxH){
     ctx.globalAlpha = 1;
   };
   const lw = Math.max(1, scale * d.ts / 7);
-  for (const r of d.routes) if (!r.w) draw(r, '#ef4444', lw, 0.30);
-  for (const r of d.routes) if (r.w) draw(r, '#22c55e', lw * 1.6, 0.85);
+  for (const r of d.routes) if (!r.w) draw(r, '#e40058', lw, 0.30);   // --dead
+  for (const r of d.routes) if (r.w) draw(r, '#58d854', lw * 1.6, 0.85);   // --run
 }
 for (const cv of document.querySelectorAll('canvas.routes')) drawRoutes(cv, 1100, Infinity);
 for (const b of document.querySelectorAll('.fsbtn')){
@@ -1937,15 +1895,15 @@ document.addEventListener('fullscreenchange', () => {
     if (fs && fs.contains(cv)) drawRoutes(cv, fs.clientWidth - 48, fs.clientHeight - 150);
     else if (cv.width !== 1100 || !fs) drawRoutes(cv, 1100, Infinity);
   }
-  document.querySelectorAll('.fsbtn').forEach(x => { x.textContent = fs ? '⛶ exit full screen' : '⛶ full screen'; });
+  document.querySelectorAll('.fsbtn').forEach(x => { x.textContent = fs ? '⛶ Exit full screen' : '⛶ Full screen'; });
 });
 for (const b of document.querySelectorAll('.copybtn')){
   b.addEventListener('click', async () => {
     const code = b.previousElementSibling;
-    try { await navigator.clipboard.writeText(code.textContent); b.textContent = 'copied'; }
+    try { await navigator.clipboard.writeText(code.textContent); b.textContent = 'Copied'; }
     catch { const r = document.createRange(); r.selectNodeContents(code);
-            getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent = 'select + ⌘C'; }
-    setTimeout(() => { b.textContent = 'copy'; }, 1500);
+            getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent = 'Select + ⌘C'; }
+    setTimeout(() => { b.textContent = 'Copy'; }, 1500);
   });
 }
 """
@@ -1955,9 +1913,9 @@ GLOSSARY = """
     <summary>How to read this page</summary>
     Each game opens on the <b>Overview</b>: one row per level, one column per persona, so skill
     tiers sit side by side. The number is the <b>win rate</b>
-    (<span style="color:#22c55e">green ≥ 50%</span>,
-    <span style="color:#eab308">yellow below</span>,
-    <span style="color:#ef4444">red = never solved</span>).
+    (<span class="wr-good">green ≥ 50%</span>,
+    <span class="wr-mid">orange below</span>,
+    <span class="wr-bad">red = never solved</span>).
     <b>Status</b>: <span class="pill pill-ok">solved</span> every seed won at least once ·
     <span class="pill pill-warn">n/N seeds</span> some did · <span class="pill pill-bad">unsolved</span>
     none did. Click a card for its window — it opens on a one-line verdict, then the routes the agents
@@ -1967,13 +1925,13 @@ GLOSSARY = """
 
 
 def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") -> str:
-    img = f'<img src="data:image/png;base64,{logo}" alt="">' if logo else ""
+    # `logo` stays in the signature, unused: the theme's pixel wordmark replaces the raster logo (off-palette glow)
     links = "" if page != "report" else "".join(
-        f'<a href="report.html#g_{g}">{_game_icon(g)}{g}</a>' for g in games)
+        f'<a href="report.html#g_{g}">{_game_icon(g)}{g.capitalize()}</a>' for g in games)
     if has_runs and page == "report":
-        links += '<a href="report.html#g_runs">runs</a>'
+        links += '<a href="report.html#g_runs">Runs</a>'
     if page != "report":
-        links += '<a class="doc" href="report.html">← Balance report</a>'
+        links += '<a class="doc" href="report.html">Balance report</a>'
     links += ('<a class="doc" href="ablation.html"' + (' aria-current="page"' if page == "ablation" else "")
               + '>Sensor ablation</a>')
     links += ('<a class="doc" href="gasweep.html"' + (' aria-current="page"' if page == "gasweep" else "")
@@ -1986,7 +1944,7 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
     return f"""
   <script>if (location.protocol === 'file:') document.documentElement.classList.add('file');</script>
   <a class="skip" href="#main">Skip to content</a>
-  <nav aria-label="Pages">{img}<h1 class="brand">PEAK <em>BALANCE COMMAND</em></h1>
+  <nav aria-label="Pages"><h1 class="brand"><span class="wordmark">PEAK</span><em>Balance Command</em></h1>
     <div class="links">{links}</div>
   </nav>"""
 
@@ -1997,7 +1955,7 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Balance Command — Instructions</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="instructions")}
-<main class="doc-body">
+<main id="main" class="doc-body">
   <h2>What this is</h2>
   <p>PEAK evolves populations of tiny neural networks (291 parameters at the default 16 hidden units;
   147–1,155 across the GA sweep) that play your levels
@@ -2045,15 +2003,15 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
   <h2>Episode statuses</h2>
   <p>Every episode (one genome playing the level once) ends in exactly one status:</p>
   <ul>
-    <li><b>WON</b> — reached the goal. Fitness = max x + win bonus (+ time left × persona rate).</li>
-    <li><b>DEAD</b> — killed by an enemy, pit, saw, spike, or the timer; the engine's death cause
+    <li><b class="c-WON">WON</b> — reached the goal. Fitness = max x + win bonus (+ time left × persona rate).</li>
+    <li><b class="c-DEAD">DEAD</b> — killed by an enemy, pit, saw, spike, or the timer; the engine's death cause
     becomes the failure cause (Enemy, Pit, Saw, Spike, OOB, Timeout…).</li>
-    <li><b>STUCK</b> — no forward progress for <code>stuck_frames</code> (5 s) or the engine's stall
+    <li><b class="c-STUCK">STUCK</b> — no forward progress for <code>stuck_frames</code> (5 s) or the engine's stall
     watchdog fired; counted as the <b>Stall</b> cause.</li>
   </ul>
-  <p>Level status rolls these up per seed: <b>solved</b> = every seed had ≥1 WON episode within the
-  budget, <b>partial</b> = some seeds, <b>unsolved</b> = none. The Overview shows the best status across
-  personas.</p>
+  <p>Level status rolls these up per seed: <b class="wr-good">solved</b> = every seed had ≥1 WON episode within the
+  budget, <b class="wr-mid">partial</b> = some seeds, <b class="wr-bad">unsolved</b> = none. The Overview shows the best
+  status across personas.</p>
 
   <h2>How the numbers are computed</h2>
   <ul>
@@ -2090,11 +2048,11 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
   <code>1234 · 2025 · 31337</code>; each (level × seed) cell evolves a fresh population with the
   same GA settings, so numbers are comparable across sweeps as long as the GA config is unchanged.</p>
 </main>
-<footer style="max-width:860px;margin:22px auto">PEAK ENGINE · instructions</footer>
+<footer style="max-width:860px;margin:22px auto">PEAK engine · instructions</footer>
 </body></html>"""
 
 
-MODE_COLOR = {"rays": "#ef4444", "grid": "#4a9eff"}
+MODE_COLOR = {"rays": "#f87858", "grid": "#bcbcbc"}   # NES $26 / $22 (CSS: .dhead em.rays, --blue)
 
 
 def _mode_svgs() -> dict[str, str]:
@@ -2105,23 +2063,23 @@ def _mode_svgs() -> dict[str, str]:
         a = math.radians(ang)
         x2, y2 = 75 + 62 * math.cos(a), 75 + 62 * math.sin(a)
         rays.append(f"<line x1='75' y1='75' x2='{x2:.1f}' y2='{y2:.1f}' stroke='{MODE_COLOR['rays']}' "
-                    f"stroke-width='2' opacity='.9'/><circle cx='{x2:.1f}' cy='{y2:.1f}' r='3' fill='#fff'/>")
-    ray_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' rx='8' fill='#0c0c0e'/>"
-               f"<rect x='0' y='100' width='150' height='50' fill='#1b1b1f'/>"
-               f"<rect x='118' y='60' width='32' height='40' fill='#1b1b1f'/>"
+                    f"stroke-width='2' opacity='.9'/><circle cx='{x2:.1f}' cy='{y2:.1f}' r='3' fill='#f8f8f8'/>")
+    ray_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' fill='#000000'/>"
+               f"<rect x='0' y='100' width='150' height='50' fill='#2e2e2e'/>"
+               f"<rect x='118' y='60' width='32' height='40' fill='#2e2e2e'/>"
                f"<rect x='88' y='92' width='6' height='8' fill='{MODE_COLOR['rays']}' opacity='.5'/>"
-               f"{''.join(rays)}<rect x='69' y='63' width='12' height='24' rx='2' fill='#fff'/></svg>")
+               f"{''.join(rays)}<rect x='69' y='63' width='12' height='24' fill='#f8f8f8'/></svg>")
     cells = []
     for r in range(11):
         for c in range(11):
             solid = r >= 8 or (c >= 9 and r >= 5)
-            fill = "#2c2c30" if solid else "#0c0c0e"
+            fill = "#4a4a4a" if solid else "#0e0e0e"
             if r == 5 and c == 5:
-                fill = "#fff"
+                fill = "#f8f8f8"
             cells.append(f"<rect x='{3 + c * 13.1:.1f}' y='{3 + r * 13.1:.1f}' width='12' height='12' "
-                         f"rx='1.5' fill='{fill}'/>")
-    grid_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' rx='8' fill='#0c0c0e'/>"
-                f"{''.join(cells)}<rect x='1.5' y='1.5' width='147' height='147' rx='7' fill='none' "
+                         f"fill='{fill}'/>")
+    grid_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' fill='#000000'/>"
+                f"{''.join(cells)}<rect x='1' y='1' width='148' height='148' fill='none' "
                 f"stroke='{MODE_COLOR['grid']}' stroke-width='2' opacity='.9'/></svg>")
     return {"rays": ray_svg, "grid": grid_svg}
 
@@ -2169,7 +2127,7 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
         return " <span class='faint'>vs</span> ".join(
             f'<span style="color:{MODE_COLOR[m]}">{A[m][key]}</span>' for m in modes)
     stats = [f'<div class="stat"><div class="lbl">{lbl}</div><div class="val">{vs(k)}</div></div>'
-             for k, lbl in (("solved", "levels solved"), ("fw", "mean first win"), ("wr", "mean win rate"), ("time", "probe train time"))]
+             for k, lbl in (("solved", "Levels solved"), ("fw", "Mean first win"), ("wr", "Mean win rate"), ("time", "Probe train time"))]
 
     dual = []
     for lvl in order:
@@ -2209,14 +2167,14 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
             else:
                 tds.append("<td class='wr-na'>—</td><td class='wr-na'>—</td>")
         trs.append("<tr>" + "".join(tds) + "</tr>")
-    mode_ths = "".join(f"<th class='{'mr' if m == 'rays' else 'mg'}' colspan='4' style='color:{MODE_COLOR[m]}'>{m}</th>"
+    mode_ths = "".join(f"<th class='{'mr' if m == 'rays' else 'mg'}' colspan='4' style='color:{MODE_COLOR[m]}'>{m.capitalize()}</th>"
                        for m in modes)
-    sub_ths = "".join(f"<th class='{'mr' if m == 'rays' else 'mg'}'>solved</th><th>first win</th><th>win rate</th><th>cause</th>"
+    sub_ths = "".join(f"<th class='{'mr' if m == 'rays' else 'mg'}'>Solved</th><th>First win</th><th>Win rate</th><th>Cause</th>"
                       for m in modes)
-    delta_th = "<th colspan='2'>grid − rays</th>" if len(modes) == 2 else ""
+    delta_th = "<th colspan='2'>Grid − rays</th>" if len(modes) == 2 else ""
     delta_sub = "<th>Δ win rate</th><th>Δ first win</th>" if len(modes) == 2 else ""
-    shades = {"rays": ["#ef4444", "#fb923c", "#b91c1c", "#fca5a5"],
-              "grid": ["#4a9eff", "#22d3ee", "#1d4ed8", "#93c5fd"]}
+    shades = {"rays": ["#f87858", "#f83800", "#fca044", "#f0d0b0"],   # NES reds / greys
+              "grid": ["#bcbcbc", "#7c7c7c", "#d8d8d8", "#5a5a5a"]}
     curve_boxes = []
     for lvl in order:
         series, colors, legend = [], [], []
@@ -2247,10 +2205,10 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
     sid = f"abl{idx}"
     legend = " vs ".join(f'<span style="color:{MODE_COLOR[m]}">■ {m}</span>' for m in modes)
     return f"""
-  <section class="game collapsed" id="abl_{idx}" aria-labelledby="abl_{idx}_t">
+  <section class="game frame stripe g-{game} collapsed" id="abl_{idx}" aria-labelledby="abl_{idx}_t">
     <div class="gamehead">
       <button class="chev" type="button" aria-expanded="false" aria-label="Expand {game} {persona}">▾</button>
-      <h2 class="gametag" id="abl_{idx}_t">{_game_icon(game)}{game}</h2>{_persona_chip(persona)}
+      <h2 class="gametag" id="abl_{idx}_t">{_game_icon(game)}{game.capitalize()}</h2>{_persona_chip(persona)}
       <span class="gamemeta">{base} · seeds {meta['seeds']} · pop {meta.get('pop_size', '?')} ×
         {meta.get('gens_budget', '?')} gens/probe</span>
     </div>
@@ -2297,16 +2255,16 @@ def _ablation_overview(paired: list) -> str:
                     sum(fw) / len(fw) if fw else None, sum(1 for x in rs if x["solved_by"]), len(rs))
         rw, rf, rsv, nl = agg(r); gw, gf, gsv, _ = agg(g)
         rows.append(
-            f'<tr><td><a class="gsjump" href="#abl_{i}">{_game_icon(game)}{game} · {persona}</a>'
-            f'<div class="faint" style="font:400 .62rem var(--mono)">{base} · {len(r["seeds"])} seeds · {nl} levels</div></td>'
+            f'<tr><td><a class="gsjump" href="#abl_{i}">{_game_icon(game)}{game.capitalize()} · {persona}</a>'
+            f'<div class="faint" style="font:400 .75rem var(--ui)">{base} · {len(r["seeds"])} seeds · {nl} levels</div></td>'
             f'<td style="color:{MODE_COLOR["rays"]}">{rw:.0%} <small class="faint">{"gen %.1f" % rf if rf is not None else "never"}</small></td>'
             f'<td style="color:{MODE_COLOR["grid"]}">{gw:.0%} <small class="faint">{"gen %.1f" % gf if gf is not None else "never"}</small></td>'
             f'<td class="{"delta-g" if m > 0.005 else "delta-r" if m < -0.005 else "delta-0"}" title="{up} cells grid better · {dn} rays better · {n} paired">'
             f'{m:+.0%} <small>± {ci:.0%}{" ★" if sig else ""}</small></td>'
             f'<td><span style="color:{MODE_COLOR["rays"]}">{rsv}</span><span class="faint">/{nl}</span> <span class="faint">vs</span> '
             f'<span style="color:{MODE_COLOR["grid"]}">{gsv}</span><span class="faint">/{nl}</span></td>'
-            f'<td><span class="verdict" style="--c:{wcol};font-size:.58rem;padding:2px 8px">{winner}</span></td>'
-            f'<td><a class="gsjump navbtn" href="#abl_{i}">open ↓</a></td></tr>')
+            f'<td><span class="verdict" style="--c:{wcol};font-size:.75rem;padding:1px 7px">{winner.capitalize()}</span></td>'
+            f'<td><a class="gsjump navbtn" href="#abl_{i}">Open ↓</a></td></tr>')
     return f"""
   <div class="viz gsov"><div class="vt">Rays vs grid at a glance <span class="faint">— win rate over the {WIN_WINDOW} gens after the
     first win; Δ = grid − rays, paired on identical level × seed cells, ★ = clears its 95 % CI. Click a row to open the details.</span></div>
@@ -2340,7 +2298,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
                      ("grid", "The cores' tile window sized to 11×11 around the agent, three channels: solid / "
                               "collectible / hazard. Sees everything nearby at tile resolution; no Dijkstra oracle.")):
         nin = sensor_dim(m)
-        hero += (f'<div class="ablmode" style="--c:{MODE_COLOR[m]}">{svgs[m]}<div><h3>{m}</h3><p>{blurb}</p>'
+        hero += (f'<div class="ablmode" style="--c:{MODE_COLOR[m]}">{svgs[m]}<div><h3>{m.capitalize()}</h3><p>{blurb}</p>'
                  f'<div class="chips"><span class="chip" style="--c:{MODE_COLOR[m]}"><b>{nin}</b> inputs</span>'
                  f'<span class="chip" style="--c:{MODE_COLOR[m]}"><b>{NeuralNet(nin).n_params:,}</b> weights</span>'
                  f'<span class="chip" style="--c:{MODE_COLOR[m]}"><b>5</b> shared body scalars</span></div></div></div>')
@@ -2362,8 +2320,8 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
 <title>PEAK Balance Command — Sensor Ablation</title><style>{CSS}</style></head><body>
 {_nav(list(games), False, logo, page="ablation")}
 <main id="main">
-  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
-    sensor ablation · same GA, same seeds, same levels — only what the agent sees changes · generated {stamp}</div>
+  <div style="font:400 .9rem var(--ui);color:var(--dim);margin-bottom:16px">
+    Sensor ablation · same GA, same seeds, same levels — only what the agent sees changes · generated {stamp}</div>
   <div class="ablhero">{hero}</div>
   {score}
   {sections}
@@ -2430,7 +2388,7 @@ def _gasweep_overview(groups: dict[tuple, list[dict]]) -> str:
     if not cols:
         return ""
     ths = "".join(
-        f'<th><a class="gsjump" href="#gs_{c["i"]}">{_game_icon(c["game"])}{c["game"]}<br><small>{c["persona"]}</small></a></th>'
+        f'<th><a class="gsjump" href="#gs_{c["i"]}">{_game_icon(c["game"])}{c["game"].capitalize()}<br><small>{c["persona"]}</small></a></th>'
         for c in cols)
     rows = ['<tr class="sum"><td class="lbl">Baseline win rate</td>' + "".join(
         f'<td>{c["base"]["wr"]:.0%} <small class="faint">gen {c["base"]["fw"]:.0f}</small></td>' if c["base"] else "<td>—</td>"
@@ -2463,7 +2421,7 @@ def _gasweep_overview(groups: dict[tuple, list[dict]]) -> str:
             comp.append('<td class="faint">not run</td>')
     rows.append('<tr class="sum"><td class="lbl">Composite (confirmed)</td>' + "".join(comp) + "</tr>")
     rows.append('<tr class="sum"><td class="lbl">Capacity</td>' + "".join(
-        f'<td><span class="verdict" style="--c:{_VERDICT[c["verdict"]["word"]][0]};font-size:.58rem;padding:2px 8px">'
+        f'<td><span class="verdict" style="--c:{_VERDICT[c["verdict"]["word"]][0]};font-size:.75rem;padding:1px 7px">'
         f'{_VERDICT[c["verdict"]["word"]][1]}</span></td>' for c in cols) + "</tr>")
     baselines = {_gs_baseline_label(c["ga"]) for c in cols}
     note = (f'Baseline: <span style="color:var(--txt)">{next(iter(baselines))}</span> · ' if len(baselines) == 1 else "")
@@ -2542,12 +2500,12 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     for p in pts:
         if p["axis"] in ("base", "hidden", "action_feedback", "memory", "best"):
             kind = "hidden" if p["axis"] in ("base", "hidden") else "arch"
-            color = "#ef4444" if p["axis"] == "base" else ("#4a9eff" if kind == "hidden" else
-                                                           "#eab308" if p["axis"] != "best" else "#22c55e")
+            color = "#f83800" if p["axis"] == "base" else ("#bcbcbc" if kind == "hidden" else
+                                                           "#f8b800" if p["axis"] != "best" else "#58d854")
             scatter_pts.append({"label": p["label"], "x": p["n_params"], "y": round(p["fw"], 2),
                                 "ci": round(p["fw_ci"], 2), "kind": kind, "color": color, "star": p["axis"] == "base"})
-    fit = ({"m": verdict["m"], "b": verdict["b"], "color": vcol.replace("var(--green)", "#22c55e99")
-            .replace("var(--blue)", "#4a9eff99").replace("var(--red)", "#ef444499")}
+    fit = ({"m": verdict["m"], "b": verdict["b"], "color": vcol.replace("var(--green)", "#58d85499")
+            .replace("var(--blue)", "#bcbcbc99").replace("var(--red)", "#e4005899")}
            if verdict["word"] not in ("insufficient",) else None)
     hs = [p for p in pts if p["axis"] in ("base", "hidden")]
     rng = (f"{min(p['n_params'] for p in hs):,}→{max(p['n_params'] for p in hs):,} weights" if len(hs) > 1 else "")
@@ -2563,9 +2521,9 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     hero = f"""
       <div class="gshero">
         <div class="viz"><div class="vt">Capacity curve <span class="faint">— generations to first win (mean ± 95 % CI,
-          unsolved = budget {budget}) vs network weights · <span style="color:#ef4444">●</span> baseline
-          <span style="color:#4a9eff">●</span> hidden size <span style="color:#eab308">◆</span> feedback / memory
-          {'<span style="color:#22c55e">◆</span> recommended' if best_pt else ''}</span></div>
+          unsolved = budget {budget}) vs network weights · <span style="color:#f83800">●</span> baseline
+          <span style="color:#bcbcbc">●</span> hidden size <span style="color:#f8b800">◆</span> feedback / memory
+          {'<span style="color:#58d854">◆</span> recommended' if best_pt else ''}</span></div>
           <canvas class="scatter" width="860" height="360" data-points='{json.dumps(scatter_pts)}'
             data-fit='{json.dumps(fit)}' role="img"
             aria-label="Capacity curve for {game} {persona}: generations to first win against network weights"></canvas></div>
@@ -2600,7 +2558,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     else:
         best_line = ('<div class="caption" style="margin-top:8px">Not confirmed yet — the composite assumes the axes '
                      'do not interact. Probe it once:</div>'
-                     f'<div class="cmdrow"><code class="cmd">{cli}</code><button class="copybtn" type="button">copy</button></div>') if rec else ""
+                     f'<div class="cmdrow"><code class="cmd">{cli}</code><button class="copybtn" type="button">Copy</button></div>') if rec else ""
     rec_html = f"""
       <div class="viz gsrec"><div class="vt">Recommended config for {game} <span class="faint">— per-axis winners on win rate
         (ties → earliest first win), everything else at baseline</span></div>
@@ -2626,7 +2584,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
                              f'<b>{fmt(v)}</b><small>not run</small></span>')
                 continue
             is_base = p["axis"] == "base"
-            col = "#ef4444" if is_base else "#4a9eff"
+            col = "#f83800" if is_base else "#bcbcbc"
             size = 10 + 16 * (p["wr"] / ref_wr)
             marks.append(f'<span class="mk{" best" if p is best else ""}" style="--x:{x:.0f}%;--s:{size:.0f}px;--c:{col}">'
                          f'<i></i><b>{fmt(v)}</b><small><strong>{p["wr"]:.0%}</strong>gen {p["fw"]:.1f}</small></span>')
@@ -2659,9 +2617,9 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
         <div class="tbltitle">{lbl} <span class="faint">— {sub_}</span></div>
         <div class="ovwrap"><table class="gst"><thead><tr><th>Value</th><th>Weights</th><th>Levels solved</th>
           <th>First win (gen ± CI)</th><th>Win rate ± CI</th><th>Best gen</th><th>Progress / gen</th><th>Train time</th>
-          <th>Δ win rate <small class="faint">paired ± CI</small></th><th>cells ↑/↓</th><th>Δ first win</th></tr></thead><tbody>{''.join(trs)}</tbody></table></div>""")
-        # learning curves per level, one colour per value (repeated per seed)
-        palette = ["#ef4444", "#4a9eff", "#eab308", "#a855f7", "#22c55e", "#f97316"]
+          <th>Δ win rate <small class="faint">paired ± CI</small></th><th>Cells ↑/↓</th><th>Δ first win</th></tr></thead><tbody>{''.join(trs)}</tbody></table></div>""")
+        # learning curves per level, one colour per value (repeated per seed); baseline first, in the baseline red
+        palette = ["#f83800", "#bcbcbc", "#f8b800", "#f878f8", "#58d854", "#f87858"]
         boxes = []
         for lvl in sorted({l for p in allpts for l in p["data"].get("cells", {})}):
             series, colors, legend = [], [], []
@@ -2684,10 +2642,10 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
 
     personas = {persona: base["data"] if base else datas[0]}
     return f"""
-  <section class="game collapsed" id="gs_{idx}" aria-labelledby="gs_{idx}_t">
+  <section class="game frame stripe g-{game} collapsed" id="gs_{idx}" aria-labelledby="gs_{idx}_t">
     <div class="gamehead">
       <button class="chev" type="button" aria-expanded="false" aria-label="Expand {game} {persona}">▾</button>
-      <h2 class="gametag" id="gs_{idx}_t">{_game_icon(game)}{game}</h2>{_persona_chip(persona)}
+      <h2 class="gametag" id="gs_{idx}_t">{_game_icon(game)}{game.capitalize()}</h2>{_persona_chip(persona)}
       <span class="gamemeta">{len(pts)} configs · {n_levels} levels · seeds {seeds} · {budget} gens/probe
         · {sensors} · train time {fmt_hms(total)} · baseline {_gs_baseline_label(base_ga)}</span>
     </div>
@@ -2696,7 +2654,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
         <div class="tabs"><button class="tab active" data-view="{sid}_s" type="button" aria-selected="true">Simple</button>
           <button class="tab" data-view="{sid}_d" type="button" aria-selected="false">In-depth</button></div>
         <button class="brainbtn tip" type="button" data-dialog="brain_{sid}"
-          data-tip="the baseline GAConfig every axis is measured against">{_BRAIN_SVG} baseline hyperparameters</button>
+          data-tip="the baseline GAConfig every axis is measured against">{_BRAIN_SVG} Baseline hyperparameters</button>
       </div>
       <div class="view active" id="{sid}_s">
         {hero}
@@ -2725,11 +2683,11 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
     measured = sum(1 for w in verdicts.values() if w != "insufficient")
     vcol = "var(--green)" if measured and flat == measured else ("var(--yellow)" if measured else "var(--faint)")
     kpis = (f'<div class="kpis">'
-            f'<div class="stat"><div class="lbl">sweeps</div><div class="val">{len(groups)}</div><div class="sub">game × persona × budget</div></div>'
-            f'<div class="stat"><div class="lbl">configs</div><div class="val">{n_cfg}</div><div class="sub">baseline + one-knob variants</div></div>'
-            f'<div class="stat"><div class="lbl">probes</div><div class="val">{n_probes}</div><div class="sub">level × seed cells</div></div>'
-            f'<div class="stat"><div class="lbl">train time</div><div class="val">{fmt_hms(total)}</div><div class="sub">all probes</div></div>'
-            f'<div class="stat accent" style="--c:{vcol}"><div class="lbl">capacity verdict</div>'
+            f'<div class="stat"><div class="lbl">Sweeps</div><div class="val">{len(groups)}</div><div class="sub">game × persona × budget</div></div>'
+            f'<div class="stat"><div class="lbl">Configs</div><div class="val">{n_cfg}</div><div class="sub">baseline + one-knob variants</div></div>'
+            f'<div class="stat"><div class="lbl">Probes</div><div class="val">{n_probes}</div><div class="sub">level × seed cells</div></div>'
+            f'<div class="stat"><div class="lbl">Train time</div><div class="val">{fmt_hms(total)}</div><div class="sub">all probes</div></div>'
+            f'<div class="stat accent" style="--c:{vcol}"><div class="lbl">Capacity verdict</div>'
             f'<div class="val">{flat}/{measured} flat</div><div class="sub">sweeps where a bigger net did not help</div></div>'
             f'</div>') if groups else ""
     sections = _gasweep_overview(groups) + "".join(
@@ -2742,11 +2700,11 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
                        for a, vs in AXES.items())
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23070708'/><circle cx='8' cy='8' r='4' stroke='%2322c55e' stroke-width='2' fill='none'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><circle cx='8' cy='8' r='4' stroke='%2358d854' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Balance Command — GA Sweep</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="gasweep")}
 <main id="main">
-  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
+  <div style="font:400 .9rem var(--ui);color:var(--dim);margin-bottom:16px">
     GA hyperparameter ablation · one knob at a time against literature bounds · same seeds, same levels · generated {stamp}</div>
   {kpis}
   {sections}
@@ -2787,12 +2745,12 @@ def build(balance_dir: str) -> dict[str, str]:
         "<p style='color:var(--dim)'>No balance data yet — run a Full Sweep (menu 13) or Sensor Ablation (menu 14) first.</p>"
     report = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23070708'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Balance Command</title><style>{CSS}</style></head><body>
 {_nav(list(games), bool(runs_html), logo)}
 <main id="main">
-  <div style="font:400 .78rem var(--mono);color:var(--dim);margin-bottom:16px">
-    multi-seed neuroevolution probes · generated {stamp} · total probe train time {fmt_hms(total)}</div>
+  <div style="font:400 .9rem var(--ui);color:var(--dim);margin-bottom:16px">
+    Multi-seed neuroevolution probes · generated {stamp} · total probe train time {fmt_hms(total)}</div>
   {GLOSSARY}
   {body}
   <footer>Generated by PEAK from the balance probes on disk. Regenerate from the menu (12) after a new sweep.</footer>
@@ -2840,11 +2798,10 @@ def serve(balance_dir: str, port: int, open_browser: bool) -> None:
 
         def _page(self, status: int, title: str, body_html: str, script: str = "") -> None:
             body = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{title}</title>"
-                    f"<style>{CSS}.card{{max-width:640px;margin:10vh auto 0;background:var(--panel);border:1px solid var(--line);"
-                    f"border-radius:12px;padding:26px 30px}}.card h1{{font:700 1.2rem var(--mono);color:#fff;margin-bottom:10px}}"
-                    f".card p{{color:var(--dim);margin:8px 0}}.card code{{color:var(--yellow);font:600 .8rem var(--mono)}}"
-                    f".row{{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}}.watchbtn.quiet{{background:var(--panel2);"
-                    f"border:1px solid var(--line2);color:var(--txt)}}</style></head><body><main id='main'>"
+                    f"<style>{CSS}.card{{max-width:640px;margin:10vh auto 0;padding:26px 30px}}"
+                    f".card h1{{font-size:1.4rem;margin-bottom:12px}}.card p{{color:var(--dim);margin:8px 0}}"
+                    f".card code{{color:var(--ink)}}.row{{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}}"
+                    f".watchbtn.quiet{{color:var(--ink)}}</style></head><body><main id='main'>"
                     f"<div class='card'>{body_html}</div></main><script>{script}</script></body></html>").encode()
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")

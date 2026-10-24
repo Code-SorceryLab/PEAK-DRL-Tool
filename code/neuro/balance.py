@@ -439,8 +439,12 @@ def main() -> None:
                     help="regenerate report JSONs from runs/probes and exit (no training)")
     ap.add_argument("--ablation", action="store_true",
                     help="sensor-ablation arm: probes under runs/ablation, JSONs as ablation_*.json")
+    ap.add_argument("--root", default=None,
+                    help="where the probes go (default runs/probes); agents trained on a mutant "
+                         "go under runs/ast/<game>/<mutant>/probes (code/neuro/ast_eval.py)")
     args = ap.parse_args()
     root, prefix = (ABLATION_ROOT, "ablation") if args.ablation else (PROBES_ROOT, "report")
+    root = args.root or root
 
     if args.rebuild:
         for path in rebuild(args.out):

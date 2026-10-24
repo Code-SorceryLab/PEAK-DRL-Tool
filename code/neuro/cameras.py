@@ -19,6 +19,7 @@ import json
 import multiprocessing as mp
 import os
 import queue
+import re
 import threading
 import time
 import urllib.parse
@@ -35,11 +36,13 @@ from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_ada
 from .balance import BALANCE_DIR, PROBES_ROOT
 from .evolution import GAConfig
 from .net import make_net
-from .personas import COLORS, PERSONAS, Hands
+from .personas import PERSONAS, Hands
 from .sensors import read_sensors
 from .trainer import THUMB_SCALE, _encode
 
 GAMES = ["mario", "meatboy", "bomberman"]
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "theme.css"), encoding="utf-8") as _f:
+    COLORS = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", _f.read()))   # the dashboards' persona colours
 ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
 TAG = "p10g40"              # the full sweep's run tag (rays, pop 10, 40 generations)
 FPS = 30
@@ -357,7 +360,10 @@ async def _serve_ws(wall: Wall, port: int) -> None:
 
     stop = asyncio.get_running_loop().create_future()
     for sig in (signal.SIGTERM, signal.SIGINT):        # wakes the loop even with no page connected
-        asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
+        try:
+            asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
+        except NotImplementedError:                    # Windows: Ctrl+C reaches asyncio.run as KeyboardInterrupt
+            break
     async with websockets.serve(handler, "127.0.0.1", port, max_size=None):
         await stop
 

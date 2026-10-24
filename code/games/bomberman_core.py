@@ -17,6 +17,8 @@ import numpy as np
 import pygame
 import yaml
 
+from . import mutants
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(_HERE, "bomberman_config.yaml")
 
@@ -101,6 +103,8 @@ class BombermanCore:
     def __init__(self, render_mode: str = "none", max_steps=None, level_idx: int = 0, seed: int = 0) -> None:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
+        self.mutant = mutants.active("bomberman")  # PEAK_MUTANT: play that copy of the game
+        mutants.apply_config(self.cfg, self.mutant)
         self.render_mode = render_mode
         self.tile_size = int(self.cfg["tile_size"])
         self.fps = int(self.cfg.get("fps", 60))
@@ -126,7 +130,8 @@ class BombermanCore:
         return dict(entry) if isinstance(entry, dict) else {"file": entry}
 
     def level_file(self, idx: int | None = None) -> str:
-        return os.path.join(_HERE, "levels", self.level_entry(idx)["file"])
+        file = self.level_entry(idx)["file"]
+        return mutants.level_path(self.mutant, file) or os.path.join(_HERE, "levels", file)
 
     def _load_level(self) -> LevelData:
         with open(self.level_file(), encoding="utf-8") as f:

@@ -1,0 +1,181 @@
+{
+  "game": "bomberman",
+  "stage": "8",
+  "base_file": "bomberman/09_two_balloms.txt",
+  "mutants": [
+    {
+      "id": "seal_route",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "Walls at row 9, column 12 and row 8, column 13 close the exit into its corner",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          12,
+          9,
+          ".",
+          "#"
+        ],
+        [
+          13,
+          8,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 13,
+        "row": 8
+      },
+      "parameter": {
+        "tiles": 2
+      },
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "add_enemy",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A third Ballom at row 7, column 7; every enemy must die before the exit opens",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          7,
+          7,
+          ".",
+          "E"
+        ]
+      ],
+      "location": {
+        "col": 7,
+        "row": 7
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "fuse_down",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "fuse_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Bomb fuse 240 -> 150 frames on this level",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "levels.8.fuse": 150
+      },
+      "parameter": {
+        "key": "levels.8.fuse",
+        "from": 240,
+        "to": 150
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "levels.8.fuse": 150
+        }
+      }
+    },
+    {
+      "id": "off_route",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The wall tile at row 11, column 5 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          5,
+          11,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 5,
+        "row": 11
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The floor cell at row 5, column 5 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          5,
+          5,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 5,
+        "row": 5
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

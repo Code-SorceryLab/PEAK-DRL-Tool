@@ -6,6 +6,7 @@ import pygame
 import yaml
 from gymnasium import spaces
 
+from . import mutants
 from .modules.Objects.GameObject import GameObject
 from .modules.Objects.MeatboyPlayer import MeatboyPlayer
 from .modules.System.LevelLoader import LevelLoader
@@ -38,6 +39,8 @@ class MeatboyCore:
         self.render_mode = render_mode
         with open(_CONFIG_PATH, "r") as f:
             self.cfg = yaml.safe_load(f)
+        self.mutant = mutants.active("meatboy")    # PEAK_MUTANT: play that copy of the game
+        mutants.apply_config(self.cfg, self.mutant)
         self.tile_size = int(self.cfg.get("tile_size", TILE_SIZE))
         phys = self.cfg.get("physics", {})
         self.ctx = MeatboyContext(
@@ -87,7 +90,7 @@ class MeatboyCore:
     def _load_level(self):
         path = self.levels[self._level_idx % len(self.levels)]
         self.current_level = path
-        self.level_data = self.loader.load_level(path)
+        self.level_data = self.loader.load_level(mutants.level_path(self.mutant, path) or path)
         self._goal_tiles = []
         for r in range(self.level_data.rows):
             for c in range(self.level_data.cols):
