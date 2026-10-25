@@ -126,7 +126,7 @@ The menu drives everything — train, watch, play, edit levels, run probes, open
 | 2 | Train single (game · level · persona · sensors) | 6 | Watch a trained agent | 10 | Toggle levels |
 | 3 | Train all levels of one game (persona · sensors · tag) | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
 | 4 | Train the full game × level grid (persona · sensors · tag) | 8 | Watch a random agent | 12 | Balance Command center |
-| P | Train all personas as a curriculum (games · personas · seed): one agent per persona carries on level after level | | | 13 | Full sweep (games × personas × seeds) |
+| P | Train all personas on the evaluation levels (Mario 1-1, Meat Boy 1-3, Bomberman 09, Mega Man Cut Man): games · personas · seeds, one seed at a time | | | 13 | Full sweep (games × personas × seeds) |
 | | | | | 14 | Sensor ablation (rays vs grid → `runs/ablation`) |
 | | | | | 15 | GA sweep (one knob at a time vs literature bounds) |
 | | | | | 16 | README figures (regenerate `docs/img/fig_*.png`, update README) |

@@ -461,6 +461,40 @@ def execute_training_run(cmd) -> bool:
         return False
 
 
+def execute_parallel_runs(runs, workers) -> int:
+    """Run (label, cmd, run_dir) trainer subprocesses, at most `workers` at once, started in list order.
+    Each run's output goes to <run_dir>/train.log; one line per finished run. Returns how many succeeded."""
+    env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")  # 1 core per run
+    pending, running, successful, done = list(runs), [], 0, 0
+    try:
+        while pending or running:
+            while pending and len(running) < workers:
+                label, cmd, run_dir = pending.pop(0)
+                Path(run_dir).mkdir(parents=True, exist_ok=True)
+                log = open(Path(run_dir) / "train.log", "w", encoding="utf-8")
+                proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+                running.append((label, proc, log, time.time(), run_dir))
+                print(_DIM(f"    started   {label}"))
+            time.sleep(1)
+            for item in [r for r in running if r[1].poll() is not None]:
+                label, proc, log, t0, run_dir = item
+                log.close()
+                running.remove(item)
+                done += 1
+                ok = proc.returncode == 0
+                successful += int(ok)
+                mins = (time.time() - t0) / 60
+                status = _GRN("done  ") if ok else _RED(f"FAILED (exit {proc.returncode}, see {run_dir}\\train.log)")
+                print(f"  {_YEL(f'[{done}/{len(runs)}]')}  {status}  {label}  {_DIM(f'{mins:.1f} min')}")
+    except KeyboardInterrupt:
+        print(_DIM("\n    Training interrupted — stopping the running jobs."))
+        for _, proc, log, _, _ in running:
+            proc.terminate()
+            proc.wait()
+            log.close()
+    return successful
+
+
 def print_training_summary(total, successful, failed):
     W = 50
     print()
@@ -627,38 +661,68 @@ def _train_batch(jobs, **summary):
         play_chime()
 
 
+# The one level per game the evaluation is run on; P trains only these.
+EVAL_LEVELS = {
+    "mario":     "Mario1-1",  # platformer/world1_1.txt
+    "meatboy":   "2",         # meatboy/world1_03_the_gap.txt (third in meatboy_config.yaml)
+    "bomberman": "8",         # bomberman/09_two_balloms.txt (ninth in bomberman_config.yaml)
+    "megaman":   "CutMan",    # the full Cut Man stage, all 8 segments in one run
+}
+
+
 def train_all_personas():
-    """Train All Personas — per game, one population per persona walks every enabled level in order (the
-    trainer's curriculum: a generation with 3 winners moves it to the next level, nets carry over), one seed."""
+    """Train All Personas — per game, one population per persona trains on that game's evaluation level
+    (EVAL_LEVELS), locked, for exactly the generation count given. Several seeds run seed by seed: every
+    game × persona on one seed finishes before the next seed starts."""
     _refresh_screen()
-    _section("TRAIN  ›  All Personas (curriculum)")
-    games = toggle_select("GAMES", get_available_games(),
-                          default_indices=[i for i, g in enumerate(get_available_games())
-                                           if g in ("mario", "meatboy", "bomberman")])
+    _section("TRAIN  ›  All Personas (evaluation levels)")
+    eval_games = [g for g in get_available_games() if g in EVAL_LEVELS]
+    games = toggle_select("GAMES", [f"{g}  ·  {EVAL_LEVELS[g]}" for g in eval_games],
+                          default_indices=list(range(len(eval_games))))
     if not games:
         return
+    games = [g.split()[0] for g in games]
     personas = toggle_select("PERSONAS", PERSONA_CHOICES, default_indices=list(range(len(PERSONA_CHOICES))))
     if not personas:
         return
-    gens = _prompt_gens("total for all levels, e.g. 800 for Mario's 4")
+    gens = _prompt_gens("per run, e.g. 200")
     if gens in ("invalid", None):
         if gens is None:
-            print(_RED("  A generation count is required: a curriculum run stops at its budget."))
+            print(_RED("  A generation count is required for batch runs."))
         return
-    seed_raw = input(_DIM("    Seed [1234]: ")).strip()
-    seed = seed_raw if seed_raw.lstrip("-").isdigit() else "1234"
-    jobs = [(g, p) for g in games for p in personas]
-    if not _print_run_summary(Games=", ".join(games), Personas=", ".join(personas), Seed=seed,
-                              Generations=f"{gens} per persona, across all levels", **{"Total runs": len(jobs)}):
+    seeds_raw = input(_DIM("    Seeds, space-separated [1234]: ")).strip()
+    seeds = [s for s in seeds_raw.split() if s.lstrip("-").isdigit()] or ["1234"]
+    jobs = [(g, p, s) for s in seeds for g in games for p in personas]  # seed outermost: one seed at a time
+    default_workers = min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
+    workers_raw = input(_DIM(f"    Runs at once, 1 core each (1 = live dashboard) [{default_workers}]: ")).strip()
+    workers = max(1, min(len(jobs), int(workers_raw))) if workers_raw.isdigit() else default_workers
+    if not _print_run_summary(Levels=", ".join(f"{g} {EVAL_LEVELS[g]}" for g in games),
+                              Personas=", ".join(personas), Seeds=" ".join(seeds),
+                              Generations=f"{gens} per run", **{"Total runs": len(jobs)},
+                              Parallel=f"{workers} at once" + (" (logs → <run dir>/train.log)" if workers > 1 else "")):
+        return
+
+    def run_args(game, persona, seed):
+        level = EVAL_LEVELS[game]
+        run_dir = _run_dir(game, level, persona, "rays", f"eval_seed{seed}")
+        cmd = _trainer_cmd(game, level, gens, turbo=True, serve=workers == 1, run_dir=run_dir,
+                           extra=("--persona", persona, "--seed", seed))
+        return f"{game} | {level} | {persona} | seed {seed}", cmd, run_dir
+
+    if workers > 1:
+        print(f"\n    Running {len(jobs)} runs, {workers} at once  {_DIM('(Ctrl+C stops them all)')}")
+        successful = execute_parallel_runs([run_args(*job) for job in jobs], workers)
+        print_training_summary(len(jobs), successful, len(jobs) - successful)
+        if successful == len(jobs):
+            play_chime()
         return
 
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}  {_DIM('(follows each run; reconnects between them)')}")
     successful = 0
-    for i, (game, persona) in enumerate(jobs, 1):
-        print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(game)} | {_WHT(persona)} | all levels")
-        ok = execute_training_run(
-            _trainer_cmd(game, None, gens, turbo=True, run_dir=_run_dir(game, None, persona, "rays", f"curriculum_seed{seed}"),
-                         extra=("--persona", persona, "--seed", seed)))
+    for i, job in enumerate(jobs, 1):
+        label, cmd, _ = run_args(*job)
+        print(f"\n  {_YEL(f'[{i}/{len(jobs)}]')}  {_WHT(label)}")
+        ok = execute_training_run(cmd)
         successful += int(ok)
 
     print_training_summary(len(jobs), successful, len(jobs) - successful)
@@ -1228,7 +1292,7 @@ def main():
         print(_menu_item("2",  "Train Single",        "pick game / level / generations"))
         print(_menu_item("3",  "Train All (1 game)",  "toggle levels, back-to-back runs"))
         print(_menu_item("4",  "Train Full Grid",     "all games × enabled levels"))
-        print(_menu_item(" P", "Train All Personas",  "one agent per persona carries on level after level"))
+        print(_menu_item(" P", "Train All Personas",  "evaluation levels only, every persona × seed"))
 
         _section("PLAY")
         print(_menu_item("5",  "Play Manually",       "keyboard controls"))
