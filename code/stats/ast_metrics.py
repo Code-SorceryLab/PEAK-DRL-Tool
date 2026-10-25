@@ -325,6 +325,7 @@ def false_alarms(results: dict) -> dict:
     nulls = [e["vs_base"] for res in results.values() for k, e in res.items()
              if k.split(" @ ")[0] == RESEEDED and (e.get("vs_base") or {}).get("counted")]
     fired = {s: sum(bool(n[s]) for n in nulls) for s in (*SIGNALS, "detected")}
+    fired["strict"] = sum(bool(n["completion_lost"] or n["win_rate_changed"]) for n in nulls)   # completion or Fisher only
     spread = [n["win_rate_beyond_seeds"] for n in nulls if n.get("win_rate_beyond_seeds") is not None]
     return {"comparisons": len(nulls), "fired": fired,
             "beyond_seeds": [sum(spread), len(spread)]}

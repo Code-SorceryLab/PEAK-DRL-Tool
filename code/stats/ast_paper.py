@@ -18,7 +18,9 @@ from code.stats import ast_page
 OUT = "paper-ast"
 GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman 09", "megaman": "Mega Man Cut Man"}
 NEAR = 3                                   # tiles: the death cluster's own radius
-MODES = ("static", "random", "replay", "retrain")
+MODES = ("static", "random", "replay", "retrain", "replay_strict", "retrain_strict")
+HEAD = {"static": "Static", "random": "Random", "replay": "Replay", "retrain": "Retrain",
+        "replay_strict": "Replay (strict)", "retrain_strict": "Retrain (strict)"}
 
 
 # ── small pieces (tested) ────────────────────────────────────────────────────────────────────
@@ -81,10 +83,21 @@ def judgments(results: dict) -> list[dict]:
                 word, tone = ast_page.judge(m, res, replay=mode == "replay")
                 row[mode] = None if tone == "none" else tone == "good"
                 row[mode + "_word"] = word
+                row[mode + "_strict"] = right(m["class"], strict_flag(m, res, mode))
             if m["operator"].endswith("cosmetic_tile"):
                 row["replay"], row["replay_word"] = None, "-"
+                row["replay_strict"] = row["retrain_strict"] = None
             rows.append(row)
     return rows
+
+
+def strict_flag(m: dict, res: dict, mode: str) -> bool | None:
+    """Flagged by the two signals that never fired on an unchanged 2D level (completion lost or
+    Fisher's test), over the counted level or sections; None when nothing counts."""
+    parts = [e for k, e in res.items() if k.startswith(m["id"] + " @ ")] or [res.get(m["id"]) or {}]
+    sigs = [((e.get("replay") or {}).get("vs_base") if mode == "replay" else e.get("vs_base")) for e in parts]
+    counted = [s for s in sigs if s and s.get("counted")]
+    return any(s["completion_lost"] or s["win_rate_changed"] for s in counted) if counted else None
 
 
 def personas(results: dict) -> list[dict]:
@@ -186,12 +199,14 @@ def detection_tex(rows: list[dict]) -> str:
     tot = {m: tally(rows, m) for m in MODES}
     caught = " & ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES)
     quiet = " & ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES)
-    return ("\\begin{table}[t]\\centering\\small\n\\caption{Mutants each method gets right: a breaking or degrading "
-            "mutant flagged, a neutral one left alone (\\checkmark{}), or not ($\\times$).}\n\\label{tab:detection}\n"
-            "\\begin{tabular}{lllcccc}\\toprule\nGame & Mutant & Class & Static & Random & Replay & Retrain \\\\\\midrule\n"
+    return ("\\begin{table*}[t]\\centering\\small\n\\caption{Mutants each method gets right: a breaking or degrading "
+            "mutant flagged, a neutral one left alone (\\checkmark{}), or not ($\\times$). The rule flags any of four signals; "
+            "strict keeps only completion lost and Fisher's test, the two that never fired on an unchanged 2D level.}\n"
+            "\\label{tab:detection}\n\\begin{tabular}{lll" + "c" * len(MODES) + "}\\toprule\nGame & Mutant & Class & "
+            + " & ".join(HEAD[m] for m in MODES) + " \\\\\\midrule\n"
             + "\n".join(body) + "\n\\midrule\n"
             f"\\multicolumn{{3}}{{l}}{{Play-changing mutants caught}} & {caught} \\\\\n"
-            f"\\multicolumn{{3}}{{l}}{{Neutral mutants left alone}} & {quiet} \\\\\n\\bottomrule\n\\end{{tabular}}\n\\end{{table}}\n")
+            f"\\multicolumn{{3}}{{l}}{{Neutral mutants left alone}} & {quiet} \\\\\n\\bottomrule\n\\end{{tabular}}\n\\end{{table*}}\n")
 
 
 def write(results: dict, out: str = OUT) -> list[str]:
@@ -213,12 +228,14 @@ def write(results: dict, out: str = OUT) -> list[str]:
           "compared with itself on the original (it never wins, so under the rule nothing it plays counts; shown "
           "here with the signals it would raise). Replay = the original's frozen agents on the mutant. Retrain = "
           "agents trained on the mutant.", "",
-          "| Game | Mutant | Class | Static | Random | Replay | Retrain |", "|---|---|---|---|---|---|---|"]
+          "Strict = only completion lost or Fisher's test (p < .05), the two signals that never fired on an unchanged "
+          "2D level in the false-alarm check below.", "",
+          "| Game | Mutant | Class | " + " | ".join(HEAD[m] for m in MODES) + " |", "|---|---|---|" + "---|" * len(MODES)]
     for r in rows:
         md.append(f"| {GAME[r['game']]} | `{r['id']}` | {r['class']} | " + " | ".join(
-            _mark(r[m]) if m in ("static", "random") or r[m] is None else f"{_mark(r[m])} ({r[m + '_word']})"
+            f"{_mark(r[m])} ({r[m + '_word']})" if m in ("replay", "retrain") and r[m] is not None else _mark(r[m])
             for m in MODES) + " |")
-    md += ["", "| Totals | Static | Random | Replay | Retrain |", "|---|---|---|---|---|",
+    md += ["", "| Totals | " + " | ".join(HEAD[m] for m in MODES) + " |", "|---|" + "---|" * len(MODES),
            "| play-changing caught | " + " | ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES) + " |",
            "| neutral left alone | " + " | ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES) + " |", ""]
     cos = [r for r in rows if r["operator"].endswith("cosmetic_tile")]
@@ -227,8 +244,17 @@ def write(results: dict, out: str = OUT) -> list[str]:
     fa = am.false_alarms(results)
     md += ["", "## False alarms (the original against itself, three new seeds)", ""]
     if fa["comparisons"]:
-        md += ["| Signal | Fired |", "|---|---|"] + [f"| {k} | {v}/{fa['comparisons']} |" for k, v in fa["fired"].items()]
+        md += ["The original retrained with seeds 1111, 2222 and 3333 and compared with itself, over every level or "
+               "Mega Man section whose original is solved. Every flag is a false alarm. Replay has no such noise: its "
+               "frozen agents replay attempt for attempt (cosmetic copies 4/4 identical), so its alarms can come only "
+               "from the change itself.", "", "| Signal | Fired |", "|---|---|"]
+        md += [f"| {k} | {v}/{fa['comparisons']} |" for k, v in fa["fired"].items()]
         md.append(f"| win rate outside the seed spread (beside the rule) | {fa['beyond_seeds'][0]}/{fa['beyond_seeds'][1]} |")
+        nulls = [(g, k, e["vs_base"]) for g, res in results.items() for k, e in res.items()
+                 if k.split(" @ ")[0] == am.RESEEDED and (e.get("vs_base") or {}).get("counted")]
+        md += ["", "| Game | Level | Verdict | Signals |", "|---|---|---|---|"]
+        md += [f"| {GAME[g]} | {k.split(' @ ')[1] if ' @ ' in k else eval_mutants.EVAL_LEVELS[g][0]} | {s['verdict']} | "
+               + (", ".join(x for x in am.SIGNALS if s[x]) or "-") + " |" for g, k, s in nulls]
     else:
         md.append("Not run yet (`base-reseeded`).")
 

@@ -22,6 +22,17 @@ def test_a_method_is_right_when_it_flags_a_change_and_leaves_a_neutral_alone():
     assert ap.tally(rows, "m") == {"caught": [1, 2], "quiet": [1, 1]}
 
 
+def test_the_strict_check_keeps_completion_and_fisher_on_counted_levels():
+    s = {"counted": True, "completion_lost": False, "win_rate_changed": False, "cluster_moved": True}
+    m = {"id": "m-jump"}
+    res = {"m-jump @ A": {"vs_base": s}, "m-jump @ B": {"vs_base": dict(s, counted=False, completion_lost=True)}}
+    assert ap.strict_flag(m, res, "retrain") is False          # B does not count, A only moved its cluster
+    res["m-jump @ A"]["vs_base"] = dict(s, win_rate_changed=True)
+    assert ap.strict_flag(m, res, "retrain") is True
+    assert ap.strict_flag(m, res, "replay") is None           # no replay played
+    assert ap.strict_flag({"id": "x"}, {"x": {"vs_base": dict(s, completion_lost=True)}}, "retrain") is True
+
+
 def test_the_random_baseline_is_compared_with_itself_on_the_original(tmp_path, monkeypatch):
     from code.stats import episode_log
     from code.tests.test_ast_metrics import row

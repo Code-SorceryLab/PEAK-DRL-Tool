@@ -1,31 +1,31 @@
-\begin{table}[t]\centering\small
-\caption{Mutants each method gets right: a breaking or degrading mutant flagged, a neutral one left alone (\checkmark{}), or not ($\times$).}
+\begin{table*}[t]\centering\small
+\caption{Mutants each method gets right: a breaking or degrading mutant flagged, a neutral one left alone (\checkmark{}), or not ($\times$). The rule flags any of four signals; strict keeps only completion lost and Fisher's test, the two that never fired on an unchanged 2D level.}
 \label{tab:detection}
-\begin{tabular}{lllcccc}\toprule
-Game & Mutant & Class & Static & Random & Replay & Retrain \\\midrule
-Mario 1-1 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark \\
-Mario 1-1 & \texttt{widen\_gap} & degrading & $\times$ & $\times$ & \checkmark & \checkmark \\
-Mario 1-1 & \texttt{jump\_velocity\_down} & degrading & $\times$ & \checkmark & \checkmark & \checkmark \\
-Mario 1-1 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark \\
-Mario 1-1 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark \\
-Meat Boy 1-3 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark \\
-Meat Boy 1-3 & \texttt{widen\_gap} & degrading & $\times$ & \checkmark & \checkmark & $\times$ \\
-Meat Boy 1-3 & \texttt{jump\_velocity\_down} & degrading & $\times$ & $\times$ & $\times$ & $\times$ \\
-Meat Boy 1-3 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark \\
-Meat Boy 1-3 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark \\
-Bomberman 09 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark \\
-Bomberman 09 & \texttt{add\_enemy} & degrading & $\times$ & $\times$ & \checkmark & \checkmark \\
-Bomberman 09 & \texttt{fuse\_down} & degrading & $\times$ & $\times$ & \checkmark & \checkmark \\
-Bomberman 09 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark \\
-Bomberman 09 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark \\
-Mega Man Cut Man & \texttt{s3-seal\_route} & breaking & \checkmark & -- & \checkmark & \checkmark \\
-Mega Man Cut Man & \texttt{s3-widen\_gap} & degrading & $\times$ & -- & \checkmark & \checkmark \\
-Mega Man Cut Man & \texttt{m-jump\_velocity\_down} & degrading & $\times$ & -- & \checkmark & \checkmark \\
-Mega Man Cut Man & \texttt{s3-off\_route} & neutral & \checkmark & -- & \checkmark & \checkmark \\
-Mega Man Cut Man & \texttt{s3-cosmetic\_tile} & neutral & \checkmark & -- & -- & \checkmark \\
+\begin{tabular}{lllcccccc}\toprule
+Game & Mutant & Class & Static & Random & Replay & Retrain & Replay (strict) & Retrain (strict) \\\midrule
+Mario 1-1 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mario 1-1 & \texttt{widen\_gap} & degrading & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark & $\times$ \\
+Mario 1-1 & \texttt{jump\_velocity\_down} & degrading & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark & $\times$ \\
+Mario 1-1 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mario 1-1 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark & -- & -- \\
+Meat Boy 1-3 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+Meat Boy 1-3 & \texttt{widen\_gap} & degrading & $\times$ & \checkmark & \checkmark & $\times$ & \checkmark & $\times$ \\
+Meat Boy 1-3 & \texttt{jump\_velocity\_down} & degrading & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\
+Meat Boy 1-3 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+Meat Boy 1-3 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark & -- & -- \\
+Bomberman 09 & \texttt{seal\_route} & breaking & \checkmark & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+Bomberman 09 & \texttt{add\_enemy} & degrading & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark & $\times$ \\
+Bomberman 09 & \texttt{fuse\_down} & degrading & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark & $\times$ \\
+Bomberman 09 & \texttt{off\_route} & neutral & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+Bomberman 09 & \texttt{cosmetic\_tile} & neutral & \checkmark & \checkmark & -- & \checkmark & -- & -- \\
+Mega Man Cut Man & \texttt{s3-seal\_route} & breaking & \checkmark & -- & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mega Man Cut Man & \texttt{s3-widen\_gap} & degrading & $\times$ & -- & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mega Man Cut Man & \texttt{m-jump\_velocity\_down} & degrading & $\times$ & -- & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mega Man Cut Man & \texttt{s3-off\_route} & neutral & \checkmark & -- & \checkmark & \checkmark & \checkmark & \checkmark \\
+Mega Man Cut Man & \texttt{s3-cosmetic\_tile} & neutral & \checkmark & -- & -- & \checkmark & -- & -- \\
 \midrule
-\multicolumn{3}{l}{Play-changing mutants caught} & 4/12 & 2/9 & 11/12 & 10/12 \\
-\multicolumn{3}{l}{Neutral mutants left alone} & 4/4 & 3/3 & 4/4 & 4/4 \\
+\multicolumn{3}{l}{Play-changing mutants caught} & 4/12 & 2/9 & 11/12 & 10/12 & 11/12 & 6/12 \\
+\multicolumn{3}{l}{Neutral mutants left alone} & 4/4 & 3/3 & 4/4 & 4/4 & 4/4 & 4/4 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}

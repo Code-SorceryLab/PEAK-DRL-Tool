@@ -489,7 +489,7 @@ def _false_alarm_card(results: dict) -> str:
     n = fa["comparisons"]
     labels = (("completion_lost", "completion lost"), ("win_rate_changed", "win rate (Fisher p < .05)"),
               ("cluster_moved", "death cluster moved more than 3 tiles"), ("cause_changed", "new top cause"),
-              ("detected", "any of them: the rule"))
+              ("detected", "any of them: the rule"), ("strict", "completion lost or win rate only (strict)"))
     rows = "".join(f'<tr><td>{esc(label)}</td><td class="n">{fa["fired"][k]}/{n}</td></tr>' for k, label in labels)
     w, m = fa["beyond_seeds"]
     if m:
