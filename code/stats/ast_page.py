@@ -16,7 +16,7 @@ import json
 import os
 
 from code.games import eval_mutants
-from code.stats.ast_metrics import ORIGINALS, RETRAINED
+from code.stats.ast_metrics import ORIGINALS, RESEEDED, RETRAINED, false_alarms
 
 SLOTS = [("seal_route",), ("widen_gap", "add_enemy"), ("jump_velocity_down", "fuse_down"), ("off_route",), ("cosmetic_tile",)]
 SLOT_NAMES = ["Sealed route", "Wider gap / extra enemy", "Weaker jump / shorter fuse", "Off-route tile", "Cosmetic tile"]
@@ -28,8 +28,13 @@ def _slot(operator: str) -> int:
     return next(i for i, ops in enumerate(SLOTS) if base in ops)
 
 
-def verdict(m: dict, entry: dict | None) -> tuple[str, str]:
-    """(word, tone) for a mutant: tone is good, bad or none (not played yet)."""
+def verdict(m: dict, entry: dict | None, replay: bool = False) -> tuple[str, str]:
+    """(word, tone) for a mutant: tone is good, bad or none (not played yet, or its original is
+    unsolved and so does not count). `replay` judges the frozen original agents' attempts instead."""
+    if replay:
+        entry = (entry or {}).get("replay")
+        if not entry:
+            return "not replayed", "none"
     if not entry or not entry.get("agents"):
         trained = os.path.isdir(os.path.join("runs", "ast", m["game"], m["id"], "probes"))
         return ("not played" if trained or not m.get("retrain", True) else "not retrained"), "none"
@@ -39,26 +44,44 @@ def verdict(m: dict, entry: dict | None) -> tuple[str, str]:
             return "no baseline", "none"
         return (f"identical {d['identical']}/{d['compared']}", "good") if d["passed"] else \
             (f"differs {len(d['differ'])}/{d['compared']}", "bad")
-    caught = (entry.get("vs_base") or {}).get("detected")
-    if caught is None:
+    sig = entry.get("vs_base") or {}
+    if sig.get("detected") is None:
         return "no baseline", "none"
+    if not sig.get("counted", True):
+        return "original unsolved", "none"
     if m["class"] == "neutral":
-        return ("false alarm", "bad") if caught else ("quiet", "good")
-    return ("caught", "good") if caught else ("missed", "bad")
+        return ("false alarm", "bad") if sig["detected"] else ("quiet", "good")
+    return ("caught", "good") if sig["detected"] else ("missed", "bad")
 
 
-def judge(m: dict, res: dict) -> tuple[str, str]:
+def judge(m: dict, res: dict, replay: bool = False) -> tuple[str, str]:
     """verdict() on the board: a mutant also played section by section (Mega Man's global jump
-    change) is judged by its sections, caught where any of them catches it."""
+    change) is judged by the sections its original solves, caught where any of them catches it."""
     parts = [e for k, e in res.items() if k.startswith(m["id"] + " @ ") and e.get("agents")]
     if not parts:
-        return verdict(m, res.get(m["id"]))
-    hits = sum(bool((e.get("vs_base") or {}).get("detected")) for e in parts)
-    word, tone = verdict(m, {"agents": True, "vs_base": {"detected": hits > 0}})
-    return f"{word} in {hits}/{len(parts)} sections", tone
+        return verdict(m, res.get(m["id"]), replay)
+    sigs = [(e.get("replay") or {}).get("vs_base") if replay else e.get("vs_base") for e in parts]
+    counted = [s for s in sigs if s and s.get("counted")]
+    if not counted:
+        return ("not replayed" if replay and not any(sigs) else "original unsolved"), "none"
+    hits = sum(bool(s["detected"]) for s in counted)
+    word, tone = verdict(m, {"agents": True, "vs_base": {"detected": hits > 0, "counted": True}})
+    return f"{word} in {hits}/{len(counted)} sections", tone
+
+
+def _null_verdict(e: dict) -> tuple[str, str]:
+    """base-reseeded against the original: any flag is a false alarm."""
+    s = e.get("vs_base") or {}
+    if not s:
+        return "no baseline", "none"
+    if not s.get("counted"):
+        return "original unsolved", "none"
+    return ("false alarm", "bad") if s["detected"] else ("quiet", "good")
 
 
 def _original(game: str, name: str) -> str:
+    if name == RESEEDED:
+        return "The level as it ships, retrained with three new seeds: any signal it raises is a false alarm."
     if name == RETRAINED:
         return "The level as it ships, each section retrained exactly as the mutants were: their baseline."
     return "The level as it ships" + (", played by the relay's hand-picked section agents." if game == "megaman" else ".")
@@ -81,10 +104,22 @@ def _signals(e: dict) -> str:
     words = [("completion lost", s.get("completion_lost")), (f"win rate (p {s.get('win_rate_p')})", s.get("win_rate_changed")),
              ("death cluster moved", s.get("cluster_moved")), ("new top cause", s.get("cause_changed"))]
     out = [w for w, on in words if on]
+    if s.get("win_rate_beyond_seeds"):
+        out.append("win rate outside the seed spread")
     if "determinism" in e:
         d = e["determinism"]
         out.append(f"replay {d['identical']}/{d['compared']} identical")
-    return ", ".join(out)
+    text = ", ".join(out)
+    return f"{s['verdict']}: {text}" if s.get("verdict") and text else s.get("verdict") or text
+
+
+def _replay(e: dict) -> str:
+    """The frozen original agents on this variant: wins and verdict."""
+    rep = e.get("replay")
+    if not rep:
+        return ""
+    w, n = rep["agents"]["win_rate"]["pooled"]
+    return f"{w}/{n} · {rep['vs_base']['verdict']}"
 
 
 def _pct(v) -> str:
@@ -103,7 +138,7 @@ def _row(v: str, e: dict, m: dict | None, desc: str, tone: str, effort: list[str
     """One variant's line of the metric table."""
     a = e["agents"]
     w, n = a["win_rate"]["pooled"]
-    cls = m["class"] if m else "original"
+    cls = m["class"] if m else "null" if v.startswith(RESEEDED) else "original"
     vs = f'<div class="label">vs {esc(e["vs"])}</div>' if e.get("vs") else ""
     what = f'<div class="label">{esc(desc)}</div>' if desc else ""
     tds = [f"<td><b>{esc(v)}</b>{what}</td>", f'<td><span class="cls {esc(cls)}">{esc(cls)}</span></td>',
@@ -113,15 +148,17 @@ def _row(v: str, e: dict, m: dict | None, desc: str, tone: str, effort: list[str
            f"<td>{esc(next(iter(a['causes']), ''))}</td>", f'<td class="n">{len(a["coverage"])}</td>']
     tds += [f'<td class="n">{_num(a["effort"].get(k))}</td>' for k in effort]
     tds.append(f'<td class="sig {tone}">{esc(_signals(e))}{vs}</td>')
+    tds.append(f"<td>{esc(_replay(e))}</td>")
     return "<tr>" + "".join(tds) + "</tr>"
 
 
 def _summary(v: str, e: dict, m: dict | None, desc: str) -> dict:
     """What the selected-variant card shows."""
     a = e.get("agents") or {}
-    word, tone = verdict(m, e) if m else ("the original", "none")
+    null = v.startswith(RESEEDED)
+    word, tone = verdict(m, e) if m else _null_verdict(e) if null else ("the original", "none")
     w, n = (a.get("win_rate") or {}).get("pooled", [0, 0])
-    return {"name": v, "cls": m["class"] if m else "original", "desc": desc,
+    return {"name": v, "cls": m["class"] if m else "null" if null else "original", "desc": desc, "replay": _replay(e) or "-",
             "word": word, "tone": tone, "wins": f"{w}/{n}", "solved": "yes" if a.get("completion") else "no",
             "progress": f"{_pct(a.get('progress_median')) or '-'} / {_pct(a.get('progress_max')) or '-'}",
             "tff": _num(a.get("time_to_finish"), ".1f", " s") or "-", "cluster": _where(a.get("death_cluster")) or "-",
@@ -134,7 +171,7 @@ def _game_section(game: str, res: dict) -> str:
     by_id = {m["id"]: m for m in ms}
     rows, cells = _level(ms)
     name = {k: k.split(" @ ")[0] for k in res}                  # "<variant> @ <section>" is that variant
-    order = sorted((k for k in res if name[k] in ORIGINALS or name[k] in by_id),
+    order = sorted((k for k in res if name[k] in ORIGINALS or name[k] == RESEEDED or name[k] in by_id),
                    key=lambda k: (res[k]["level"] != main, res[k]["level"]))     # grouped by the level played
     mut = {v: by_id.get(name[v]) for v in order}
     desc = {v: mut[v]["description"] if mut[v] else _original(game, name[v]) for v in order}
@@ -147,7 +184,8 @@ def _game_section(game: str, res: dict) -> str:
     body, described = [], set()
     for v in (v for v in order if res[v].get("agents")):          # a variant's description on its first row only
         body.append(_row(v, res[v], mut[v], "" if name[v] in described else desc[v],
-                         verdict(mut[v], res[v])[1] if mut[v] else "none", effort))
+                         verdict(mut[v], res[v])[1] if mut[v] else _null_verdict(res[v])[1] if name[v] == RESEEDED
+                         else "none", effort))
         described.add(name[v])
     personas = sorted({p for v in order for p in ((res[v].get("agents") or {}).get("win_rate") or {}) if p != "pooled"})
     grid = "".join(
@@ -180,7 +218,8 @@ def _game_section(game: str, res: dict) -> str:
             '<div class="duo"><div class="card vsum" aria-live="polite"></div>' + side + "</div>"
             f'<h3><i class="ico flag"></i>Every variant</h3><div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
             f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n"><i class="ico hourglass"></i> Time to finish</th><th><i class="ico skull"></i> Death cluster</th>'
-            f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Signals</th></tr>{"".join(body)}</table></div>'
+            f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Verdict and signals</th>'
+            f'<th>Replay (frozen agents)</th></tr>{"".join(body)}</table></div>'
             + human_html + ("" if not pips else seg_html) + "</section>")
 
 
@@ -255,8 +294,10 @@ def board(results: dict) -> str:
             word, tone = judge(m, res)
             icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
             slot = _slot(m["id"])
+            rep = "" if m["operator"].endswith("cosmetic_tile") else '<span class="rep {1}">replay: {0}</span>'.format(
+                *map(esc, judge(m, res, replay=True)))
             cells[slot] = (f'<td class="cell {tone}"><a href="#{game}" data-slot="{SLOT_NAMES[slot]}"><span class="v">{icon}{esc(word)}</span>'
-                                     f'<span class="label">{esc(m["class"])}</span></a></td>')
+                           f'<span class="label">{esc(m["class"])}</span>{rep}</a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
                     f'{"".join(cells)}</tr>')
     return ('<div class="scroll"><table class="board"><tr><th></th>' + "".join(f"<th>{n}</th>" for n in SLOT_NAMES) + "</tr>"
@@ -328,7 +369,10 @@ section.game[hidden] { display: none; }
 .k-clu { box-shadow: inset 0 0 0 2px var(--ink); } .k-cell { box-shadow: inset 0 0 0 2px var(--won); }
 .scroll { overflow-x: auto; }
 .cls { font-weight: 600; } .cls.breaking { color: var(--dead); } .cls.degrading { color: var(--stuck); }
-.cls.neutral { color: var(--run); } .cls.base { color: var(--dim); }
+.cls.neutral { color: var(--run); } .cls.base, .cls.null { color: var(--dim); }
+.board .rep { font: 500 .78rem/1.3 var(--ui); color: var(--dim); margin-top: 2px; }
+.board .rep.good { color: var(--won); } .board .rep.bad { color: var(--dead); }
+.fa { padding: 14px 16px; } .fa table.data { max-width: 560px; }
 td.sig.good { color: var(--won); } td.sig.bad { color: var(--dead); } td.sig.none { color: var(--dim); }
 .pips td { white-space: nowrap; }
 .pips .ico { --ico: 15px; margin-right: 3px; }
@@ -379,7 +423,8 @@ function summarize(card, s) {
     <dl><dt>Wins</dt><dd>${esc(s.wins)}</dd><dt>Solved</dt><dd>${esc(s.solved)}</dd>
     <dt>Progress (median / max)</dt><dd>${esc(s.progress)}</dd><dt>Time to finish</dt><dd>${esc(s.tff)}</dd>
     <dt>Death cluster</dt><dd>${esc(s.cluster)}</dd><dt>Top cause</dt><dd>${esc(s.cause)}</dd>
-    <dt>Signals</dt><dd>${esc(s.signals)}</dd><dt>Compared with</dt><dd>${esc(s.vs)}</dd></dl>`;
+    <dt>Verdict and signals</dt><dd>${esc(s.signals)}</dd><dt>Replay (frozen agents)</dt><dd>${esc(s.replay)}</dd>
+    <dt>Compared with</dt><dd>${esc(s.vs)}</dd></dl>`;
 }
 const redraws = {};
 document.querySelectorAll('section.game').forEach(sec => {
@@ -431,7 +476,28 @@ def render(results: dict) -> str:
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
             'or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must play out identically.</p></div>'
-            f'{strip}</div>{board(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
+            f'{strip}</div>{board(results)}{_false_alarm_card(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
+
+
+def _false_alarm_card(results: dict) -> str:
+    """How often each signal fires when the original is compared with itself (base-reseeded)."""
+    fa = false_alarms(results)
+    if not fa["comparisons"]:
+        return ('<p class="empty"><i class="ico hourglass"></i> False-alarm check not run yet: retrain the original with '
+                'three new seeds (<code>python -m code.neuro.ast_eval retrain --game &lt;game&gt; --mutant base-reseeded</code>), '
+                'then play it.</p>')
+    n = fa["comparisons"]
+    labels = (("completion_lost", "completion lost"), ("win_rate_changed", "win rate (Fisher p < .05)"),
+              ("cluster_moved", "death cluster moved more than 3 tiles"), ("cause_changed", "new top cause"),
+              ("detected", "any of them: the rule"))
+    rows = "".join(f'<tr><td>{esc(label)}</td><td class="n">{fa["fired"][k]}/{n}</td></tr>' for k, label in labels)
+    w, m = fa["beyond_seeds"]
+    if m:
+        rows += f'<tr><td>win rate outside the seed spread (beside the rule)</td><td class="n">{w}/{m}</td></tr>'
+    return (f'<div class="card fa"><h3><i class="ico eye"></i> False alarms: the original against itself</h3>'
+            f'<p class="lede">The original retrained with three new seeds and played like a mutant, over {n} comparisons '
+            '(a level, or a Mega Man section, whose original is solved). Every signal it raises would be a false alarm on a '
+            f'real mutant.</p><table class="data"><tr><th>Signal</th><th class="n">Fired</th></tr>{rows}</table></div>')
 
 
 def write(results: dict, path: str) -> str:

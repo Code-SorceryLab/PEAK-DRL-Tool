@@ -20,13 +20,22 @@ the keyboard (manual_play --record runs/ast/<game>/<variant>/human).
     segment reached   Mega Man: the segment each attempt ended in, time and damage
                       per segment                                                       1 (by segment), 3
 
-A mutant is compared with the original level on four signals: completion lost, a change in win
-rate (Fisher's exact test on the pooled agent attempts, p < 0.05), the death cluster moved more
-than 3 tiles, and a new dominant cause of death. The cosmetic mutant is replayed, not retrained:
-it passes the determinism check (RQ2) when every agent's attempt matches its attempt on the
-original, field for field. Mega Man's mutants are compared with base-retrained, the original
-retrained section by section exactly as they were; base, its relay of hand-picked section agents,
-stays on the page as context.
+The rule (fixed 2026-10-25, after the pilot runs; see paper-ast/ast_rule.md). A mutant is
+compared with the original level on four signals: completion lost, a change in win rate (Fisher's
+exact test on the pooled agent attempts, p < 0.05), the death cluster moved more than 3 tiles, and
+a new dominant cause of death; any one of them flags it. A comparison only counts when agents
+solve the original (an unsolved original cannot lose completion and has no route to break). Each
+counted comparison gets one verdict: broken (completion lost), changed (any other signal) or
+unchanged. Reported beside it, not part of the rule: whether the mutant's win rate falls outside
+the spread of the original's per-seed win rates (the outline's alternative to Fisher).
+
+Two modes per mutant: retrain (agents.csv, agents trained on the mutant) and replay
+(agents_replay.csv, the original's frozen agents on it). The cosmetic mutant is only replayed: it
+passes the determinism check (RQ2) when every agent's attempt matches its attempt on the original,
+field for field. base-reseeded, the original retrained with three new seeds, is compared with the
+original like a mutant: every signal it raises is a false alarm. Mega Man's mutants are compared
+with base-retrained, the original retrained section by section exactly as they were; base, its
+relay of hand-picked section agents, stays on the page as context.
 """
 from __future__ import annotations
 
@@ -43,7 +52,9 @@ from code.stats import episode_log
 ROOT = os.path.join("runs", "ast")
 GAMES = ["mario", "meatboy", "bomberman", "megaman"]
 RETRAINED = "base-retrained"            # Mega Man's original retrained like its mutants (code/neuro/ast_eval.py)
+RESEEDED = "base-reseeded"              # the original retrained with new seeds: the false-alarm check
 ORIGINALS = ("base", RETRAINED)
+SIGNALS = ("completion_lost", "win_rate_changed", "cluster_moved", "cause_changed")
 CLUSTER_TILES = 3
 ALPHA = 0.05
 # (label, column) per effort count; a column a game does not log is left out
@@ -53,9 +64,13 @@ SAME_ATTEMPT = ("status", "cause", "frames", "end_x", "end_y", "route")
 
 
 # ── reading ──────────────────────────────────────────────────────────────────────────────────
-def load(game: str, variant: str) -> list[dict]:
-    """Every attempt at this variant: the agents' playtest and any people's recorded play."""
+def load(game: str, variant: str, replay: bool = False) -> list[dict]:
+    """Every attempt at this variant: the agents' playtest and any people's recorded play, or with
+    `replay` the original's frozen agents on it."""
     base = os.path.join(ROOT, game, variant)
+    if replay:
+        path = os.path.join(base, "agents_replay.csv")
+        return episode_log.read(path) if os.path.exists(path) else []
     rows = []
     for path in [os.path.join(base, "agents.csv")] + sorted(glob.glob(os.path.join(base, "human", "**", "episodes.csv"),
                                                                      recursive=True)):
@@ -74,8 +89,8 @@ def variants(game: str) -> list[str]:
     files = glob.glob(os.path.join(ROOT, game, "*", "agents.csv"))
     files += glob.glob(os.path.join(ROOT, game, "*", "human", "**", "episodes.csv"), recursive=True)
     found = {os.path.relpath(p, os.path.join(ROOT, game)).split(os.sep)[0] for p in files}
-    rest = sorted(found - set(order) - set(ORIGINALS))
-    return [v for v in [*ORIGINALS, *order, *rest] if v in found]
+    rest = sorted(found - set(order) - set(ORIGINALS) - {RESEEDED})
+    return [v for v in [*ORIGINALS, RESEEDED, *order, *rest] if v in found]
 
 
 # ── per attempt ──────────────────────────────────────────────────────────────────────────────
@@ -132,6 +147,19 @@ def win_rate(rows: list[dict], key: str = "persona") -> dict:
     return out
 
 
+def seed_win_rates(rows: list[dict]) -> dict:
+    """{training seed: [wins, attempts]}, the seed read from the run dir (".../Mario1-1_1234");
+    empty where the attempts do not name one run per seed (Mega Man's relay)."""
+    out: dict = {}
+    for r in rows:
+        tail = os.path.basename(str(r.get("run") or "")).rsplit("_", 1)
+        if len(tail) == 2 and tail[1].isdigit():
+            w = out.setdefault(tail[1], [0, 0])
+            w[0] += _won(r)
+            w[1] += 1
+    return out
+
+
 def route_lines(rows: list[dict], points: int = 80) -> list[dict]:
     """Every attempt's route in tile units, at most `points` points, for the map: {"w": won, "p": [[x, y], ...]}."""
     out = []
@@ -154,6 +182,7 @@ def summarize(rows: list[dict]) -> dict:
         "attempts": len(rows),
         "completion": any(map(_won, rows)),
         "win_rate": win_rate(rows),
+        "seed_win_rates": seed_win_rates(rows),
         "progress_median": _median(progress),
         "progress_max": round(max(map(float, progress)), 3) if progress else None,
         "end_tiles": sorted(ends),
@@ -198,7 +227,8 @@ def fisher_exact(a: int, b: int, c: int, d: int) -> float:
 
 
 def compare(base: dict, mut: dict) -> dict:
-    """The four signals a mutant can raise against the original level."""
+    """The four signals a mutant can raise against the original level, whether the comparison
+    counts (the original is solved), the verdict, and the seed-spread check beside them."""
     bw, bn = base["win_rate"]["pooled"]
     mw, mn = mut["win_rate"]["pooled"]
     p = fisher_exact(bw, bn - bw, mw, mn - mw)
@@ -213,7 +243,12 @@ def compare(base: dict, mut: dict) -> dict:
         "cluster_moved": moved or new_cluster,
         "cause_changed": bool(cause[1] and cause[0] != cause[1]),
     }
-    signals["detected"] = any(v for k, v in signals.items() if k != "win_rate_p")
+    rates = [w / n for w, n in (base.get("seed_win_rates") or {}).values() if n]
+    signals["win_rate_beyond_seeds"] = (not min(rates) <= mw / mn <= max(rates)) if len(rates) >= 2 and mn else None
+    signals["counted"] = bool(base["completion"])
+    signals["detected"] = signals["counted"] and any(signals[k] for k in SIGNALS)
+    signals["verdict"] = ("not counted" if not signals["counted"] else "broken" if signals["completion_lost"]
+                          else "changed" if signals["detected"] else "unchanged")
     return signals
 
 
@@ -249,6 +284,9 @@ def evaluate(game: str) -> dict:
         by_level: dict = {}
         for r in load(game, v):
             by_level.setdefault(str(r.get("level")), []).append(r)
+        replayed: dict = {}
+        for r in load(game, v, replay=True):
+            replayed.setdefault(str(r.get("level")), []).append(r)
         for level, rs in sorted(by_level.items(), key=lambda kv: (kv[0] != main, kv[0])):
             one = v not in ORIGINALS and len(by_level) == 1      # a section mutant keeps its own name
             key = v if level == main or one else f"{v} @ {level}"
@@ -262,14 +300,29 @@ def evaluate(game: str) -> dict:
                 entry["vs"] = vs
                 if v.endswith("cosmetic_tile"):
                     entry["determinism"] = determinism(ref, agents)
+                if replayed.get(level):
+                    rep = summarize(replayed[level])
+                    entry["replay"] = {"agents": rep, "vs_base": compare(summarize(ref), rep)}
             out[key] = entry
     return out
+
+
+def false_alarms(results: dict) -> dict:
+    """How often each signal fires on base-reseeded, the original against itself trained with new
+    seeds, over every counted comparison (a game's level, or a Mega Man section)."""
+    nulls = [e["vs_base"] for res in results.values() for k, e in res.items()
+             if k.split(" @ ")[0] == RESEEDED and (e.get("vs_base") or {}).get("counted")]
+    fired = {s: sum(bool(n[s]) for n in nulls) for s in (*SIGNALS, "detected")}
+    spread = [n["win_rate_beyond_seeds"] for n in nulls if n.get("win_rate_beyond_seeds") is not None]
+    return {"comparisons": len(nulls), "fired": fired,
+            "beyond_seeds": [sum(spread), len(spread)]}
 
 
 def table(game: str, results: dict) -> str:
     """The text table the menu prints: one line per variant."""
     width = max(map(len, results), default=20) + 2
-    lines = [f"{game}", f"  {'VARIANT':<{width}}{'WINS':>8}{'SOLVED':>8}{'PROG':>7}{'TIME':>7}  {'CLUSTER':<14}{'CAUSE':<12}SIGNALS"]
+    lines = [f"{game}", f"  {'VARIANT':<{width}}{'WINS':>8}{'SOLVED':>8}{'PROG':>7}{'TIME':>7}  {'CLUSTER':<14}{'CAUSE':<12}"
+                        f"{'VERDICT':<13}{'REPLAY':<20}SIGNALS"]
     for v, e in results.items():
         a = e["agents"]
         if not a:
@@ -278,15 +331,19 @@ def table(game: str, results: dict) -> str:
         c = a["death_cluster"]
         cause = next(iter(a["causes"]), "-")
         sig = e.get("vs_base") or {}
-        flags = [k for k in ("completion_lost", "win_rate_changed", "cluster_moved", "cause_changed") if sig.get(k)]
+        flags = [k for k in SIGNALS if sig.get(k)]
         if "determinism" in e:
             d = e["determinism"]
             flags.append(f"replay {d['identical']}/{d['compared']} identical")
+        rep = e.get("replay")
+        replay = (f"{rep['agents']['win_rate']['pooled'][0]}/{rep['agents']['win_rate']['pooled'][1]} "
+                  f"{rep['vs_base']['verdict']}") if rep else "-"
         prog = "-" if a["progress_median"] is None else f"{100 * a['progress_median']:.0f}%"
         tff = "-" if a["time_to_finish"] is None else f"{a['time_to_finish']:.1f}s"
         where = f"({c['col']},{c['row']}) {c['share']:.0%}" if c else "-"
         lines.append(f"  {v:<{width}}{f'{w}/{n}':>8}{'yes' if a['completion'] else 'no':>8}{prog:>7}{tff:>7}  "
-                     f"{where:<14}{cause:<12}{', '.join(flags) or ('-' if v.startswith('base') else 'none')}")
+                     f"{where:<14}{cause:<12}{sig.get('verdict', '-'):<13}{replay:<20}"
+                     f"{', '.join(flags) or ('-' if v.startswith('base') else 'none')}")
     return "\n".join(lines)
 
 
@@ -313,6 +370,11 @@ def main() -> None:
     for g in games:
         print(table(g, results[g]) if results[g] else f"{g}\n  no playtests yet: python -m code.neuro.ast_eval play --game {g}")
         print()
+    fa = false_alarms(results)
+    if fa["comparisons"]:
+        print(f"false alarms ({RESEEDED} vs the original, {fa['comparisons']} comparisons): "
+              + ", ".join(f"{k} {v}" for k, v in fa["fired"].items())
+              + f", beyond the seed spread {fa['beyond_seeds'][0]}/{fa['beyond_seeds'][1]}")
     print(f"wrote {path}")
 
 

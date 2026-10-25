@@ -174,6 +174,8 @@ python -m code.games.eval_mutants --list                               # the eva
 python -m code.neuro.ast_eval retrain --game mario --mutant widen_gap  # every persona's 3 seeds on the mutant
 python -m code.neuro.ast_eval play --game mario                        # one attempt per agent: original + mutants
 python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained   # Mega Man's original, trained like its mutants
+python -m code.neuro.ast_eval play --game mario --replay               # the original's frozen agents on each mutant
+python -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded     # the original, new seeds: the false-alarm check
 python -m code.stats.ast_metrics --page                                # metric tables + runs/balance/mutations.html
 PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 
@@ -482,9 +484,14 @@ completion, win rate, progress, end location, death cluster, cause mix, time to 
 coverage, effort counts and, for Mega Man, the segment reached. A mutant is caught when completion
 is lost, the win rate changes (Fisher's exact test, p < 0.05), the death cluster moves more than
 three tiles or the top cause of death changes; the cosmetic copy passes when every replay matches
-the original attempt for attempt. Mega Man's relay legs are hand-picked runs of an older pipeline,
-so its mutants are compared with `base-retrained`, the original with every section retrained
-exactly as the mutants were, over the same section (the global jump change section by section).
+the original attempt for attempt. A comparison counts only where the original's agents win, and
+each gets one verdict: broken, changed or unchanged (the rule, and how it was fixed:
+`paper-ast/ast_rule.md`). Every retrained mutant is also replayed by the original's frozen agents
+(`play --replay`, `agents_replay.csv`), and `base-reseeded`, the original retrained with three new
+seeds, measures how often each signal fires by chance. Mega Man's relay legs are hand-picked runs
+of an older pipeline, so its mutants are compared with `base-retrained`, the original with every
+section retrained exactly as the mutants were, over the same section (the global jump change
+section by section).
 
 ## Research use
 

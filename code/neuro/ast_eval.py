@@ -51,6 +51,8 @@ ROOT = os.path.join("runs", "ast")
 PERSONA_ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
 MEGAMAN_STAGE, MEGAMAN_FRAMES, MEGAMAN_STALL = "CutMan", 18000, 300     # relay.py's defaults
 RETRAINED = "base-retrained"    # Mega Man's original, every section retrained as its mutants were
+RESEEDED = "base-reseeded"      # the original retrained with new seeds: how often a signal fires by chance
+RESEEDS = (1111, 2222, 3333)
 
 
 def variant_dir(game: str, variant: str) -> str:
@@ -58,16 +60,18 @@ def variant_dir(game: str, variant: str) -> str:
 
 
 def variants(game: str) -> list[str]:
-    return ["base"] + ([RETRAINED] if game == "megaman" else []) + [m["id"] for m in eval_mutants.eval_set(game)]
+    return (["base"] + ([RETRAINED] if game == "megaman" else []) + [RESEEDED]
+            + [m["id"] for m in eval_mutants.eval_set(game)])
 
 
 def mutant(game: str, variant: str) -> dict | None:
     if variant == "base":
         return None
-    if game == "megaman" and variant == RETRAINED:      # retrained like a global mutant, on the original
+    if variant == RESEEDED or (game == "megaman" and variant == RETRAINED):   # the original, retrained
         from .relay import stage_legs
-        return {"id": RETRAINED, "dir": None, "retrain": True, "section": None,
-                "retrain_levels": [leg.level for leg in stage_legs(MEGAMAN_STAGE)]}
+        levels = [leg.level for leg in stage_legs(MEGAMAN_STAGE)] if game == "megaman" else [EVAL_LEVELS[game][0]]
+        return {"id": variant, "dir": None, "retrain": True, "section": None, "retrain_levels": levels,
+                "seeds": RESEEDS if variant == RESEEDED else SEEDS}
     m = next((m for m in eval_mutants.eval_set(game) if m["id"] == variant), None)
     if m is None:
         raise SystemExit(f"{game} has no mutant '{variant}' on disk: python -m code.games.eval_mutants")
@@ -97,7 +101,7 @@ def agent_dirs(game: str, variant: str, persona: str) -> list[str]:
     root = os.path.join(variant_dir(game, variant), "probes")
     tags = sorted(os.path.basename(d) for d in glob.glob(os.path.join(root, game, persona, "*")))
     tag = tag if tag in tags or not tags else tags[0]       # a shorter test budget leaves its own tag
-    return [balance.probe_dir(game, persona, tag, level, s, root) for s in SEEDS]
+    return [balance.probe_dir(game, persona, tag, level, s, root) for s in m.get("seeds", SEEDS)]
 
 
 # ── retraining ───────────────────────────────────────────────────────────────────────────────
@@ -109,7 +113,7 @@ def retrain_job(game: str, variant: str, persona: str, gens: int = GENS, workers
     if m is None or not m["retrain"]:
         raise SystemExit(f"{game} {variant} is not retrained (the baseline agents replay it)")
     cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
-           "--levels", *(levels or m["retrain_levels"]), "--seeds", *map(str, SEEDS), "--gens", str(gens),
+           "--levels", *(levels or m["retrain_levels"]), "--seeds", *map(str, m.get("seeds", SEEDS)), "--gens", str(gens),
            "--root", os.path.join(variant_dir(game, variant), "probes"), "--out", variant_dir(game, variant)]
     if game != "megaman" and baseline_tag(game, persona).endswith("_best"):
         cmd.append("--best")
@@ -179,12 +183,13 @@ def _best_retrained(variant: str, section: str) -> str | None:
     return max(scored)[1] if scored else None
 
 
-def play_megaman(variant: str, episodes: int = 20) -> list[dict]:
+def play_megaman(variant: str, episodes: int = 20, replay: bool = False) -> list[dict]:
     """The relay over the full stage, or over the one section a level mutant changes, from that
     section's start (most full-stage attempts end before segment 3, so they would never meet a
     change there). A global mutant and base-retrained are played over the full stage and over each
     section alone, so every mutant meets the retrained original over the same ground. The relay's
-    hand-picked legs (base) are kept as context; the cosmetic copy is replayed by base-retrained's."""
+    hand-picked legs (base) are kept as context; the cosmetic copy is replayed by base-retrained's,
+    and so is any mutant with `replay` (the frozen original's agents, not those retrained on it)."""
     from . import relay
     m = mutant("megaman", variant)
     if m is None:
@@ -195,7 +200,7 @@ def play_megaman(variant: str, episodes: int = 20) -> list[dict]:
         legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
         for leg in legs:
             if m and leg.level in m["retrain_levels"]:
-                trained = m["id"] if m["retrain"] else RETRAINED
+                trained = m["id"] if m["retrain"] and not replay else RETRAINED
                 run = _best_retrained(trained, leg.level)
                 if run is None:
                     raise SystemExit(f"no agent retrained on {trained} for {leg.level}: retrain it first")
@@ -212,16 +217,22 @@ def play_megaman(variant: str, episodes: int = 20) -> list[dict]:
     return rows
 
 
-def play(game: str, variant: str, personas: list[str] | None = None, episodes: int = 20) -> str:
-    """Playtest one variant and write its agents.csv (rows of personas not replayed are kept)."""
+def play(game: str, variant: str, personas: list[str] | None = None, episodes: int = 20,
+         replay: bool = False) -> str:
+    """Playtest one variant and write its agents.csv (rows of personas not replayed are kept).
+    `replay` plays the original's frozen agents on a retrained mutant instead, into agents_replay.csv."""
     personas = personas or PERSONA_ORDER
+    m = mutant(game, variant)
+    if replay and (m is None or not m["retrain"] or variant in (RETRAINED, RESEEDED)):
+        return f"skip {variant}: only a retrained mutant has a replay of its own"
+    name = "agents_replay.csv" if replay else "agents.csv"
     if game == "megaman":
-        rows, keep = play_megaman(variant, episodes), []
+        rows, keep = play_megaman(variant, episodes, replay), []
     else:
-        m, level, rows = mutant(game, variant), EVAL_LEVELS[game][0], []
+        level, rows = EVAL_LEVELS[game][0], []
         with eval_mutants._named(m["dir"] if m else None):
             for persona in personas:
-                for run in agent_dirs(game, variant, persona):
+                for run in agent_dirs(game, "base" if replay else variant, persona):
                     if not os.path.exists(os.path.join(run, "best.npz")):
                         print(f"  {variant:<20}{persona:<13}missing {run}", flush=True)
                         continue
@@ -229,9 +240,9 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
                     rows.append(row)
                     print(f"  {variant:<20}{persona:<13}{row['status']:<6}{row['cause'] or '':<10}"
                           f"{100 * (row['progress'] or 0):>4.0f}%  {row['time_s']:>6.1f} s", flush=True)
-        path = os.path.join(variant_dir(game, variant), "agents.csv")
+        path = os.path.join(variant_dir(game, variant), name)
         keep = [r for r in (episode_log.read(path) if os.path.exists(path) else []) if r.get("persona") not in personas]
-    path = os.path.join(variant_dir(game, variant), "agents.csv")
+    path = os.path.join(variant_dir(game, variant), name)
     if not rows:
         return f"nothing for {variant}: no agents to play it"
     episode_log.reset(path)
@@ -255,6 +266,8 @@ def main() -> None:
     p.add_argument("--variant", nargs="*", default=None, help="base and/or mutant ids (default: all)")
     p.add_argument("--persona", nargs="*", default=None, help="default: all six")
     p.add_argument("--episodes", type=int, default=20, help="Mega Man relay attempts per variant")
+    p.add_argument("--replay", action="store_true",
+                   help="the original's frozen agents on each retrained mutant (agents_replay.csv)")
     args = ap.parse_args()
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     if args.cmd == "retrain":
@@ -274,7 +287,7 @@ def main() -> None:
                 raise SystemExit(1)
         return
     for variant in args.variant or variants(args.game):
-        print(play(args.game, variant, args.persona, args.episodes), flush=True)
+        print(play(args.game, variant, args.persona, args.episodes, args.replay), flush=True)
 
 
 if __name__ == "__main__":
