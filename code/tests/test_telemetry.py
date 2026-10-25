@@ -43,8 +43,25 @@ def test_dashboard_metrics_come_from_rows_alone(tmp_path):
     data = telemetry.build([str(tmp_path)])
     assert data["episodes"] == 3 and len(data["groups"]) == 2       # agent and random are separate players
     g = next(x for x in data["groups"] if x["player"] == "tester")
-    assert g["completed"] and g["wins"] == 1 and g["win_rate"] == 0.5 and g["furthest"] == 1.0
+    assert g["completed"] and g["wins"] == 1 and g["win_rate"] == 0.5 and g["furthest"] < 1.0   # failed attempts only
     assert g["time_to_finish"] > 0 and g["causes"] == [{"cause": "Stall", "n": 1}]
     assert sum(g["progress_hist"]) == 1 and g["geometry"]["solid"] and g["sections"][0]["reached"] == 2
-    assert {m["key"] for m in g["means"]} >= {"jumps", "kills", "coins"}
+    assert {m["key"] for m in g["medians"]} >= {"jumps", "kills", "coins"}
     json.dumps(data)                                                # the page embeds it as JSON
+
+
+def test_progress_is_over_failed_attempts_and_effort_is_median():
+    rows = [{"status": "WON", "progress": 1.0, "jumps": 1}, {"status": "DEAD", "progress": 0.2, "jumps": 2},
+            {"status": "DEAD", "progress": 0.6, "jumps": 30}, {"status": "DEAD", "progress": 0.4, "bombs_placed": 3}]
+    g = telemetry.summarize(rows, "bomberman")
+    assert g["furthest"] == 0.6 and g["median_progress"] == 0.4      # the win's 1.0 is left out
+    med = {m["key"]: m["value"] for m in g["medians"]}
+    assert med["jumps"] == 2 and med["bombs_placed"] == 3             # median, not the mean (11)
+
+
+def test_two_human_players_get_a_pooled_group(tmp_path):
+    rows = [dict(_play("CutMan-7-Corridor", 60, (0, 0, 0, 0), source="human"), persona=name) for name in ("ana", "ben")]
+    episode_log.append(str(tmp_path / "h" / "episodes.csv"), rows)
+    groups = {g["player"]: g for g in telemetry.build([str(tmp_path)])["groups"]}
+    assert set(groups) == {"ana (human)", "ben (human)", telemetry.POOLED}
+    assert groups[telemetry.POOLED]["episodes"] == 2

@@ -9,7 +9,8 @@ only (episodes.csv, code/stats/episode_log.py), so it does not know or care whet
 an agent played. Per level and per player it shows the metrics of the paper's section 3.5:
 
     completion · win rate · furthest progress and where attempts ended · cause-of-death mix ·
-    time to finish and the routes taken · jumps, pickups, kills, bricks per episode
+    time to finish and the routes taken · median jumps, pickups, kills, bricks, bombs, wall jumps
+    per episode. Progress is over failed attempts; with 2+ human players a pooled group is added.
 
 A game that records a split by stage section (megaman) gets that table too. The level's
 geometry is drawn under the routes when its file can be found; otherwise the map is omitted.
@@ -33,7 +34,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(HERE, "..", "games")
 SOLID, LADDER, SPIKE = "#=?<>FLd", "H", "^"
 PER_EPISODE = [("jumps", "Jumps"), ("coins", "Pickups"), ("kills", "Enemies killed"),
-               ("bricks", "Bricks destroyed"), ("damage_taken", "Damage taken"), ("shots", "Shots fired")]
+               ("bricks", "Bricks destroyed"), ("damage_taken", "Damage taken"), ("shots", "Shots fired"),
+               ("bombs_placed", "Bombs placed"), ("wall_jumps", "Wall jumps")]
+POOLED = "all humans (pooled)"
 
 
 def find_logs(paths: list[str]) -> list[str]:
@@ -87,15 +90,15 @@ def summarize(rows: list[dict], game: str) -> dict:
     n = len(rows)
     won = [r for r in rows if r.get("status") == "WON"]
     lost = [r for r in rows if r.get("status") != "WON"]
-    prog = [r["progress"] for r in rows if r.get("progress") is not None]
+    prog = [r["progress"] for r in lost if r.get("progress") is not None]   # how far the failed attempts got
     times = [r["time_s"] for r in won if r.get("time_s") is not None]
     causes = Counter((r.get("cause") or "?") for r in lost)
     hist = [0] * 10
     for r in lost:
         if r.get("progress") is not None:
             hist[min(9, int(r["progress"] * 10))] += 1
-    means = [{"key": k, "label": label, "value": round(statistics.fmean(v), 2)}
-             for k, label in PER_EPISODE if (v := [r[k] for r in rows if r.get(k) is not None])]
+    medians = [{"key": k, "label": label, "value": round(statistics.median(v), 2)}
+               for k, label in PER_EPISODE if (v := [r[k] for r in rows if r.get(k) is not None])]
     # split by stage section, where the game records one
     order: list[str] = []
     for r in rows:
@@ -123,7 +126,7 @@ def summarize(rows: list[dict], game: str) -> dict:
         "median_progress": statistics.median(prog) if prog else None,
         "time_to_finish": statistics.median(times) if times else None,
         "causes": [{"cause": c, "n": k} for c, k in causes.most_common()],
-        "progress_hist": hist, "means": means, "sections": sections,
+        "progress_hist": hist, "medians": medians, "sections": sections,
         "deaths_per_win": balance.get("deaths_per_run"), "death_spread": balance.get("death_cluster_entropy"),
         "episode_rows": [{
             "agent": str(r.get("agent", "")), "seed": r.get("seed"), "status": r.get("status"), "cause": r.get("cause") or "",
@@ -161,6 +164,13 @@ def build(paths: list[str]) -> dict:
         if r.get("source") and r["source"] != "agent":
             player = f"{player} ({r['source']})"
         groups.setdefault((r.get("game") or "?", str(r.get("level")), player), []).append(r)
+    humans: dict[tuple, dict[str, list[dict]]] = {}
+    for (game, level, player), eps in groups.items():
+        if eps[0].get("source") == "human":
+            humans.setdefault((game, level), {})[player] = eps
+    for (game, level), by_player in humans.items():   # pooled only adds something with 2+ people
+        if len(by_player) > 1:
+            groups[(game, level, POOLED)] = [r for eps in by_player.values() for r in eps]
     out = []
     for (game, level, player), eps in sorted(groups.items()):
         tile = int(next((r["tile"] for r in eps if r.get("tile")), 32))
@@ -280,9 +290,9 @@ function render(){
   let h = '<div class="tiles">' +
     `<div class="tile"><div class="k">Completion</div><div class="v">${status}</div><div class="n">by at least one attempt</div></div>` +
     tile("Win rate", pct(g.win_rate), g.wins + " of " + g.episodes + " attempts") +
-    tile("Furthest progress", pct(g.furthest), "median " + pct(g.median_progress)) +
+    tile("Furthest progress", pct(g.furthest), "median " + pct(g.median_progress) + " · failed attempts") +
     tile("Time to finish", g.time_to_finish == null ? "—" : num(g.time_to_finish) + " s", g.wins ? "median of wins" : "no wins yet") +
-    g.means.map(m => tile(m.label, num(m.value), "per episode")).join("") + "</div>";
+    g.medians.map(m => tile(m.label, num(m.value), "median per episode")).join("") + "</div>";
 
   const m = map(g);
   if (m) h += `<div class="card"><h2>Routes and where attempts ended</h2><div class="legend"><span><i class="line" style="background:var(--s1)"></i>Route taken</span><span><i style="background:var(--s2)"></i>Attempt ended (failed)</span><span><i style="background:var(--s3)"></i>Finished</span></div>${m}</div>`;
