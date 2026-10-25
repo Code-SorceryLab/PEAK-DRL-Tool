@@ -94,6 +94,18 @@ def _row(v: str, a: dict, m: dict | None, tone: str, effort: list[str], signals:
     return "<tr>" + "".join(tds) + "</tr>"
 
 
+def _summary(v: str, e: dict, m: dict | None) -> dict:
+    """What the selected-variant card shows."""
+    a = e.get("agents") or {}
+    word, tone = verdict(m, e) if m else ("the original", "none")
+    w, n = (a.get("win_rate") or {}).get("pooled", [0, 0])
+    return {"name": v, "cls": m["class"] if m else "original", "desc": m["description"] if m else "The level as it ships.",
+            "word": word, "tone": tone, "wins": f"{w}/{n}", "solved": "yes" if a.get("completion") else "no",
+            "progress": f"{_pct(a.get('progress_median')) or '-'} / {_pct(a.get('progress_max')) or '-'}",
+            "tff": _num(a.get("time_to_finish"), ".1f", " s") or "-", "cluster": _where(a.get("death_cluster")) or "-",
+            "cause": next(iter(a.get("causes") or {}), "-") or "-", "signals": _signals(e) or "-"}
+
+
 def _game_section(game: str, res: dict) -> str:
     title = eval_mutants.EVAL_LEVELS[game][1]
     ms = eval_mutants.eval_set(game)
@@ -101,7 +113,7 @@ def _game_section(game: str, res: dict) -> str:
     rows, cells = _level(ms)
     order = [v for v in ["base"] + sorted(k for k in res if k.startswith("base @")) + [m["id"] for m in ms] if v in res]
     if not order:
-        return (f'<section class="frame stripe g-{game} game" id="{game}"><h2>{esc(title)}</h2>'
+        return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
                 f'<p class="empty"><i class="ico qblock"></i> No playtests yet. Run Agent Playtest (menu 20) or '
                 f'<code>python -m code.neuro.ast_eval play --game {game}</code>.</p></section>')
     effort = sorted({k for v in order for k in ((res[v].get("agents") or {}).get("effort") or {})})
@@ -122,21 +134,25 @@ def _game_section(game: str, res: dict) -> str:
     data = {"rows": rows, "cells": cells,
             "runs": {v: {"ends": (res[v].get("agents") or {}).get("end_tiles") or [],
                          "cluster": (res[v].get("agents") or {}).get("death_cluster"),
-                         "coverage": (res[v].get("agents") or {}).get("coverage") or []} for v in order}}
+                         "routes": (res[v].get("agents") or {}).get("routes") or []} for v in order},
+            "summary": {v: _summary(v, res[v], by_id.get(v)) for v in order}}
     buttons = "".join(f'<button class="btn{" on" if i == 0 else ""}" data-variant="{esc(v)}">{esc(v)}</button>'
                       for i, v in enumerate(order))
-    return (f'<section class="frame stripe g-{game} game" id="{game}"><h2>{esc(title)}</h2>'
+    pips = (f'<div class="card"><h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips">'
+            f'<tr><th>Persona</th>' + "".join(f"<th>{esc(v)}</th>" for v in order) + f"</tr>{grid}</table></div></div>"
+            if personas and game != "megaman" else "")
+    side = pips or (f'<div class="card">{seg_html}</div>' if seg_html else "")
+    return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
             f'<div class="mapbar">{buttons}</div>'
             f'<div class="map"><canvas data-game="{game}"></canvas></div>'
-            '<p class="legend"><i class="k-cov"></i>tiles the routes covered <i class="k-end"></i>where a failed attempt ended '
+            '<p class="legend"><i class="k-won"></i>winning runs <i class="k-lost"></i>failed runs, ending where they died '
             '<i class="k-clu"></i>death cluster (3 tiles) <i class="k-cell"></i>the mutated tiles</p>'
             f'<script type="application/json" id="data-{game}">{json.dumps(data, separators=(",", ":"))}</script>'
-            f'<div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
+            '<div class="duo"><div class="card vsum" aria-live="polite"></div>' + side + "</div>"
+            f'<h3><i class="ico flag"></i>Every variant</h3><div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
             f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n"><i class="ico hourglass"></i> Time to finish</th><th><i class="ico skull"></i> Death cluster</th>'
             f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Signals</th></tr>{"".join(body)}</table></div>'
-            + (f'<h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips"><tr><th>Persona</th>'
-               + "".join(f"<th>{esc(v)}</th>" for v in order) + f"</tr>{grid}</table></div>" if personas and game != "megaman" else "")
-            + human_html + seg_html + "</section>")
+            + human_html + ("" if not pips else seg_html) + "</section>")
 
 
 def _human_row(v: str, h: dict) -> str:
@@ -193,6 +209,15 @@ def _icon(game: str) -> str:
         return ""
 
 
+def scores(results: dict) -> dict:
+    """How many mutants the playtests got right, got wrong, and still wait for."""
+    out = {"good": 0, "bad": 0, "none": 0}
+    for game, res in results.items():
+        for m in eval_mutants.eval_set(game):
+            out[verdict(m, res.get(m["id"]))[1]] += 1
+    return out
+
+
 def board(results: dict) -> str:
     rows = []
     for game, res in results.items():
@@ -204,8 +229,8 @@ def board(results: dict) -> str:
                                      f'<span class="label">{esc(m["class"])}</span></a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
                     f'{"".join(cells)}</tr>')
-    return ('<table class="board"><tr><th></th>' + "".join(f"<th>{n}</th>" for n in SLOT_NAMES) + "</tr>"
-            + "".join(rows) + "</table>")
+    return ('<div class="scroll"><table class="board"><tr><th></th>' + "".join(f"<th>{n}</th>" for n in SLOT_NAMES) + "</tr>"
+            + "".join(rows) + "</table></div>")
 
 
 CSS = """
@@ -213,7 +238,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 64px; display: flex
 header.top { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 header.top nav { margin-left: auto; display: flex; gap: 8px; }
 .lede { color: var(--dim); max-width: 70ch; margin: 6px 0 0; }
-.board { border-collapse: separate; border-spacing: 6px; width: 100%; table-layout: fixed; }
+.board { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 820px; table-layout: fixed; }
 .board th { font: 600 12.5px/1.3 var(--ui); color: var(--dim); text-align: left; padding: 0 4px 2px; }
 .board th.g { font: 700 18px/1.2 var(--pixel); padding: 0 10px; box-shadow: inset 4px 0 0 var(--stripe); width: 17%; }
 .board th.g a { color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
@@ -229,13 +254,33 @@ header.top nav { margin-left: auto; display: flex; gap: 8px; }
 .board td.none .v { color: var(--mute); }
 h3 .ico { --ico: 15px; margin-right: 4px; }
 th .ico { --ico: 13px; vertical-align: -2px; }
-section.game { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 12px; }
+section.game { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
+section.game[hidden] { display: none; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 32px; align-items: end; }
+.scorestrip { display: flex; gap: 10px; }
+.scorestrip .frame { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 110px; }
+.scorestrip .num { font-size: 36px; display: flex; align-items: center; gap: 10px; }
+.scorestrip .num .ico { --ico: 26px; }
+.scorestrip .good .num { color: var(--won); } .scorestrip .bad .num { color: var(--dead); } .scorestrip .none .num { color: var(--mute); }
+.gametabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.gametabs .btn { font: 700 18px/1.2 var(--pixel); padding: 8px 14px; }
+.gametabs .btn img.gicon, .gametabs .btn .gletter { height: 22px; }
+.duo { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
+.card { background: var(--night); border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; padding: 14px 16px; min-width: 0; }
+.card h3 { margin-bottom: 10px; }
+.vsum .vname { font: 700 27px/1.1 var(--pixel); margin: 0 0 6px; overflow-wrap: anywhere; }
+.vsum .vverdict { font: 700 18px/1.2 var(--pixel); display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.vsum .vverdict .ico { --ico: 20px; }
+.vsum .vverdict.good { color: var(--won); } .vsum .vverdict.bad { color: var(--dead); } .vsum .vverdict.none { color: var(--mute); }
+.vsum dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font: 500 14px/1.35 var(--dense); }
+.vsum dt { color: var(--dim); } .vsum dd { margin: 0; color: var(--ink); }
+@media (max-width: 900px) { .hero, .duo { grid-template-columns: minmax(0, 1fr); } .scorestrip { flex-wrap: wrap; } }
 .mapbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .map { overflow-x: auto; background: #000; padding: 8px; width: fit-content; max-width: 100%; box-sizing: border-box; }
 .map canvas { display: block; }
 .legend { color: var(--dim); font-size: 13px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
 .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
-.k-cov { background: rgba(248, 56, 0, .32); } .k-end { background: var(--ink); }
+.k-won { height: 3px !important; background: var(--run); } .k-lost { height: 3px !important; background: var(--dead); }
 .k-clu { box-shadow: inset 0 0 0 2px var(--ink); } .k-cell { box-shadow: inset 0 0 0 2px var(--won); }
 .scroll { overflow-x: auto; }
 .cls { font-weight: 600; } .cls.breaking { color: var(--dead); } .cls.degrading { color: var(--stuck); }
@@ -266,10 +311,14 @@ function draw(canvas, data, variant) {
     g.fillRect(c * s, r * s, s, s);
   }
   const run = data.runs[variant] || {};
-  g.fillStyle = 'rgba(248,56,0,.32)';
-  (run.coverage || []).forEach(([c, r]) => g.fillRect(c * s, Math.min(r, n) * s, s, s));
-  g.fillStyle = '#f8f8f8';
-  (run.ends || []).forEach(([c, r]) => g.fillRect(c * s + s / 4, Math.min(r, n) * s + s / 4, s / 2, s / 2));
+  const lw = Math.max(1.2, s / 4);
+  const line = (r, color, width, alpha) => {
+    g.strokeStyle = color; g.lineWidth = width; g.globalAlpha = alpha; g.lineJoin = 'round'; g.beginPath();
+    r.p.forEach(([x, y], i) => i ? g.lineTo(x * s, Math.min(y, n + 0.5) * s) : g.moveTo(x * s, Math.min(y, n + 0.5) * s));
+    g.stroke(); g.globalAlpha = 1;
+  };
+  (run.routes || []).filter(r => !r.w).forEach(r => line(r, '#e40058', lw, 0.55));   // failed runs, red
+  (run.routes || []).filter(r => r.w).forEach(r => line(r, '#58d854', lw * 1.7, 0.9));   // the route the winners take, green
   if (run.cluster) {
     const k = run.cluster; g.strokeStyle = '#f8f8f8'; g.lineWidth = 2;
     g.strokeRect((k.col - 3) * s, (Math.min(k.row, n) - 3) * s, 7 * s, 7 * s);
@@ -277,18 +326,46 @@ function draw(canvas, data, variant) {
   g.strokeStyle = '#f8d878'; g.lineWidth = 2;
   (data.cells[variant] || []).forEach(([c, r]) => g.strokeRect(c * s + 1, r * s + 1, s - 2, s - 2));
 }
+const ICON = {good: '<i class="ico coin"></i>', bad: '<i class="ico heartbreak"></i>', none: ''};
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function summarize(card, s) {
+  card.innerHTML = `<p class="label">Selected variant</p><p class="vname">${esc(s.name)}</p>
+    <span class="cls ${esc(s.cls)}">${esc(s.cls)}</span><p class="label">${esc(s.desc)}</p>
+    <p class="vverdict ${s.tone}">${ICON[s.tone] || ''}${esc(s.word)}</p>
+    <dl><dt>Wins</dt><dd>${esc(s.wins)}</dd><dt>Solved</dt><dd>${esc(s.solved)}</dd>
+    <dt>Progress (median / max)</dt><dd>${esc(s.progress)}</dd><dt>Time to finish</dt><dd>${esc(s.tff)}</dd>
+    <dt>Death cluster</dt><dd>${esc(s.cluster)}</dd><dt>Top cause</dt><dd>${esc(s.cause)}</dd>
+    <dt>Signals</dt><dd>${esc(s.signals)}</dd></dl>`;
+}
+const redraws = {};
 document.querySelectorAll('section.game').forEach(sec => {
   const canvas = sec.querySelector('canvas'); if (!canvas) return;
   const data = JSON.parse(document.getElementById('data-' + canvas.dataset.game).textContent);
-  if (!data.rows.length) { sec.querySelector('.map').remove(); return; }
+  const card = sec.querySelector('.vsum');
   let cur = Object.keys(data.runs)[0];
-  const redraw = () => draw(canvas, data, cur);
+  const redraw = () => { if (data.rows.length && !sec.hidden) draw(canvas, data, cur); if (card) summarize(card, data.summary[cur]); };
+  if (!data.rows.length) sec.querySelector('.map').remove();
   sec.querySelectorAll('.mapbar .btn').forEach(b => b.addEventListener('click', () => {
     sec.querySelectorAll('.mapbar .btn').forEach(x => x.classList.toggle('on', x === b));
     cur = b.dataset.variant; redraw();
   }));
-  redraw(); addEventListener('resize', redraw);
+  redraws[sec.id] = redraw;
+  addEventListener('resize', redraw);
 });
+function show(game) {
+  const secs = [...document.querySelectorAll('section.game')];
+  if (!secs.some(s => s.id === game)) game = secs.length ? secs[0].id : null;
+  secs.forEach(s => { s.hidden = s.id !== game; });
+  document.querySelectorAll('.gametabs .btn').forEach(b => {
+    const on = b.dataset.game === game; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
+  });
+  if (redraws[game]) redraws[game]();
+}
+document.querySelectorAll('.gametabs .btn').forEach(b => b.addEventListener('click', () => {
+  history.replaceState(null, '', '#' + b.dataset.game); show(b.dataset.game);
+}));
+addEventListener('hashchange', () => show(location.hash.slice(1)));
+show(location.hash.slice(1));
 """
 
 
@@ -296,14 +373,23 @@ def render(results: dict) -> str:
     with open(THEME, encoding="utf-8") as f:
         theme = f.read()
     sections = "".join(_game_section(g, res) for g, res in results.items())
+    sc = scores(results)
+    strip = ('<div class="scorestrip">'
+             f'<div class="frame good"><span class="label">Right</span><span class="num"><i class="ico coin"></i>{sc["good"]}</span></div>'
+             f'<div class="frame bad"><span class="label">Wrong</span><span class="num"><i class="ico heartbreak"></i>{sc["bad"]}</span></div>'
+             f'<div class="frame none"><span class="label">Waiting</span><span class="num"><i class="ico hourglass"></i>{sc["none"]}</span></div>'
+             '</div>')
+    tabs = ('<div class="gametabs" role="tablist" aria-label="Games">'
+            + "".join(f'<button class="btn" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
+                      f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in results) + "</div>")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>PEAK mutations</title><style>{theme}{CSS}</style></head><body><main>'
             '<header class="top"><span class="wordmark">PEAK</span><span class="banner">Mutations</span>'
             '<nav><a class="btn" href="../balance/report.html">Balance Command</a></nav></header>'
-            '<div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
+            '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
             'or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must play out identically.</p></div>'
-            f'{board(results)}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
+            f'{strip}</div>{board(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
 
 
 def write(results: dict, path: str) -> str:

@@ -148,6 +148,8 @@ ICONS = {
              "KGKKKKKKKK..", "KGK.........", "KGK.........", "KGK.........", "KGK.........", "KKKKK......."],
     "star": [".....K.....", "....KYK....", "....KYK....", "KKKKYWYKKKK", "KYYYYWYYYYK", ".KYYYYYYOK.", "..KYYYYOK..",
              "..KYYKYOK..", ".KYYK.KYOK.", ".KYK...KOK.", ".KK.....KK."],
+    "halfstar": [".....K.....", "....KYK....", "....KYK....", "KKKKYWNKKKK", "KYYYYWNNNNK", ".KYYYYNNNK.", "..KYYYNNK..",
+                 "..KYYKNNK..", ".KYYK.KNNK.", ".KYK...KNK.", ".KK.....KK."],
     "hourglass": ["KKKKKKKKKK", "KDDDDDDDDK", "KKKKKKKKKK", ".KWYYYYWK.", "..KYYYYK..", "...KYYK...", "....KK....",
                   "...KWYK...", "..KW.YYK..", ".KWYYYYYK.", "KKKKKKKKKK", "KDDDDDDDDK", "KKKKKKKKKK"],
     "bomb": ["........K.H.", ".......K.HAH", "......KK..H.", "...KKKKK....", "..KNNNNNK...", ".KNWWNNNNK..",

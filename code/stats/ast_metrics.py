@@ -128,6 +128,17 @@ def win_rate(rows: list[dict], key: str = "persona") -> dict:
     return out
 
 
+def route_lines(rows: list[dict], points: int = 80) -> list[dict]:
+    """Every attempt's route in tile units, at most `points` points, for the map: {"w": won, "p": [[x, y], ...]}."""
+    out = []
+    for r in rows:
+        pts, t = r.get("route") or [], _tile_size(r)
+        if len(pts) >= 2:
+            step = max(1, len(pts) // points)
+            out.append({"w": _won(r), "p": [[round(x / t, 2), round(y / t, 2)] for x, y in pts[::step] + pts[-1:]]})
+    return out
+
+
 def summarize(rows: list[dict]) -> dict:
     """The metrics of one set of attempts (one variant; agents or people, never mixed)."""
     failed = [r for r in rows if not _won(r)]
@@ -146,6 +157,7 @@ def summarize(rows: list[dict]) -> dict:
         "causes": {c: round(n / len(failed), 3) for c, n in causes.most_common()},
         "time_to_finish": _median([r.get("time_s") for r in rows if _won(r)]),
         "coverage": sorted(coverage),
+        "routes": route_lines(rows),
         "effort": {},
     }
     for label, col in EFFORT:

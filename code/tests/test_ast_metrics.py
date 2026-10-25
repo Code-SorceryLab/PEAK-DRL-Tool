@@ -39,6 +39,7 @@ def test_summarize_reads_the_spec_metrics():
     assert s["time_to_finish"] == 40.0 and s["progress_median"] == 0.5
     assert s["causes"] == {"Pit": 0.5, "Enemy": 0.5} and s["end_tiles"] == [(10, 3), (10, 3)]
     assert s["effort"] == {"jumps": 10.0, "kills": 1.0, "pickups": 2.0}
+    assert [r["w"] for r in s["routes"]] == [True, True, False, False] and s["routes"][2]["p"][-1] == [10.0, 3.0]
     bomb = am.summarize([dict(row(), game="bomberman", bombs_placed=3)])
     assert "jumps" not in bomb["effort"] and bomb["effort"]["bombs placed"] == 3.0
 
