@@ -64,12 +64,15 @@ SAME_ATTEMPT = ("status", "cause", "frames", "end_x", "end_y", "route")
 
 
 # ── reading ──────────────────────────────────────────────────────────────────────────────────
-def load(game: str, variant: str, replay: bool = False) -> list[dict]:
-    """Every attempt at this variant: the agents' playtest and any people's recorded play, or with
-    `replay` the original's frozen agents on it."""
+MODES = {"retrain": "agents.csv", "replay": "agents_replay.csv", "random": "agents_random.csv"}
+
+
+def load(game: str, variant: str, mode: str = "retrain") -> list[dict]:
+    """Every attempt at this variant: the agents' playtest and any people's recorded play; or the
+    original's frozen agents on it (replay), or the random-action baseline (random)."""
     base = os.path.join(ROOT, game, variant)
-    if replay:
-        path = os.path.join(base, "agents_replay.csv")
+    if mode != "retrain":
+        path = os.path.join(base, MODES[mode])
         return episode_log.read(path) if os.path.exists(path) else []
     rows = []
     for path in [os.path.join(base, "agents.csv")] + sorted(glob.glob(os.path.join(base, "human", "**", "episodes.csv"),
@@ -279,14 +282,20 @@ def evaluate(game: str) -> dict:
             if r.get("source") == "agent":
                 rows.setdefault(str(r.get("level")), []).append(r)
         refs.update({level: (ref if level == main else f"{ref} @ {level}", rs) for level, rs in rows.items()})
+    rand_ref: dict = {}
+    for r in load(game, "base", "random"):
+        rand_ref.setdefault(str(r.get("level")), []).append(r)
     out = {}
     for v in variants(game):
         by_level: dict = {}
         for r in load(game, v):
             by_level.setdefault(str(r.get("level")), []).append(r)
         replayed: dict = {}
-        for r in load(game, v, replay=True):
+        for r in load(game, v, "replay"):
             replayed.setdefault(str(r.get("level")), []).append(r)
+        randoms: dict = {}
+        for r in load(game, v, "random"):
+            randoms.setdefault(str(r.get("level")), []).append(r)
         for level, rs in sorted(by_level.items(), key=lambda kv: (kv[0] != main, kv[0])):
             one = v not in ORIGINALS and len(by_level) == 1      # a section mutant keeps its own name
             key = v if level == main or one else f"{v} @ {level}"
@@ -303,6 +312,9 @@ def evaluate(game: str) -> dict:
                 if replayed.get(level):
                     rep = summarize(replayed[level])
                     entry["replay"] = {"agents": rep, "vs_base": compare(summarize(ref), rep)}
+            if v not in ORIGINALS and randoms.get(level) and rand_ref.get(level):
+                rnd = summarize(randoms[level])          # the random baseline against itself on the original
+                entry["random"] = {"agents": rnd, "vs_base": compare(summarize(rand_ref[level]), rnd)}
             out[key] = entry
     return out
 

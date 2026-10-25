@@ -176,6 +176,8 @@ python -m code.neuro.ast_eval play --game mario                        # one att
 python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained   # Mega Man's original, trained like its mutants
 python -m code.neuro.ast_eval play --game mario --replay               # the original's frozen agents on each mutant
 python -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded     # the original, new seeds: the false-alarm check
+python -m code.neuro.ast_eval play --game mario --random               # the random-action baseline (2D games)
+python -m code.stats.ast_paper                                         # paper-ast/: results tables, LaTeX, figures
 python -m code.stats.ast_metrics --page                                # metric tables + runs/balance/mutations.html
 PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 

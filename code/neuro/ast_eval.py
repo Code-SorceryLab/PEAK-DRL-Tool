@@ -141,20 +141,42 @@ def load_agent(run_dir: str, game: str):
 
 def play_agent(game: str, run_dir: str, level: str, seed: int = 0) -> dict:
     """One attempt by a run's best genome with learning off. Returns its telemetry row."""
-    from code.stats.episode_stats import make_stats
     net, cfg, persona = load_agent(run_dir, game)
+    return _attempt(game, level, cfg, persona, net.act, net.reset, seed, os.path.basename(run_dir), run_dir)
+
+
+def play_random(game: str, level: str, seed: int = 0) -> dict:
+    """One attempt by an agent whose network outputs are uniform noise, in the body the trained
+    agents use (the experienced persona's hands and reaction time, the baseline's GA config): the
+    floor a learned agent has to beat."""
+    _, cfg, _ = load_agent(agent_dirs(game, "base", "experienced")[0], game)
+    rng = np.random.default_rng(10_000 + seed)                   # apart from the hands' own stream
+
+    def act(_vec):
+        # shortcut: Net.act's decoding for 3-output nets only (left, right, jump); Mega Man has no random baseline
+        left, right, jump = rng.random(3)
+        return (0 if max(left, right) <= 0.5 else -1 if left > right else 1), bool(jump > 0.5), 0
+    return _attempt(game, level, cfg, get_persona("experienced"), act, lambda: None, seed,
+                    f"random_{seed}", f"random/{seed}", persona_name="random")
+
+
+def _attempt(game: str, level: str, cfg, persona, act, reset, seed: int, agent: str, run: str,
+             persona_name: str | None = None) -> dict:
+    """One attempt: `act(sensors)` gives the network outputs, the persona's hands turn them into
+    buttons, the trainer's stall rule ends a run that stops making progress."""
+    from code.stats.episode_stats import make_stats
     adapter = make_adapter(game, level, cfg.max_frames, cfg.win_bonus, sprint=persona.sprint,
                            time_rate=persona.time_rate, weights=persona.weights)
     adapter.reset()
-    net.reset()
+    reset()
     hands = Hands(persona, np.random.default_rng(seed))
-    stats = make_stats(game, adapter.core, level=level, persona=persona.name, source="agent",
-                       agent=os.path.basename(run_dir))
+    stats = make_stats(game, adapter.core, level=level, persona=persona_name or persona.name, source="agent",
+                       agent=agent)
     anchor, still, frame, vec, status = adapter.fitness(), 0, 0, None, None
     while adapter.alive:
         if vec is None or frame % persona.sensor_period == 0:   # the persona's reaction time
             vec = read_sensors(adapter, cfg.sensors)[0]
-        move_x, jump, move_y, *extra = hands(net.act(vec))
+        move_x, jump, move_y, *extra = hands(act(vec))
         adapter.step(move_x, jump, move_y, *extra)
         stats.on_step(bool(jump))
         frame += 1
@@ -170,7 +192,7 @@ def play_agent(game: str, run_dir: str, level: str, seed: int = 0) -> dict:
                 break
     stats.finish(status or adapter.status)
     row = stats.to_dict()
-    row.update({"seed": seed, "run": run_dir.replace("\\", "/")})
+    row.update({"seed": seed, "run": run.replace("\\", "/")})
     return row
 
 
@@ -218,11 +240,22 @@ def play_megaman(variant: str, episodes: int = 20, replay: bool = False) -> list
 
 
 def play(game: str, variant: str, personas: list[str] | None = None, episodes: int = 20,
-         replay: bool = False) -> str:
+         replay: bool = False, random: bool = False) -> str:
     """Playtest one variant and write its agents.csv (rows of personas not replayed are kept).
-    `replay` plays the original's frozen agents on a retrained mutant instead, into agents_replay.csv."""
+    `replay` plays the original's frozen agents on a retrained mutant instead, into agents_replay.csv;
+    `random` the random-action baseline, as many attempts as the agents make, into agents_random.csv."""
     personas = personas or PERSONA_ORDER
     m = mutant(game, variant)
+    if random:
+        if game == "megaman" or variant in (RETRAINED, RESEEDED):
+            return f"skip {variant}: the random baseline plays the 2D games' original and mutants"
+        with eval_mutants._named(m["dir"] if m else None):
+            rows = [dict(play_random(game, EVAL_LEVELS[game][0], s), variant=variant)
+                    for s in range(len(PERSONA_ORDER) * len(SEEDS))]
+        path = os.path.join(variant_dir(game, variant), "agents_random.csv")
+        episode_log.reset(path)
+        episode_log.append(path, rows)
+        return f"wrote {path} ({sum(r['status'] == 'WON' for r in rows)}/{len(rows)} won)"
     if replay and (m is None or not m["retrain"] or variant in (RETRAINED, RESEEDED)):
         return f"skip {variant}: only a retrained mutant has a replay of its own"
     name = "agents_replay.csv" if replay else "agents.csv"
@@ -268,6 +301,8 @@ def main() -> None:
     p.add_argument("--episodes", type=int, default=20, help="Mega Man relay attempts per variant")
     p.add_argument("--replay", action="store_true",
                    help="the original's frozen agents on each retrained mutant (agents_replay.csv)")
+    p.add_argument("--random", action="store_true",
+                   help="the random-action baseline on the original and each mutant (agents_random.csv)")
     args = ap.parse_args()
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     if args.cmd == "retrain":
@@ -287,7 +322,7 @@ def main() -> None:
                 raise SystemExit(1)
         return
     for variant in args.variant or variants(args.game):
-        print(play(args.game, variant, args.persona, args.episodes, args.replay), flush=True)
+        print(play(args.game, variant, args.persona, args.episodes, args.replay, args.random), flush=True)
 
 
 if __name__ == "__main__":
