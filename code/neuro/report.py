@@ -576,9 +576,9 @@ CSS = THEME_CSS + """
     --bg:var(--night);--panel:var(--deck);--panel2:var(--deck-2);--line2:var(--line);
     --txt:var(--ink);--faint:var(--mute);--mono:var(--ui);
     --green:var(--run);--yellow:var(--stuck);--red:var(--dead);--red-dim:var(--deck-3);
-    --blue:#bcbcbc}   /* the second series (grid sensing, "bigger helps"): grey beside the red */
+    --blue:#cfcfcf}   /* the second series (grid sensing, "bigger helps"): grey beside the red */
   *{box-sizing:border-box;margin:0}
-  html{font-size:clamp(15px,1.05vw + 10px,17px);scroll-behavior:smooth}
+  html{font-size:clamp(16px,1.05vw + 10px,18px);scroll-behavior:smooth}
   body{font-size:1rem;line-height:1.55;padding:0 clamp(12px,3vw,32px) clamp(12px,3vw,32px)}
   canvas.chart,canvas.curve,canvas.scatter{image-rendering:auto}   /* scaled charts, not game frames */
   .skip{position:absolute;left:-999px;top:8px;z-index:99;background:var(--ink);color:var(--night);
@@ -1029,8 +1029,8 @@ CSS = THEME_CSS + """
   }
 """ + TIP_CSS
 
-CAUSE_COLORS = {"Enemy": "#f83800", "Pit": "#f8f8f8", "OOB": "#f8b800", "Spike": "#f878f8", "Bomb": "#e45c10",
-                "Saw": "#f878f8", "Stall": "#fca044", "Timeout": "#bcbcbc", "?": "#7c7c7c"}  # NES; Stall = --stuck
+CAUSE_COLORS = {"Enemy": "#e0442e", "Pit": "#ededed", "OOB": "#f8b800", "Spike": "#f878f8", "Bomb": "#e45c10",
+                "Saw": "#f878f8", "Stall": "#fca044", "Timeout": "#cfcfcf", "?": "#a0a0a0"}  # NES; Stall = --stuck
 
 
 STATUS_ICON = {"ok": "trophy", "warn": "halfstar", "bad": "skull"}   # solved / partial / unsolved
@@ -1081,7 +1081,7 @@ def _causebar(causes: dict[str, int]) -> str:
         return '<div class="causekey">no deaths recorded</div>'
     parts, key = [], []
     for name, n in sorted(causes.items(), key=lambda kv: -kv[1]):
-        color = CAUSE_COLORS.get(name, "#7c7c7c")
+        color = CAUSE_COLORS.get(name, "#a0a0a0")
         parts.append(f'<i style="width:{100 * n / total:.1f}%;background:{color}" '
                      f'title="{_cause_name(name)}: {n}"></i>')
         key.append(f'<span style="color:{color}">■</span> {_cause_name(name)} {100 * n / total:.0f}%')
@@ -1201,7 +1201,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
                    | ({"best": best | {"p": _pack(best["p"])}} if best else {}))
         legend = " ".join(f'<span class="lg"><i style="background:{c}"></i>{GLYPH_NAME[k]}</span>'
                           for k, c in (("#", "#3a3a3a"), ("?", "#ac7c00"), ("^", "#a81000"),   # = drawRoutes
-                                       ("E", "#f83800"), ("C", "#f8d878"), ("S", "#f878f8"),
+                                       ("E", "#e0442e"), ("C", "#f8d878"), ("S", "#f878f8"),
                                        ("H", "#fca044"), ("P", "#58d854"), ("G", "#006800"))
                           if any(k in r for r in grid))
         n_win = sum(1 for r in routes if r["w"])
@@ -1353,7 +1353,7 @@ def _overview(personas: dict[str, dict]) -> str:
     per-level breakdown — click a card for its window with routes, death maps, causes, and curves.</div>"""
 
 
-CONFIG_COLORS = ["#f83800", "#bcbcbc", "#f8d878", "#58d854", "#f878f8", "#fca044", "#e40058", "#f87858"]  # NES, red first
+CONFIG_COLORS = ["#e0442e", "#cfcfcf", "#f8d878", "#58d854", "#f878f8", "#fca044", "#e40058", "#f87858"]  # NES, red first
 PERSONA_DASH = {"experienced": [], "novice": [7, 5], "speedrunner": [2, 4]}
 # chart series per persona: theme.css --p-* as hex (a canvas can't read CSS variables)
 PERSONA_COLOR = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", THEME_CSS))
@@ -1398,7 +1398,7 @@ def _game_chart(game: str, by_tag: dict, idx: int) -> str:
         ccolor = CONFIG_COLORS[ti % len(CONFIG_COLORS)]
         cells = {}
         for pname, data in personas.items():
-            color = PERSONA_COLOR.get(pname, "#bcbcbc") if by_persona else ccolor
+            color = PERSONA_COLOR.get(pname, "#cfcfcf") if by_persona else ccolor
             dash = [] if by_persona else PERSONA_DASH.get(pname, [4, 3])
             rows = {r["level"]: r for r in data["levels"]}
             name = f"{tag or 'legacy'} · {pname}"
@@ -1460,51 +1460,51 @@ def _net_svg(mode: str = "rays", n_hidden: int = 16) -> str:
     if mode == "grid":
         # input side: a mini tile window (3 channels stacked) + the body scalars
         gx, gy, cell = 40, 24, 11
-        for ch, col in enumerate(("#bcbcbc", "#f8d878", "#f83800")):
+        for ch, col in enumerate(("#cfcfcf", "#f8d878", "#e0442e")):
             off = ch * 7
             out.append(f'<rect x="{gx + off}" y="{gy + off}" width="{GRID_N * cell}" height="{GRID_N * cell}" '
                        f'fill="#000000" stroke="{col}" stroke-opacity=".8"/>')
         for r in range(GRID_N):
             for c in range(GRID_N):
                 solid = r >= 8 or (c >= 9 and r >= 5)
-                fill = "#f8f8f8" if (r, c) == (5, 5) else ("#4a4a4a" if solid else "#0e0e0e")
+                fill = "#ededed" if (r, c) == (5, 5) else ("#4a4a4a" if solid else "#0e0e0e")
                 out.append(f'<rect x="{gx + 14 + c * cell + 1}" y="{gy + 14 + r * cell + 1}" width="{cell - 2}" '
                            f'height="{cell - 2}" fill="{fill}"/>')
         gcy = gy + 14 + GRID_N * cell / 2
         out.append(f'<text x="{gx}" y="{gy + 14 + GRID_N * cell + 26}" class="lbl">{GRID_CH} × {GRID_N} × {GRID_N} tiles'
                    f'</text><text x="{gx}" y="{gy + 14 + GRID_N * cell + 42}" class="lbl">'
-                   f'<tspan fill="#bcbcbc">solid</tspan> · <tspan fill="#f8d878">collectible</tspan> · '
-                   f'<tspan fill="#f83800">hazard</tspan></text>')
-        out.append('<g stroke="#bcbcbc" stroke-opacity=".16" stroke-width="1.2">')
+                   f'<tspan fill="#cfcfcf">solid</tspan> · <tspan fill="#f8d878">collectible</tspan> · '
+                   f'<tspan fill="#e0442e">hazard</tspan></text>')
+        out.append('<g stroke="#cfcfcf" stroke-opacity=".16" stroke-width="1.2">')
         out += [f'<line x1="{gx + 14 + GRID_N * cell}" y1="{gcy:.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for j in range(n_hidden)]
         out.append('</g>')
         yb = lambda i: H - 118 + i * 22
-        out.append('<g stroke="#bcbcbc" stroke-opacity=".13" stroke-width="1">')
+        out.append('<g stroke="#cfcfcf" stroke-opacity=".13" stroke-width="1">')
         out += [f'<line x1="{xi}" y1="{yb(i):.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for i in range(N_BODY) for j in range(n_hidden)]
         out.append('</g>')
         for i, name in enumerate(BODY):
             out.append(f'<text x="{xi - 12}" y="{yb(i) + 4:.0f}" text-anchor="end" class="lbl">{name}</text>'
-                       f'<circle cx="{xi}" cy="{yb(i):.0f}" r="5" fill="#0e0e0e" stroke="#bcbcbc" stroke-width="1.5"/>')
+                       f'<circle cx="{xi}" cy="{yb(i):.0f}" r="5" fill="#0e0e0e" stroke="#cfcfcf" stroke-width="1.5"/>')
         in_cap = f"{GRID_CH * GRID_N * GRID_N} grid + {N_BODY} body"
     else:
         yi = lambda i: 22 + i * (H - 44) / (len(SENSORS) - 1)
-        out.append('<g stroke="#bcbcbc" stroke-opacity=".13" stroke-width="1">')
+        out.append('<g stroke="#cfcfcf" stroke-opacity=".13" stroke-width="1">')
         out += [f'<line x1="{xi}" y1="{yi(i):.0f}" x2="{xh}" y2="{yh(j):.0f}"/>'
                 for i in range(len(SENSORS)) for j in range(n_hidden)]
         out.append('</g>')
         for i, name in enumerate(SENSORS):
             out.append(f'<text x="{xi - 12}" y="{yi(i) + 4:.0f}" text-anchor="end" class="lbl">{name}</text>'
-                       f'<circle cx="{xi}" cy="{yi(i):.0f}" r="5" fill="#0e0e0e" stroke="#bcbcbc" stroke-width="1.5"/>')
+                       f'<circle cx="{xi}" cy="{yi(i):.0f}" r="5" fill="#0e0e0e" stroke="#cfcfcf" stroke-width="1.5"/>')
         in_cap = f"{len(SENSORS)} ray sensors"
-    out.append('<g stroke="#f83800" stroke-opacity=".22" stroke-width="1">')
+    out.append('<g stroke="#e0442e" stroke-opacity=".22" stroke-width="1">')
     out += [f'<line x1="{xh}" y1="{yh(j):.0f}" x2="{xo}" y2="{yo(k):.0f}"/>'
             for j in range(n_hidden) for k in range(N_OUTPUTS)]
     out.append('</g>')
     for j in range(n_hidden):
-        out.append(f'<circle cx="{xh}" cy="{yh(j):.0f}" r="{5.5 if n_hidden <= 24 else 3.2}" fill="#1c1c1c" stroke="#bcbcbc" stroke-width="1.5"/>')
-    for k, (name, col) in enumerate((("left", "#f8d878"), ("right", "#58d854"), ("jump", "#f83800"))):
+        out.append(f'<circle cx="{xh}" cy="{yh(j):.0f}" r="{5.5 if n_hidden <= 24 else 3.2}" fill="#1c1c1c" stroke="#cfcfcf" stroke-width="1.5"/>')
+    for k, (name, col) in enumerate((("left", "#f8d878"), ("right", "#58d854"), ("jump", "#e0442e"))):
         out.append(f'<circle cx="{xo}" cy="{yo(k):.0f}" r="7" fill="{col}22" stroke="{col}" stroke-width="2"/>'
                    f'<text x="{xo + 14}" y="{yo(k) + 4:.0f}" class="lbl out" fill="{col}">{name}</text>')
     out.append(f'<text x="{xi if mode != "grid" else 110}" y="{H - 2}" text-anchor="middle" class="cap">{in_cap}</text>'
@@ -1582,7 +1582,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
         f'<span class="chip" style="--c:{col}"><b>{p.name}</b> '
         f'{"sprint" if p.sprint else "walk"} · senses every {p.sensor_period} frame{"s" if p.sensor_period > 1 else ""}'
         f'{" · +" + format(p.time_rate, "g") + " fitness / s left" if p.time_rate else ""}</span>'
-        for (n, p), col in ((kv, PERSONA_COLOR.get(kv[0], "#bcbcbc"))
+        for (n, p), col in ((kv, PERSONA_COLOR.get(kv[0], "#cfcfcf"))
                             for kv in PERSONAS.items()) if n in personas)
     return f"""
     <dialog class="detail brain" id="brain_{sec_id}" aria-labelledby="brain_{sec_id}_t">
@@ -1894,15 +1894,15 @@ function drawScatter(cv){
   for (let q = 0; q <= 4; q++){
     const v = maxY * q / 4, y = py(v);
     ctx.strokeStyle = '#2e2e2e'; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
-    ctx.fillStyle = '#7c7c7c'; ctx.fillText(maxY < 10 ? v.toFixed(1) : v.toFixed(0), 8, y + 4);
+    ctx.fillStyle = '#a0a0a0'; ctx.fillText(maxY < 10 ? v.toFixed(1) : v.toFixed(0), 8, y + 4);
   }
   let lastEnd = -1e9;
   for (const p of [...pts].sort((a, b) => a.x - b.x)){
     const x = px(p.x), t = p.x.toLocaleString(), w = ctx.measureText(t).width;
     ctx.strokeStyle = '#1c1c1c'; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, H - B); ctx.stroke();
-    if (x - w / 2 > lastEnd + 6){ ctx.fillStyle = '#7c7c7c'; ctx.fillText(t, x - w / 2, H - B + 16); lastEnd = x + w / 2; }
+    if (x - w / 2 > lastEnd + 6){ ctx.fillStyle = '#a0a0a0'; ctx.fillText(t, x - w / 2, H - B + 16); lastEnd = x + w / 2; }
   }
-  ctx.fillStyle = '#7c7c7c';
+  ctx.fillStyle = '#a0a0a0';
   const xl = 'weights (log scale)'; ctx.fillText(xl, W - R - ctx.measureText(xl).width, H - 6);
   ctx.save(); ctx.translate(14, (T + H - B) / 2); ctx.rotate(-Math.PI / 2);
   const yl = 'gens to first win'; ctx.fillText(yl, -ctx.measureText(yl).width / 2, 0); ctx.restore();
@@ -1925,7 +1925,7 @@ function drawScatter(cv){
     if (p.kind === 'arch'){ ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath(); }
     else ctx.arc(x, y, p.star ? 7 : 5.5, 0, Math.PI * 2);
     ctx.fill();
-    if (p.star){ ctx.strokeStyle = '#f8f8f8'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1; }
+    if (p.star){ ctx.strokeStyle = '#ededed'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1; }
   }
   // labels last, nudged apart when points sit on top of each other
   const placed = [];
@@ -1934,7 +1934,7 @@ function drawScatter(cv){
     const w = ctx.measureText(p.label).width;
     for (let k = 0; k < 6 && placed.some(q => Math.abs(q.y - y) < 13 && x < q.x + q.w + 6 && x + w + 6 > q.x); k++) y -= 13;
     placed.push({x, y, w});
-    ctx.fillStyle = '#f8f8f8'; ctx.fillText(p.label, x, y);
+    ctx.fillStyle = '#ededed'; ctx.fillText(p.label, x, y);
   }
 }
 // learning curves: best (solid) and population average (faint) per generation, one colour per seed
@@ -1953,7 +1953,7 @@ function drawCurve(cv){
   const px = i => L + i * (W - L - R) / (maxX - 1);
   const py = v => H - B - (v / maxY) * (H - T - B);
   ctx.font = FONT;
-  ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#7c7c7c'; ctx.lineWidth = 1;
+  ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#a0a0a0'; ctx.lineWidth = 1;
   for (let q = 0; q <= 4; q++){
     const v = maxY * q / 4, y = py(v);
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
@@ -1966,11 +1966,11 @@ function drawCurve(cv){
     ctx.setLineDash([]);
     ctx.fillStyle = '#58d85499'; ctx.fillText('win bonus', W - R - 78, y - 5);
   }
-  ctx.fillStyle = '#7c7c7c';
+  ctx.fillStyle = '#a0a0a0';
   ctx.fillText('gen 1', L, H - 9);
   const el = 'gen ' + maxX;
   ctx.fillText(el, W - R - ctx.measureText(el).width, H - 9);
-  const colors = JSON.parse(cv.dataset.colors || 'null') || ['#f83800', '#f8d878', '#bcbcbc', '#f878f8'];
+  const colors = JSON.parse(cv.dataset.colors || 'null') || ['#e0442e', '#f8d878', '#cfcfcf', '#f878f8'];
   seeds.forEach((c, si) => {
     for (const [j, w] of [[1, 1], [0, 2]]){
       ctx.strokeStyle = j ? colors[si % colors.length] + '44' : colors[si % colors.length];
@@ -2020,7 +2020,7 @@ function drawChart(cv, t){
   if (cv.dataset.kind === 'bars'){
     const L = 48, R = 12, T = 16, B = 34, n = d.axes.length;
     const plotW = W - L - R, plotH = H - T - B;
-    ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#7c7c7c'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#2e2e2e'; ctx.fillStyle = '#a0a0a0'; ctx.lineWidth = 1;
     for (let q = 0; q <= 4; q++){
       const y = T + plotH - plotH * q / 4;
       ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
@@ -2044,7 +2044,7 @@ function drawChart(cv, t){
         }
         ctx.globalAlpha = 1;
       });
-      ctx.fillStyle = '#bcbcbc'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#cfcfcf'; ctx.textAlign = 'center';
       ctx.fillText(ax, L + off + k * groupW + groupW / 2, H - 12);
       ctx.textAlign = 'left';
     });
@@ -2061,12 +2061,12 @@ function drawChart(cv, t){
     }
     ctx.stroke();
   }
-  ctx.fillStyle = '#7c7c7c'; ctx.fillText('50%', cx + 4, cy - R * 0.5 - 3);
+  ctx.fillStyle = '#a0a0a0'; ctx.fillText('50%', cx + 4, cy - R * 0.5 - 3);
   for (let i = 0; i < n; i++){
     const a = ang(i);
     ctx.strokeStyle = '#2e2e2e';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a)); ctx.stroke();
-    ctx.fillStyle = '#bcbcbc';
+    ctx.fillStyle = '#cfcfcf';
     ctx.textAlign = Math.abs(Math.cos(a)) < 0.3 ? 'center' : (Math.cos(a) > 0 ? 'left' : 'right');
     ctx.fillText(d.axes[i], cx + (R + 16) * Math.cos(a), cy + (R + 16) * Math.sin(a) + 4);
   }
@@ -2085,7 +2085,7 @@ function drawChart(cv, t){
     ctx.closePath();
     ctx.strokeStyle = s.color; ctx.lineWidth = alpha(s) < 1 ? 1.5 : 2.2; ctx.stroke();
     ctx.setLineDash([]);
-    if (alpha(s) === 1){ ctx.fillStyle = s.color + '1a'; ctx.fill(); }
+    if (alpha(s) === 1){ ctx.fillStyle = s.color + '0d'; ctx.fill(); }   // a faint fill: six series overlap
     for (let i = 0; i < n; i++){
       const a = ang(i), v = Math.min(1, s.vals[i] || 0) * t;
       ctx.fillStyle = s.color;
@@ -2130,8 +2130,8 @@ function drawRoutes(cv, maxW, maxH, cap = 1){
   ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, cv.width, cv.height);
   const cell = d.ts * scale;
   const BLOCK = {'#': '#3a3a3a', '=': '#5a5a5a', '?': '#ac7c00', '^': '#a81000', 'G': '#006800',
-                 'S': '#f878f8', 'H': '#fca044', 'D': '#7c7c7c'};   // NES; the legend in _card matches
-  const MARK = {'E': '#f83800', 'C': '#f8d878', 'P': '#58d854'};  // entities drawn as markers
+                 'S': '#f878f8', 'H': '#fca044', 'D': '#a0a0a0'};   // NES; the legend in _card matches
+  const MARK = {'E': '#e0442e', 'C': '#f8d878', 'P': '#58d854'};  // entities drawn as markers
   const marks = [];
   grid.forEach((row, r) => {
     for (let c = 0; c < row.length; c++){
@@ -2223,9 +2223,11 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
     links = "" if page != "report" else "".join(
         f'<a href="report.html#g_{g}">{_game_icon(g)}{g.capitalize()}</a>' for g in games)
     if has_runs and page == "report":
-        links += '<a href="report.html#g_runs"><i class="ico dna"></i>Runs</a>'
+        links += '<a href="report.html#g_runs"><i class="ico hourglass"></i>Runs</a>'
     if page != "report":
         links += '<a class="doc" href="report.html">Balance report</a>'
+    links += ('<a class="doc" href="mutations.html"' + (' aria-current="page"' if page == "mutations" else "")
+              + '><i class="ico dna"></i>Mutations</a>')
     links += ('<a class="doc" href="ablation.html"' + (' aria-current="page"' if page == "ablation" else "")
               + '><i class="ico eye"></i>Sensor ablation</a>')
     links += ('<a class="doc" href="gasweep.html"' + (' aria-current="page"' if page == "gasweep" else "")
@@ -2354,7 +2356,7 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
 </body></html>"""
 
 
-MODE_COLOR = {"rays": "#f87858", "grid": "#bcbcbc"}   # NES $26 / $22 (CSS: .dhead em.rays, --blue)
+MODE_COLOR = {"rays": "#f87858", "grid": "#cfcfcf"}   # NES $26 / $22 (CSS: .dhead em.rays, --blue)
 
 
 def _mode_svgs() -> dict[str, str]:
@@ -2365,19 +2367,19 @@ def _mode_svgs() -> dict[str, str]:
         a = math.radians(ang)
         x2, y2 = 75 + 62 * math.cos(a), 75 + 62 * math.sin(a)
         rays.append(f"<line x1='75' y1='75' x2='{x2:.1f}' y2='{y2:.1f}' stroke='{MODE_COLOR['rays']}' "
-                    f"stroke-width='2' opacity='.9'/><circle cx='{x2:.1f}' cy='{y2:.1f}' r='3' fill='#f8f8f8'/>")
+                    f"stroke-width='2' opacity='.9'/><circle cx='{x2:.1f}' cy='{y2:.1f}' r='3' fill='#ededed'/>")
     ray_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' fill='#000000'/>"
                f"<rect x='0' y='100' width='150' height='50' fill='#2e2e2e'/>"
                f"<rect x='118' y='60' width='32' height='40' fill='#2e2e2e'/>"
                f"<rect x='88' y='92' width='6' height='8' fill='{MODE_COLOR['rays']}' opacity='.5'/>"
-               f"{''.join(rays)}<rect x='69' y='63' width='12' height='24' fill='#f8f8f8'/></svg>")
+               f"{''.join(rays)}<rect x='69' y='63' width='12' height='24' fill='#ededed'/></svg>")
     cells = []
     for r in range(11):
         for c in range(11):
             solid = r >= 8 or (c >= 9 and r >= 5)
             fill = "#4a4a4a" if solid else "#0e0e0e"
             if r == 5 and c == 5:
-                fill = "#f8f8f8"
+                fill = "#ededed"
             cells.append(f"<rect x='{3 + c * 13.1:.1f}' y='{3 + r * 13.1:.1f}' width='12' height='12' "
                          f"fill='{fill}'/>")
     grid_svg = (f"<svg viewBox='0 0 150 150'><rect width='150' height='150' fill='#000000'/>"
@@ -2475,8 +2477,8 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
                       for m in modes)
     delta_th = "<th colspan='2'>Grid − rays</th>" if len(modes) == 2 else ""
     delta_sub = "<th>Δ win rate</th><th>Δ first win</th>" if len(modes) == 2 else ""
-    shades = {"rays": ["#f87858", "#f83800", "#fca044", "#f0d0b0"],   # NES reds / greys
-              "grid": ["#bcbcbc", "#7c7c7c", "#d8d8d8", "#5a5a5a"]}
+    shades = {"rays": ["#f87858", "#e0442e", "#fca044", "#f0d0b0"],   # NES reds / greys
+              "grid": ["#cfcfcf", "#a0a0a0", "#d8d8d8", "#5a5a5a"]}
     curve_boxes = []
     for lvl in order:
         series, colors, legend = [], [], []
@@ -2805,12 +2807,12 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     for p in pts:
         if p["axis"] in ("base", "hidden", "action_feedback", "memory", "best"):
             kind = "hidden" if p["axis"] in ("base", "hidden") else "arch"
-            color = "#f83800" if p["axis"] == "base" else ("#bcbcbc" if kind == "hidden" else
+            color = "#e0442e" if p["axis"] == "base" else ("#cfcfcf" if kind == "hidden" else
                                                            "#f8b800" if p["axis"] != "best" else "#58d854")
             scatter_pts.append({"label": p["label"], "x": p["n_params"], "y": round(p["fw"], 2),
                                 "ci": round(p["fw_ci"], 2), "kind": kind, "color": color, "star": p["axis"] == "base"})
     fit = ({"m": verdict["m"], "b": verdict["b"], "color": vcol.replace("var(--green)", "#58d85499")
-            .replace("var(--blue)", "#bcbcbc99").replace("var(--red)", "#e4005899")}
+            .replace("var(--blue)", "#cfcfcf99").replace("var(--red)", "#e4005899")}
            if verdict["word"] not in ("insufficient",) else None)
     hs = [p for p in pts if p["axis"] in ("base", "hidden")]
     rng = (f"{min(p['n_params'] for p in hs):,}→{max(p['n_params'] for p in hs):,} weights" if len(hs) > 1 else "")
@@ -2826,8 +2828,8 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     hero = f"""
       <div class="gshero">
         <div class="viz"><div class="vt">Capacity curve <span class="faint">— generations to first win (mean ± 95 % CI,
-          unsolved = budget {budget}) vs network weights · <span style="color:#f83800">●</span> baseline
-          <span style="color:#bcbcbc">●</span> hidden size <span style="color:#f8b800">◆</span> feedback / memory
+          unsolved = budget {budget}) vs network weights · <span style="color:#e0442e">●</span> baseline
+          <span style="color:#cfcfcf">●</span> hidden size <span style="color:#f8b800">◆</span> feedback / memory
           {'<span style="color:#58d854">◆</span> recommended' if best_pt else ''}</span></div>
           <canvas class="scatter" width="860" height="360" data-points='{_json(scatter_pts)}'
             data-fit='{_json(fit)}' role="img"
@@ -2889,7 +2891,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
                              f'<b>{fmt(v)}</b><small>not run</small></span>')
                 continue
             is_base = p["axis"] == "base"
-            col = "#f83800" if is_base else "#bcbcbc"
+            col = "#e0442e" if is_base else "#cfcfcf"
             size = 10 + 16 * (p["wr"] / ref_wr)
             marks.append(f'<span class="mk{" best" if p is best else ""}" style="--x:{x:.0f}%;--s:{size:.0f}px;--c:{col}">'
                          f'<i></i><b>{fmt(v)}</b><small><strong>{p["wr"]:.0%}</strong>gen {p["fw"]:.1f}</small></span>')
@@ -2924,7 +2926,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
           <th>First win (gen ± CI)</th><th>Win rate ± CI</th><th>Best gen</th><th>Progress / gen</th><th>Train time</th>
           <th>Δ win rate <small class="faint">paired ± CI</small></th><th>Cells ↑/↓</th><th>Δ first win</th></tr></thead><tbody>{''.join(trs)}</tbody></table></div>""")
         # learning curves per level, one colour per value (repeated per seed); baseline first, in the baseline red
-        palette = ["#f83800", "#bcbcbc", "#f8b800", "#f878f8", "#58d854", "#f87858"]
+        palette = ["#e0442e", "#cfcfcf", "#f8b800", "#f878f8", "#58d854", "#f87858"]
         boxes = []
         for lvl in sorted({l for p in allpts for l in p["data"].get("cells", {})}):
             refs, colors, legend = [], [], []   # the baseline's curves sit in every knob's box: stored once, referenced
@@ -3081,7 +3083,9 @@ def build(balance_dir: str) -> dict[str, str]:
   {body}
   <footer>Generated by PEAK from the balance probes on disk. Regenerate from the menu (12) after a new sweep.</footer>
 </main><div class="bricks" aria-hidden="true"></div>{TIP_DESC}{_page_data()}<script>{JS}</script></body></html>"""
+    from code.stats import ast_metrics, ast_page
     pages = {"report.html": report,
+             "mutations.html": ast_page.render({g: ast_metrics.evaluate(g) for g in ast_metrics.GAMES}),
              "instructions.html": _instructions_page(list(games), logo),
              "ablation.html": _ablation_page(flat_abl, logo, stamp),
              "gasweep.html": _gasweep_page(gs_groups, list(games), logo, stamp)}

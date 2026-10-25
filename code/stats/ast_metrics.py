@@ -293,13 +293,15 @@ def table(game: str, results: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="AST evaluation metrics over the playtest attempts")
     ap.add_argument("--game", action="append", choices=GAMES, help="only this game (repeatable)")
-    ap.add_argument("--page", action="store_true", help="also write the mutation page, runs/ast/index.html (every game)")
+    ap.add_argument("--page", action="store_true",
+                    help="also write the Balance Command's Mutations page, runs/balance/mutations.html (every game)")
     args = ap.parse_args()
     games = args.game or GAMES
     results = {g: evaluate(g) for g in (GAMES if args.page else games)}
     if args.page:
+        from code.neuro.report import BALANCE_DIR
         from code.stats import ast_page
-        print(f"wrote {ast_page.write(results, os.path.join(ROOT, 'index.html'))}")
+        print(f"wrote {ast_page.write(results, os.path.join(BALANCE_DIR, 'mutations.html'))}")
     os.makedirs(ROOT, exist_ok=True)
     path = os.path.join(ROOT, "metrics.json")
     old = {}

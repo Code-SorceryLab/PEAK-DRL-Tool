@@ -1047,7 +1047,7 @@ def run_full_sweep():
 # ============================================================================
 
 AST_GAMES = ["mario", "meatboy", "bomberman", "megaman"]
-AST_PAGE = RUNS_DIR / "ast" / "index.html"
+AST_PAGE = RUNS_DIR / "balance" / "mutations.html"   # the Balance Command's Mutations page
 
 
 def _ast_games():

@@ -1,6 +1,8 @@
-/* PEAK's look, shared by every dashboard (live training, Balance Command, the replay wall, the
-   mutation page): black and red, like the menu. Colors come from the NES 2C02 palette as they are;
-   pixel type names and counts things, Barlow carries everything read in quantity.
+/* PEAK's look, shared by every dashboard (live training, Balance Command and its Mutations page,
+   the replay wall): black and red, like the menu. Red is the accent, never the structure: frames and
+   rules are a quiet brick, text is light grey (AL: bright red frames were "blinding" and the grey
+   text hard to read). Data colours come from the NES 2C02 palette; pixel type names and counts
+   things, Barlow carries everything read in quantity.
    Served by code/neuro/server.py at /theme.css and inlined into the generated pages. */
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap');
 
@@ -10,11 +12,11 @@
   --deck: #0e0e0e;         /* frames */
   --deck-2: #1c1c1c;       /* raised: buttons, hover rows */
   --deck-3: #3a0c06;       /* pressed, selected: a dark red */
-  --line: #a81000;         /* NES $06: frame and table rules */
-  --ink: #f8f8f8;          /* NES $20 */
-  --dim: #bcbcbc;          /* NES $10: secondary text */
-  --mute: #7c7c7c;         /* NES $00: tertiary text, axis labels */
-  --peak: #f83800;         /* NES $16: the red (wordmark, pressed buttons, accents) */
+  --line: #5e2a22;         /* frame and table rules: a quiet brick, not a red */
+  --ink: #ededed;          /* body text: off-white, no glare on black */
+  --dim: #cfcfcf;          /* secondary text */
+  --mute: #a0a0a0;         /* tertiary text, axis labels: still 7.8:1 on black */
+  --peak: #e0442e;         /* the red: wordmark, the lit frame, accents only */
 
   /* status (one meaning each) */
   --run: #58d854;          /* $2A */
@@ -23,7 +25,7 @@
   --won: #f8d878;          /* $38: a coin */
 
   /* games: one stripe each, on every page */
-  --g-mario: #f83800;      /* $16 */
+  --g-mario: #e0442e;      /* the red */
   --g-meatboy: #e40058;    /* $15 */
   --g-bomberman: #f8f8f8;  /* $20: his suit */
   --g-megaman: #f8b800;    /* $28 */
@@ -34,7 +36,7 @@
   --p-clumsy: #fca044;     /* $27 */
   --p-experienced: #f8f8f8;/* $20: the default persona in white */
   --p-speedrunner: #f878f8;/* $24 */
-  --p-killer: #f83800;     /* $16 */
+  --p-killer: #e0442e;     /* the red */
   --p-collector: #f8d878;  /* $38 */
 
   --pixel: 'PEAK Pixel', 'Barlow', system-ui, sans-serif;   /* PEAK's own face (code/neuro/pixel_art.py) */
@@ -43,8 +45,8 @@
   --code: ui-monospace, 'Cascadia Mono', Consolas, monospace;   /* commands only */
 
   /* a 3-px pixel frame with notched corners: a 3x3 plus sliced into 9 (border-image) */
-  --frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23a81000'/%3E%3C/svg%3E");
-  --frame-hi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23f83800'/%3E%3C/svg%3E");
+  --frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%235e2a22'/%3E%3C/svg%3E");
+  --frame-hi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23e0442e'/%3E%3C/svg%3E");
   --frame-k: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='3' height='3'%3E%3Cpath d='M1 0h1v3H1zM0 1h3v1H0z' fill='%23000000'/%3E%3C/svg%3E");
 }
 
@@ -53,11 +55,11 @@ body {
   margin: 0;
   background-color: var(--night);
   background-image:                     /* the tile grid the levels are built on, barely there */
-    linear-gradient(rgba(248, 56, 0, .07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(248, 56, 0, .07) 1px, transparent 1px);
+    linear-gradient(rgba(237, 237, 237, .03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(237, 237, 237, .03) 1px, transparent 1px);
   background-size: 16px 16px;
   color: var(--ink);
-  font: 400 15px/1.5 var(--ui);
+  font: 400 16px/1.55 var(--ui);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
@@ -100,27 +102,27 @@ h3 { font-size: 18px; }
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 5px 12px; cursor: pointer;
-  font: 600 13px/1.2 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink); text-decoration: none;
+  font: 600 14px/1.2 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink); text-decoration: none;
   border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch;
   background: var(--deck-2); background-clip: padding-box;
 }
 .btn:hover { background-color: var(--deck-3); }
 .btn:active { transform: translateY(2px); }
-.btn.on, .btn[aria-pressed="true"] { background-color: var(--peak); color: var(--ink); }
-.btn kbd { font: 600 11px/1 var(--ui); color: var(--mute); }
-.btn.on kbd, .btn[aria-pressed="true"] kbd { color: rgba(248, 248, 248, .75); }
+.btn.on, .btn[aria-pressed="true"] { background-color: var(--ink); color: var(--night); }   /* as the selected page tab */
+.btn kbd { font: 600 12px/1 var(--ui); color: var(--mute); }
+.btn.on kbd, .btn[aria-pressed="true"] kbd { color: rgba(0, 0, 0, .65); }
 
-.label { font: 500 12.5px/1.3 var(--ui); font-variant-numeric: tabular-nums; color: var(--dim); }
+.label { font: 500 14px/1.35 var(--ui); font-variant-numeric: tabular-nums; color: var(--dim); }
 .num { font-family: var(--pixel); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* ── tables ─────────────────────────────────────────────────────────────────── */
-table.data { border-collapse: collapse; width: 100%; font: 500 14px/1.35 var(--dense); font-variant-numeric: tabular-nums; }
+table.data { border-collapse: collapse; width: 100%; font: 500 15px/1.4 var(--dense); font-variant-numeric: tabular-nums; }
 table.data th {
-  text-align: left; font: 600 12.5px/1.3 var(--ui); color: var(--dim);
+  text-align: left; font: 600 14px/1.3 var(--ui); color: var(--dim);
   padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap;
 }
 table.data td { padding: 7px 10px; border-bottom: 1px solid rgba(248, 248, 248, .08); vertical-align: top; }
-table.data tr:hover td { background: rgba(248, 56, 0, .08); }
+table.data tr:hover td { background: rgba(237, 237, 237, .05); }
 table.data td.n, table.data th.n { text-align: right; }
 
 /* ── status words ───────────────────────────────────────────────────────────── */
@@ -206,7 +208,7 @@ h1 .ico, h2 .ico, h3 .ico { --ico: .9em; vertical-align: -.1em; margin-right: .3
 .btn .ico { --ico: 14px; }
 .label .ico { --ico: 13px; vertical-align: -2px; }
 
-/* the red brick floor each page stands on */
-.bricks { height: 32px; margin-top: 28px; background: var(--i-bricks) 0 0 / 32px 16px repeat; image-rendering: pixelated; }
+/* the brick floor each page stands on, dimmed so it stays scenery */
+.bricks { height: 32px; margin-top: 28px; background: var(--i-bricks) 0 0 / 32px 16px repeat; image-rendering: pixelated; opacity: .45; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

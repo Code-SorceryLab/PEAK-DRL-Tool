@@ -102,3 +102,15 @@ def test_collect_routes_merges_routes_json_and_csv_and_finds_the_fastest_win(tmp
     assert best == {"p": [[0, 400], [90, 350]], "t": 20.3, "seed": "31337"}
     assert report._collect_routes("mario", "killer", "Mario1-1", "p10g200") == ([], None)   # nothing on disk
     assert report._pack([[3, 4], [5, 1], [5, 1]]) == [3, 4, 2, -3, 0, 0]   # what the page embeds: steps
+
+
+def test_mutations_is_a_balance_command_page():
+    """AL: the Balance Command and the mutation page are one site: every page's top bar links the
+    Mutations page, and that page carries the same top bar (marked as the current page)."""
+    from code.neuro import report
+    from code.stats import ast_page
+    for page in ("report", "ablation", "gasweep", "instructions"):
+        assert 'href="mutations.html"' in report._nav(["mario"], True, None, page)
+    html = ast_page.render({})                       # no playtests yet: the page still renders
+    assert report._nav([], False, None, "mutations") in html
+    assert 'href="mutations.html" aria-current="page"' in html

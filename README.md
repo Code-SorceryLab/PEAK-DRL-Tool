@@ -135,7 +135,7 @@ center. Every choice in it is the same checklist: type numbers to tick, Enter to
 | | | | | 18 | Play a mutant yourself (each attempt logged under your name) |
 | | | | | 19 | Retrain on mutants (every persona's three seeds, the baseline's GA setting) |
 | | | | | 20 | Agent playtest: one attempt per agent, learning off, original vs mutants |
-| | | | | 21 | Mutation metrics + the mutation page (`runs/ast/index.html`) |
+| | | | | 21 | Mutation metrics + the Balance Command's Mutations page (`runs/balance/mutations.html`) |
 | | | | | D | Delete runs (pick runs / probe trees, or everything) |
 
 <details>
@@ -174,7 +174,7 @@ python -m code.games.eval_mutants --list                               # the eva
 python -m code.neuro.ast_eval retrain --game mario --mutant widen_gap  # every persona's 3 seeds on the mutant
 python -m code.neuro.ast_eval play --game mario                        # one attempt per agent: original + mutants
 python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained   # Mega Man's original, trained like its mutants
-python -m code.stats.ast_metrics --page                                # metric tables + runs/ast/index.html
+python -m code.stats.ast_metrics --page                                # metric tables + runs/balance/mutations.html
 PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 
 # Play
@@ -495,7 +495,7 @@ exactly as the mutants were, over the same section (the global jump change secti
 | Did my edit help? | edit → menu 13 again | same seeds, same GA — the probe is frozen, so the diff is the level |
 | How much skill does the design reward? | menu 13, compare personas | novice vs speedrunner completion on the same level (`skill gap` tile) |
 | Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
-| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the mutation page: caught / missed per mutant, then where and how play changed |
+| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the Balance Command's Mutations page: caught / missed per mutant, then where and how play changed |
 
 ---
 

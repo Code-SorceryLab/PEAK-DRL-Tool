@@ -1,12 +1,13 @@
-"""The mutation page, runs/ast/index.html: the AST evaluation at a glance (ast_metrics --page).
+"""The Balance Command's Mutations page, runs/balance/mutations.html: the AST evaluation at a glance
+(written by `python -m code.neuro.report` with the other pages, and by ast_metrics --page).
 
 On top, the board: one cell per game and mutant, saying whether the playtest caught it (a breaking
 or degrading mutant should be caught, a neutral one should stay quiet, the cosmetic copy must
 replay identically; a mutant played section by section is caught where any section catches it).
 Below, per game: the level map with the change, where failed attempts ended and the tiles the
 routes covered; the metric table, grouped by the level played, each mutant naming the original it
-was compared with; win rates per persona; people, when they played; Mega Man's segments. A
-standalone file in the shared look (code/neuro/web/theme.css).
+was compared with; win rates per persona; people, when they played; Mega Man's segments. One
+standalone file with the Balance Command's styles and top bar (code/neuro/report.py).
 """
 from __future__ import annotations
 
@@ -17,7 +18,6 @@ import os
 from code.games import eval_mutants
 from code.stats.ast_metrics import ORIGINALS, RETRAINED
 
-THEME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "neuro", "web", "theme.css")
 SLOTS = [("seal_route",), ("widen_gap", "add_enemy"), ("jump_velocity_down", "fuse_down"), ("off_route",), ("cosmetic_tile",)]
 SLOT_NAMES = ["Sealed route", "Wider gap / extra enemy", "Weaker jump / shorter fuse", "Off-route tile", "Cosmetic tile"]
 esc = html.escape
@@ -168,7 +168,7 @@ def _game_section(game: str, res: dict) -> str:
     buttons = "".join(f'<button class="btn{" on" if i == 0 else ""}" data-variant="{esc(v)}">{esc(v)}</button>'
                       for i, v in enumerate(order))
     pips = (f'<div class="card"><h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips">'
-            f'<tr><th>Persona</th>' + "".join(f"<th>{esc(v)}</th>" for v in order) + f"</tr>{grid}</table></div></div>"
+            f'<tr><th>Persona</th>' + "".join(f"<th>{esc(v).replace('_', '_<wbr>')}</th>" for v in order) + f"</tr>{grid}</table></div></div>"
             if personas and game != "megaman" else "")
     side = pips or (f'<div class="card">{seg_html}</div>' if seg_html else "")
     return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
@@ -263,12 +263,16 @@ def board(results: dict) -> str:
 
 
 CSS = """
-main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 64px; display: flex; flex-direction: column; gap: 22px; }
-header.top { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-header.top nav { margin-left: auto; display: flex; gap: 8px; }
+main { display: flex; flex-direction: column; gap: 22px; }
 .lede { color: var(--dim); max-width: 70ch; margin: 6px 0 0; }
 .board { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 820px; table-layout: fixed; }
-.board th { font: 600 12.5px/1.3 var(--ui); color: var(--dim); text-align: left; padding: 0 4px 2px; }
+.board th, .board td { text-align: left; white-space: normal; border: 0; }   /* not the report's number columns */
+table.data th { white-space: normal; vertical-align: bottom; }   /* headers wrap between words, the tables fit */
+table.data:not(.pips) td:first-child { white-space: normal; min-width: 16em; }   /* so do the variant descriptions */
+table.data td.sig { white-space: normal; min-width: 12em; }        /* and the signal list */
+table.data td { text-align: left; }                                /* words read from the left; td.n stays right */
+table.data th, table.data td { padding: 7px 10px; }
+.board th { font: 600 .82rem/1.3 var(--ui); color: var(--dim); padding: 0 4px 2px; }
 .board th.g { font: 700 18px/1.2 var(--pixel); padding: 0 10px; box-shadow: inset 4px 0 0 var(--stripe); width: 17%; }
 .board th.g a { color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
 .gicon { height: 24px; image-rendering: pixelated; flex: none; }
@@ -301,13 +305,13 @@ section.game[hidden] { display: none; }
 .vsum .vverdict { font: 700 18px/1.2 var(--pixel); display: flex; align-items: center; gap: 8px; margin: 10px 0; }
 .vsum .vverdict .ico { --ico: 20px; }
 .vsum .vverdict.good { color: var(--won); } .vsum .vverdict.bad { color: var(--dead); } .vsum .vverdict.none { color: var(--mute); }
-.vsum dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font: 500 14px/1.35 var(--dense); }
+.vsum dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font: 500 .9rem/1.4 var(--dense); }
 .vsum dt { color: var(--dim); } .vsum dd { margin: 0; color: var(--ink); }
 @media (max-width: 900px) { .hero, .duo { grid-template-columns: minmax(0, 1fr); } .scorestrip { flex-wrap: wrap; } }
 .mapbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .map { overflow-x: auto; background: #000; padding: 8px; width: fit-content; max-width: 100%; box-sizing: border-box; }
 .map canvas { display: block; }
-.legend { color: var(--dim); font-size: 13px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.legend { color: var(--dim); font-size: .85rem; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
 .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
 .k-won { height: 3px !important; background: var(--run); } .k-lost { height: 3px !important; background: var(--dead); }
 .k-clu { box-shadow: inset 0 0 0 2px var(--ink); } .k-cell { box-shadow: inset 0 0 0 2px var(--won); }
@@ -322,9 +326,9 @@ td.sig.good { color: var(--won); } td.sig.bad { color: var(--dead); } td.sig.non
 """
 
 JS = r"""
-const TILE = { '#': '#4a4a4a', '=': '#7c7c7c', '%': '#7c7c7c', 'H': '#fca044', '^': '#e40058', 'O': '#3a0018',
+const TILE = { '#': '#4a4a4a', '=': '#a0a0a0', '%': '#a0a0a0', 'H': '#fca044', '^': '#e40058', 'O': '#3a0018',
   '?': '#f8d878', '<': '#f8d878', '>': '#f8d878', 'F': '#f8d878', 'L': '#f8d878', 'P': '#58d854', 'G': '#f8d878',
-  'D': '#f8d878', '@': '#f8d878', 'd': '#7c7c7c' };
+  'D': '#f8d878', '@': '#f8d878', 'd': '#a0a0a0' };
 function draw(canvas, data, variant) {
   const rows = data.rows, cols = Math.max(...rows.map(r => r.length)), n = rows.length;
   const room = canvas.closest('section').clientWidth - 60;
@@ -336,7 +340,7 @@ function draw(canvas, data, variant) {
   for (let r = 0; r < n; r++) for (let c = 0; c < cols; c++) {
     const ch = changed[c + ',' + r] ?? (rows[r][c] || ' ');
     if (ch === '.' || ch === ' ') continue;
-    g.fillStyle = TILE[ch] || (/[A-Za-z]/.test(ch) ? '#e40058' : '#7c7c7c');
+    g.fillStyle = TILE[ch] || (/[A-Za-z]/.test(ch) ? '#e40058' : '#a0a0a0');
     g.fillRect(c * s, r * s, s, s);
   }
   const run = data.runs[variant] || {};
@@ -349,7 +353,7 @@ function draw(canvas, data, variant) {
   (run.routes || []).filter(r => !r.w).forEach(r => line(r, '#e40058', lw, 0.55));   // failed runs, red
   (run.routes || []).filter(r => r.w).forEach(r => line(r, '#58d854', lw * 1.7, 0.9));   // the route the winners take, green
   if (run.cluster) {
-    const k = run.cluster; g.strokeStyle = '#f8f8f8'; g.lineWidth = 2;
+    const k = run.cluster; g.strokeStyle = '#ededed'; g.lineWidth = 2;
     g.strokeRect((k.col - 3) * s, (Math.min(k.row, n) - 3) * s, 7 * s, 7 * s);
   }
   g.strokeStyle = '#f8d878'; g.lineWidth = 2;
@@ -399,8 +403,7 @@ show(location.hash.slice(1));
 
 
 def render(results: dict) -> str:
-    with open(THEME, encoding="utf-8") as f:
-        theme = f.read()
+    from code.neuro import report   # its styles and top bar: one site with the other Balance Command pages
     sections = "".join(_game_section(g, res) for g, res in results.items())
     sc = scores(results)
     strip = ('<div class="scorestrip">'
@@ -409,12 +412,11 @@ def render(results: dict) -> str:
              f'<div class="frame none"><span class="label">Waiting</span><span class="num"><i class="ico hourglass"></i>{sc["none"]}</span></div>'
              '</div>')
     tabs = ('<div class="gametabs" role="tablist" aria-label="Games">'
-            + "".join(f'<button class="btn" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
+            + "".join(f'<button class="btn g-{g}" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
                       f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in results) + "</div>")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>PEAK mutations</title><style>{theme}{CSS}</style></head><body><main>'
-            '<header class="top"><span class="wordmark">PEAK</span><span class="banner">Mutations</span>'
-            '<nav><a class="btn" href="../balance/report.html">Balance Command</a></nav></header>'
+            f'<title>PEAK Balance Command — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
+            f'{report._nav([], False, None, "mutations")}<main id="main">'
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
             'or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must play out identically.</p></div>'
