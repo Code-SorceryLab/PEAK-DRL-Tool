@@ -2,9 +2,11 @@
 
 On top, the board: one cell per game and mutant, saying whether the playtest caught it (a breaking
 or degrading mutant should be caught, a neutral one should stay quiet, the cosmetic copy must
-replay identically). Below, per game: the level map with the change, where failed attempts ended
-and the tiles the routes covered; the metric table; win rates per persona; people, when they
-played; Mega Man's segments. A standalone file in the shared look (code/neuro/web/theme.css).
+replay identically; a mutant played section by section is caught where any section catches it).
+Below, per game: the level map with the change, where failed attempts ended and the tiles the
+routes covered; the metric table, grouped by the level played, each mutant naming the original it
+was compared with; win rates per persona; people, when they played; Mega Man's segments. A
+standalone file in the shared look (code/neuro/web/theme.css).
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ import json
 import os
 
 from code.games import eval_mutants
+from code.stats.ast_metrics import ORIGINALS, RETRAINED
 
 THEME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "neuro", "web", "theme.css")
 SLOTS = [("seal_route",), ("widen_gap", "add_enemy"), ("jump_velocity_down", "fuse_down"), ("off_route",), ("cosmetic_tile",)]
@@ -42,6 +45,23 @@ def verdict(m: dict, entry: dict | None) -> tuple[str, str]:
     if m["class"] == "neutral":
         return ("false alarm", "bad") if caught else ("quiet", "good")
     return ("caught", "good") if caught else ("missed", "bad")
+
+
+def judge(m: dict, res: dict) -> tuple[str, str]:
+    """verdict() on the board: a mutant also played section by section (Mega Man's global jump
+    change) is judged by its sections, caught where any of them catches it."""
+    parts = [e for k, e in res.items() if k.startswith(m["id"] + " @ ") and e.get("agents")]
+    if not parts:
+        return verdict(m, res.get(m["id"]))
+    hits = sum(bool((e.get("vs_base") or {}).get("detected")) for e in parts)
+    word, tone = verdict(m, {"agents": True, "vs_base": {"detected": hits > 0}})
+    return f"{word} in {hits}/{len(parts)} sections", tone
+
+
+def _original(game: str, name: str) -> str:
+    if name == RETRAINED:
+        return "The level as it ships, each section retrained exactly as the mutants were: their baseline."
+    return "The level as it ships" + (", played by the relay's hand-picked section agents." if game == "megaman" else ".")
 
 
 def _level(ms: list[dict]) -> tuple[list[str], dict]:
@@ -79,47 +99,56 @@ def _where(c: dict | None) -> str:
     return "" if not c else f"({c['col']}, {c['row']}) {100 * c['share']:.0f}%"
 
 
-def _row(v: str, a: dict, m: dict | None, tone: str, effort: list[str], signals: str) -> str:
+def _row(v: str, e: dict, m: dict | None, desc: str, tone: str, effort: list[str]) -> str:
     """One variant's line of the metric table."""
+    a = e["agents"]
     w, n = a["win_rate"]["pooled"]
-    what = f'<div class="label">{esc(m["description"])}</div>' if m else ""
     cls = m["class"] if m else "original"
+    vs = f'<div class="label">vs {esc(e["vs"])}</div>' if e.get("vs") else ""
+    what = f'<div class="label">{esc(desc)}</div>' if desc else ""
     tds = [f"<td><b>{esc(v)}</b>{what}</td>", f'<td><span class="cls {esc(cls)}">{esc(cls)}</span></td>',
            f'<td class="n">{w}/{n}</td>', f'<td class="n">{"yes" if a["completion"] else "no"}</td>',
            f'<td class="n">{_pct(a["progress_median"])}<span class="label"> / {_pct(a["progress_max"])}</span></td>',
            f'<td class="n">{_num(a["time_to_finish"], ".1f", " s")}</td>', f"<td>{_where(a['death_cluster'])}</td>",
            f"<td>{esc(next(iter(a['causes']), ''))}</td>", f'<td class="n">{len(a["coverage"])}</td>']
     tds += [f'<td class="n">{_num(a["effort"].get(k))}</td>' for k in effort]
-    tds.append(f'<td class="sig {tone}">{esc(signals)}</td>')
+    tds.append(f'<td class="sig {tone}">{esc(_signals(e))}{vs}</td>')
     return "<tr>" + "".join(tds) + "</tr>"
 
 
-def _summary(v: str, e: dict, m: dict | None) -> dict:
+def _summary(v: str, e: dict, m: dict | None, desc: str) -> dict:
     """What the selected-variant card shows."""
     a = e.get("agents") or {}
     word, tone = verdict(m, e) if m else ("the original", "none")
     w, n = (a.get("win_rate") or {}).get("pooled", [0, 0])
-    return {"name": v, "cls": m["class"] if m else "original", "desc": m["description"] if m else "The level as it ships.",
+    return {"name": v, "cls": m["class"] if m else "original", "desc": desc,
             "word": word, "tone": tone, "wins": f"{w}/{n}", "solved": "yes" if a.get("completion") else "no",
             "progress": f"{_pct(a.get('progress_median')) or '-'} / {_pct(a.get('progress_max')) or '-'}",
             "tff": _num(a.get("time_to_finish"), ".1f", " s") or "-", "cluster": _where(a.get("death_cluster")) or "-",
-            "cause": next(iter(a.get("causes") or {}), "-") or "-", "signals": _signals(e) or "-"}
+            "cause": next(iter(a.get("causes") or {}), "-") or "-", "signals": _signals(e) or "-", "vs": e.get("vs") or "-"}
 
 
 def _game_section(game: str, res: dict) -> str:
-    title = eval_mutants.EVAL_LEVELS[game][1]
+    title, main = eval_mutants.EVAL_LEVELS[game][1], eval_mutants.EVAL_LEVELS[game][0]
     ms = eval_mutants.eval_set(game)
     by_id = {m["id"]: m for m in ms}
     rows, cells = _level(ms)
-    order = [v for v in ["base"] + sorted(k for k in res if k.startswith("base @")) + [m["id"] for m in ms] if v in res]
+    name = {k: k.split(" @ ")[0] for k in res}                  # "<variant> @ <section>" is that variant
+    order = sorted((k for k in res if name[k] in ORIGINALS or name[k] in by_id),
+                   key=lambda k: (res[k]["level"] != main, res[k]["level"]))     # grouped by the level played
+    mut = {v: by_id.get(name[v]) for v in order}
+    desc = {v: mut[v]["description"] if mut[v] else _original(game, name[v]) for v in order}
     if not order:
         return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
                 f'<p class="empty"><i class="ico qblock"></i> No playtests yet. Run Agent Playtest (menu 20) or '
                 f'<code>python -m code.neuro.ast_eval play --game {game}</code>.</p></section>')
     effort = sorted({k for v in order for k in ((res[v].get("agents") or {}).get("effort") or {})})
     head = "".join(f'<th class="n">{_ICON_OF.get(k, "")}{esc(k)}</th>' for k in effort)
-    body = [_row(v, res[v]["agents"], by_id.get(v), verdict(by_id[v], res[v])[1] if v in by_id else "none",
-                 effort, _signals(res[v])) for v in order if res[v].get("agents")]
+    body, described = [], set()
+    for v in (v for v in order if res[v].get("agents")):          # a variant's description on its first row only
+        body.append(_row(v, res[v], mut[v], "" if name[v] in described else desc[v],
+                         verdict(mut[v], res[v])[1] if mut[v] else "none", effort))
+        described.add(name[v])
     personas = sorted({p for v in order for p in ((res[v].get("agents") or {}).get("win_rate") or {}) if p != "pooled"})
     grid = "".join(
         f'<tr><td><i class="ico p-{esc(p)}"></i> {esc(p)}</td>' + "".join(_pips(((res[v].get("agents") or {}).get("win_rate") or {}).get(p)) for v in order) + "</tr>"
@@ -130,12 +159,12 @@ def _game_section(game: str, res: dict) -> str:
         human_html = ('<h3><i class="ico cursor"></i> People at the keyboard</h3><table class="data"><tr><th>Variant</th><th class="n">Attempts</th>'
                       '<th class="n">Wins</th><th>Per player</th><th class="n">Progress</th><th>Death cluster</th><th>Top cause</th></tr>'
                       + "".join(_human_row(v, h) for v, h in humans) + "</table>")
-    seg_html = _segments(order, res) if game == "megaman" else ""
+    seg_html = _segments([v for v in order if res[v]["level"] == main], res) if game == "megaman" else ""
     data = {"rows": rows, "cells": cells,
             "runs": {v: {"ends": (res[v].get("agents") or {}).get("end_tiles") or [],
                          "cluster": (res[v].get("agents") or {}).get("death_cluster"),
                          "routes": (res[v].get("agents") or {}).get("routes") or []} for v in order},
-            "summary": {v: _summary(v, res[v], by_id.get(v)) for v in order}}
+            "summary": {v: _summary(v, res[v], mut[v], desc[v]) for v in order}}
     buttons = "".join(f'<button class="btn{" on" if i == 0 else ""}" data-variant="{esc(v)}">{esc(v)}</button>'
                       for i, v in enumerate(order))
     pips = (f'<div class="card"><h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips">'
@@ -197,7 +226,7 @@ def _segments(order: list[str], res: dict) -> str:
                        f'<td><b>{ended}</b> ended here<div class="label">{_num(per["time_median"], ".0f", " s")}, '
                        f'damage {_num(per["damage_median"])}</div></td>')
         rows.append(f"<tr><td>{esc(s)}</td>{''.join(tds)}</tr>")
-    return (f'<h3><i class="ico flag"></i>Segments</h3><div class="scroll"><table class="data"><tr><th>Segment</th>{head}</tr>'
+    return (f'<h3><i class="ico flag"></i>Segments of the full stage</h3><div class="scroll"><table class="data"><tr><th>Segment</th>{head}</tr>'
             f'{"".join(rows)}</table></div>')
 
 
@@ -214,7 +243,7 @@ def scores(results: dict) -> dict:
     out = {"good": 0, "bad": 0, "none": 0}
     for game, res in results.items():
         for m in eval_mutants.eval_set(game):
-            out[verdict(m, res.get(m["id"]))[1]] += 1
+            out[judge(m, res)[1]] += 1
     return out
 
 
@@ -223,7 +252,7 @@ def board(results: dict) -> str:
     for game, res in results.items():
         cells = ["<td></td>"] * len(SLOTS)
         for m in eval_mutants.eval_set(game):
-            word, tone = verdict(m, res.get(m["id"]))
+            word, tone = judge(m, res)
             icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
             cells[_slot(m["id"])] = (f'<td class="cell {tone}"><a href="#{game}"><span class="v">{icon}{esc(word)}</span>'
                                      f'<span class="label">{esc(m["class"])}</span></a></td>')
@@ -335,7 +364,7 @@ function summarize(card, s) {
     <dl><dt>Wins</dt><dd>${esc(s.wins)}</dd><dt>Solved</dt><dd>${esc(s.solved)}</dd>
     <dt>Progress (median / max)</dt><dd>${esc(s.progress)}</dd><dt>Time to finish</dt><dd>${esc(s.tff)}</dd>
     <dt>Death cluster</dt><dd>${esc(s.cluster)}</dd><dt>Top cause</dt><dd>${esc(s.cause)}</dd>
-    <dt>Signals</dt><dd>${esc(s.signals)}</dd></dl>`;
+    <dt>Signals</dt><dd>${esc(s.signals)}</dd><dt>Compared with</dt><dd>${esc(s.vs)}</dd></dl>`;
 }
 const redraws = {};
 document.querySelectorAll('section.game').forEach(sec => {

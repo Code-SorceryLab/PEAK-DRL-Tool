@@ -85,3 +85,37 @@ def test_each_variant_is_compared_with_the_original_played_over_the_same_level(t
     assert res["base"]["agents"]["attempts"] == 2 and res["base @ CutMan-3-Ledges"]["agents"]["attempts"] == 2
     assert res["s3-cosmetic_tile"]["determinism"]["passed"]            # matched against the section's own run
     assert res["s3-seal_route"]["agents"] is None and res["s3-seal_route"]["humans"]["win_rate"]["al"] == [0, 1]
+
+
+def test_mega_man_mutants_meet_the_retrained_original_section_by_section(tmp_path, monkeypatch):
+    from code.stats import ast_page, episode_log
+    monkeypatch.setattr(am, "ROOT", str(tmp_path))
+
+    def rows(level, status="DEAD"):
+        return [row(status, level=level, seed=s, game="megaman", end=(1200.0, 1100.0)) for s in (1, 2, 3)]
+
+    def write(variant, *parts):
+        episode_log.append(str(tmp_path / "megaman" / variant / "agents.csv"), [r for p in parts for r in p])
+    write("base", rows("CutMan"), rows("CutMan-3-Ledges", "WON"))           # the relay's hand-picked legs
+    write("base-retrained", rows("CutMan"), rows("CutMan-1-Street", "WON"), rows("CutMan-3-Ledges"))
+    write("s3-off_route", rows("CutMan-3-Ledges"))
+    write("m-jump_velocity_down", rows("CutMan"), rows("CutMan-1-Street"), rows("CutMan-3-Ledges"))
+    res = am.evaluate("megaman")
+    off = res["s3-off_route"]                                              # quiet: the relay's 3/3 is not its baseline
+    assert off["vs"] == "base-retrained @ CutMan-3-Ledges" and not off["vs_base"]["detected"]
+    street = res["m-jump_velocity_down @ CutMan-1-Street"]
+    assert street["vs"] == "base-retrained @ CutMan-1-Street" and street["vs_base"]["completion_lost"]
+    assert res["m-jump_velocity_down"]["vs"] == "base-retrained" and "vs_base" not in res["base @ CutMan-3-Ledges"]
+    jump = {"id": "m-jump_velocity_down", "class": "degrading", "operator": "m-jump_velocity_down"}
+    assert ast_page.judge(jump, res) == ("caught in 1/2 sections", "good")
+
+
+def test_mega_mans_original_is_retrained_with_the_mutants_command():
+    from code.neuro import ast_eval
+    m = ast_eval.mutant("megaman", "base-retrained")
+    assert m["dir"] is None and len(m["retrain_levels"]) == 8                # every section of the stage
+    cmd, env = ast_eval.retrain_job("megaman", "base-retrained", "experienced", levels=["CutMan-3-Ledges"])
+    arg = {k: cmd[cmd.index(k) + 1] for k in ("--levels", "--gens", "--root")}
+    assert env["PEAK_MUTANT"] == "" and cmd[cmd.index("--seeds") + 1:][:3] == list(map(str, ast_eval.SEEDS))
+    assert arg == {"--levels": "CutMan-3-Ledges", "--gens": "200",
+                   "--root": os.path.join("runs", "ast", "megaman", "base-retrained", "probes")}

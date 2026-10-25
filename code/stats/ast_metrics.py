@@ -24,7 +24,9 @@ A mutant is compared with the original level on four signals: completion lost, a
 rate (Fisher's exact test on the pooled agent attempts, p < 0.05), the death cluster moved more
 than 3 tiles, and a new dominant cause of death. The cosmetic mutant is replayed, not retrained:
 it passes the determinism check (RQ2) when every agent's attempt matches its attempt on the
-original, field for field.
+original, field for field. Mega Man's mutants are compared with base-retrained, the original
+retrained section by section exactly as they were; base, its relay of hand-picked section agents,
+stays on the page as context.
 """
 from __future__ import annotations
 
@@ -40,6 +42,8 @@ from code.stats import episode_log
 
 ROOT = os.path.join("runs", "ast")
 GAMES = ["mario", "meatboy", "bomberman", "megaman"]
+RETRAINED = "base-retrained"            # Mega Man's original retrained like its mutants (code/neuro/ast_eval.py)
+ORIGINALS = ("base", RETRAINED)
 CLUSTER_TILES = 3
 ALPHA = 0.05
 # (label, column) per effort count; a column a game does not log is left out
@@ -61,7 +65,7 @@ def load(game: str, variant: str) -> list[dict]:
 
 
 def variants(game: str) -> list[str]:
-    """base first, then every variant that has attempts on disk (mutant ids in the evaluation order)."""
+    """The originals first, then every variant that has attempts on disk (mutant ids in the evaluation order)."""
     try:
         from code.games.eval_mutants import eval_set
         order = [m["id"] for m in eval_set(game)]
@@ -70,8 +74,8 @@ def variants(game: str) -> list[str]:
     files = glob.glob(os.path.join(ROOT, game, "*", "agents.csv"))
     files += glob.glob(os.path.join(ROOT, game, "*", "human", "**", "episodes.csv"), recursive=True)
     found = {os.path.relpath(p, os.path.join(ROOT, game)).split(os.sep)[0] for p in files}
-    rest = sorted(found - set(order) - {"base"})
-    return [v for v in ["base"] + order + rest if v in found]
+    rest = sorted(found - set(order) - set(ORIGINALS))
+    return [v for v in [*ORIGINALS, *order, *rest] if v in found]
 
 
 # ── per attempt ──────────────────────────────────────────────────────────────────────────────
@@ -226,39 +230,46 @@ def determinism(base_rows: list[dict], mut_rows: list[dict]) -> dict:
 
 # ── one game, every variant ──────────────────────────────────────────────────────────────────
 def evaluate(game: str) -> dict:
-    """{variant: {"agents": metrics, "humans": metrics or None, "vs_base": signals, ...}}.
-    A variant is compared with the original played over the same level: Mega Man's section
-    mutants are played from their section's start, and so is a second run of the original,
-    listed as "base @ <section>"."""
+    """{variant: {"agents": metrics, "humans": metrics or None, "vs_base": signals, "vs": the
+    original it was compared with, ...}}. A variant is compared with the original played over the
+    same level, by base-retrained where it played that level. Mega Man's section mutants are played
+    from their section's start, and the originals and the global mutant over each section too,
+    listed as "<variant> @ <section>"."""
     from code.games.eval_mutants import EVAL_LEVELS
     main = EVAL_LEVELS[game][0]
+    refs: dict = {}
+    for ref in ORIGINALS:                           # the retrained original replaces the relay where it played
+        rows: dict = {}
+        for r in load(game, ref):
+            if r.get("source") == "agent":
+                rows.setdefault(str(r.get("level")), []).append(r)
+        refs.update({level: (ref if level == main else f"{ref} @ {level}", rs) for level, rs in rows.items()})
     out = {}
-    base: dict = {}
-    for r in load(game, "base"):
-        if r.get("source") == "agent":
-            base.setdefault(str(r.get("level")), []).append(r)
     for v in variants(game):
         by_level: dict = {}
         for r in load(game, v):
             by_level.setdefault(str(r.get("level")), []).append(r)
-        for level, rs in sorted(by_level.items(), key=lambda kv: kv[0] != main):
-            key = f"base @ {level}" if v == "base" and level != main else v
+        for level, rs in sorted(by_level.items(), key=lambda kv: (kv[0] != main, kv[0])):
+            one = v not in ORIGINALS and len(by_level) == 1      # a section mutant keeps its own name
+            key = v if level == main or one else f"{v} @ {level}"
             agents = [r for r in rs if r.get("source") == "agent"]
             humans = [r for r in rs if r.get("source") != "agent"]
             entry = {"agents": summarize(agents) if agents else None, "level": level,
                      "humans": dict(summarize(humans), win_rate=win_rate(humans)) if humans else None}
-            ref = base.get(level)
-            if v != "base" and ref and agents:
+            vs, ref = refs.get(level, (None, None))
+            if v not in ORIGINALS and ref and agents:
                 entry["vs_base"] = compare(summarize(ref), entry["agents"])
+                entry["vs"] = vs
                 if v.endswith("cosmetic_tile"):
                     entry["determinism"] = determinism(ref, agents)
-            out.setdefault(key, entry)
+            out[key] = entry
     return out
 
 
 def table(game: str, results: dict) -> str:
     """The text table the menu prints: one line per variant."""
-    lines = [f"{game}", f"  {'VARIANT':<22}{'WINS':>8}{'SOLVED':>8}{'PROG':>7}{'TIME':>7}  {'CLUSTER':<14}{'CAUSE':<12}SIGNALS"]
+    width = max(map(len, results), default=20) + 2
+    lines = [f"{game}", f"  {'VARIANT':<{width}}{'WINS':>8}{'SOLVED':>8}{'PROG':>7}{'TIME':>7}  {'CLUSTER':<14}{'CAUSE':<12}SIGNALS"]
     for v, e in results.items():
         a = e["agents"]
         if not a:
@@ -274,7 +285,7 @@ def table(game: str, results: dict) -> str:
         prog = "-" if a["progress_median"] is None else f"{100 * a['progress_median']:.0f}%"
         tff = "-" if a["time_to_finish"] is None else f"{a['time_to_finish']:.1f}s"
         where = f"({c['col']},{c['row']}) {c['share']:.0%}" if c else "-"
-        lines.append(f"  {v:<22}{f'{w}/{n}':>8}{'yes' if a['completion'] else 'no':>8}{prog:>7}{tff:>7}  "
+        lines.append(f"  {v:<{width}}{f'{w}/{n}':>8}{'yes' if a['completion'] else 'no':>8}{prog:>7}{tff:>7}  "
                      f"{where:<14}{cause:<12}{', '.join(flags) or ('-' if v.startswith('base') else 'none')}")
     return "\n".join(lines)
 

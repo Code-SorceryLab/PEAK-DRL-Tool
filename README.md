@@ -173,6 +173,7 @@ python -m code.games.megaman_mutants                                   # Mega Ma
 python -m code.games.eval_mutants --list                               # the evaluation set of every game
 python -m code.neuro.ast_eval retrain --game mario --mutant widen_gap  # every persona's 3 seeds on the mutant
 python -m code.neuro.ast_eval play --game mario                        # one attempt per agent: original + mutants
+python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained   # Mega Man's original, trained like its mutants
 python -m code.stats.ast_metrics --page                                # metric tables + runs/ast/index.html
 PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 
@@ -481,7 +482,9 @@ completion, win rate, progress, end location, death cluster, cause mix, time to 
 coverage, effort counts and, for Mega Man, the segment reached. A mutant is caught when completion
 is lost, the win rate changes (Fisher's exact test, p < 0.05), the death cluster moves more than
 three tiles or the top cause of death changes; the cosmetic copy passes when every replay matches
-the original attempt for attempt.
+the original attempt for attempt. Mega Man's relay legs are hand-picked runs of an older pipeline,
+so its mutants are compared with `base-retrained`, the original with every section retrained
+exactly as the mutants were, over the same section (the global jump change section by section).
 
 ## Research use
 

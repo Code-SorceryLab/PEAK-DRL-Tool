@@ -4,12 +4,15 @@ mutant, and the metrics of code/stats/ast_metrics.py over them.
     python -m code.neuro.ast_eval retrain --game mario --mutant seal_route [--persona novice ...]
     python -m code.neuro.ast_eval play --game mario [--variant base seal_route ...] [--persona ...]
     python -m code.neuro.ast_eval play --game megaman [--episodes 20]      # the relay of section agents
+    python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained [--level CutMan-1-Street]
 
 A playtest gives each agent one attempt with learning off: the best genome of each of the three
 seeds of a persona, under the rules it trained with (frame budget, stall rule, the persona's
 reaction time and slips). Agents and games are deterministic, so one attempt is the answer and a
 persona's win rate moves in steps of 1/3. Mega Man is played by the relay of section agents
-(code/neuro/relay.py) over --episodes varied attempts.
+(code/neuro/relay.py) over --episodes varied attempts. Its original's relay (runs/megaman/relay.json)
+holds hand-picked legs of an older pipeline, so the mutants are compared with `base-retrained`:
+the original level, every section retrained exactly as the mutants were.
 
     runs/ast/<game>/<variant>/agents.csv     one row per attempt (code/stats/episode_stats.py)
     runs/ast/<game>/<variant>/human/         people at the keyboard (manual_play --record)
@@ -47,6 +50,7 @@ GENS = 200
 ROOT = os.path.join("runs", "ast")
 PERSONA_ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
 MEGAMAN_STAGE, MEGAMAN_FRAMES, MEGAMAN_STALL = "CutMan", 18000, 300     # relay.py's defaults
+RETRAINED = "base-retrained"    # Mega Man's original, every section retrained as its mutants were
 
 
 def variant_dir(game: str, variant: str) -> str:
@@ -54,12 +58,16 @@ def variant_dir(game: str, variant: str) -> str:
 
 
 def variants(game: str) -> list[str]:
-    return ["base"] + [m["id"] for m in eval_mutants.eval_set(game)]
+    return ["base"] + ([RETRAINED] if game == "megaman" else []) + [m["id"] for m in eval_mutants.eval_set(game)]
 
 
 def mutant(game: str, variant: str) -> dict | None:
     if variant == "base":
         return None
+    if game == "megaman" and variant == RETRAINED:      # retrained like a global mutant, on the original
+        from .relay import stage_legs
+        return {"id": RETRAINED, "dir": None, "retrain": True, "section": None,
+                "retrain_levels": [leg.level for leg in stage_legs(MEGAMAN_STAGE)]}
     m = next((m for m in eval_mutants.eval_set(game) if m["id"] == variant), None)
     if m is None:
         raise SystemExit(f"{game} has no mutant '{variant}' on disk: python -m code.games.eval_mutants")
@@ -107,7 +115,7 @@ def retrain_job(game: str, variant: str, persona: str, gens: int = GENS, workers
         cmd.append("--best")
     if workers:
         cmd += ["--workers", str(workers)]
-    env = dict(os.environ, PEAK_MUTANT=m["dir"], SDL_VIDEODRIVER="dummy")
+    env = dict(os.environ, PEAK_MUTANT=m["dir"] or "", SDL_VIDEODRIVER="dummy")     # "" plays the original
     env.pop("PEAK_MM1_MUTANT", None)
     return cmd, env
 
@@ -162,10 +170,10 @@ def play_agent(game: str, run_dir: str, level: str, seed: int = 0) -> dict:
     return row
 
 
-def _best_retrained(m: dict, section: str) -> str | None:
-    """The run trained on this section of the mutant that wins most often (relay.py's test)."""
+def _best_retrained(variant: str, section: str) -> str | None:
+    """The run trained on this section of the variant that wins most often (relay.py's test)."""
     from .relay import evaluate
-    root = os.path.join(variant_dir("megaman", m["id"]), "probes")
+    root = os.path.join(variant_dir("megaman", variant), "probes")
     runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", "*", "*", f"{section}_*", "best.npz"))]
     scored = [(evaluate(r, section, 12), r) for r in sorted(runs)]
     return max(scored)[1] if scored else None
@@ -174,20 +182,23 @@ def _best_retrained(m: dict, section: str) -> str | None:
 def play_megaman(variant: str, episodes: int = 20) -> list[dict]:
     """The relay over the full stage, or over the one section a level mutant changes, from that
     section's start (most full-stage attempts end before segment 3, so they would never meet a
-    change there). The original is played both ways, so each mutant has its own baseline."""
+    change there). A global mutant and base-retrained are played over the full stage and over each
+    section alone, so every mutant meets the retrained original over the same ground. The relay's
+    hand-picked legs (base) are kept as context; the cosmetic copy is replayed by base-retrained's."""
     from . import relay
     m = mutant("megaman", variant)
     if m is None:
         scopes = [MEGAMAN_STAGE] + sorted({x["section"] for x in eval_mutants.eval_set("megaman") if x["section"]})
     else:
-        scopes = [m["section"] or MEGAMAN_STAGE]
+        scopes = [m["section"]] if m["section"] else [MEGAMAN_STAGE] + m["retrain_levels"]
     with eval_mutants._named(m["dir"] if m else None):
         legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
         for leg in legs:
-            if m and m["retrain"] and leg.level in m["retrain_levels"]:
-                run = _best_retrained(m, leg.level)
+            if m and leg.level in m["retrain_levels"]:
+                trained = m["id"] if m["retrain"] else RETRAINED
+                run = _best_retrained(trained, leg.level)
                 if run is None:
-                    raise SystemExit(f"no agent retrained on {variant} for {leg.level}: retrain it first")
+                    raise SystemExit(f"no agent retrained on {trained} for {leg.level}: retrain it first")
                 leg.run_dir = run
                 leg.net, leg.sensors, leg.persona = relay.load_net(run)
         rows = []
