@@ -254,7 +254,8 @@ def board(results: dict) -> str:
         for m in eval_mutants.eval_set(game):
             word, tone = judge(m, res)
             icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
-            cells[_slot(m["id"])] = (f'<td class="cell {tone}"><a href="#{game}"><span class="v">{icon}{esc(word)}</span>'
+            slot = _slot(m["id"])
+            cells[slot] = (f'<td class="cell {tone}"><a href="#{game}" data-slot="{SLOT_NAMES[slot]}"><span class="v">{icon}{esc(word)}</span>'
                                      f'<span class="label">{esc(m["class"])}</span></a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
                     f'{"".join(cells)}</tr>')
@@ -265,7 +266,7 @@ def board(results: dict) -> str:
 CSS = """
 main { display: flex; flex-direction: column; gap: 22px; }
 .lede { color: var(--dim); max-width: 70ch; margin: 6px 0 0; }
-.board { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 820px; table-layout: fixed; }
+.board { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 680px; table-layout: fixed; }
 .board th, .board td { text-align: left; white-space: normal; border: 0; }   /* not the report's number columns */
 table.data th { white-space: normal; vertical-align: bottom; }   /* headers wrap between words, the tables fit */
 table.data:not(.pips) td:first-child { white-space: normal; min-width: 16em; }   /* so do the variant descriptions */
@@ -307,7 +308,17 @@ section.game[hidden] { display: none; }
 .vsum .vverdict.good { color: var(--won); } .vsum .vverdict.bad { color: var(--dead); } .vsum .vverdict.none { color: var(--mute); }
 .vsum dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font: 500 .9rem/1.4 var(--dense); }
 .vsum dt { color: var(--dim); } .vsum dd { margin: 0; color: var(--ink); }
-@media (max-width: 900px) { .hero, .duo { grid-template-columns: minmax(0, 1fr); } .scorestrip { flex-wrap: wrap; } }
+@media (max-width: 900px) { .hero, .duo { grid-template-columns: minmax(0, 1fr); } .scorestrip { flex-wrap: wrap; }
+  .board th.g { width: 22%; font: 600 .9rem/1.25 var(--ui); } .board th.g a { gap: 6px; } }   /* tablets: names fit their column */
+@media (max-width: 700px) {   /* phones: each game's verdicts as a card, the slot named inside each cell */
+  .board, .board tbody { display: block; min-width: 0; }
+  .board tr:first-child, .board td:not(.cell) { display: none; }
+  .board tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+  .board th.g { grid-column: 1 / -1; width: auto; padding: 4px 10px; }
+  .board td.cell a::before { content: attr(data-slot); font: 600 .75rem/1.2 var(--ui); color: var(--dim); }
+}
+@media (max-width: 560px) { .scorestrip { flex-wrap: nowrap; } .scorestrip .frame { flex: 1 1 0; min-width: 0; padding: 8px 10px; }
+  .scorestrip .num { font-size: 27px; } }
 .mapbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .map { overflow-x: auto; background: #000; padding: 8px; width: fit-content; max-width: 100%; box-sizing: border-box; }
 .map canvas { display: block; }

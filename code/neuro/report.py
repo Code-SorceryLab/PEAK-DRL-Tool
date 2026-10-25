@@ -1021,6 +1021,8 @@ CSS = THEME_CSS + """
   @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
   @media (max-width:560px){
     nav{position:static}
+    nav .links{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:6px}   /* one swipeable row, not five */
+    nav .links>*{flex:none}
     .lvlgrid{grid-template-columns:1fr 1fr}
     .stats{grid-template-columns:1fr 1fr}
     .tabs{margin-left:0;width:100%}
@@ -2012,6 +2014,8 @@ function drawChart(cv, t){
   if (!st) return;
   const {d, focus, hidden} = st;
   const ctx = cv.getContext('2d');
+  const shown = Math.round(cv.getBoundingClientRect().width);   // phones: a square radar at the size shown, not 720 x 400 shrunk
+  if (cv.dataset.kind === 'radar' && shown && shown < 560 && cv.width !== shown){ cv.width = shown; cv.height = shown; }
   const W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);
   ctx.font = FONT;
