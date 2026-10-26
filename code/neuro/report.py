@@ -29,7 +29,7 @@ GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "game
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
-from .balance import BALANCE_DIR, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
+from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 from .gasweep import rebuild as rebuild_gasweep
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
@@ -318,8 +318,8 @@ def _config_html(sections: list[tuple[str, dict]]) -> str:
 
 
 def _collect_routes(game: str, persona: str, level: str, tag: str | None,
-                    max_routes: int = 22) -> tuple[list[dict], dict | None]:
-    """Route traces for one (game, persona, level), merged over seeds, and the fastest win.
+                    max_routes: int = 22, seeds=PAPER_SEEDS) -> tuple[list[dict], dict | None]:
+    """Route traces for one (game, persona, level), merged over `seeds`, and the fastest win.
 
     A probe dir gives its episodes.csv rows when it has one, else the compact routes.json sampled
     on the cluster ({won, lost, best, best_time_s}: routes already ≤60 integer points).
@@ -330,6 +330,8 @@ def _collect_routes(game: str, persona: str, level: str, tag: str | None,
     sub = (game, persona, tag) if tag else (game,)  # legacy reports pre-date the tagged layout
     for d in sorted(glob.glob(os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_")))):
         seed = os.path.basename(d).rsplit("_", 1)[-1]
+        if seed not in {str(s) for s in seeds}:
+            continue
         if os.path.exists(os.path.join(d, "episodes.csv")):
             try:
                 with open(os.path.join(d, "episodes.csv"), encoding="utf-8", newline="") as f:

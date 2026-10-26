@@ -33,7 +33,7 @@ import pygame
 
 from . import relay
 from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter
-from .balance import BALANCE_DIR, PROBES_ROOT
+from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT
 from .evolution import GAConfig
 from .net import make_net
 from .personas import PERSONAS, Hands
@@ -53,13 +53,15 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 NET_KEYS = ("sensors", "hidden", "action_feedback", "memory")
 
 
-def pick_models(game: str, persona: str, root: str = PROBES_ROOT) -> list[tuple[str, str]]:
-    """[(level, run dir)] in level order: per level, the seed with the best training record.
-    A level without a saved model is left out."""
+def pick_models(game: str, persona: str, root: str = PROBES_ROOT, seeds=PAPER_SEEDS) -> list[tuple[str, str]]:
+    """[(level, run dir)] in level order: per level, the seed (of `seeds`) with the best training
+    record. A level without a saved model is left out."""
+    keep = {str(s) for s in seeds}
     out = []
     for level in list_levels(game, include_disabled=True):  # every level that has trained agents
-        runs = [s for s in map(relay.run_summary, sorted(glob.glob(os.path.join(root, game, persona, TAG, f"{level}_*"))))
-                if s]
+        dirs = [d for d in sorted(glob.glob(os.path.join(root, game, persona, TAG, f"{level}_*")))
+                if d.rsplit("_", 1)[-1] in keep]
+        runs = [s for s in map(relay.run_summary, dirs) if s]
         if runs:
             out.append((level, max(runs, key=lambda s: (s["win_rate"], s["best"]))["run"]))
     return out
