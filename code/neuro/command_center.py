@@ -69,6 +69,7 @@ def shell(walls: dict[str, dict[str, bool]]) -> str:
 
 
 CSS = """
+[hidden]{display:none !important}
 body{height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .bar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 16px;border-bottom:3px solid var(--line);background:var(--deck)}
 .brand{display:flex;align-items:baseline;gap:10px;font-size:18px}

@@ -276,3 +276,11 @@ def test_the_sub_page_titles_carry_no_long_dashes():
              ast_page.render({g: ast_metrics.evaluate(g) for g in GAMES}, only="mario", nav=False)]
     titles = [re.search(r"<title>([^<]*)</title>", p).group(1) for p in pages]
     assert not any("\u2014" in t or "\u2013" in t for t in titles), titles
+
+
+def test_a_hidden_wall_stays_hidden_whatever_its_display():
+    from code.neuro import command_center
+    html = command_center.shell({"mario": {"novice": True}, "megaman": {"novice": True}})
+    css = re.sub(r"\s+", "", command_center.CSS)
+    assert "[hidden]{display:none!important}" in css and ".wall{display:grid" in css    # .wall's grid beat [hidden]
+    assert html.count('class="wall') == 2 and html.count("hidden>") >= 2
