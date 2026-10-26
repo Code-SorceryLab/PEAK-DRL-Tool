@@ -8,6 +8,9 @@ Below, per game: the level map with the change, where failed attempts ended and 
 routes covered; the metric table, grouped by the level played, each mutant naming the original it
 was compared with; win rates per persona; people, when they played; Mega Man's segments. One
 standalone file with the Command Center's styles and top bar (code/neuro/report.py).
+
+The 2D games' other levels carry the same five operators, placed by rule (<id>@<level>): the board
+adds one row per game that totals them, and a game's section picks the level to show.
 """
 from __future__ import annotations
 
@@ -16,10 +19,11 @@ import json
 import os
 
 from code.games import eval_mutants
-from code.stats.ast_metrics import ORIGINALS, RESEEDED, RETRAINED, false_alarms
+from code.stats.ast_metrics import RESEEDED, RETRAINED, false_alarms, is_original, kind
 
 SLOTS = [("seal_route",), ("widen_gap", "add_enemy"), ("jump_velocity_down", "fuse_down"), ("off_route",), ("cosmetic_tile",)]
 SLOT_NAMES = ["Sealed route", "Wider gap / extra enemy", "Weaker jump / shorter fuse", "Off-route tile", "Cosmetic tile"]
+SHORT = {"mario": "Super Mario Bros.", "meatboy": "Super Meat Boy", "bomberman": "Bomberman"}
 esc = html.escape
 
 
@@ -102,23 +106,27 @@ def _null_verdict(e: dict) -> tuple[str, str]:
 
 
 def _original(game: str, name: str) -> str:
-    if name == RESEEDED:
+    if kind(name) == RESEEDED:
         return "The level as it ships, retrained with three new seeds: any signal it raises is a false alarm."
     if name == RETRAINED:
         return "The level as it ships, each section retrained exactly as the mutants were: their baseline."
-    return "The level as it ships" + (", played by the relay's hand-picked section agents." if game == "megaman" else ".")
+    return "The level as it ships" + (", played by the relay's hand-picked section agents." if game == "megaman" and name == "base"
+                                      else ".")
 
 
 def _level(ms: list[dict]) -> tuple[list[str], dict]:
     """The evaluation level's rows and each level mutant's changed cells."""
     if not ms:
         return [], {}
-    path = os.path.join(eval_mutants.LEVELS_DIR, ms[0]["base_file"])
-    with open(path, encoding="utf-8") as f:
+    return _file_rows(ms[0]["base_file"]), {m["id"]: m.get("cells") or [] for m in ms}
+
+
+def _file_rows(file: str) -> list[str]:
+    with open(os.path.join(eval_mutants.LEVELS_DIR, file), encoding="utf-8") as f:
         rows = [r.rstrip("\n") for r in f]
     while rows and not rows[-1].strip():
         rows.pop()
-    return rows, {m["id"]: m.get("cells") or [] for m in ms}
+    return rows
 
 
 def _signals(e: dict) -> str:
@@ -160,7 +168,7 @@ def _row(v: str, e: dict, m: dict | None, desc: str, tone: str, effort: list[str
     """One variant's line of the metric table."""
     a = e["agents"]
     w, n = a["win_rate"]["pooled"]
-    cls = m["class"] if m else "null" if v.startswith(RESEEDED) else "original"
+    cls = m["class"] if m else "null" if kind(v) == RESEEDED else "original"
     vs = f'<div class="label">vs {esc(e["vs"])}</div>' if e.get("vs") else ""
     what = f'<div class="label">{esc(desc)}</div>' if desc else ""
     tds = [f"<td><b>{esc(v)}</b>{what}</td>", f'<td><span class="cls {esc(cls)}">{esc(cls)}</span></td>',
@@ -171,13 +179,13 @@ def _row(v: str, e: dict, m: dict | None, desc: str, tone: str, effort: list[str
     tds += [f'<td class="n">{_num(a["effort"].get(k))}</td>' for k in effort]
     tds.append(f'<td class="sig {tone}">{esc(_signals(e))}{vs}</td>')
     tds.append(f"<td>{esc(_replay(e))}</td>")
-    return "<tr>" + "".join(tds) + "</tr>"
+    return f'<tr data-level="{esc(e["level"])}">' + "".join(tds) + "</tr>"
 
 
 def _summary(v: str, e: dict, m: dict | None, desc: str) -> dict:
     """What the selected-variant card shows."""
     a = e.get("agents") or {}
-    null = v.startswith(RESEEDED)
+    null = kind(v) == RESEEDED
     replayed = m and not m["operator"].endswith("cosmetic_tile")        # the detector's word for a mutant
     word, tone = verdict(m, e, replay=bool(replayed)) if m else _null_verdict(e) if null else ("the original", "none")
     w, n = (a.get("win_rate") or {}).get("pooled", [0, 0])
@@ -190,12 +198,19 @@ def _summary(v: str, e: dict, m: dict | None, desc: str) -> dict:
 
 def _game_section(game: str, res: dict) -> str:
     title, main = eval_mutants.EVAL_LEVELS[game][1], eval_mutants.EVAL_LEVELS[game][0]
-    ms = eval_mutants.eval_set(game)
+    ms = eval_mutants.all_mutants(game)
     by_id = {m["id"]: m for m in ms}
-    rows, cells = _level(ms)
+    rows = (_file_rows(eval_mutants.level_file(game, main)) if game in eval_mutants.CHANGES
+            else _level(eval_mutants.eval_set(game))[0])
+    cells = {m["id"]: m.get("cells") or [] for m in ms}
     name = {k: k.split(" @ ")[0] for k in res}                  # "<variant> @ <section>" is that variant
-    order = sorted((k for k in res if name[k] in ORIGINALS or name[k] == RESEEDED or name[k] in by_id),
-                   key=lambda k: (res[k]["level"] != main, res[k]["level"]))     # grouped by the level played
+    levels = [main] + (eval_mutants.other_levels(game) if game in eval_mutants.CHANGES else [])
+    rank = {lv: i for i, lv in enumerate(levels)}
+    order = sorted((k for k in res if is_original(name[k]) or kind(name[k]) == RESEEDED or name[k] in by_id),
+                   key=lambda k: (rank.get(res[k]["level"], len(levels)), res[k]["level"] != main, res[k]["level"]))
+    shown = list(dict.fromkeys(res[v]["level"] for v in order))     # the levels played, in the game's order
+    picks = [lv for lv in shown if lv in rank] if game in eval_mutants.CHANGES else []
+    maps = {lv: _file_rows(eval_mutants.level_file(game, lv)) for lv in picks if lv != main}
     mut = {v: by_id.get(name[v]) for v in order}
     desc = {v: mut[v]["description"] if mut[v] else _original(game, name[v]) for v in order}
     if not order:
@@ -207,12 +222,14 @@ def _game_section(game: str, res: dict) -> str:
     body, described = [], set()
     for v in (v for v in order if res[v].get("agents")):          # a variant's description on its first row only
         body.append(_row(v, res[v], mut[v], "" if name[v] in described else desc[v],
-                         verdict(mut[v], res[v])[1] if mut[v] else _null_verdict(res[v])[1] if name[v] == RESEEDED
+                         verdict(mut[v], res[v])[1] if mut[v] else _null_verdict(res[v])[1] if kind(name[v]) == RESEEDED
                          else "none", effort))
         described.add(name[v])
     personas = sorted({p for v in order for p in ((res[v].get("agents") or {}).get("win_rate") or {}) if p != "pooled"})
     grid = "".join(
-        f'<tr><td><i class="ico p-{esc(p)}"></i> {esc(p)}</td>' + "".join(_pips(((res[v].get("agents") or {}).get("win_rate") or {}).get(p)) for v in order) + "</tr>"
+        f'<tr><td><i class="ico p-{esc(p)}"></i> {esc(p)}</td>' + "".join(
+            _pips(((res[v].get("agents") or {}).get("win_rate") or {}).get(p)).replace("<td", f'<td data-level="{esc(res[v]["level"])}"', 1)
+            for v in order) + "</tr>"
         for p in personas)
     humans = [(v, res[v]["humans"]) for v in order if res[v].get("humans")]
     human_html = ""
@@ -221,15 +238,20 @@ def _game_section(game: str, res: dict) -> str:
                       '<th class="n">Wins</th><th>Per player</th><th class="n">Progress</th><th>Death cluster</th><th>Top cause</th></tr>'
                       + "".join(_human_row(v, h) for v, h in humans) + "</table>")
     seg_html = _segments([v for v in order if res[v]["level"] == main], res) if game == "megaman" else ""
-    data = {"rows": rows, "cells": cells,
+    data = {"rows": rows, "maps": maps, "level": {v: res[v]["level"] for v in order}, "cells": cells,
             "runs": {v: {"ends": (res[v].get("agents") or {}).get("end_tiles") or [],
                          "cluster": (res[v].get("agents") or {}).get("death_cluster"),
                          "routes": (res[v].get("agents") or {}).get("routes") or []} for v in order},
             "summary": {v: _summary(v, res[v], mut[v], desc[v]) for v in order}}
-    buttons = "".join(f'<button class="btn{" on" if i == 0 else ""}" data-variant="{esc(v)}">{esc(v)}</button>'
-                      for i, v in enumerate(order))
+    buttons = "".join(f'<button class="btn{" on" if i == 0 else ""}" data-variant="{esc(v)}" data-level="{esc(res[v]["level"])}">'
+                      f'{esc(v)}</button>' for i, v in enumerate(order))
+    if len(picks) > 1:                     # one level at a time: the map, its buttons, table rows and pips
+        buttons = ('<select class="levelpick" aria-label="Level">' + "".join(
+            f'<option value="{esc(lv)}">{esc(eval_mutants.level_name(game, lv))}</option>' for lv in picks) + "</select>" + buttons)
+        title += f" and {len(picks) - 1} more levels"
     pips = (f'<div class="card"><h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips">'
-            f'<tr><th>Persona</th>' + "".join(f"<th>{esc(v).replace('_', '_<wbr>')}</th>" for v in order) + f"</tr>{grid}</table></div></div>"
+            f'<tr><th>Persona</th>' + "".join(f'<th data-level="{esc(res[v]["level"])}">{esc(v).replace("_", "_<wbr>")}</th>' for v in order)
+            + f"</tr>{grid}</table></div></div>"
             if personas else "")
     side = pips or (f'<div class="card">{seg_html}</div>' if seg_html else "")
     return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
@@ -302,10 +324,10 @@ def _icon(game: str) -> str:
 
 
 def scores(results: dict) -> dict:
-    """How many mutants the playtests got right, got wrong, and still wait for."""
+    """How many mutants the playtests got right, got wrong, and still wait for, on every level."""
     out = {"good": 0, "bad": 0, "none": 0}
     for game, res in results.items():
-        for m in eval_mutants.eval_set(game):
+        for m in eval_mutants.all_mutants(game):
             out[detect(m, res)[1]] += 1
     return out
 
@@ -324,12 +346,43 @@ def board(results: dict) -> str:
                            f'<span class="label">{esc(m["class"])}</span>{rep}</a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
                     f'{"".join(cells)}</tr>')
+        placed = eval_mutants.placed_set(game)
+        if placed:
+            rows.append(_others_row(game, res, placed))
     return ('<div class="scroll"><table class="board"><tr><th></th>' + "".join(f"<th>{n}</th>" for n in SLOT_NAMES) + "</tr>"
             + "".join(rows) + "</table></div>")
 
 
+def _others_row(game: str, res: dict, placed: list[dict]) -> str:
+    """One board row for a game's other levels: per operator, how many levels the playtest got right."""
+    cells = ["<td></td>"] * len(SLOTS)
+    for slot in range(len(SLOTS)):
+        ms = [m for m in placed if _slot(m["operator"]) == slot]
+        if not ms:
+            continue
+        tones = [detect(m, res)[1] for m in ms]
+        good, bad, wait = tones.count("good"), tones.count("bad"), tones.count("none")
+        tone = "bad" if bad else "good" if good else "none"
+        icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
+        word = f"right {good}/{good + bad}" if good + bad else "waiting"
+        label = f"{len(ms)} levels" + (f", {wait} waiting" if wait and good + bad else "")
+        rep = ""
+        if not ms[0]["operator"].endswith("cosmetic_tile"):
+            st = [solvable(m, res)[1] for m in ms]
+            sg, sb = st.count("good"), st.count("bad")
+            rep = (f'<span class="rep {"bad" if sb else "good" if sg else "none"}">retrained: '
+                   f'{f"right {sg}/{sg + sb}" if sg + sb else "waiting"}</span>')
+        cells[slot] = (f'<td class="cell {tone}"><a href="#{game}" data-slot="{SLOT_NAMES[slot]}"><span class="v">{icon}{esc(word)}</span>'
+                       f'<span class="label">{esc(label)}</span>{rep}</a></td>')
+    n = len({m["stage"] for m in placed})
+    return (f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(SHORT.get(game, game))}: other levels ({n})</a></th>'
+            f'{"".join(cells)}</tr>')
+
+
 CSS = """
 main { display: flex; flex-direction: column; gap: 22px; }
+[hidden] { display: none !important; }
+.levelpick { font: 700 15px/1.2 var(--pixel); padding: 6px 8px; background: var(--panel, #111); color: inherit; border: 2px solid currentColor; }
 .lede { color: var(--dim); max-width: 70ch; margin: 6px 0 0; }
 .board { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 680px; table-layout: fixed; }
 .board th, .board td { text-align: left; white-space: normal; border: 0; }   /* not the report's number columns */
@@ -409,7 +462,7 @@ const TILE = { '#': '#4a4a4a', '=': '#a0a0a0', '%': '#a0a0a0', 'H': '#fca044', '
   '?': '#f8d878', '<': '#f8d878', '>': '#f8d878', 'F': '#f8d878', 'L': '#f8d878', 'P': '#58d854', 'G': '#f8d878',
   'D': '#f8d878', '@': '#f8d878', 'd': '#a0a0a0' };
 function draw(canvas, data, variant) {
-  const rows = data.rows, cols = Math.max(...rows.map(r => r.length)), n = rows.length;
+  const rows = (data.maps && data.maps[data.level[variant]]) || data.rows, cols = Math.max(...rows.map(r => r.length)), n = rows.length;
   const room = canvas.closest('section').clientWidth - 60;
   const s = Math.max(2, Math.min(16, Math.floor(room / cols)));
   canvas.width = cols * s; canvas.height = (n + 1) * s;
@@ -457,12 +510,20 @@ document.querySelectorAll('section.game').forEach(sec => {
   const data = JSON.parse(document.getElementById('data-' + canvas.dataset.game).textContent);
   const card = sec.querySelector('.vsum');
   let cur = Object.keys(data.runs)[0];
-  const redraw = () => { if (data.rows.length && !sec.hidden) draw(canvas, data, cur); if (card) summarize(card, data.summary[cur]); };
+  const mapOf = v => (data.maps && data.maps[data.level[v]]) || data.rows;
+  const redraw = () => { if (mapOf(cur).length && !sec.hidden) draw(canvas, data, cur); if (card) summarize(card, data.summary[cur]); };
   if (!data.rows.length) sec.querySelector('.map').remove();
   sec.querySelectorAll('.mapbar .btn').forEach(b => b.addEventListener('click', () => {
     sec.querySelectorAll('.mapbar .btn').forEach(x => x.classList.toggle('on', x === b));
     cur = b.dataset.variant; redraw();
   }));
+  const pick = sec.querySelector('.levelpick');
+  const filter = () => {                      // one level at a time: its buttons, table rows and pips
+    sec.querySelectorAll('[data-level]').forEach(el => { el.hidden = el.dataset.level !== pick.value; });
+    const first = [...sec.querySelectorAll('.mapbar .btn')].find(b => b.dataset.level === pick.value);
+    if (first) first.click();
+  };
+  if (pick) { pick.addEventListener('change', filter); filter(); }
   redraws[sec.id] = redraw;
   addEventListener('resize', redraw);
 });
@@ -503,8 +564,8 @@ def render(results: dict, only: str | None = None, nav: bool = True) -> str:
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>PEAK Command Center: Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
             f'{report._nav([], False, None, "mutations") if nav else ""}<main id="main">'
-            '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
-            'one-change copies. The original\'s agents, frozen, replay each copy and are compared with their own play on the '
+            '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Every level of each game gets five '
+            'one-change copies: placed by hand on the evaluation level, by rule on the others. The original\'s agents, frozen, replay each copy and are compared with their own play on the '
             'original: a sealed or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must '
             'play out identically. Agents retrained on a copy answer one question only: can it still be finished?'
             + (f' (Retrained agents are too noisy to detect with: on the unchanged level, new seeds set off the rule '

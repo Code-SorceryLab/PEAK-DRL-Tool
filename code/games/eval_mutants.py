@@ -147,6 +147,20 @@ def level_file(game: str, level: str) -> str:
     return entry if isinstance(entry, str) else entry["file"]
 
 
+def level_name(game: str, level: str) -> str:
+    """A level as people call it, from its file name: "Super Meat Boy 1-6 Bladecatcher"."""
+    if game not in CHANGES:
+        return level
+    stem = os.path.splitext(os.path.basename(level_file(game, level)))[0]
+    if game == "mario":
+        return f"Super Mario Bros. {level.replace('Mario', '')}"
+    if game == "meatboy":
+        world, n, *rest = stem.replace("world", "").split("_")
+        return f"Super Meat Boy {int(world)}-{int(n)} {' '.join(rest).title()}"
+    n, *rest = stem.split("_")
+    return f"Bomberman {n} {' '.join(rest).title()}"
+
+
 def other_levels(game: str) -> list[str]:
     """Every enabled level but the evaluation one: their mutants are placed by program (place())."""
     from code.neuro.adapters import list_levels
@@ -522,6 +536,11 @@ def placed_set(game: str) -> list[dict]:
             m.setdefault("retrain", op != "cosmetic_tile")
             out.append(m)
     return out
+
+
+def all_mutants(game: str) -> list[dict]:
+    """The evaluation level's mutants, then every other level's placed ones."""
+    return eval_set(game) + placed_set(game)
 
 
 def table(game: str) -> str:

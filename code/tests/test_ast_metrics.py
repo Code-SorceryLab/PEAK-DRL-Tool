@@ -190,3 +190,19 @@ def test_mega_mans_original_is_retrained_with_the_mutants_command():
     assert env["PEAK_MUTANT"] == "" and cmd[cmd.index("--seeds") + 1:][:3] == list(map(str, ast_eval.SEEDS))
     assert arg == {"--levels": "CutMan-3-Ledges", "--gens": "200",
                    "--root": os.path.join("runs", "ast", "megaman", "base-retrained", "probes")}
+
+
+def test_a_level_variant_is_compared_with_the_base_of_its_own_level(tmp_path, monkeypatch):
+    from code.stats import episode_log
+    monkeypatch.setattr(am, "ROOT", str(tmp_path))
+    won = [row("WON", game="meatboy", level="5", seed=s) for s in (1, 2, 3)]
+    dead = [row(cause="Stall", end=(900.0, 400.0), game="meatboy", level="5", seed=s) for s in (1, 2, 3)]
+    episode_log.append(str(tmp_path / "meatboy" / "base" / "agents.csv"), [row("WON", game="meatboy", level="2")])
+    episode_log.append(str(tmp_path / "meatboy" / "base@5" / "agents.csv"), won)
+    episode_log.append(str(tmp_path / "meatboy" / "base-reseeded@5" / "agents.csv"), [dict(r) for r in won])
+    episode_log.append(str(tmp_path / "meatboy" / "seal_route@5" / "agents.csv"), dead)
+    res = am.evaluate("meatboy")
+    assert ["base", "base@5", "base-reseeded@5", "seal_route@5"] == [v for v in res]
+    assert res["seal_route@5"]["vs"] == "base@5" and res["seal_route@5"]["vs_base"]["verdict"] == "broken"
+    assert res["base-reseeded@5"]["vs"] == "base@5" and "vs_base" not in res["base@5"]
+    assert am.false_alarms({"meatboy": res})["comparisons"] == 1

@@ -6,6 +6,8 @@ change; whether play reached it; and why each miss was missed.
 
 Everything is read from the playtests on disk through code/stats/ast_metrics.py, so rerun it
 after any new playtest. Figures are drawn on white for print (the dashboards stay black and red).
+The tables and figures cover the evaluation levels; "Every level" and tables/detection_levels.tex
+add the 2D games' other levels, whose mutants are placed by rule (<id>@<level>).
 """
 from __future__ import annotations
 
@@ -17,9 +19,19 @@ from code.stats import ast_page
 
 OUT = "paper-ast"
 GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman 09", "megaman": "Mega Man Cut Man"}
+NAME = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man"}
 NEAR = 3                                   # tiles: the death cluster's own radius
 MODES = ("static", "random", "replay")              # the detectors compared; retraining only answers "still solvable?"
 HEAD = {"static": "Static", "random": "Random", "replay": "Replay (detector)", "solvable": "Still solvable (retrained)"}
+
+
+def where(game: str, level: str | None) -> str:
+    """The level a row is about, in the paper's words: "Meat Boy 1-6"."""
+    if game == "megaman" or not level or level == eval_mutants.EVAL_LEVELS[game][0]:
+        return GAME[game]
+    if game == "mario":
+        return f"Mario {level.replace('Mario', '')}"
+    return f"Meat Boy 1-{int(level) + 1}" if game == "meatboy" else f"Bomberman {int(level) + 1:02d}"
 
 
 # ── small pieces (tested) ────────────────────────────────────────────────────────────────────
@@ -68,13 +80,16 @@ def tally(rows: list[dict], mode: str) -> dict:
 
 # ── the analyses ─────────────────────────────────────────────────────────────────────────────
 def judgments(results: dict) -> list[dict]:
-    """One row per mutant: whether each method got it right, and the words the page shows."""
+    """One row per mutant on every level: whether each method got it right, and the words the page
+    shows; `main` marks the evaluation level's."""
     rows = []
     for game, res in results.items():
-        for m in eval_mutants.eval_set(game):
+        main = {m["id"] for m in eval_mutants.eval_set(game)}
+        for m in eval_mutants.all_mutants(game):
             e = res.get(m["id"]) or {}
             row = {"game": game, "id": m["id"], "class": m["class"], "operator": m["operator"],
-                   "slot": ast_page.SLOT_NAMES[ast_page._slot(m["id"])]}
+                   "slot": ast_page.SLOT_NAMES[ast_page._slot(m["operator"])], "level": m.get("stage"),
+                   "main": m["id"] in main}
             row["static"] = right(m["class"], not (m.get("checks") or {}).get("exit_reachable", True))
             rnd = (e.get("random") or {}).get("vs_base")
             row["random"] = right(m["class"], any(rnd[k] for k in am.SIGNALS)) if rnd else None   # never counted: it never wins
@@ -113,14 +128,15 @@ def strict_flag(m: dict, res: dict, mode: str) -> bool | None:
     return any(s["completion_lost"] or s["win_rate_changed"] for s in counted) if counted else None
 
 
-def personas(results: dict) -> list[dict]:
+def personas(results: dict, every: bool = False) -> list[dict]:
     """Per game, mutant and persona: the verdict of that persona's agents alone, against the same
     persona on the original over the same level (Mega Man: base-retrained). A mutant played section
-    by section takes its worst verdict over the sections that count, as the board judges it."""
+    by section takes its worst verdict over the sections that count, as the board judges it.
+    `every` takes every level's mutants, not only the evaluation level's."""
     out = []
     for game, res in results.items():
         refs = am.references(game)
-        for m in eval_mutants.eval_set(game):
+        for m in (eval_mutants.all_mutants if every else eval_mutants.eval_set)(game):
             if m["operator"].endswith("cosmetic_tile"):
                 continue
             row = {"game": game, "id": m["id"], "class": m["class"]}
@@ -189,7 +205,7 @@ def misses(results: dict, rows: list[dict]) -> list[str]:
             why = (f" Unsolved after retraining: {', '.join(lost)}; the unchanged level also failed to train from new seeds "
                    f"there ({', '.join(null)}), so this is likely seed noise." if null else
                    f" Unsolved after retraining: {', '.join(lost)}." if lost else "")
-            out.append(f"{GAME[r['game']]} `{r['id']}` (retrained): {r['solvable_word']}, expected {want}.{why}")
+            out.append(f"{where(r['game'], r['level'])} `{r['id']}` (retrained): {r['solvable_word']}, expected {want}.{why}")
         for mode in ("replay",):
             if r[mode] is not False:
                 continue
@@ -198,14 +214,14 @@ def misses(results: dict, rows: list[dict]) -> list[str]:
             s, a = part.get("vs_base") or {}, part.get("agents") or {}
             ref = (results[r["game"]].get(e.get("vs") or "base") or {}).get("agents") or {}
             if not s or not a or not ref:
-                out.append(f"{GAME[r['game']]} {r['id']} ({mode}): judged section by section; see the page.")
+                out.append(f"{where(r['game'], r['level'])} {r['id']} ({mode}): judged section by section; see the page.")
                 continue
             bw, bn = ref["win_rate"]["pooled"]
             mw, mn = a["win_rate"]["pooled"]
             bc, mc = ref.get("death_cluster"), a.get("death_cluster")
             moved = (max(abs(bc["col"] - mc["col"]), abs(bc["row"] - mc["row"])) if bc and mc else None)
             what = "a false alarm" if r["class"] == "neutral" else "missed"
-            out.append(f"{GAME[r['game']]} `{r['id']}` ({mode}, {what}): wins {mw}/{mn} vs {bw}/{bn} on the original "
+            out.append(f"{where(r['game'], r['level'])} `{r['id']}` ({mode}, {what}): wins {mw}/{mn} vs {bw}/{bn} on the original "
                        f"(Fisher p = {s['win_rate_p']}), death cluster moved {moved if moved is not None else '-'} "
                        f"tile(s), top cause {next(iter(ref.get('causes') or {}), '-')} -> {next(iter(a.get('causes') or {}), '-')}.")
     return out
@@ -248,11 +264,48 @@ def detection_tex(rows: list[dict]) -> str:
             "\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
 
 
+def by_operator(rows: list[dict]) -> list[dict]:
+    """Per game and operator over its levels: [right, judged] for each method, and how many levels."""
+    out: dict = {}
+    for r in rows:
+        k = (r["game"], r["operator"])
+        e = out.setdefault(k, {"game": r["game"], "operator": r["operator"], "class": r["class"], "levels": 0,
+                               **{m: [0, 0] for m in (*MODES, "solvable")}})
+        e["levels"] += 1
+        for m in (*MODES, "solvable"):
+            if r[m] is not None:
+                e[m][0] += bool(r[m])
+                e[m][1] += 1
+    return list(out.values())
+
+
+def levels_tex(rows: list[dict]) -> str:
+    """Table: each game's operators over every level, right / judged per method. Needs booktabs."""
+    cols = (*MODES, "solvable")
+    frac = lambda x: f"{x[0]}/{x[1]}" if x[1] else "--"  # noqa: E731
+    body = [f"{_tex(NAME[e['game']])} & \\texttt{{{_tex(e['operator'])}}} & "
+            f"{e['class']} & {e['levels']} & " + " & ".join(frac(e[m]) for m in cols) + r" \\" for e in by_operator(rows)]
+    tot = {m: tally(rows, m) for m in MODES}
+    sv = solvability(rows)
+    return ("\\begin{table*}[t]\\centering\\small\n\\caption{Every level: each operator placed on every level of the "
+            "2D games (by hand on the evaluation level, by rule on the others), right / judged per method over its levels.}\n"
+            "\\label{tab:detection-levels}\n\\begin{tabular}{lllr" + "c" * len(cols) + "}\\toprule\nGame & Operator & Class & Levels & "
+            + " & ".join(HEAD[m] for m in cols) + " \\\\\\midrule\n" + "\n".join(body) + "\n\\midrule\n"
+            f"\\multicolumn{{4}}{{l}}{{Play-changing mutants caught}} & "
+            + " & ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES) + " & -- \\\\\n"
+            f"\\multicolumn{{4}}{{l}}{{Neutral mutants left alone}} & "
+            + " & ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES) + " & -- \\\\\n"
+            f"\\multicolumn{{4}}{{l}}{{Solvability right (breaking / others)}} & & & & "
+            f"{sv['breaking'][0]}/{sv['breaking'][1]}, {sv['others'][0]}/{sv['others'][1]} \\\\\n"
+            "\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
+
+
 def write(results: dict, out: str = OUT) -> list[str]:
-    rows = judgments(results)
+    every = judgments(results)
+    rows = [r for r in every if r["main"]]              # the evaluation levels: the paper's main tables
     per = personas(results)
     loc = localization(results)
-    miss = misses(results, rows)
+    miss = misses(results, every)
     tot = {m: tally(rows, m) for m in MODES}
     os.makedirs(os.path.join(out, "tables"), exist_ok=True)
     os.makedirs(os.path.join(out, "figures"), exist_ok=True)
@@ -272,7 +325,7 @@ def write(results: dict, out: str = OUT) -> list[str]:
           "| Game | Mutant | Class | " + " | ".join(HEAD[m] for m in (*MODES, "solvable")) + " |",
           "|---|---|---|" + "---|" * (len(MODES) + 1)]
     for r in rows:
-        md.append(f"| {GAME[r['game']]} | `{r['id']}` | {r['class']} | " + " | ".join(
+        md.append(f"| {where(r['game'], r['level'])} | `{r['id']}` | {r['class']} | " + " | ".join(
             f"{_mark(r[m])} ({r[m + '_word']})" if m in ("replay", "solvable") and r[m] is not None else _mark(r[m])
             for m in (*MODES, "solvable")) + " |")
     sv = solvability(rows)
@@ -284,6 +337,7 @@ def write(results: dict, out: str = OUT) -> list[str]:
     cos = [r for r in rows if r["operator"].endswith("cosmetic_tile")]
     md.append(f"Cosmetic copies replayed identically: {sum(bool(r['retrain']) for r in cos)}/{len(cos)} games "
               f"({', '.join(r['retrain_word'] for r in cos)}).")
+    md += _every_level(results, every)
     fa = am.false_alarms(results)
     md += ["", "## False alarms: why retraining is not the detector", ""]
     if fa["comparisons"]:
@@ -298,11 +352,11 @@ def write(results: dict, out: str = OUT) -> list[str]:
                "fails outright.", "", "| Signal | Fired |", "|---|---|"]
         md += [f"| {k} | {v}/{fa['comparisons']} |" for k, v in fa["fired"].items()]
         md.append(f"| win rate outside the seed spread (beside the rule) | {fa['beyond_seeds'][0]}/{fa['beyond_seeds'][1]} |")
-        nulls = [(g, k, e["vs_base"]) for g, res in results.items() for k, e in res.items()
-                 if k.split(" @ ")[0] == am.RESEEDED and (e.get("vs_base") or {}).get("counted")]
+        nulls = [(g, e["level"], e["vs_base"]) for g, res in results.items() for k, e in res.items()
+                 if am.kind(k) == am.RESEEDED and (e.get("vs_base") or {}).get("counted")]
         md += ["", "| Game | Level | Verdict | Signals |", "|---|---|---|---|"]
-        md += [f"| {GAME[g]} | {k.split(' @ ')[1] if ' @ ' in k else eval_mutants.EVAL_LEVELS[g][0]} | {s['verdict']} | "
-               + (", ".join(x for x in am.SIGNALS if s[x]) or "-") + " |" for g, k, s in nulls]
+        md += [f"| {where(g, lv)} | {lv} | {s['verdict']} | " + (", ".join(x for x in am.SIGNALS if s[x]) or "-") + " |"
+               for g, lv, s in nulls]
     else:
         md.append("Not run yet (`base-reseeded`).")
 
@@ -346,8 +400,50 @@ def write(results: dict, out: str = OUT) -> list[str]:
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(detection_tex(rows))
     written.append(path)
+    path = os.path.join(out, "tables", "detection_levels.tex")
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(levels_tex([r for r in every if r["game"] != "megaman"]))
+    written.append(path)
     written += figures(results, os.path.join(out, "figures"))
     return written
+
+
+def _every_level(results: dict, every: list[dict]) -> list[str]:
+    """The ast_results.md section on every level of the 2D games."""
+    rows = [r for r in every if r["game"] != "megaman"]
+    if not any(not r["main"] for r in rows):
+        return []
+    others = {(r["game"], r["level"]) for r in rows if not r["main"]}
+    tot, sv = {m: tally(rows, m) for m in MODES}, solvability(rows)
+    cos = [r for r in rows if r["operator"].endswith("cosmetic_tile") and r["retrain"] is not None]
+    md = ["", "## Every level", "",
+          f"The same five operators on every level of the 2D games: placed by hand on the evaluation level, by rule on the "
+          f"other {len(others)} levels (`code/games/eval_mutants.py` place(); {5 * len(others) - sum(not r['main'] for r in rows)} "
+          "operator-level pairs had no place for the change). Each mutant is compared with its own level's original "
+          "(`base@<level>`).", "",
+          "| Totals, every level | " + " | ".join(HEAD[m] for m in MODES) + " |", "|---|" + "---|" * len(MODES),
+          "| play-changing caught | " + " | ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES) + " |",
+          "| neutral left alone | " + " | ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES) + " |", "",
+          f"Still solvable after retraining, as expected: breaking {sv['breaking'][0]}/{sv['breaking'][1]}, all others "
+          f"{sv['others'][0]}/{sv['others'][1]}. Cosmetic copies replayed identically on "
+          f"{sum(bool(r['retrain']) for r in cos)}/{len(cos)} levels.", "",
+          "| Game | Operator | Class | Levels | " + " | ".join(HEAD[m] for m in (*MODES, "solvable")) + " |",
+          "|---|---|---|---|" + "---|" * (len(MODES) + 1)]
+    frac = lambda x: f"{x[0]}/{x[1]}" if x[1] else "-"  # noqa: E731
+    md += [f"| {NAME[e['game']]} | `{e['operator']}` | {e['class']} | {e['levels']} | "
+           + " | ".join(frac(e[m]) for m in (*MODES, "solvable")) + " |" for e in by_operator(rows)]
+    plist = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
+    per = [r for r in personas(results, every=True) if r["game"] != "megaman"]
+    for mode in ("retrain", "replay"):
+        counts = {p: sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
+        n_play = {p: sum(1 for r in per if r["class"] != "neutral" and (mode, p) in r) for p in plist}
+        md.append("")
+        md.append(f"Flags per persona, every level ({mode}): " + ", ".join(f"{p} {counts[p]}/{n_play[p]}" for p in plist) + ".")
+    md += ["", "| Level | Mutant | Class | " + " | ".join(HEAD[m] for m in (*MODES, "solvable")) + " |",
+           "|---|---|---|" + "---|" * (len(MODES) + 1)]
+    md += [f"| {where(r['game'], r['level'])} | `{r['id']}` | {r['class']} | " + " | ".join(_mark(r[m]) for m in (*MODES, "solvable")) + " |"
+           for r in rows]
+    return md
 
 
 # ── figures (white, for print) ───────────────────────────────────────────────────────────────

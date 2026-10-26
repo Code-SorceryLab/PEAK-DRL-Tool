@@ -38,6 +38,169 @@ Still solvable after retraining, as expected: breaking mutants no longer solvabl
 
 Cosmetic copies replayed identically: 4/4 games (identical 18/18, identical 18/18, identical 18/18, identical 120/120).
 
+## Every level
+
+The same five operators on every level of the 2D games: placed by hand on the evaluation level, by rule on the other 24 levels (`code/games/eval_mutants.py` place(); 8 operator-level pairs had no place for the change). Each mutant is compared with its own level's original (`base@<level>`).
+
+| Totals, every level | Static | Random | Replay (detector) |
+|---|---|---|---|
+| play-changing caught | 27/74 | 2/9 | 8/9 |
+| neutral left alone | 26/26 | 3/3 | 3/3 |
+
+Still solvable after retraining, as expected: breaking 3/3, all others 9/9. Cosmetic copies replayed identically on 3/3 levels.
+
+| Game | Operator | Class | Levels | Static | Random | Replay (detector) | Still solvable (retrained) |
+|---|---|---|---|---|---|---|---|
+| Mario | `seal_route` | breaking | 4 | 4/4 | 0/1 | 1/1 | 1/1 |
+| Mario | `widen_gap` | degrading | 4 | 0/4 | 0/1 | 1/1 | 1/1 |
+| Mario | `jump_velocity_down` | degrading | 4 | 0/4 | 1/1 | 1/1 | 1/1 |
+| Mario | `off_route` | neutral | 3 | 3/3 | 1/1 | 1/1 | 1/1 |
+| Mario | `cosmetic_tile` | neutral | 4 | 4/4 | 1/1 | - | - |
+| Meat Boy | `seal_route` | breaking | 11 | 11/11 | 0/1 | 1/1 | 1/1 |
+| Meat Boy | `widen_gap` | degrading | 4 | 0/4 | 1/1 | 1/1 | 1/1 |
+| Meat Boy | `jump_velocity_down` | degrading | 11 | 0/11 | 0/1 | 0/1 | 1/1 |
+| Meat Boy | `off_route` | neutral | 11 | 11/11 | 1/1 | 1/1 | 1/1 |
+| Meat Boy | `cosmetic_tile` | neutral | 11 | 11/11 | 1/1 | - | - |
+| Bomberman | `seal_route` | breaking | 12 | 12/12 | 0/1 | 1/1 | 1/1 |
+| Bomberman | `add_enemy` | degrading | 12 | 0/12 | 0/1 | 1/1 | 1/1 |
+| Bomberman | `fuse_down` | degrading | 12 | 0/12 | 0/1 | 1/1 | 1/1 |
+| Bomberman | `off_route` | neutral | 12 | 12/12 | 1/1 | 1/1 | 1/1 |
+| Bomberman | `cosmetic_tile` | neutral | 12 | 12/12 | 1/1 | - | - |
+
+Flags per persona, every level (retrain): novice 6/9, clumsy 0/9, experienced 4/9, speedrunner 4/9, killer 4/9, collector 4/9.
+
+Flags per persona, every level (replay): novice 9/9, clumsy 0/9, experienced 9/9, speedrunner 9/9, killer 8/9, collector 7/9.
+
+| Level | Mutant | Class | Static | Random | Replay (detector) | Still solvable (retrained) |
+|---|---|---|---|---|---|---|
+| Mario 1-1 | `seal_route` | breaking | yes | no | yes | yes |
+| Mario 1-1 | `widen_gap` | degrading | no | no | yes | yes |
+| Mario 1-1 | `jump_velocity_down` | degrading | no | yes | yes | yes |
+| Mario 1-1 | `off_route` | neutral | yes | yes | yes | yes |
+| Mario 1-1 | `cosmetic_tile` | neutral | yes | yes | - | - |
+| Mario 1-2 | `seal_route@Mario1-2` | breaking | yes | - | - | - |
+| Mario 1-2 | `widen_gap@Mario1-2` | degrading | no | - | - | - |
+| Mario 1-2 | `jump_velocity_down@Mario1-2` | degrading | no | - | - | - |
+| Mario 1-2 | `cosmetic_tile@Mario1-2` | neutral | yes | - | - | - |
+| Mario 1-3 | `seal_route@Mario1-3` | breaking | yes | - | - | - |
+| Mario 1-3 | `widen_gap@Mario1-3` | degrading | no | - | - | - |
+| Mario 1-3 | `jump_velocity_down@Mario1-3` | degrading | no | - | - | - |
+| Mario 1-3 | `off_route@Mario1-3` | neutral | yes | - | - | - |
+| Mario 1-3 | `cosmetic_tile@Mario1-3` | neutral | yes | - | - | - |
+| Mario 1-4 | `seal_route@Mario1-4` | breaking | yes | - | - | - |
+| Mario 1-4 | `widen_gap@Mario1-4` | degrading | no | - | - | - |
+| Mario 1-4 | `jump_velocity_down@Mario1-4` | degrading | no | - | - | - |
+| Mario 1-4 | `off_route@Mario1-4` | neutral | yes | - | - | - |
+| Mario 1-4 | `cosmetic_tile@Mario1-4` | neutral | yes | - | - | - |
+| Meat Boy 1-3 | `seal_route` | breaking | yes | no | yes | yes |
+| Meat Boy 1-3 | `widen_gap` | degrading | no | yes | yes | yes |
+| Meat Boy 1-3 | `jump_velocity_down` | degrading | no | no | no | yes |
+| Meat Boy 1-3 | `off_route` | neutral | yes | yes | yes | yes |
+| Meat Boy 1-3 | `cosmetic_tile` | neutral | yes | yes | - | - |
+| Meat Boy 1-1 | `seal_route@0` | breaking | yes | - | - | - |
+| Meat Boy 1-1 | `jump_velocity_down@0` | degrading | no | - | - | - |
+| Meat Boy 1-1 | `off_route@0` | neutral | yes | - | - | - |
+| Meat Boy 1-1 | `cosmetic_tile@0` | neutral | yes | - | - | - |
+| Meat Boy 1-2 | `seal_route@1` | breaking | yes | - | - | - |
+| Meat Boy 1-2 | `jump_velocity_down@1` | degrading | no | - | - | - |
+| Meat Boy 1-2 | `off_route@1` | neutral | yes | - | - | - |
+| Meat Boy 1-2 | `cosmetic_tile@1` | neutral | yes | - | - | - |
+| Meat Boy 1-4 | `seal_route@3` | breaking | yes | - | - | - |
+| Meat Boy 1-4 | `jump_velocity_down@3` | degrading | no | - | - | - |
+| Meat Boy 1-4 | `off_route@3` | neutral | yes | - | - | - |
+| Meat Boy 1-4 | `cosmetic_tile@3` | neutral | yes | - | - | - |
+| Meat Boy 1-5 | `seal_route@4` | breaking | yes | - | - | - |
+| Meat Boy 1-5 | `jump_velocity_down@4` | degrading | no | - | - | - |
+| Meat Boy 1-5 | `off_route@4` | neutral | yes | - | - | - |
+| Meat Boy 1-5 | `cosmetic_tile@4` | neutral | yes | - | - | - |
+| Meat Boy 1-6 | `seal_route@5` | breaking | yes | - | - | - |
+| Meat Boy 1-6 | `jump_velocity_down@5` | degrading | no | - | - | - |
+| Meat Boy 1-6 | `off_route@5` | neutral | yes | - | - | - |
+| Meat Boy 1-6 | `cosmetic_tile@5` | neutral | yes | - | - | - |
+| Meat Boy 1-7 | `seal_route@6` | breaking | yes | - | - | - |
+| Meat Boy 1-7 | `jump_velocity_down@6` | degrading | no | - | - | - |
+| Meat Boy 1-7 | `off_route@6` | neutral | yes | - | - | - |
+| Meat Boy 1-7 | `cosmetic_tile@6` | neutral | yes | - | - | - |
+| Meat Boy 1-8 | `seal_route@7` | breaking | yes | - | - | - |
+| Meat Boy 1-8 | `jump_velocity_down@7` | degrading | no | - | - | - |
+| Meat Boy 1-8 | `off_route@7` | neutral | yes | - | - | - |
+| Meat Boy 1-8 | `cosmetic_tile@7` | neutral | yes | - | - | - |
+| Meat Boy 1-9 | `seal_route@8` | breaking | yes | - | - | - |
+| Meat Boy 1-9 | `widen_gap@8` | degrading | no | - | - | - |
+| Meat Boy 1-9 | `jump_velocity_down@8` | degrading | no | - | - | - |
+| Meat Boy 1-9 | `off_route@8` | neutral | yes | - | - | - |
+| Meat Boy 1-9 | `cosmetic_tile@8` | neutral | yes | - | - | - |
+| Meat Boy 1-10 | `seal_route@9` | breaking | yes | - | - | - |
+| Meat Boy 1-10 | `widen_gap@9` | degrading | no | - | - | - |
+| Meat Boy 1-10 | `jump_velocity_down@9` | degrading | no | - | - | - |
+| Meat Boy 1-10 | `off_route@9` | neutral | yes | - | - | - |
+| Meat Boy 1-10 | `cosmetic_tile@9` | neutral | yes | - | - | - |
+| Meat Boy 1-11 | `seal_route@10` | breaking | yes | - | - | - |
+| Meat Boy 1-11 | `widen_gap@10` | degrading | no | - | - | - |
+| Meat Boy 1-11 | `jump_velocity_down@10` | degrading | no | - | - | - |
+| Meat Boy 1-11 | `off_route@10` | neutral | yes | - | - | - |
+| Meat Boy 1-11 | `cosmetic_tile@10` | neutral | yes | - | - | - |
+| Bomberman 09 | `seal_route` | breaking | yes | no | yes | yes |
+| Bomberman 09 | `add_enemy` | degrading | no | no | yes | yes |
+| Bomberman 09 | `fuse_down` | degrading | no | no | yes | yes |
+| Bomberman 09 | `off_route` | neutral | yes | yes | yes | yes |
+| Bomberman 09 | `cosmetic_tile` | neutral | yes | yes | - | - |
+| Bomberman 01 | `seal_route@0` | breaking | yes | - | - | - |
+| Bomberman 01 | `add_enemy@0` | degrading | no | - | - | - |
+| Bomberman 01 | `fuse_down@0` | degrading | no | - | - | - |
+| Bomberman 01 | `off_route@0` | neutral | yes | - | - | - |
+| Bomberman 01 | `cosmetic_tile@0` | neutral | yes | - | - | - |
+| Bomberman 02 | `seal_route@1` | breaking | yes | - | - | - |
+| Bomberman 02 | `add_enemy@1` | degrading | no | - | - | - |
+| Bomberman 02 | `fuse_down@1` | degrading | no | - | - | - |
+| Bomberman 02 | `off_route@1` | neutral | yes | - | - | - |
+| Bomberman 02 | `cosmetic_tile@1` | neutral | yes | - | - | - |
+| Bomberman 03 | `seal_route@2` | breaking | yes | - | - | - |
+| Bomberman 03 | `add_enemy@2` | degrading | no | - | - | - |
+| Bomberman 03 | `fuse_down@2` | degrading | no | - | - | - |
+| Bomberman 03 | `off_route@2` | neutral | yes | - | - | - |
+| Bomberman 03 | `cosmetic_tile@2` | neutral | yes | - | - | - |
+| Bomberman 04 | `seal_route@3` | breaking | yes | - | - | - |
+| Bomberman 04 | `add_enemy@3` | degrading | no | - | - | - |
+| Bomberman 04 | `fuse_down@3` | degrading | no | - | - | - |
+| Bomberman 04 | `off_route@3` | neutral | yes | - | - | - |
+| Bomberman 04 | `cosmetic_tile@3` | neutral | yes | - | - | - |
+| Bomberman 05 | `seal_route@4` | breaking | yes | - | - | - |
+| Bomberman 05 | `add_enemy@4` | degrading | no | - | - | - |
+| Bomberman 05 | `fuse_down@4` | degrading | no | - | - | - |
+| Bomberman 05 | `off_route@4` | neutral | yes | - | - | - |
+| Bomberman 05 | `cosmetic_tile@4` | neutral | yes | - | - | - |
+| Bomberman 06 | `seal_route@5` | breaking | yes | - | - | - |
+| Bomberman 06 | `add_enemy@5` | degrading | no | - | - | - |
+| Bomberman 06 | `fuse_down@5` | degrading | no | - | - | - |
+| Bomberman 06 | `off_route@5` | neutral | yes | - | - | - |
+| Bomberman 06 | `cosmetic_tile@5` | neutral | yes | - | - | - |
+| Bomberman 07 | `seal_route@6` | breaking | yes | - | - | - |
+| Bomberman 07 | `add_enemy@6` | degrading | no | - | - | - |
+| Bomberman 07 | `fuse_down@6` | degrading | no | - | - | - |
+| Bomberman 07 | `off_route@6` | neutral | yes | - | - | - |
+| Bomberman 07 | `cosmetic_tile@6` | neutral | yes | - | - | - |
+| Bomberman 08 | `seal_route@7` | breaking | yes | - | - | - |
+| Bomberman 08 | `add_enemy@7` | degrading | no | - | - | - |
+| Bomberman 08 | `fuse_down@7` | degrading | no | - | - | - |
+| Bomberman 08 | `off_route@7` | neutral | yes | - | - | - |
+| Bomberman 08 | `cosmetic_tile@7` | neutral | yes | - | - | - |
+| Bomberman 10 | `seal_route@9` | breaking | yes | - | - | - |
+| Bomberman 10 | `add_enemy@9` | degrading | no | - | - | - |
+| Bomberman 10 | `fuse_down@9` | degrading | no | - | - | - |
+| Bomberman 10 | `off_route@9` | neutral | yes | - | - | - |
+| Bomberman 10 | `cosmetic_tile@9` | neutral | yes | - | - | - |
+| Bomberman 11 | `seal_route@10` | breaking | yes | - | - | - |
+| Bomberman 11 | `add_enemy@10` | degrading | no | - | - | - |
+| Bomberman 11 | `fuse_down@10` | degrading | no | - | - | - |
+| Bomberman 11 | `off_route@10` | neutral | yes | - | - | - |
+| Bomberman 11 | `cosmetic_tile@10` | neutral | yes | - | - | - |
+| Bomberman 12 | `seal_route@11` | breaking | yes | - | - | - |
+| Bomberman 12 | `add_enemy@11` | degrading | no | - | - | - |
+| Bomberman 12 | `fuse_down@11` | degrading | no | - | - | - |
+| Bomberman 12 | `off_route@11` | neutral | yes | - | - | - |
+| Bomberman 12 | `cosmetic_tile@11` | neutral | yes | - | - | - |
+
 ## False alarms: why retraining is not the detector
 
 The original retrained with seeds 1111, 2222 and 3333 and compared with itself, over every level or Mega Man section whose original is solved. Every flag is a false alarm. Used as a detector, retraining would catch 10/12 play-changing mutants, but it also flags the unchanged level in 6 of 10 comparisons, so its catches cannot be told from seed noise. Replay has no such noise: its frozen agents replay attempt for attempt (cosmetic copies identical in every game), so its alarms can only come from the change itself. Completion lost, the signal behind "still solvable", fired only in Mega Man sections, whose training from new seeds sometimes fails outright.

@@ -1,0 +1,27 @@
+\begin{table*}[t]\centering\small
+\caption{Every level: each operator placed on every level of the 2D games (by hand on the evaluation level, by rule on the others), right / judged per method over its levels.}
+\label{tab:detection-levels}
+\begin{tabular}{lllrcccc}\toprule
+Game & Operator & Class & Levels & Static & Random & Replay (detector) & Still solvable (retrained) \\\midrule
+Mario & \texttt{seal\_route} & breaking & 4 & 4/4 & 0/1 & 1/1 & 1/1 \\
+Mario & \texttt{widen\_gap} & degrading & 4 & 0/4 & 0/1 & 1/1 & 1/1 \\
+Mario & \texttt{jump\_velocity\_down} & degrading & 4 & 0/4 & 1/1 & 1/1 & 1/1 \\
+Mario & \texttt{off\_route} & neutral & 3 & 3/3 & 1/1 & 1/1 & 1/1 \\
+Mario & \texttt{cosmetic\_tile} & neutral & 4 & 4/4 & 1/1 & -- & -- \\
+Meat Boy & \texttt{seal\_route} & breaking & 11 & 11/11 & 0/1 & 1/1 & 1/1 \\
+Meat Boy & \texttt{widen\_gap} & degrading & 4 & 0/4 & 1/1 & 1/1 & 1/1 \\
+Meat Boy & \texttt{jump\_velocity\_down} & degrading & 11 & 0/11 & 0/1 & 0/1 & 1/1 \\
+Meat Boy & \texttt{off\_route} & neutral & 11 & 11/11 & 1/1 & 1/1 & 1/1 \\
+Meat Boy & \texttt{cosmetic\_tile} & neutral & 11 & 11/11 & 1/1 & -- & -- \\
+Bomberman & \texttt{seal\_route} & breaking & 12 & 12/12 & 0/1 & 1/1 & 1/1 \\
+Bomberman & \texttt{add\_enemy} & degrading & 12 & 0/12 & 0/1 & 1/1 & 1/1 \\
+Bomberman & \texttt{fuse\_down} & degrading & 12 & 0/12 & 0/1 & 1/1 & 1/1 \\
+Bomberman & \texttt{off\_route} & neutral & 12 & 12/12 & 1/1 & 1/1 & 1/1 \\
+Bomberman & \texttt{cosmetic\_tile} & neutral & 12 & 12/12 & 1/1 & -- & -- \\
+\midrule
+\multicolumn{4}{l}{Play-changing mutants caught} & 27/74 & 2/9 & 8/9 & -- \\
+\multicolumn{4}{l}{Neutral mutants left alone} & 26/26 & 3/3 & 3/3 & -- \\
+\multicolumn{4}{l}{Solvability right (breaking / others)} & & & & 3/3, 9/9 \\
+\bottomrule
+\end{tabular}
+\end{table*}

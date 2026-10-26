@@ -36,6 +36,10 @@ field for field. base-reseeded, the original retrained with three new seeds, is 
 original like a mutant: every signal it raises is a false alarm. Mega Man's mutants are compared
 with base-retrained, the original retrained section by section exactly as they were; base, its
 relay of hand-picked section agents, stays on the page as context.
+
+Every other level of the 2D games has the same variants, named <id>@<level>: base@<level> (that
+level's baseline agents), base-reseeded@<level> and the mutants placed there by rule
+(code/games/eval_mutants.py place()). Each is compared with base@<level>.
 """
 from __future__ import annotations
 
@@ -82,18 +86,32 @@ def load(game: str, variant: str, mode: str = "retrain") -> list[dict]:
     return rows
 
 
+def kind(v: str) -> str:
+    """What a variant is, without its level or section: "base-reseeded@5 @ x" -> "base-reseeded"."""
+    return v.split(" @ ")[0].split("@")[0]
+
+
+def is_original(v: str) -> bool:
+    """base, base-retrained, or another level's base (base@<level>)."""
+    return v.split(" @ ")[0] in ORIGINALS or kind(v) == "base"
+
+
 def variants(game: str) -> list[str]:
-    """The originals first, then every variant that has attempts on disk (mutant ids in the evaluation order)."""
+    """The originals first, then every variant that has attempts on disk (mutant ids in the evaluation
+    order), then each other level's: its base, its reseeded base and its placed mutants."""
     try:
-        from code.games.eval_mutants import eval_set
+        from code.games.eval_mutants import eval_set, placed_set
         order = [m["id"] for m in eval_set(game)]
+        for m in placed_set(game):
+            order += [v for v in (f"base@{m['stage']}", f"{RESEEDED}@{m['stage']}") if v not in order] + [m["id"]]
     except Exception:  # noqa: BLE001 — the tables still work from what is on disk
         order = []
     files = glob.glob(os.path.join(ROOT, game, "*", "agents.csv"))
     files += glob.glob(os.path.join(ROOT, game, "*", "human", "**", "episodes.csv"), recursive=True)
     found = {os.path.relpath(p, os.path.join(ROOT, game)).split(os.sep)[0] for p in files}
     rest = sorted(found - set(order) - set(ORIGINALS) - {RESEEDED})
-    return [v for v in [*ORIGINALS, RESEEDED, *order, *rest] if v in found]
+    head = [v for v in order if "@" not in v]
+    return [v for v in [*ORIGINALS, RESEEDED, *head, *rest, *(v for v in order if "@" in v)] if v in found]
 
 
 # ── per attempt ──────────────────────────────────────────────────────────────────────────────
@@ -269,16 +287,17 @@ def determinism(base_rows: list[dict], mut_rows: list[dict]) -> dict:
 # ── one game, every variant ──────────────────────────────────────────────────────────────────
 def references(game: str) -> dict:
     """{level: (name, agent attempts)}: the original each variant is compared with over that level,
-    base-retrained where it played the level, else base."""
+    base-retrained where it played the level, else base (another level's: base@<level>)."""
     from code.games.eval_mutants import EVAL_LEVELS
     main = EVAL_LEVELS[game][0]
     refs: dict = {}
-    for ref in ORIGINALS:                           # the retrained original replaces the relay where it played
+    others = [v for v in variants(game) if "@" in v and is_original(v)]
+    for ref in [ORIGINALS[0], *others, ORIGINALS[1]]:  # the retrained original replaces the relay where it played
         rows: dict = {}
         for r in load(game, ref):
             if r.get("source") == "agent":
                 rows.setdefault(str(r.get("level")), []).append(r)
-        refs.update({level: (ref if level == main else f"{ref} @ {level}", rs) for level, rs in rows.items()})
+        refs.update({level: (ref if level == main or "@" in ref else f"{ref} @ {level}", rs) for level, rs in rows.items()})
     return refs
 
 
@@ -313,14 +332,14 @@ def evaluate(game: str) -> dict:
         for r in load(game, v, "random"):
             randoms.setdefault(str(r.get("level")), []).append(r)
         for level, rs in sorted(by_level.items(), key=lambda kv: (kv[0] != main, kv[0])):
-            one = v not in ORIGINALS and len(by_level) == 1      # a section mutant keeps its own name
-            key = v if level == main or one else f"{v} @ {level}"
+            one = not is_original(v) and len(by_level) == 1      # a section mutant keeps its own name
+            key = v if level == main or one or "@" in v else f"{v} @ {level}"
             agents = [r for r in rs if r.get("source") == "agent"]
             humans = [r for r in rs if r.get("source") != "agent"]
             entry = {"agents": summarize(agents) if agents else None, "level": level,
                      "humans": dict(summarize(humans), win_rate=win_rate(humans)) if humans else None}
             vs, ref = refs.get(level, (None, None))
-            if v not in ORIGINALS and ref and agents and _alike(ref, agents):
+            if not is_original(v) and ref and agents and _alike(ref, agents):
                 entry["vs_base"] = compare(summarize(_alike(ref, agents)), entry["agents"])
                 entry["vs"] = vs
                 if v.endswith("cosmetic_tile"):
@@ -328,7 +347,7 @@ def evaluate(game: str) -> dict:
                 if replayed.get(level) and _alike(ref, replayed[level]):
                     rep = summarize(replayed[level])
                     entry["replay"] = {"agents": rep, "vs_base": compare(summarize(_alike(ref, replayed[level])), rep)}
-            if v not in ORIGINALS and randoms.get(level) and rand_ref.get(level):
+            if not is_original(v) and randoms.get(level) and rand_ref.get(level):
                 rnd = summarize(randoms[level])          # the random baseline against itself on the original
                 entry["random"] = {"agents": rnd, "vs_base": compare(summarize(rand_ref[level]), rnd)}
             out[key] = entry
@@ -339,7 +358,7 @@ def false_alarms(results: dict) -> dict:
     """How often each signal fires on base-reseeded, the original against itself trained with new
     seeds, over every counted comparison (a game's level, or a Mega Man section)."""
     nulls = [e["vs_base"] for res in results.values() for k, e in res.items()
-             if k.split(" @ ")[0] == RESEEDED and (e.get("vs_base") or {}).get("counted")]
+             if kind(k) == RESEEDED and (e.get("vs_base") or {}).get("counted")]
     fired = {s: sum(bool(n[s]) for n in nulls) for s in (*SIGNALS, "detected")}
     fired["strict"] = sum(bool(n["completion_lost"] or n["win_rate_changed"]) for n in nulls)   # completion or Fisher only
     spread = [n["win_rate_beyond_seeds"] for n in nulls if n.get("win_rate_beyond_seeds") is not None]
