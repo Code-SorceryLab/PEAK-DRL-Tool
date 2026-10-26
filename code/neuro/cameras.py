@@ -147,8 +147,10 @@ class MegamanCamera:
     game = "megaman"
     persona = PERSONAS["experienced"]
 
-    def __init__(self, manifest: str, stage: str = "CutMan", hold: int = FPS) -> None:
-        self.legs, self.stage, self.hold = relay.load_legs(manifest, stage), stage, hold
+    def __init__(self, manifest: str | None = None, stage: str = "CutMan", hold: int = FPS, legs: list | None = None) -> None:
+        """`legs` (one persona's section agents, code/neuro/ast_eval.py persona_legs) replaces the manifest's."""
+        self.legs = legs if legs is not None else relay.load_legs(manifest, stage)
+        self.stage, self.hold, self.persona = stage, hold, self.legs[0].persona
         self.wins = self.attempts = self.hold_left = 0
         self.last, self.level = "", self.legs[0].level
         self.adapter, self.rays, self.tiles, self.vec = None, [], [], None

@@ -205,6 +205,21 @@ def _best_retrained(variant: str, section: str, persona: str = "experienced") ->
     return max(scored)[1] if scored else None
 
 
+def persona_legs(persona: str, variant: str = RETRAINED, levels: list[str] | None = None) -> list | None:
+    """The Cut Man relay with the legs of `levels` (default: every section) replaced by `persona`'s
+    best run of that section trained on `variant`; None when one of them has no such run."""
+    from . import relay
+    legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
+    for leg in legs:
+        if levels is None or leg.level in levels:
+            run = _best_retrained(variant, leg.level, persona)
+            if run is None:
+                return None
+            leg.run_dir = run
+            leg.net, leg.sensors, leg.persona = relay.load_net(run)
+    return legs
+
+
 def play_megaman(variant: str, episodes: int = 20, replay: bool = False, persona: str = "experienced") -> list[dict]:
     """The relay over the full stage, or over the one section a level mutant changes, from that
     section's start (most full-stage attempts end before segment 3, so they would never meet a
@@ -223,17 +238,15 @@ def play_megaman(variant: str, episodes: int = 20, replay: bool = False, persona
     else:
         scopes = [m["section"]] if m["section"] else [MEGAMAN_STAGE] + m["retrain_levels"]
     with eval_mutants._named(m["dir"] if m else None):
-        legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
-        for leg in legs:
-            if m and leg.level in m["retrain_levels"]:
-                trained = m["id"] if m["retrain"] and not replay else RETRAINED
-                run = _best_retrained(trained, leg.level, persona)
-                if run is None:
-                    print(f"  {variant:<22}{persona:<13}missing: no {persona} agent retrained on {trained} for {leg.level}",
-                          flush=True)
-                    return []
-                leg.run_dir = run
-                leg.net, leg.sensors, leg.persona = relay.load_net(run)
+        if m is None:
+            legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
+        else:
+            trained = m["id"] if m["retrain"] and not replay else RETRAINED
+            legs = persona_legs(persona, trained, m["retrain_levels"])
+            if legs is None:
+                print(f"  {variant:<22}{persona:<13}missing: a section with no {persona} agent retrained on {trained}",
+                      flush=True)
+                return []
         rows = []
         for scope in scopes:
             use = legs if scope == MEGAMAN_STAGE else [leg for leg in legs if leg.level == scope]

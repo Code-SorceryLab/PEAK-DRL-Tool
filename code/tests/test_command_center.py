@@ -93,3 +93,44 @@ def test_the_wall_says_which_videos_are_missing():
     assert 'data-src="videos/mario/novice.webm"' in html and "not recorded yet" in html
     assert "PEAK Command Center" in html and "Balance Command" not in html
     assert "loop" in html and "muted" in html and "playsinline" in html
+
+
+class FakeCam:
+    """Camera's surface: `models` (one per level), `attempts`, `hold_left`, `step()`, `adapter.render(surf)`
+    and `adapter.core.WIDTH/HEIGHT`. Each attempt takes `steps` steps, then `hold` steps of hold."""
+
+    def __init__(self, levels, steps, hold):
+        self.models, self.steps, self.hold = [None] * levels, steps, hold
+        self.attempts = self.hold_left = self.frame = 0
+        core = type("Core", (), {"WIDTH": 64, "HEIGHT": 48})()
+        self.adapter = type("Adapter", (), {"core": core, "render": lambda self, surf: surf.fill((200, 30, 20))})()
+
+    def step(self):
+        if self.hold_left:
+            self.hold_left -= 1
+            return
+        self.frame += 1
+        if self.frame == self.steps:
+            self.attempts, self.frame, self.hold_left = self.attempts + 1, 0, self.hold
+
+
+def test_a_video_stops_after_one_pass_and_its_hold():
+    from code.neuro import wall_video
+    assert sum(1 for _ in wall_video.frames(FakeCam(levels=2, steps=3, hold=2))) == 2 * (3 + 2)
+    assert sum(1 for _ in wall_video.frames(FakeCam(levels=2, steps=10_000, hold=2), max_frames=50)) == 50
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_webm_frames_are_written(tmp_path):
+    import pygame
+    from code.neuro import wall_video
+    surfaces = [pygame.Surface((64, 48)) for _ in range(10)]
+    assert wall_video.write_webm(surfaces, str(tmp_path / "v.webm")) == 10
+    assert (tmp_path / "v.webm").stat().st_size > 0
+
+
+def test_recording_never_uses_ripped_art(monkeypatch):
+    from code.neuro import wall_video
+    monkeypatch.setenv("PEAK_MM1_ASSETS", "/somewhere")
+    with pytest.raises(SystemExit, match="megaman-data"):
+        wall_video.main(["--game", "megaman"])
