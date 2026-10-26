@@ -14,6 +14,7 @@ page carries the published numbers, and nothing needs a server: GitHub Pages hos
 from __future__ import annotations
 
 import argparse
+import glob
 import html
 import json
 import os
@@ -21,9 +22,11 @@ import shutil
 import subprocess
 import tempfile
 import webbrowser
+import zipfile
 from datetime import datetime
 
 from . import report
+from .balance import PAPER_SEEDS
 from .cameras import ORDER as PERSONAS
 
 SITE_DIR = os.path.join("runs", "site")
@@ -31,7 +34,7 @@ VIDEOS_DIR = os.path.join("runs", "videos")
 GAMES = ["mario", "meatboy", "bomberman", "megaman"]
 NAMES = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man"}
 TABS = [("wall", "Replay wall"), ("balance", "Balance"), ("mutations", "Mutations"), ("gasweep", "GA sweep"),
-        ("ablation", "Sensor ablation"), ("howitworks", "How it works")]
+        ("ablation", "Sensor ablation"), ("reproduce", "Reproduce"), ("howitworks", "How it works")]
 ICONS = {"wall": "gamepad", "balance": "trophy", "mutations": "dna", "gasweep": "gear", "ablation": "eye",
          "reproduce": "sprout", "howitworks": "qblock"}   # the theme's pixel icons, as the old top bar had
 esc = html.escape
@@ -265,6 +268,134 @@ show();
 """
 
 
+STATE_KEYS = ("seed", "sensors", "hidden", "action_feedback", "memory", "pop_size", "max_frames")   # all a replay reads
+
+
+def _agent_dirs(game: str):
+    """(source, variant, persona, tag, level, seed, run dir) of every paper-seed agent of the game under runs/:
+    the balance probes and the AST evaluation's original and mutant agents."""
+    keep = {str(s) for s in PAPER_SEEDS}
+    found = [("probes", None, p) for p in glob.glob(os.path.join("runs", "probes", game, "*", "*", "*", "best.npz"))]
+    found += [("ast", p.split(os.sep)[3], p) for p in glob.glob(os.path.join("runs", "ast", game, "*", "probes", game, "*", "*", "*",
+                                                                                "best.npz"))]
+    for source, variant, path in sorted(found, key=lambda f: f[2]):
+        d = os.path.dirname(path)
+        level, seed = os.path.basename(d).rsplit("_", 1)
+        if seed in keep and os.path.isfile(os.path.join(d, "state.json")):
+            yield source, variant, d.split(os.sep)[-3], d.split(os.sep)[-2], level, int(seed), d
+
+
+def host_agents(dest: str, games: list[str] = GAMES) -> list[dict]:
+    """Copy every paper-seed agent to dest/<its path under runs/>/ as best.npz plus a slim state.json (the
+    keys a replay reads, no training history), so `trainer --replay <dir>/best.npz` works on a download;
+    one zip per game. Returns one row per agent for the Reproduce tab."""
+    rows = []
+    os.makedirs(dest, exist_ok=True)
+    for game in games:
+        with zipfile.ZipFile(os.path.join(dest, f"{game}.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+            for source, variant, persona, tag, level, seed, d in _agent_dirs(game):
+                rel = os.path.relpath(d, "runs")
+                out = os.path.join(dest, rel)
+                os.makedirs(out, exist_ok=True)
+                with open(os.path.join(d, "state.json"), encoding="utf-8") as f:
+                    st = json.load(f)
+                slim = {"persona": st.get("persona") or persona, "best_level": st.get("best_level") or level,
+                        "best_fitness": st.get("best_fitness"),
+                        "config": {k: v for k, v in (st.get("config") or {}).items() if k in STATE_KEYS}}
+                shutil.copyfile(os.path.join(d, "best.npz"), os.path.join(out, "best.npz"))
+                with open(os.path.join(out, "state.json"), "w", encoding="utf-8") as f:
+                    json.dump(slim, f, separators=(",", ":"))
+                for name in ("best.npz", "state.json"):
+                    z.write(os.path.join(out, name), os.path.join(rel, name))
+                rows.append({"game": game, "source": source, "variant": variant, "persona": persona, "tag": tag,
+                             "level": level, "seed": seed, "path": "agents/" + rel.replace(os.sep, "/"),
+                             "best_fitness": slim["best_fitness"]})
+    return rows
+
+
+def _retrain(a: dict) -> str:
+    """The command that trains this agent again, seed and budget as it had them."""
+    if a["source"] == "ast":
+        return (f"python -m code.neuro.ast_eval retrain --game {a['game']} --mutant {a['variant']} --persona {a['persona']}"
+                + (f" --level {a['level']}" if a["game"] == "megaman" else ""))
+    gens = a["tag"].split("g", 1)[1].split("_", 1)[0]
+    return (f"python -m code.neuro.balance --game {a['game']} --persona {a['persona']} --levels {a['level']} "
+            f"--seeds {a['seed']} --gens {gens}" + (" --best" if a["tag"].endswith("_best") else ""))
+
+
+def reproduce_page(game: str, agents: list[dict]) -> str:
+    """The Reproduce tab of one game: set up, download the agents, replay one, retrain it, rebuild the results."""
+    rows = [a for a in agents if a["game"] == game]
+    level = lambda lv: f"Level {int(lv) + 1}" if lv.isdigit() else lv   # noqa: E731  (indexed games count from 0)
+    source = lambda a: f"AST {a['variant']}" if a["source"] == "ast" else f"probe {a['tag']}"   # noqa: E731
+    personas = sorted({a["persona"] for a in rows})
+    sources = sorted({source(a) for a in rows})
+    table = "".join(
+        f'<tr data-p="{esc(a["persona"])}" data-s="{esc(source(a))}"><td>{esc(source(a))}</td><td>{esc(a["persona"])}</td>'
+        f'<td>{esc(level(a["level"]))}</td><td class="n">{a["seed"]}</td>'
+        f'<td><a href="{esc(a["path"])}/best.npz" download>best.npz</a> <a href="{esc(a["path"])}/state.json" download>state.json</a></td>'
+        f'<td><code>python -m code.neuro.trainer --game {game} --replay {esc(a["path"])}/best.npz</code></td>'
+        f"<td><code>{esc(_retrain(a))}</code></td></tr>" for a in rows)
+    pick = lambda name, vals: (f'<label>{name} <select data-f="{name[0].lower()}"><option value="">all</option>'   # noqa: E731
+                               + "".join(f"<option>{esc(v)}</option>" for v in vals) + "</select></label>")
+    cmds = [(f"python -m code.neuro.ast_eval play --game {game}", "playtests: one attempt per agent"),
+            (f"python -m code.neuro.ast_eval play --game {game} --replay", "the original's frozen agents on each mutant"),
+            ("python -m code.stats.ast_metrics --page", "the mutation metrics, and this site"),
+            ("python -m code.stats.ast_paper", "the paper's tables and figures"),
+            ("python -m code.neuro.command_center --open", "this Command Center, on your machine")]
+    width = max(len(c) for c, _ in cmds) + 2
+    rebuild = "\n".join(esc(f"{c.ljust(width)}# {why}") for c, why in cmds)
+    steps = f"""
+<h2><i class="ico sprout"></i>Reproduce: {esc(NAMES[game])}</h2>
+<p class="lede">Every number on this site comes from agents trained with seeds {", ".join(map(str, PAPER_SEEDS))}.
+Each agent below is a folder with its network (best.npz) and the settings it trained with (state.json).</p>
+<h3>1. Set up</h3>
+<pre><code>git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
+cd PEAK-DRL-Tool
+pip install -r requirements.txt</code></pre>
+<h3>2. Get the agents</h3>
+<p>All {len(rows)} agents of this game: <a href="agents/{game}.zip" download>agents/{game}.zip</a>.
+Unpack it into the repository: <code>unzip {game}.zip -d agents</code>. Or take one agent's two files from the table.</p>
+<h3>3. Replay an agent</h3>
+<p>The replay command in the table opens the live dashboard at <code>http://127.0.0.1:8000/</code> and plays the
+agent with its own persona, reaction time and seed.</p>
+<h3>4. Train it again</h3>
+<p>The retrain command trains the same persona, level, seed and generation budget from scratch. The AST
+evaluation's agents retrain all three seeds on their mutant at once.</p>
+<h3>5. Rebuild the results</h3>
+<pre><code>{rebuild}</code></pre>
+<h3>Every agent</h3>
+<div class="filters">{pick("Persona", personas)} {pick("Source", sources)}</div>
+<div class="ovwrap"><table class="agents"><thead><tr><th>Source</th><th>Persona</th><th>Level</th><th class="n">Seed</th>
+<th>Files</th><th>Replay</th><th>Retrain</th></tr></thead><tbody>{table}</tbody></table></div>"""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEAK Command Center: {esc(NAMES[game])} reproduce</title><style>{report.CSS}{REPRO_CSS}</style></head><body>
+<main id="main" class="repro">{steps}</main>
+<script>
+const sel = [...document.querySelectorAll('.filters select')];
+for (const s of sel) s.addEventListener('change', () => {{
+  const [p, src] = sel.map(x => x.value);
+  for (const tr of document.querySelectorAll('table.agents tbody tr'))
+    tr.hidden = (p && tr.dataset.p !== p) || (src && tr.dataset.s !== src);
+}});
+</script></body></html>"""
+
+
+REPRO_CSS = """
+[hidden]{display:none !important}
+.repro{padding:18px 0;display:flex;flex-direction:column;gap:10px}
+.repro h3{margin-top:10px}
+.repro pre{background:var(--deck);border:3px solid transparent;border-image:var(--frame) 1 / 3px stretch;padding:10px 12px;overflow:auto}
+.repro .lede{color:var(--dim);max-width:80ch}
+.filters{display:flex;gap:14px;flex-wrap:wrap;font:600 .9rem var(--ui)}
+.filters select{background:var(--deck-2);color:var(--ink);border:2px solid var(--line);padding:2px 6px}
+table.agents{border-collapse:collapse;font-size:.82rem}
+table.agents td,table.agents th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+table.agents code{font-size:.78rem;white-space:nowrap}
+"""
+
+
 def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[str]:
     """Write the whole site to out_dir (replacing an earlier build there) and return the paths written."""
     from code.stats import ast_metrics, ast_page
@@ -275,13 +406,15 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
     data = report.load_data()
     results = {g: ast_metrics.evaluate(g) for g in GAMES}
     pages = {"howitworks.html": report.instructions_page(data)}
+    agents = host_agents(os.path.join(out_dir, "agents"))
     for g in GAMES:
+        pages[f"{g}-reproduce.html"] = reproduce_page(g, agents)
         pages[f"{g}-balance.html"] = report.balance_page(g, data)
         pages[f"{g}-mutations.html"] = ast_page.render(results, only=g, nav=False)
         pages[f"{g}-gasweep.html"] = report.gasweep_page(g, data)
         pages[f"{g}-ablation.html"] = report.ablation_page(g, data)
     walls: dict[str, dict] = {}
-    written = []
+    written = [os.path.join(out_dir, "agents", f"{g}.zip") for g in GAMES]
     for g in GAMES:
         walls[g] = {}
         for p in PERSONAS:

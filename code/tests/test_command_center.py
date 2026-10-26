@@ -90,7 +90,8 @@ def test_the_site_has_every_tab_of_every_game(tmp_path):
     track = (tmp_path / "site" / "videos" / "mario" / "novice.sensors.js").read_text()   # a script: works from file://
     assert track.startswith('PEAK_TRACK("mario/novice",') and '"labels":["a"]' in track
     assert '"Mario1-1"' in (tmp_path / "site" / "index.html").read_text()               # the timeline, embedded
-    assert {f"{g}-{t}.html" for g in command_center.GAMES for t in ("balance", "mutations", "gasweep", "ablation")} <= names
+    assert {f"{g}-{t}.html" for g in command_center.GAMES for t in ("balance", "mutations", "gasweep", "ablation", "reproduce")} <= names
+    assert {f"agents/{g}.zip" for g in command_center.GAMES} <= names
 
 
 def test_the_wall_says_which_videos_are_missing():
@@ -379,3 +380,39 @@ def test_the_new_modules_compile_without_warnings():
             warnings.simplefilter("always")
             compile(open(path, encoding="utf-8").read(), path, "exec")
         assert not [w for w in caught if issubclass(w.category, SyntaxWarning)], path
+
+
+def test_hosted_agents_load_from_their_folder_and_skip_stray_seeds(tmp_path):
+    import json
+    from code.neuro import command_center
+    agents = command_center.host_agents(str(tmp_path / "agents"), games=["mario"])
+    d = tmp_path / "agents" / "probes" / "mario" / "novice" / "p10g40" / "Mario1-1_1234"
+    st = json.load(open(d / "state.json"))
+    assert (d / "best.npz").exists() and "history" not in st and {"persona", "best_level", "config"} <= set(st)
+    assert "seed" in st["config"] and set(st["config"]) <= {"seed", "sensors", "hidden", "action_feedback", "memory",
+                                                            "pop_size", "max_frames"}   # what trainer.replay reads, and the budget
+    assert not (tmp_path / "agents" / "probes" / "mario" / "novice" / "p10g40" / "Mario1-1_8").exists()
+    assert (tmp_path / "agents" / "mario.zip").stat().st_size > 0
+    assert agents and all(str(a["seed"]) in PAPER for a in agents)
+    cam = cameras.Camera("mario", "novice", [("Mario1-1", str(d))])                 # the hosted folder loads and plays
+    for _ in range(5):
+        cam.step()
+
+
+def test_the_reproduce_tab_gives_the_commands_for_every_agent():
+    from code.neuro import command_center
+    agents = [{"game": "mario", "source": "probes", "variant": None, "persona": "novice", "tag": "p10g40", "level": "Mario1-1",
+               "seed": 1234, "path": "agents/probes/mario/novice/p10g40/Mario1-1_1234", "best_fitness": 1.0}]
+    html = command_center.reproduce_page("mario", agents)
+    assert "pip install -r requirements.txt" in html and 'href="agents/mario.zip"' in html
+    assert "--replay agents/probes/mario/novice/p10g40/Mario1-1_1234/best.npz" in html
+    assert "python -m code.neuro.balance --game mario --persona novice --levels Mario1-1 --seeds 1234 --gens 40" in html
+    body = html.split("</style>", 1)[1]                        # the shared styles' comments are not page text
+    assert "<nav" not in body and "\u2014" not in body and "\u2013" not in body
+
+
+def test_the_tabs_run_in_the_spec_order_with_reproduce_before_how_it_works():
+    from code.neuro import command_center
+    html = command_center.shell({"mario": {"novice": True}})
+    assert re.findall(r'<button class="tab"[^>]*data-tab="(\w+)"', html) == [
+        "wall", "balance", "mutations", "gasweep", "ablation", "reproduce", "howitworks"]
