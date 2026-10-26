@@ -184,3 +184,9 @@ def test_publish_makes_one_commit_and_keeps_the_old_page_as_a_tag(tmp_repo):
     assert git(tmp_repo, "rev-parse", "landing-page-2026-03^{commit}") == old
     assert git(tmp_repo, "ls-remote", "origin", "refs/heads/gh-pages").split()[0] == git(tmp_repo, "rev-parse", "gh-pages")
     assert git(tmp_repo, "ls-remote", "origin", "refs/tags/landing-page-2026-03").split()[0] == old
+
+
+def test_the_menu_lists_the_command_center_and_its_two_new_items():
+    import menu
+    assert menu.DISPATCH["12"][0] == "command_center"
+    assert menu.DISPATCH["22"][0] == "record_wall" and menu.DISPATCH["23"][0] == "publish_site"

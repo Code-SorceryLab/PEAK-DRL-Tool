@@ -861,7 +861,7 @@ def run_dashboard():
         print(_RED(f"  ✖  Could not open browser: {e}"))
 
 
-def open_balance_command():
+def open_command_center():
     """Command Center: regenerate the pages from runs/ and open them."""
     _refresh_screen()
     _section("COMMAND CENTER")
@@ -956,11 +956,33 @@ def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg,
     return True
 
 
-def _open_command_center(page: str = "report") -> None:
+def _open_command_center(game: str = "mario", tab: str = "balance") -> None:
     if input(_DIM("\n    Open the Command Center? [Y/n]: ")).strip().lower() in ("n", "no"):
         return
     subprocess.run([sys.executable, "-m", "code.neuro.command_center"])  # rebuilds runs/site
-    webbrowser.open((RUNS_DIR / "site" / "index.html").resolve().as_uri())
+    webbrowser.open((RUNS_DIR / "site" / "index.html").resolve().as_uri() + f"#{game}/{tab}")
+
+
+def record_wall_videos():
+    """Record Replay Wall: one looping video per game and persona for the Command Center (runs/videos/)."""
+    _refresh_screen()
+    _section("TOOLS  ›  Record Replay Wall")
+    print(_DIM("    About 100 s per video, 24 videos; the Mega Man art folder must not be present.\n"))
+    try:
+        subprocess.run([sys.executable, "-m", "code.neuro.wall_video"])
+    except KeyboardInterrupt:
+        print(_RED("\n  Stopped: the videos written so far are kept."))
+
+
+def publish_site():
+    """Publish: build the Command Center and, after a yes, push it to GitHub Pages."""
+    _refresh_screen()
+    _section("TOOLS  ›  Publish to GitHub Pages")
+    print(_DIM("    Builds runs/site, puts it on the gh-pages branch as one commit (the old landing page stays"))
+    print(_DIM("    as tag landing-page-2026-03) and refuses while runs/balance or runs/ast have uncommitted changes.\n"))
+    if input(_BOLD("    ⟫ Publish to https://code-sorcerylab.github.io/PEAK-DRL-Tool/? [y/N]: ")).strip().lower() != "y":
+        return
+    subprocess.run([sys.executable, "-m", "code.neuro.command_center", "--publish", "--push"])
 
 
 def run_sensor_ablation():
@@ -983,7 +1005,7 @@ def run_sensor_ablation():
             subprocess.run([sys.executable, "-m", "code.neuro.balance", "--game", game,
                             "--persona", persona, "--gens", gens, "--compare", "--ablation"])
     play_chime()
-    _open_command_center("ablation")
+    _open_command_center(games[0], "ablation")
 
 
 def run_ga_sweep():
@@ -1019,7 +1041,7 @@ def run_ga_sweep():
                   module="code.neuro.gasweep", extra=extra):
         return
     play_chime()
-    _open_command_center("gasweep")
+    _open_command_center(games[0], "gasweep")
 
 
 def run_full_sweep():
@@ -1038,7 +1060,7 @@ def run_full_sweep():
                   "\n  Sweep interrupted — finished probes are already in the report."):
         return
     play_chime()
-    _open_command_center()
+    _open_command_center(games[0], "balance")
 
 
 # ============================================================================
@@ -1046,7 +1068,6 @@ def run_full_sweep():
 # ============================================================================
 
 AST_GAMES = ["mario", "meatboy", "bomberman", "megaman"]
-AST_PAGE = RUNS_DIR / "balance" / "mutations.html"   # the Command Center's Mutations page
 
 
 def _ast_games():
@@ -1193,12 +1214,13 @@ def playtest_agents():
 
 
 def mutation_metrics():
-    """Mutation Metrics — the metric tables here, and the mutation dashboard in the browser."""
+    """Mutation Metrics: the metric tables here, and the Command Center's Mutations tab in the browser."""
     _refresh_screen()
     _section("MUTATE  ›  Mutation Metrics")
-    subprocess.run([sys.executable, "-m", "code.stats.ast_metrics", "--page"])
-    if AST_PAGE.exists():
-        webbrowser.open(AST_PAGE.resolve().as_uri())
+    subprocess.run([sys.executable, "-m", "code.stats.ast_metrics", "--page"])   # also rebuilds runs/site
+    site = RUNS_DIR / "site" / "index.html"
+    if site.exists():
+        webbrowser.open(site.resolve().as_uri() + f"#{AST_GAMES[0]}/mutations")
 
 
 _RUN_GROUPS = [  # label, dir — whole probe/sweep trees are deleted as one unit
@@ -1284,43 +1306,46 @@ def show_project_status():
 # MAIN LOOP
 # ============================================================================
 
+# DISPATCH table maps menu key → (debug_label, callable).
+# None as the callable means "handled inline" (currently only exit/0).
+# Adding a new menu item: add the entry here AND a matching _menu_item() print below.
+DISPATCH = {
+    "1":  ("show_project_status",  show_project_status),
+    "2":  ("run_training",         run_training),
+    "3":  ("train_all_game",       train_all_models_for_game),
+    "4":  ("train_grid",           train_complete_grid),
+    "p":  ("train_all_personas",   train_all_personas),
+    "5":  ("manual_play",          run_manual_play),
+    "6":  ("watch_agent",          watch_trained_agent),
+    "7":  ("watch_all",            watch_all_models),
+    "8":  ("watch_random",         watch_random_agent),
+    "9":  ("level_editor",         run_level_editor),
+    "10": ("toggle_levels",        run_toggle_levels),
+    "11": ("dashboard",            run_dashboard),
+    "12": ("command_center",       open_command_center),
+    "13": ("full_sweep",           run_full_sweep),
+    "14": ("sensor_ablation",      run_sensor_ablation),
+    "15": ("ga_sweep",             run_ga_sweep),
+    "16": ("readme_figures",       run_readme_figures),
+    "17": ("mutants",              run_mutants),
+    "18": ("play_mutant",          play_mutant),
+    "19": ("retrain_mutants",      retrain_mutants),
+    "20": ("playtest_agents",      playtest_agents),
+    "21": ("mutation_metrics",     mutation_metrics),
+    "22": ("record_wall",          record_wall_videos),
+    "23": ("publish_site",         publish_site),
+    "d":  ("delete_all",           delete_logs_and_models),
+    "c":  ("clear_cli",            clear_cli),
+    "0":  ("exit",                 None),
+}
+
+
 def main():
     import warnings
     warnings.filterwarnings(
         "ignore",
         message=r".*pkg_resources is deprecated as an API.*"
     )
-
-    # DISPATCH table maps menu key → (debug_label, callable).
-    # None as the callable means "handled inline" (currently only exit/0).
-    # Adding a new menu item: add the entry here AND a matching _menu_item() print below.
-    DISPATCH = {
-        "1":  ("show_project_status",  show_project_status),
-        "2":  ("run_training",         run_training),
-        "3":  ("train_all_game",       train_all_models_for_game),
-        "4":  ("train_grid",           train_complete_grid),
-        "p":  ("train_all_personas",   train_all_personas),
-        "5":  ("manual_play",          run_manual_play),
-        "6":  ("watch_agent",          watch_trained_agent),
-        "7":  ("watch_all",            watch_all_models),
-        "8":  ("watch_random",         watch_random_agent),
-        "9":  ("level_editor",         run_level_editor),
-        "10": ("toggle_levels",        run_toggle_levels),
-        "11": ("dashboard",            run_dashboard),
-        "12": ("balance_command",      open_balance_command),
-        "13": ("full_sweep",           run_full_sweep),
-        "14": ("sensor_ablation",      run_sensor_ablation),
-        "15": ("ga_sweep",             run_ga_sweep),
-        "16": ("readme_figures",       run_readme_figures),
-        "17": ("mutants",              run_mutants),
-        "18": ("play_mutant",          play_mutant),
-        "19": ("retrain_mutants",      retrain_mutants),
-        "20": ("playtest_agents",      playtest_agents),
-        "21": ("mutation_metrics",     mutation_metrics),
-        "d":  ("delete_all",           delete_logs_and_models),
-        "c":  ("clear_cli",            clear_cli),
-        "0":  ("exit",                 None),
-    }
 
     while True:
         setup_project()
@@ -1346,7 +1371,9 @@ def main():
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
-        print(_menu_item("12", "Command Center",      "every result, one game at a time"))
+        print(_menu_item("12", "Command Center",       "every result, one game at a time"))
+        print(_menu_item("22", "Record Replay Wall",   "one looping video per game and persona"))
+        print(_menu_item("23", "Publish Command Center", "push it to GitHub Pages (asks first)"))
 
         _section("BALANCE")
         print(_menu_item("13", "Full Sweep",           "games × personas × seeds, parallel"))
