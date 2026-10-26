@@ -1,0 +1,32 @@
+{
+  "id": "jump_velocity_down@Mario1-4",
+  "game": "mario",
+  "stage": "Mario1-4",
+  "section": null,
+  "operator": "jump_velocity_down",
+  "class": "degrading",
+  "direction": "harder",
+  "description": "Jump velocity x0.85: take-off -495 -> -420.75 px/s, the cap -800 -> -680",
+  "retrain": true,
+  "base_file": "platformer/world1_4.txt",
+  "family": "mechanics",
+  "level_file": null,
+  "cells": [],
+  "location": null,
+  "config": {
+    "player.jump.min_velocity": -420.75,
+    "player.jump.max_velocity": -680.0
+  },
+  "parameter": {
+    "key": "player.jump.min_velocity",
+    "from": -495.0,
+    "to": -420.75
+  },
+  "checks": {
+    "exit_reachable": true,
+    "values": {
+      "player.jump.min_velocity": -420.75,
+      "player.jump.max_velocity": -680.0
+    }
+  }
+}

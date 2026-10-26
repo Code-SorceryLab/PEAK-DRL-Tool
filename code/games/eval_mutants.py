@@ -116,11 +116,41 @@ EFFECTIVE = {
     "player.jump.max_velocity": lambda core: core.physics_manager.context.JUMP_VEL_MAX,
     "jump.jump_vel": lambda core: core._jump["jump_vel"],
     "levels.8.fuse": lambda core: core.fuse_frames,
+    "bomb.fuse_frames": lambda core: core.fuse_frames,
 }
+EMPTY = (".", " ")                  # air or floor in every game's level text
+BOMBABLE = set("?@CFS")             # Bomberman: a brick, or the exit or a power-up under one; a bomb opens it
+GAP_FILL = set(".  O*%^")           # what may fill a gap: air, Mario's pit, Meat Boy's saws and spikes
+FUSE_SCALE = 150 / 240              # Bomberman 09's fuse_down, applied to every level's own fuse
+
+
+def _effective(key: str):
+    """The reader for a mechanics key; every level's own fuse reads like level 8's."""
+    return EFFECTIVE["levels.8.fuse" if key.startswith("levels.") and key.endswith(".fuse") else key]
 
 
 def out_dir(game: str) -> str:
     return os.path.join("runs", game, "mutants")
+
+
+def level_file(game: str, level: str) -> str:
+    """The level's file under LEVELS_DIR, as the game's config names it (disabled levels too)."""
+    import yaml
+    games = os.path.dirname(LEVELS_DIR)
+    if game == "mario":
+        with open(os.path.join(games, "game_config.yaml"), encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return {**(data.get("disabled_levels") or {}), **(data.get("levels") or {})}[level]["file"]
+    with open(os.path.join(games, f"{game}_config.yaml"), encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    entry = ((data.get("levels") or []) + (data.get("disabled_levels") or []))[int(level)]
+    return entry if isinstance(entry, str) else entry["file"]
+
+
+def other_levels(game: str) -> list[str]:
+    """Every enabled level but the evaluation one: their mutants are placed by program (place())."""
+    from code.neuro.adapters import list_levels
+    return [lv for lv in list_levels(game) if lv != EVAL_LEVELS[game][0]]
 
 
 # ── the game as an agent meets it ─────────────────────────────────────────────────────────────
@@ -137,10 +167,10 @@ def _named(folder: str | None):
         os.environ.update({k: v for k, v in saved.items() if v is not None})
 
 
-def _load(game: str, folder: str | None = None):
+def _load(game: str, folder: str | None = None, level: str | None = None):
     from code.neuro.adapters import make_adapter
     with _named(folder):
-        return make_adapter(game, EVAL_LEVELS[game][0], 600, 0.0)
+        return make_adapter(game, level or EVAL_LEVELS[game][0], 600, 0.0)
 
 
 def _layout(adapter):
@@ -168,50 +198,215 @@ def _goal_tiles(adapter) -> set:
             for r in range(int(g.gObj.y // ts), int((g.gObj.y + g.gObj.height - 1) // ts) + 1)}
 
 
-def exit_reachable(adapter) -> bool:
-    """A flood fill over the open tiles inside the level, from the start. It ignores gravity and
-    jump height, so 'no' proves the exit cut off; 'yes' only says nothing walls it off."""
-    ld, ts = adapter.core.level_data, adapter.tile_size
-    goals = _goal_tiles(adapter)
-    start = (int(adapter.x // ts), int(adapter.y // ts))
-    seen, todo = {start}, [start]
+def _passable(adapter, c: int, r: int) -> bool:
+    """Open, or (Bomberman) a tile a bomb opens: a brick, or the exit or a power-up under one."""
+    ld = adapter.core.level_data
+    return _tile_open(adapter, c, r) or (hasattr(ld, "exit") and ld.grid[r][c] in BOMBABLE)
+
+
+def _start(adapter) -> tuple[int, int]:
+    return int(adapter.x // adapter.tile_size), int(adapter.y // adapter.tile_size)
+
+
+def _flood(adapter, walls=frozenset()) -> set:
+    """The tiles a flood fill reaches from the start over passable tiles, `walls` taken as solid."""
+    ld = adapter.core.level_data
+    seen = {_start(adapter)}
+    todo = list(seen)
     while todo:
         c, r = todo.pop()
-        if (c, r) in goals:
-            return True
         for nc, nr in ((c + 1, r), (c - 1, r), (c, r + 1), (c, r - 1)):
-            if 0 <= nc < ld.cols and 0 <= nr < ld.rows and (nc, nr) not in seen and _tile_open(adapter, nc, nr):
+            if (0 <= nc < ld.cols and 0 <= nr < ld.rows and (nc, nr) not in seen and (nc, nr) not in walls
+                    and _passable(adapter, nc, nr)):
                 seen.add((nc, nr))
                 todo.append((nc, nr))
-    return False
+    return seen
+
+
+def exit_reachable(adapter, walls=frozenset()) -> bool:
+    """A flood fill over the passable tiles inside the level, from the start. It ignores gravity and
+    jump height, so 'no' proves the exit cut off; 'yes' only says nothing walls it off."""
+    return bool(_goal_tiles(adapter) & _flood(adapter, walls))
+
+
+# ── the five operators placed by program, on every level but the evaluation one ─────────────────
+def _ch(rows: list, c: int, r: int) -> str | None:
+    return rows[r][c] if 0 <= r < len(rows) and 0 <= c < len(rows[r]) else None
+
+
+def _seal(game: str, rows: list, base, start, goals):
+    """The wall nearest the goal that cuts it off: '#' over every empty cell of one column (or row)
+    between start and goal, the axis they lie further apart on first. Bomberman: hard walls on the
+    floor and bombable cells next to the exit."""
+    if game == "bomberman":
+        cells = sorted({(c, r) for gc, gr in goals for c, r in ((gc + 1, gr), (gc - 1, gr), (gc, gr + 1), (gc, gr - 1))
+                        if _ch(rows, c, r) in set(".") | BOMBABLE - {"@"} and (c, r) != start})
+        if cells and not exit_reachable(base, frozenset(cells)):
+            return [(r, c, rows[r][c], "#") for c, r in cells], \
+                f"Hard walls on the {len(cells)} tiles next to the exit close it in"
+        return None, "walls on the exit's neighbours do not close it in"
+    (sc, sr), gc, gr = start, sorted(c for c, _ in goals), sorted(r for _, r in goals)
+    cols = range(gc[0] - 1, sc, -1) if gc[0] > sc else range(gc[-1] + 1, sc) if gc[-1] < sc else range(0)
+    rws = range(gr[0] - 1, sr, -1) if gr[0] > sr else range(gr[-1] + 1, sr) if gr[-1] < sr else range(0)
+    lines = [("column", n, [(n, r) for r in range(len(rows)) if _ch(rows, n, r) in EMPTY]) for n in cols]
+    lines_r = [("row", n, [(c, n) for c in range(len(rows[n])) if _ch(rows, c, n) in EMPTY]) for n in rws]
+    if abs(gr[0] - sr) > abs(gc[0] - sc):
+        lines, lines_r = lines_r, lines
+    for axis, n, cells in lines + lines_r:
+        if cells and not set(cells) & goals and not exit_reachable(base, frozenset(cells)):
+            return [(r, c, rows[r][c], "#") for c, r in cells], \
+                f"A wall along {axis} {n}, {len(cells)} tiles: the goal can no longer be reached"
+    return None, "no wall of one column or row between start and goal cuts the goal off"
+
+
+def _widen(rows: list, base, start, goals):
+    """The gap nearest the start widened by 2 tiles on its far side: a run of 1-8 open tiles in a
+    floor row with a drop under it and a ledge on each side; the 2 ledge tiles take the gap edge's
+    contents down to the gap's floor, and the ledge keeps at least one tile."""
+    def solid(c, r):
+        return _ch(rows, c, r) is not None and not _tile_open(base, c, r)
+
+    (sc, sr), found = start, []
+    for r in range(1, len(rows) - 1):
+        c = 0
+        while c < len(rows[r]):
+            if solid(c, r) or _ch(rows, c, r) is None:
+                c += 1
+                continue
+            c1 = c
+            while c < len(rows[r]) and not solid(c, r):
+                c += 1
+            c2 = c - 1
+            if (c2 - c1 < 8 and solid(c1 - 1, r) and solid(c2 + 1, r)
+                    and all(not solid(x, r - 1) for x in range(c1 - 1, c2 + 2))
+                    and all(not solid(x, r + 1) for x in range(c1, c2 + 1))):
+                found.append((abs((c1 + c2) / 2 - sc) + abs(r - sr), c1, c2, r))
+    for _, c1, c2, r in sorted(found):
+        right = (c1 + c2) / 2 >= sc
+        edge, new, keep = (c2, (c2 + 1, c2 + 2), c2 + 3) if right else (c1, (c1 - 1, c1 - 2), c1 - 3)
+        if not solid(keep, r) or any(solid(n, r - 1) for n in new):
+            continue
+        change, ok, rr = [], True, r
+        while ok and rr < len(rows) and not solid(edge, rr):
+            fill = rows[rr][edge]
+            for n in new:
+                if (n, rr) == start or (n, rr) in goals or fill not in GAP_FILL:
+                    ok = False
+                elif solid(n, rr):
+                    change.append((rr, n, rows[rr][n], fill))
+            rr += 1
+        if ok and change:
+            return change, (f"The gap at row {r}, columns {c1}-{c2}, widened by 2 to the "
+                            f"{'right' if right else 'left'}: {c2 - c1 + 1} tiles -> {c2 - c1 + 3}")
+    return None, "no gap with a ledge on each side and a drop under it"
+
+
+def _add_enemy(rows: list, base, start, goals):
+    """One more Ballom on the floor tile nearest the level's centre, at least 4 tiles from the start."""
+    (sc, sr), reach = start, _flood(base)
+    floor = [(c, r) for c, r in reach if _ch(rows, c, r) == "." and abs(c - sc) + abs(r - sr) >= 4
+             and (c, r) not in goals]
+    if not floor:
+        return None, "no floor tile 4 tiles from the start"
+    mc, mr = (len(rows[0]) - 1) / 2, (len(rows) - 1) / 2
+    c, r = min(floor, key=lambda t: ((t[0] - mc) ** 2 + (t[1] - mr) ** 2, t[1], t[0]))
+    return [(r, c, ".", "E")], f"A Ballom at row {r}, column {c}"
+
+
+def _off_route(rows: list, base, start, goals):
+    """The '#' tile nearest the start whose four neighbours are solid (and, in Bomberman, not
+    bombable), hollowed out. Outside the level is what the game says (solid in Bomberman, so a
+    corner of a one-tile border qualifies; open where a platformer's player can fall out)."""
+    (sc, sr), ld = start, base.core.level_data
+
+    def closed(c, r):
+        inside = 0 <= c < ld.cols and 0 <= r < ld.rows
+        return not (_passable(base, c, r) if inside else _tile_open(base, c, r))
+
+    cells = [(c, r) for r in range(len(rows)) for c in range(len(rows[r]))
+             if rows[r][c] == "#" and closed(c, r)
+             and all(closed(c + dc, r + dr) for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+    if not cells:
+        return None, "no solid tile closed on all four sides"
+    c, r = min(cells, key=lambda t: ((t[0] - sc) ** 2 + (t[1] - sr) ** 2, t[1], t[0]))
+    return [(r, c, "#", ".")], f"The tile at row {r}, column {c} hollowed out, closed on all four sides"
+
+
+def _cosmetic(rows: list, base, start, goals):
+    """The first '.' cell, row by row, written as ' '."""
+    cell = next(((r, c) for r in range(len(rows)) for c in range(len(rows[r])) if rows[r][c] == "."), None)
+    if cell is None:
+        return None, "no '.' cell"
+    return [(cell[0], cell[1], ".", " ")], f"The cell at row {cell[0]}, column {cell[1]} written as ' ' instead of '.': the same tile"
+
+
+def place(game: str, level: str, text: list, base) -> tuple[list, list]:
+    """The evaluation level's five operators placed on another level by rule, in CHANGES' format
+    (id, class, change, description, note), and the operators no rule could place, with why."""
+    rows, start, goals = [list(r) for r in text], _start(base), _goal_tiles(base)
+    specs, skipped = [], []
+    for mid, cls, change, description, _ in CHANGES[game][1]:
+        if mid == "jump_velocity_down":                     # one game-wide value: the same change
+            specs.append((mid, cls, change, description, None))
+            continue
+        if mid == "fuse_down":
+            old = base.core.fuse_frames
+            specs.append((mid, cls, [(_fuse_key(level), old, round(old * FUSE_SCALE))],
+                          f"Bomb fuse {old} -> {round(old * FUSE_SCALE)} frames on this level", None))
+            continue
+        rule = {"seal_route": lambda: _seal(game, rows, base, start, goals), "widen_gap": lambda: _widen(rows, base, start, goals),
+                "add_enemy": lambda: _add_enemy(rows, base, start, goals), "off_route": lambda: _off_route(rows, base, start, goals),
+                "cosmetic_tile": lambda: _cosmetic(rows, base, start, goals)}[mid]
+        cells, why = rule()
+        if cells is None:
+            skipped.append({"operator": mid, "reason": why})
+        else:
+            specs.append((mid, cls, cells, why, "placed by rule (eval_mutants.place)"))
+    return specs, skipped
+
+
+def _fuse_key(level: str) -> str:
+    """Bomberman: a level written as {file: ...} takes its own fuse; a bare path plays bomb.fuse_frames."""
+    import yaml
+    with open(os.path.join(os.path.dirname(LEVELS_DIR), "bomberman_config.yaml"), encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    entry = ((data.get("levels") or []) + (data.get("disabled_levels") or []))[int(level)]
+    return f"levels.{level}.fuse" if isinstance(entry, dict) else "bomb.fuse_frames"
 
 
 # ── generating ───────────────────────────────────────────────────────────────────────────────
-def build(game: str, out: str | None = None) -> dict:
-    """Write the game's five mutants, each checked through the game itself. Raises on a mismatch."""
+def build(game: str, out: str | None = None, level: str | None = None) -> dict:
+    """Write the game's five mutants, each checked through the game itself. Raises on a mismatch.
+    The evaluation level takes CHANGES' hand-placed cells; any other `level` takes place()'s, and
+    its mutants are named <operator>@<level>."""
     out = out or out_dir(game)
-    file, specs = CHANGES[game]
-    level = EVAL_LEVELS[game][0]
+    level = level or EVAL_LEVELS[game][0]
+    hand = level == EVAL_LEVELS[game][0]
+    file, specs = CHANGES[game] if hand else (level_file(game, level), None)
     path = os.path.join(LEVELS_DIR, file)
     with open(path, encoding="utf-8") as f:
         text = f.read().split("\n")
     while text and not text[-1]:
         text.pop()
     sidecar = os.path.splitext(path)[0] + ".yaml"
-    base = _load(game)
+    base = _load(game, level=level)
     base_layout, base_reach = _layout(base), exit_reachable(base)
     if not base_reach:
-        raise SystemExit(f"{game}: the flood fill cannot reach the exit of the unmutated level")
+        raise SystemExit(f"{game} {level}: the flood fill cannot reach the exit of the unmutated level")
+    skipped = []
+    if not hand:
+        specs, skipped = place(game, level, text, base)
     records = []
-    for mid, cls, change, description, note in specs:
+    for op, cls, change, description, note in specs:
+        mid = op if hand else f"{op}@{level}"
         folder = os.path.join(out, mid)
         shutil.rmtree(folder, ignore_errors=True)           # only what this run writes
         os.makedirs(folder)
-        record = {"id": mid, "game": game, "stage": level, "section": None, "operator": mid, "class": cls,
+        record = {"id": mid, "game": game, "stage": level, "section": None, "operator": op, "class": cls,
                   "direction": "none" if cls == "neutral" else "harder", "description": description,
-                  "retrain": mid != "cosmetic_tile", "base_file": file}
+                  "retrain": op != "cosmetic_tile", "base_file": file}
         if isinstance(change[0][0], str):                   # mechanics: config values
-            olds = {k: EFFECTIVE[k](base.core) for k, _, _ in change}
+            olds = {k: _effective(k)(base.core) for k, _, _ in change}
             wrong = [f"{k} is {olds[k]}, the spec expects {b}" for k, b, _ in change if olds[k] != b]
             if wrong:
                 raise SystemExit(f"{game} {mid}: refused, " + "; ".join(wrong))
@@ -248,20 +443,22 @@ def build(game: str, out: str | None = None) -> dict:
         with open(os.path.join(folder, "mutant.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(record, f, indent=2)
         records.append(record)
-    index = {"game": game, "stage": level, "base_file": file, "mutants": records, "skipped": []}
-    with open(os.path.join(out, "mutants.json"), "w", encoding="utf-8", newline="\n") as f:
+    index = {"game": game, "stage": level, "base_file": file, "mutants": records, "skipped": skipped}
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "mutants.json" if hand else f"mutants@{level}.json"), "w", encoding="utf-8",
+              newline="\n") as f:
         json.dump(index, f, indent=2)
     return index
 
 
 def check(game: str, m: dict, folder: str, base, base_layout) -> dict:
     """Load the mutant through the game's hook and confirm it is what its class says."""
-    played = _load(game, folder)
+    played = _load(game, folder, m["stage"])
     if played.core.mutant is None or played.core.mutant["id"] != m["id"]:
         raise SystemExit(f"{game} {m['id']}: the game did not pick up the mutant")
     checks: dict = {"exit_reachable": exit_reachable(played)}
     if m["family"] == "mechanics":
-        now = {k: EFFECTIVE[k](played.core) for k in m["config"]}
+        now = {k: _effective(k)(played.core) for k in m["config"]}
         if now != m["config"]:
             raise SystemExit(f"{game} {m['id']}: the game plays {now}, not {m['config']}")
         checks["values"] = now
@@ -307,6 +504,26 @@ def eval_set(game: str) -> list[dict]:
     return out
 
 
+def placed_set(game: str) -> list[dict]:
+    """Every other level's placed mutants as written on disk, level by level in operator order, each
+    with `dir` and `retrain_levels` (its own level)."""
+    if game not in CHANGES:
+        return []
+    out = []
+    for level in other_levels(game):
+        for op, *_ in CHANGES[game][1]:
+            folder = os.path.join(out_dir(game), f"{op}@{level}")
+            try:
+                with open(os.path.join(folder, "mutant.json"), encoding="utf-8") as f:
+                    m = json.load(f)
+            except OSError:
+                continue
+            m.update({"dir": folder, "retrain_levels": [level]})
+            m.setdefault("retrain", op != "cosmetic_tile")
+            out.append(m)
+    return out
+
+
 def table(game: str) -> str:
     rows = eval_set(game)
     lines = [f"{EVAL_LEVELS[game][1]}  ({out_dir(game)})"]
@@ -322,10 +539,16 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Write the AST evaluation mutants")
     ap.add_argument("--game", action="append", choices=list(CHANGES), help="only this game (repeatable)")
     ap.add_argument("--list", action="store_true", help="print the evaluation set of every game and exit")
+    ap.add_argument("--all-levels", action="store_true",
+                    help="also place the five operators on every other level (<operator>@<level>)")
     args = ap.parse_args()
     if not args.list:
         for game in args.game or list(CHANGES):
             build(game)
+            for level in other_levels(game) if args.all_levels else []:
+                index = build(game, level=level)
+                print(f"{game} {level}: {len(index['mutants'])} placed"
+                      + "".join(f"; {s['operator']} skipped ({s['reason']})" for s in index["skipped"]))
     for game in (args.game or list(EVAL_LEVELS)):
         print(table(game), "\n")
 

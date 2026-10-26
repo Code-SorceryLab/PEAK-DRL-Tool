@@ -1,0 +1,299 @@
+{
+  "game": "meatboy",
+  "stage": "9",
+  "base_file": "meatboy/world1_10_the_levee.txt",
+  "mutants": [
+    {
+      "id": "seal_route@9",
+      "game": "meatboy",
+      "stage": "9",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall along column 4, 16 tiles: the goal can no longer be reached",
+      "retrain": true,
+      "base_file": "meatboy/world1_10_the_levee.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          4,
+          1,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          2,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          16,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          17,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          18,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          19,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          20,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          21,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          22,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          23,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          24,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          25,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          26,
+          ".",
+          "#"
+        ],
+        [
+          4,
+          27,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 4,
+        "row": 20
+      },
+      "parameter": {
+        "tiles": 16
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap@9",
+      "game": "meatboy",
+      "stage": "9",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The gap at row 4, columns 13-14, widened by 2 to the right: 2 tiles -> 4",
+      "retrain": true,
+      "base_file": "meatboy/world1_10_the_levee.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          15,
+          4,
+          "#",
+          "."
+        ],
+        [
+          15,
+          5,
+          "#",
+          "."
+        ],
+        [
+          16,
+          4,
+          "#",
+          "."
+        ],
+        [
+          16,
+          5,
+          "#",
+          "."
+        ],
+        [
+          16,
+          6,
+          "#",
+          "."
+        ],
+        [
+          16,
+          7,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 16,
+        "row": 5
+      },
+      "parameter": {
+        "tiles": 6
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down@9",
+      "game": "meatboy",
+      "stage": "9",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "retrain": true,
+      "base_file": "meatboy/world1_10_the_levee.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "jump.jump_vel": 408.0
+      },
+      "parameter": {
+        "key": "jump.jump_vel",
+        "from": 480.0,
+        "to": 408.0
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "jump.jump_vel": 408.0
+        }
+      }
+    },
+    {
+      "id": "off_route@9",
+      "game": "meatboy",
+      "stage": "9",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 10, column 5 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "meatboy/world1_10_the_levee.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          5,
+          10,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 5,
+        "row": 10
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@9",
+      "game": "meatboy",
+      "stage": "9",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 1, column 2 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "meatboy/world1_10_the_levee.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          2,
+          1,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 2,
+        "row": 1
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

@@ -1,0 +1,251 @@
+{
+  "game": "meatboy",
+  "stage": "8",
+  "base_file": "meatboy/world1_09_safety_third.txt",
+  "mutants": [
+    {
+      "id": "seal_route@8",
+      "game": "meatboy",
+      "stage": "8",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall along row 3, 11 tiles: the goal can no longer be reached",
+      "retrain": true,
+      "base_file": "meatboy/world1_09_safety_third.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          4,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          5,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          6,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          7,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          13,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          14,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          15,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          16,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          17,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          19,
+          3,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 14,
+        "row": 3
+      },
+      "parameter": {
+        "tiles": 11
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap@8",
+      "game": "meatboy",
+      "stage": "8",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The gap at row 3, columns 4-7, widened by 2 to the right: 4 tiles -> 6",
+      "retrain": true,
+      "base_file": "meatboy/world1_09_safety_third.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          8,
+          3,
+          "#",
+          "."
+        ],
+        [
+          9,
+          3,
+          "#",
+          "."
+        ],
+        [
+          9,
+          4,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 9,
+        "row": 3
+      },
+      "parameter": {
+        "tiles": 3
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down@8",
+      "game": "meatboy",
+      "stage": "8",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "retrain": true,
+      "base_file": "meatboy/world1_09_safety_third.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "jump.jump_vel": 408.0
+      },
+      "parameter": {
+        "key": "jump.jump_vel",
+        "from": 480.0,
+        "to": 408.0
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "jump.jump_vel": 408.0
+        }
+      }
+    },
+    {
+      "id": "off_route@8",
+      "game": "meatboy",
+      "stage": "8",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 24, column 1 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "meatboy/world1_09_safety_third.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          1,
+          24,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 1,
+        "row": 24
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@8",
+      "game": "meatboy",
+      "stage": "8",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 1, column 2 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "meatboy/world1_09_safety_third.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          2,
+          1,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 2,
+        "row": 1
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

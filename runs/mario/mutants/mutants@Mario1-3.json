@@ -1,0 +1,265 @@
+{
+  "game": "mario",
+  "stage": "Mario1-3",
+  "base_file": "platformer/world1_3.txt",
+  "mutants": [
+    {
+      "id": "seal_route@Mario1-3",
+      "game": "mario",
+      "stage": "Mario1-3",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall along column 151, 14 tiles: the goal can no longer be reached",
+      "retrain": true,
+      "base_file": "platformer/world1_3.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          151,
+          0,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          1,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          2,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          5,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          6,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          7,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          8,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          9,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          10,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          11,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          12,
+          ".",
+          "#"
+        ],
+        [
+          151,
+          13,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 151,
+        "row": 7
+      },
+      "parameter": {
+        "tiles": 14
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap@Mario1-3",
+      "game": "mario",
+      "stage": "Mario1-3",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The gap at row 14, columns 54-58, widened by 2 to the right: 5 tiles -> 7",
+      "retrain": true,
+      "base_file": "platformer/world1_3.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          59,
+          14,
+          "=",
+          "."
+        ],
+        [
+          60,
+          14,
+          "=",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 60,
+        "row": 14
+      },
+      "parameter": {
+        "tiles": 2
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down@Mario1-3",
+      "game": "mario",
+      "stage": "Mario1-3",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: take-off -495 -> -420.75 px/s, the cap -800 -> -680",
+      "retrain": true,
+      "base_file": "platformer/world1_3.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "player.jump.min_velocity": -420.75,
+        "player.jump.max_velocity": -680.0
+      },
+      "parameter": {
+        "key": "player.jump.min_velocity",
+        "from": -495.0,
+        "to": -420.75
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "player.jump.min_velocity": -420.75,
+          "player.jump.max_velocity": -680.0
+        }
+      }
+    },
+    {
+      "id": "off_route@Mario1-3",
+      "game": "mario",
+      "stage": "Mario1-3",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 15, column 3 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "platformer/world1_3.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          3,
+          15,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 3,
+        "row": 15
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@Mario1-3",
+      "game": "mario",
+      "stage": "Mario1-3",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 0, column 0 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "platformer/world1_3.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          0,
+          0,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 0,
+        "row": 0
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

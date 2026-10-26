@@ -86,3 +86,61 @@ def test_config_paths_index_lists_and_refuse_typos():
     assert cfg == {"jump": {"jump_vel": 408.0}, "levels": [{"file": "a"}, {"file": "b", "fuse": 150}]}
     with pytest.raises(KeyError):
         mutants.apply_config(cfg, {"config": {"jumps.jump_vel": 1.0}})
+
+
+# ── the same five operators placed by program on every other level ─────────────────────────────
+OTHER = {"mario": "Mario1-2", "meatboy": "5", "bomberman": "3"}
+
+
+@pytest.fixture(scope="module", params=list(OTHER))
+def placed(request, tmp_path_factory):
+    game = request.param
+    out = str(tmp_path_factory.mktemp(f"{game}-levels"))
+    return game, OTHER[game], out, em.build(game, out, level=OTHER[game])
+
+
+def test_a_bomberman_exit_behind_bricks_counts_as_reachable():
+    from code.neuro.adapters import make_adapter
+    assert em.exit_reachable(make_adapter("bomberman", "3", 600, 0.0))     # 04 One Wall: bricks across the route
+
+
+def test_another_level_gets_the_five_operators_placed_and_checked(placed):
+    game, level, _, index = placed
+    ops = [m["operator"] for m in index["mutants"]] + [s["operator"] for s in index["skipped"]]
+    assert sorted(ops) == sorted(mid for mid, *_ in em.CHANGES[game][1])
+    for m in index["mutants"]:
+        assert m["id"] == f"{m['operator']}@{level}" and m["stage"] == level, m["id"]
+        assert m["checks"]["exit_reachable"] == (m["class"] != "breaking"), m["id"]
+    assert all(s["reason"] for s in index["skipped"])
+
+
+def test_a_placed_mutant_changes_only_its_recorded_cells(placed):
+    game, level, out, index = placed
+    with open(os.path.join(em.LEVELS_DIR, em.level_file(game, level)), encoding="utf-8") as f:
+        base = f.read().rstrip("\n").split("\n")
+    for m in index["mutants"]:
+        if m["family"] != "level":
+            continue
+        with open(os.path.join(out, m["id"], "level.txt"), encoding="utf-8") as f:
+            text = f.read().rstrip("\n").split("\n")
+        diff = {(c, r) for r in range(len(base)) for c in range(len(base[r])) if text[r][c] != base[r][c]}
+        assert diff == {(c, r) for c, r, _, _ in m["cells"]}, m["id"]
+
+
+def test_the_game_plays_a_placed_mutant_on_its_own_level(placed, monkeypatch):
+    game, level, out, index = placed
+    from code.neuro.adapters import make_adapter
+    seal = next(m for m in index["mutants"] if m["operator"] == "seal_route")
+    monkeypatch.setenv(mutants.ENV, os.path.join(out, seal["id"]))
+    played = make_adapter(game, level, 600, 0.0)
+    assert played.core.mutant["id"] == seal["id"] and not em.exit_reachable(played)
+
+
+def test_every_other_level_gets_a_wall_a_mechanics_change_and_a_cosmetic_copy(tmp_path):
+    mechanics = {"mario": "jump_velocity_down", "meatboy": "jump_velocity_down", "bomberman": "fuse_down"}
+    for game in OTHER:
+        levels = em.other_levels(game)
+        assert levels and em.EVAL_LEVELS[game][0] not in levels
+        for level in levels:
+            got = {m["operator"] for m in em.build(game, str(tmp_path / game), level=level)["mutants"]}
+            assert {"seal_route", mechanics[game], "cosmetic_tile"} <= got, (game, level, got)
