@@ -44,7 +44,7 @@ def frames(cam, max_frames: int = 5400, track: dict | None = None, width: int = 
     share = max(1, max_frames // target - getattr(cam, "hold", 0))
     if track is not None:
         track.update(labels=list(getattr(cam.adapter, "SENSOR_LABELS", None) or []), attempts=[], frames=[])
-    surf, played, attempts, opened = None, 0, cam.attempts, False
+    surf, played, attempts, opened, cut = None, 0, cam.attempts, False, False
     for i in range(max_frames):
         holding = cam.hold_left                 # a step that only runs down the result hold is not play
         if track is not None and not holding and not opened:
@@ -55,11 +55,13 @@ def frames(cam, max_frames: int = 5400, track: dict | None = None, width: int = 
             played += 1
             if played >= share and hasattr(cam, "end_attempt"):
                 cam.end_attempt()              # a 2D camera counts it now, Mega Man's on its next step
+                cut = True
         if cam.attempts != attempts:
             attempts, played = cam.attempts, 0
-            if track is not None and opened:
-                track["attempts"][-1][2] = cam.last or "Stall"
+            if track is not None and opened:          # "cut": the video's share ran out, not the game
+                track["attempts"][-1][2] = "cut" if cut else (cam.last or "Stall")
                 opened = False
+            cut = False
         core = cam.adapter.core
         if surf is None or surf.get_size() != (core.WIDTH, core.HEIGHT):
             surf = pygame.Surface((core.WIDTH, core.HEIGHT))

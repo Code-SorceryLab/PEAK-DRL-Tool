@@ -191,7 +191,8 @@ function caption(key, frame, total){
   let k = 0;
   while (k + 1 < a.length && a[k + 1][0] <= frame) k++;
   const next = k + 1 < a.length ? a[k + 1][0] : total;
-  return levelName(a[k][1]) + (a[k][2] && frame >= next - tl.fps ? ' \u00b7 ' + a[k][2] : '');   // the result shows in its hold
+  const result = a[k][2] === 'cut' ? 'cut short for the video' : a[k][2];
+  return levelName(a[k][1]) + (result && frame >= next - tl.fps ? ' \u00b7 ' + result : '');   // the result shows in its hold
 }
 const big = document.getElementById('big'), bigv = big.querySelector('video'), cv = big.querySelector('canvas');
 const sens = big.querySelector('.sensors');
@@ -243,12 +244,13 @@ function openBig(tile){
   bigv.src = v.dataset.src;
   bigv.currentTime = v.currentTime || 0;
   bigv.play().catch(() => {});
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);      // no rays left from the last video
   if (!TRACKS[key]){
     sens.textContent = 'Loading the sensors...';
     sens.dataset.key = '';
     const s = document.createElement('script');
     s.src = 'videos/' + key + '.sensors.js';
-    s.onerror = () => { sens.textContent = 'No sensor track for this video.'; };
+    s.onerror = () => { if (bigKey === key) sens.textContent = 'No sensor track for this video.'; };   // still this video
     document.head.appendChild(s);
   }
   big.showModal();
@@ -281,7 +283,7 @@ def _agent_dirs(game: str):
     for source, variant, path in sorted(found, key=lambda f: f[2]):
         d = os.path.dirname(path)
         level, seed = os.path.basename(d).rsplit("_", 1)
-        if seed in keep and os.path.isfile(os.path.join(d, "state.json")):
+        if seed in keep and d.split(os.sep)[-3] in PERSONAS and os.path.isfile(os.path.join(d, "state.json")):
             yield source, variant, d.split(os.sep)[-3], d.split(os.sep)[-2], level, int(seed), d
 
 
@@ -313,6 +315,13 @@ def host_agents(dest: str, games: list[str] = GAMES) -> list[dict]:
     return rows
 
 
+def _replay(a: dict) -> str:
+    """The command that watches this agent play, on the mutant it trained on when it has one."""
+    mutant = (f"PEAK_MUTANT=runs/{a['game']}/mutants/{a['variant']} "
+              if a["source"] == "ast" and a["variant"] not in ("base", "base-retrained") else "")
+    return f"{mutant}python -m code.neuro.trainer --game {a['game']} --replay {a['path']}/best.npz"
+
+
 def _retrain(a: dict) -> str:
     """The command that trains this agent again, seed and budget as it had them."""
     if a["source"] == "ast":
@@ -326,15 +335,14 @@ def _retrain(a: dict) -> str:
 def reproduce_page(game: str, agents: list[dict]) -> str:
     """The Reproduce tab of one game: set up, download the agents, replay one, retrain it, rebuild the results."""
     rows = [a for a in agents if a["game"] == game]
-    level = lambda lv: f"Level {int(lv) + 1}" if lv.isdigit() else lv   # noqa: E731  (indexed games count from 0)
     source = lambda a: f"AST {a['variant']}" if a["source"] == "ast" else f"probe {a['tag']}"   # noqa: E731
     personas = sorted({a["persona"] for a in rows})
     sources = sorted({source(a) for a in rows})
     table = "".join(
         f'<tr data-p="{esc(a["persona"])}" data-s="{esc(source(a))}"><td>{esc(source(a))}</td><td>{esc(a["persona"])}</td>'
-        f'<td>{esc(level(a["level"]))}</td><td class="n">{a["seed"]}</td>'
+        f'<td>{esc(a["level"])}</td><td class="n">{a["seed"]}</td>'
         f'<td><a href="{esc(a["path"])}/best.npz" download>best.npz</a> <a href="{esc(a["path"])}/state.json" download>state.json</a></td>'
-        f'<td><code>python -m code.neuro.trainer --game {game} --replay {esc(a["path"])}/best.npz</code></td>'
+        f'<td><code>{esc(_replay(a))}</code></td>'
         f"<td><code>{esc(_retrain(a))}</code></td></tr>" for a in rows)
     pick = lambda name, vals: (f'<label>{name} <select data-f="{name[0].lower()}"><option value="">all</option>'   # noqa: E731
                                + "".join(f"<option>{esc(v)}</option>" for v in vals) + "</select></label>")
@@ -347,8 +355,9 @@ def reproduce_page(game: str, agents: list[dict]) -> str:
     rebuild = "\n".join(esc(f"{c.ljust(width)}# {why}") for c, why in cmds)
     steps = f"""
 <h2><i class="ico sprout"></i>Reproduce: {esc(NAMES[game])}</h2>
-<p class="lede">Every number on this site comes from agents trained with seeds {", ".join(map(str, PAPER_SEEDS))}.
-Each agent below is a folder with its network (best.npz) and the settings it trained with (state.json).</p>
+<p class="lede">Every agent below was trained with one of the seeds {", ".join(map(str, PAPER_SEEDS))}, the seeds
+behind the published numbers. Each one is a folder with its network (best.npz) and the settings it trained with
+(state.json). Levels are named as the game's files and the commands name them (0 is the first level of an indexed game).</p>
 <h3>1. Set up</h3>
 <pre><code>git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
 cd PEAK-DRL-Tool
@@ -358,7 +367,8 @@ pip install -r requirements.txt</code></pre>
 Unpack it into the repository: <code>unzip {game}.zip -d agents</code>. Or take one agent's two files from the table.</p>
 <h3>3. Replay an agent</h3>
 <p>The replay command in the table opens the live dashboard at <code>http://127.0.0.1:8000/</code> and plays the
-agent with its own persona, reaction time and seed.</p>
+agent with its own persona, reaction time and seed. An agent trained on a mutant replays on that mutant: its command
+sets <code>PEAK_MUTANT</code> first (on Windows, run <code>set PEAK_MUTANT=...</code> on its own line before it).</p>
 <h3>4. Train it again</h3>
 <p>The retrain command trains the same persona, level, seed and generation budget from scratch. The AST
 evaluation's agents retrain all three seeds on their mutant at once.</p>
@@ -481,9 +491,9 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
     """Put the built site on gh-pages as one commit with no history (so the videos never pile up in
     every clone), after keeping the old landing page as tag LANDING_TAG; with `push`, force-push it
     to origin (GitHub Pages serves that branch). Refuses while the results have uncommitted changes,
-    so the site only ever shows committed numbers. Returns the new commit."""
+    so the site only ever shows committed numbers and agents. Returns the new commit."""
     meta = (":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store")      # macOS metadata on exFAT, never a result
-    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", *meta)
+    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", "runs/probes", *meta)
     if dirty:
         raise SystemExit(f"uncommitted results; commit them first so the site shows committed numbers:\n{dirty}")
     if not os.path.isfile(os.path.join(site_dir, "index.html")):

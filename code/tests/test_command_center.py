@@ -423,3 +423,48 @@ def test_the_untrained_cards_are_not_a_collapsible_game_section():
     data = report.load_data()
     block = report._untrained("bomberman", data["games"]["bomberman"])
     assert block and not re.search(r'<section class="[^"]*\bgame\b', block)
+
+
+# ── the round 2 review's fixes ────────────────────────────────────────────────────────────────────
+def test_a_cut_attempt_is_labelled_as_cut_not_as_a_stall():
+    from code.neuro import wall_video
+    track = {}
+    list(wall_video.frames(FakeCam(levels=2, steps=10_000, hold=2), max_frames=60, track=track))
+    assert [a[2] for a in track["attempts"]] == ["cut", "cut"]          # the recorder ended them, not the game
+    track = {}
+    list(wall_video.frames(FakeCam(levels=2, steps=3, hold=2), track=track))
+    assert [a[2] for a in track["attempts"]] == ["Pit", "Pit"]          # the game's own ends keep their cause
+
+
+def test_the_large_view_clears_old_rays_and_ignores_a_late_error():
+    from code.neuro import command_center
+    js = command_center.JS
+    body = js[js.index("function openBig"):js.index("big.addEventListener('click'")]
+    assert "clearRect" in body and "bigKey === key" in body
+
+
+def test_a_mutant_agent_replays_on_its_mutant_and_good_is_not_hosted(tmp_path):
+    from code.neuro import command_center
+    row = {"game": "mario", "source": "ast", "variant": "seal_route", "persona": "novice", "tag": "p10g200",
+           "level": "Mario1-1", "seed": 1234, "path": "agents/ast/mario/seal_route/probes/mario/novice/p10g200/Mario1-1_1234"}
+    html = command_center.reproduce_page("mario", [row])
+    assert "PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario --replay" in html
+    agents = command_center.host_agents(str(tmp_path / "agents"), games=["meatboy"])
+    assert agents and {a["persona"] for a in agents} <= set(command_center.PERSONAS)   # "good" was renamed experienced
+
+
+def test_a_reproduce_row_names_its_level_as_its_command_does():
+    from code.neuro import command_center
+    row = {"game": "bomberman", "source": "probes", "variant": None, "persona": "novice", "tag": "p10g40", "level": "12",
+           "seed": 1234, "path": "agents/probes/bomberman/novice/p10g40/12_1234"}
+    html = command_center.reproduce_page("bomberman", [row])
+    assert "<td>12</td>" in html and "--levels 12 " in html and "Level 13" not in html
+    assert "Every agent below" in html and "Every number on this site" not in html
+
+
+def test_publish_refuses_uncommitted_probes(tmp_repo):
+    from code.neuro import command_center
+    (tmp_repo / "runs" / "probes").mkdir(parents=True)
+    (tmp_repo / "runs" / "probes" / "new.json").write_text("{}")        # an agent the site would host, not committed
+    with pytest.raises(SystemExit, match="uncommitted"):
+        command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
