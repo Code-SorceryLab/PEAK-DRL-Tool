@@ -15,6 +15,7 @@ import argparse
 import base64
 import functools
 import glob
+import itertools
 import json
 import multiprocessing as mp
 import os
@@ -145,20 +146,31 @@ class Camera:
         self._start()
 
 
+class _Ended(Exception):
+    """Raised inside relay.play to end an attempt early (MegamanCamera.end_attempt)."""
+
+
 class MegamanCamera:
     """The Cut Man stage played as a relay (one network per section). relay.play runs in its own
-    thread and pauses after every frame, so the worker steps it like any other camera."""
+    thread and pauses after every frame, so the worker steps it like any other camera. With
+    `scopes` (section names), it plays one attempt per section from that section's start, in turn,
+    as ast_eval.play_megaman does; `models` then lists them, like a 2D camera's levels."""
 
     game = "megaman"
     persona = PERSONAS["experienced"]
 
-    def __init__(self, manifest: str | None = None, stage: str = "CutMan", hold: int = FPS, legs: list | None = None) -> None:
+    def __init__(self, manifest: str | None = None, stage: str = "CutMan", hold: int = FPS, legs: list | None = None,
+                 scopes: list[str] | None = None) -> None:
         """`legs` (one persona's section agents, code/neuro/ast_eval.py persona_legs) replaces the manifest's."""
         self.legs = legs if legs is not None else relay.load_legs(manifest, stage)
         self.stage, self.hold, self.persona = stage, hold, self.legs[0].persona
+        self.scopes = list(scopes) if scopes else [stage]
+        if scopes:
+            self.models = self.scopes
         self.wins = self.attempts = self.hold_left = 0
-        self.last, self.level = "", self.legs[0].level
+        self.last, self.level = "", self.scopes[0] if scopes else self.legs[0].level
         self.adapter, self.rays, self.tiles, self.vec = None, [], [], None
+        self._abort = False
         self._go, self._done = threading.Semaphore(0), threading.Semaphore(0)
         threading.Thread(target=self._run, daemon=True).start()
         self._done.acquire()                            # the first frame
@@ -170,17 +182,31 @@ class MegamanCamera:
     def _on_frame(self, adapter, leg, rays, tiles, vec) -> None:
         self.adapter, self.level, self.rays, self.tiles, self.vec = adapter, leg.level, rays, tiles, vec
         self._pause()
+        if self._abort:
+            raise _Ended
 
     def _run(self) -> None:
         seed = 1234
-        while True:
-            e = relay.play(self.legs, self.stage, seed, 18000, STALL, on_frame=self._on_frame)
+        for n in itertools.count():
+            scope = self.scopes[n % len(self.scopes)]
+            use = self.legs if scope == self.stage else [leg for leg in self.legs if leg.level == scope]
+            try:
+                e = relay.play(use, scope, seed, 18000, STALL, on_frame=self._on_frame)
+                won, cause = e["status"] == "WON", e.get("cause") or e["status"]
+            except _Ended:
+                won, cause = False, "Stall"
+            self._abort = False
             self.attempts += 1
-            self.wins += e["status"] == "WON"
-            self.last = "WON" if e["status"] == "WON" else (e.get("cause") or e["status"])
+            self.wins += won
+            self.last = "WON" if won else cause
+            self.level = self.scopes[(n + 1) % len(self.scopes)]   # the next attempt's, once the hold is over
             self.hold_left = self.hold
             seed += 1
             self._pause()
+
+    def end_attempt(self) -> None:
+        """End the attempt on the next step, counted as a stall (a recording's share of frames ran out)."""
+        self._abort = True
 
     def step(self) -> None:
         if self.hold_left:

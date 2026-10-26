@@ -96,25 +96,34 @@ def test_the_wall_says_which_videos_are_missing():
 
 
 class FakeCam:
-    """Camera's surface: `models` (one per level), `attempts`, `hold_left`, `step()`, `adapter.render(surf)`
-    and `adapter.core.WIDTH/HEIGHT`. Each attempt takes `steps` steps, then `hold` steps of hold."""
+    """Camera's surface: `models` (one per level), `level`, `last`, `attempts`, `hold_left`, `rays`, `vec`,
+    `step()`, `end_attempt()`, `adapter.render(surf)`, `adapter.camera` and `adapter.core.WIDTH/HEIGHT`.
+    Each attempt takes `steps` steps, then `hold` steps of hold, then the next level."""
 
     def __init__(self, levels, steps, hold):
         self.models, self.steps, self.hold = [None] * levels, steps, hold
-        self.attempts = self.hold_left = self.frame = 0
+        self.attempts = self.hold_left = self.frame = self.i = 0
+        self.last, self.rays, self.vec = "", [(10.0, 20.0, 74.0, 20.0, 1)], [0.5, 0.25]
         core = type("Core", (), {"WIDTH": 64, "HEIGHT": 48})()
-        self.adapter = type("Adapter", (), {"core": core, "render": lambda self, surf: surf.fill((200, 30, 20))})()
+        self.adapter = type("Adapter", (), {"core": core, "camera": (2.0, 0.0), "SENSOR_LABELS": ["a", "b"],
+                                            "render": lambda self, surf: surf.fill((200, 30, 20))})()
+
+    @property
+    def level(self):
+        return f"L{self.i % len(self.models)}"
 
     def step(self):
         if self.hold_left:
             self.hold_left -= 1
+            if not self.hold_left:
+                self.i += 1
             return
         self.frame += 1
         if self.frame == self.steps:
             self.end_attempt()
 
     def end_attempt(self):
-        self.attempts, self.frame, self.hold_left = self.attempts + 1, 0, self.hold
+        self.attempts, self.frame, self.hold_left, self.last = self.attempts + 1, 0, self.hold, "Pit"
 
 
 def test_a_video_stops_after_one_pass_and_its_hold():
@@ -302,3 +311,47 @@ def test_the_balance_tab_lists_the_levels_no_agent_trained_on():
     assert all(f'data-untrained="{lv}"' in bomberman for lv in ("12", "13", "14")) and 'data-untrained="8"' not in bomberman
     assert 'data-untrained="CutMan-4-Shaft-Gap"' in megaman and 'data-untrained="CutMan-3-Ledges"' not in megaman
     assert "not trained yet" in bomberman
+
+
+def test_a_recording_keeps_a_timeline_and_a_sensor_track():
+    from code.neuro import wall_video
+    track = {}
+    n = sum(1 for _ in wall_video.frames(FakeCam(levels=2, steps=3, hold=2), track=track))
+    assert n == 10 and track["attempts"] == [[0, "L0", "Pit"], [5, "L1", "Pit"]]
+    assert len(track["frames"]) == 5 and track["labels"] == ["a", "b"]         # every 2nd frame
+    rays, sensors = track["frames"][0]
+    assert sensors == [0.5, 0.25] and rays == [[60, 150, 540, 150, 1]]            # view-relative, at 480 px wide
+
+
+def test_mega_man_plays_one_attempt_per_section():
+    from code.neuro import relay, wall_video
+    legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), "CutMan")     # quick to load; any legs do
+    cam = cameras.MegamanCamera(legs=legs, scopes=["CutMan-5-Rooftop", "CutMan-7-Corridor"], hold=5)
+    track = {}
+    n = sum(1 for _ in wall_video.frames(cam, max_frames=200, track=track))
+    assert cam.attempts == 2 and n <= 200
+    assert [a[1] for a in track["attempts"]] == ["CutMan-5-Rooftop", "CutMan-7-Corridor"]
+
+
+def test_the_recorder_writes_the_timeline_and_the_sensor_track_beside_the_video(tmp_path, monkeypatch):
+    import json
+    from code.neuro import wall_video
+    monkeypatch.setenv("PEAK_MM1_ASSETS", "x")
+    monkeypatch.delenv("PEAK_MM1_ASSETS")                       # the guard's own setting is undone after the test
+    monkeypatch.setattr(wall_video, "camera", lambda game, persona: FakeCam(levels=2, steps=3, hold=2))
+    monkeypatch.setattr(wall_video, "write_webm", lambda surfaces, path, **k: (open(path, "wb").close(), sum(1 for _ in surfaces))[1])
+    wall_video.main(["--game", "mario", "--persona", "novice", "--out", str(tmp_path)])
+    timeline = json.load(open(tmp_path / "mario" / "novice.json"))
+    track = json.load(open(tmp_path / "mario" / "novice.sensors.json"))
+    assert (tmp_path / "mario" / "novice.webm").exists() and timeline["fps"] == 30 and timeline["width"] == 480
+    assert timeline["attempts"] == [[0, "L0", "Pit"], [5, "L1", "Pit"]]
+    assert track["every"] == 2 and track["labels"] == ["a", "b"] and len(track["frames"]) == 5
+
+
+
+def test_recording_twice_in_one_process_is_allowed(monkeypatch):
+    from code.neuro import wall_video
+    monkeypatch.setenv("PEAK_MM1_ASSETS", "x")
+    monkeypatch.delenv("PEAK_MM1_ASSETS")
+    wall_video.no_ripped_art()
+    wall_video.no_ripped_art()                                  # its own setting is not ripped art
