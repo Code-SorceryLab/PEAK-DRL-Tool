@@ -272,10 +272,10 @@ def test_recording_hides_any_mega_man_art(tmp_path, monkeypatch):
 
 def test_the_experienced_mega_man_video_uses_the_paper_seed_agents(monkeypatch):
     from code.neuro import ast_eval, wall_video
-    calls = []
-    monkeypatch.setattr(ast_eval, "persona_legs", lambda p, *a, **k: calls.append(p) or ["legs"])
-    monkeypatch.setattr(cameras, "MegamanCamera", lambda *a, legs=None, **k: ("camera", legs))
-    assert wall_video.camera("megaman", "experienced") == ("camera", ["legs"]) and calls == ["experienced"]
+    calls, leg = [], type("Leg", (), {"level": "CutMan-1-Street"})()
+    monkeypatch.setattr(ast_eval, "persona_legs", lambda p, *a, **k: calls.append(p) or [leg])
+    monkeypatch.setattr(cameras, "MegamanCamera", lambda *a, legs=None, scopes=None, **k: ("camera", legs, scopes))
+    assert wall_video.camera("megaman", "experienced") == ("camera", [leg], ["CutMan-1-Street"]) and calls == ["experienced"]
 
 
 def test_the_sub_page_titles_carry_no_long_dashes():
