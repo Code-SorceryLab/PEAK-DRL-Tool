@@ -32,6 +32,8 @@ GAMES = ["mario", "meatboy", "bomberman", "megaman"]
 NAMES = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man"}
 TABS = [("wall", "Replay wall"), ("balance", "Balance"), ("mutations", "Mutations"), ("gasweep", "GA sweep"),
         ("ablation", "Sensor ablation"), ("howitworks", "How it works")]
+ICONS = {"wall": "gamepad", "balance": "trophy", "mutations": "dna", "gasweep": "gear", "ablation": "eye",
+         "reproduce": "sprout", "howitworks": "qblock"}   # the theme's pixel icons, as the old top bar had
 esc = html.escape
 
 
@@ -49,7 +51,8 @@ def shell(walls: dict[str, dict[str, bool]]) -> str:
     options = "".join(f'<option value="{g}">{NAMES[g]}</option>' for g in games)
     icons = "".join(f'<span class="gi" data-game="{g}" hidden>{report._game_icon(g)}</span>' for g in games)
     tabs = "".join(f'<button class="tab" role="tab" type="button" id="t-{t}" data-tab="{t}" aria-controls="p-{t}" '
-                   f'aria-selected="false" tabindex="-1">{esc(label)}</button>' for t, label in TABS)
+                   f'aria-selected="false" tabindex="-1"><i class="ico {ICONS[t]}"></i>{esc(label)}</button>'
+                   for t, label in TABS)
     wall = "".join(f'<div class="wall stripe g-{g}" data-game="{g}" hidden>'
                    + "".join(_tile(g, p, walls.get(g, {}).get(p, False)) for p in PERSONAS) + "</div>" for g in games)
     panels = (f'<section class="panel" role="tabpanel" id="p-wall" aria-labelledby="t-wall" hidden>{wall}</section>'
@@ -58,31 +61,26 @@ def shell(walls: dict[str, dict[str, bool]]) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
-<title>PEAK Command Center</title><style>{report.THEME_CSS}{CSS}</style></head><body>
-<header class="bar">
+<title>PEAK Command Center</title><style>{report.CSS}{CSS}</style></head><body>
+<nav aria-label="Command Center">
   <h1 class="brand"><span class="wordmark">PEAK</span><em>Command Center</em></h1>
   <label class="pick">{icons}<span class="sr">Game</span><select id="game">{options}</select></label>
-  <div class="tabs" role="tablist" aria-label="Parts of the Command Center">{tabs}</div>
-</header>
+  <div class="links" role="tablist" aria-label="Parts of the Command Center">{tabs}</div>
+</nav>
 <main id="main">{panels}</main>
 <script>const GAMES = {json.dumps(games)}, NAMES = {json.dumps(NAMES)};{JS}</script></body></html>"""
 
 
 CSS = """
 [hidden]{display:none !important}
-body{height:100vh;display:flex;flex-direction:column;overflow:hidden}
-.bar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 16px;border-bottom:3px solid var(--line);background:var(--deck)}
-.brand{display:flex;align-items:baseline;gap:10px;font-size:18px}
-.brand .wordmark{font-size:27px}
-.brand em{font-style:normal;color:var(--dim)}
+body{height:100vh;display:flex;flex-direction:column;overflow:hidden;padding:0}
+nav{flex:none;position:static;margin:0}                 /* the old pages' top bar, in a full-height page */
 .pick{display:flex;align-items:center;gap:8px}
 .pick .gicon{height:26px;width:auto;vertical-align:middle}
-.pick select{font:600 16px var(--ui);color:var(--ink);background:var(--deck-2);border:2px solid var(--line);padding:4px 8px}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.tabs{display:flex;flex-wrap:wrap;gap:6px}
-.tab{font:600 15px var(--ui);color:var(--dim);background:var(--deck-2);border:2px solid var(--line);padding:5px 12px;cursor:pointer}
-.tab[aria-selected="true"]{color:var(--ink);background:var(--deck-3);border-color:var(--peak)}
-main{flex:1;min-height:0}
+.pick select{font:700 18px/1 var(--pixel);color:var(--ink);background:var(--deck-2);padding:4px 8px;cursor:pointer;
+  border:3px solid transparent;border-image:var(--frame) 1 / 3px stretch;background-clip:padding-box}
+.tab[aria-selected="true"]{background-color:var(--ink);color:var(--night)}
+main{flex:1;min-height:0;max-width:none;margin:0}
 .panel{height:100%}
 .panel iframe{width:100%;height:100%;border:0;display:block;background:var(--night)}
 #p-wall{overflow:auto}
@@ -91,7 +89,7 @@ main{flex:1;min-height:0}
 .tile video{width:100%;display:block;background:#000;image-rendering:pixelated}
 .who{font:700 15px var(--pixel);color:var(--c);margin:0 0 6px;display:flex;gap:6px;align-items:center}
 .missing .none{display:grid;place-items:center;aspect-ratio:4/3;color:var(--mute);border:2px dashed var(--line)}
-@media (max-width:640px){.bar{padding:8px}.wall{grid-template-columns:1fr;padding:12px}}
+@media (max-width:640px){nav{padding:8px}.wall{grid-template-columns:1fr;padding:12px}}
 """
 
 JS = """
@@ -129,7 +127,7 @@ function show(){
 const go = (game, tab) => { location.hash = '#' + game + '/' + tab; };
 select.addEventListener('change', () => go(select.value, parse(location.hash).tab));
 for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => go(select.value, b.dataset.tab));
-document.querySelector('.tabs').addEventListener('keydown', e => {
+document.querySelector('[role=tablist]').addEventListener('keydown', e => {
   const step = {ArrowRight: 1, ArrowLeft: -1}[e.key];
   if (!step) return;
   const i = (TABS.indexOf(parse(location.hash).tab) + step + TABS.length) % TABS.length;

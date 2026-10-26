@@ -284,3 +284,13 @@ def test_a_hidden_wall_stays_hidden_whatever_its_display():
     css = re.sub(r"\s+", "", command_center.CSS)
     assert "[hidden]{display:none!important}" in css and ".wall{display:grid" in css    # .wall's grid beat [hidden]
     assert html.count('class="wall') == 2 and html.count("hidden>") >= 2
+
+
+# ── round 2 ───────────────────────────────────────────────────────────────────────────────────────
+def test_the_top_bar_and_tabs_are_the_old_pages_pixel_buttons_with_icons():
+    from code.neuro import command_center
+    html = command_center.shell({"mario": {"novice": True}})
+    assert "<nav" in html and 'class="brand"' in html and ".tab.active" in html      # the old pages' styles
+    tabs = re.findall(r'<button class="tab"[^>]*data-tab="(\w+)"[^>]*>(.*?)</button>', html)
+    assert [t for t, _ in tabs][:5] == ["wall", "balance", "mutations", "gasweep", "ablation"]
+    assert tabs and all('<i class="ico ' in body for _, body in tabs)
