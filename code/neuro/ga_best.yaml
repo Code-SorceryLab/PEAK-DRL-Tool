@@ -10,7 +10,7 @@
 #
 # OFAT composites ignore interactions between knobs — `confirmed_win_rate` is the composite
 # actually probed by `--confirm`, next to the `baseline_win_rate` it has to beat.
-generated: 2026-10-25 17:55
+generated: 2026-10-26 15:45
 baseline:
   pop_size: 10
   elite: 4
@@ -24,6 +24,106 @@ baseline:
   action_feedback: false
   memory: 0
 games:
+  bomberman:
+    recommended:
+      hidden: 8
+      pop_size: 30
+      elite: 1
+      tournament_k: 8
+      mutation_sigma: 0.5
+      anneal_factor: 0.3
+      init_sigma: 0.25
+      memory: 3
+    per_sweep:
+      clumsy / 50 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 1.0
+          crossover_rate: 0.95
+          elite: 1
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_rate: 0.5
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.1322
+        confirmed_win_rate: 0.0981
+        configs: 24
+      collector / 50 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          crossover_rate: 0.0
+          elite: 1
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.2152
+        confirmed_win_rate: 0.4507
+        configs: 24
+      experienced / 50 gens / rays:
+        overrides:
+          pop_size: 100
+          action_feedback: true
+          anneal_factor: 0.3
+          crossover_rate: 0.95
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_rate: 0.5
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.2202
+        confirmed_win_rate: 0.2272
+        configs: 24
+      killer / 50 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          crossover_rate: 0.0
+          elite: 1
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.215
+        confirmed_win_rate: 0.4222
+        configs: 24
+      novice / 50 gens / rays:
+        overrides:
+          pop_size: 30
+          action_feedback: true
+          anneal_factor: 0.3
+          crossover_rate: 0.0
+          elite: 1
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_rate: 0.5
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.2113
+        confirmed_win_rate: 0.3388
+        configs: 24
+      speedrunner / 50 gens / rays:
+        overrides:
+          pop_size: 100
+          action_feedback: true
+          anneal_factor: 0.3
+          crossover_rate: 0.95
+          hidden: 8
+          init_sigma: 0.25
+          memory: 3
+          mutation_sigma: 0.5
+          tournament_k: 8
+        baseline_win_rate: 0.2335
+        confirmed_win_rate: 0.2895
+        configs: 24
+    sweeps: 6
   mario:
     recommended:
       pop_size: 30
