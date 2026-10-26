@@ -37,17 +37,22 @@ ICONS = {"wall": "gamepad", "balance": "trophy", "mutations": "dna", "gasweep": 
 esc = html.escape
 
 
-def _tile(game: str, persona: str, recorded: bool) -> str:
+def _tile(game: str, persona: str, recorded) -> str:
+    """One persona's view: its video with a caption; a click opens it large with its sensors."""
     head = f'<div class="who" style="--c:var(--p-{persona})"><i class="ico p-{persona}"></i>{persona}</div>'
     if not recorded:
         return f'<div class="tile frame missing">{head}<div class="none">not recorded yet</div></div>'
-    return (f'<div class="tile frame">{head}<video muted loop playsinline preload="none" '
-            f'data-src="videos/{game}/{persona}.webm" aria-label="{NAMES[game]}, {persona}: the agents playing"></video></div>')
+    return (f'<div class="tile frame">{head}<div class="vid" role="button" tabindex="0" data-key="{game}/{persona}" '
+            f'aria-label="Watch {NAMES[game]}, {persona} large, with its rays and sensors">'
+            f'<video muted loop playsinline preload="none" data-src="videos/{game}/{persona}.webm"></video>'
+            f'<div class="cap"></div></div></div>')
 
 
-def shell(walls: dict[str, dict[str, bool]]) -> str:
-    """index.html. walls[game][persona]: whether that persona's video exists."""
+def shell(walls: dict[str, dict]) -> str:
+    """index.html. walls[game][persona]: that persona's video timeline (or True when it has none),
+    falsy when there is no video."""
     games = [g for g in GAMES if g in walls] or GAMES
+    timelines = {f"{g}/{p}": v for g in walls for p, v in walls[g].items() if isinstance(v, dict)}
     options = "".join(f'<option value="{g}">{NAMES[g]}</option>' for g in games)
     icons = "".join(f'<span class="gi" data-game="{g}" hidden>{report._game_icon(g)}</span>' for g in games)
     tabs = "".join(f'<button class="tab" role="tab" type="button" id="t-{t}" data-tab="{t}" aria-controls="p-{t}" '
@@ -68,7 +73,13 @@ def shell(walls: dict[str, dict[str, bool]]) -> str:
   <div class="links" role="tablist" aria-label="Parts of the Command Center">{tabs}</div>
 </nav>
 <main id="main">{panels}</main>
-<script>const GAMES = {json.dumps(games)}, NAMES = {json.dumps(NAMES)};{JS}</script></body></html>"""
+<dialog id="big" aria-labelledby="bigtitle">
+  <div class="bighead"><h2 id="bigtitle"></h2><span class="bigcap"></span><button class="close" type="button">Close</button></div>
+  <div class="bigbody"><div class="stage"><video muted loop playsinline></video><canvas class="rays"></canvas></div>
+    <div class="sensors" aria-label="Sensor values"></div></div>
+</dialog>
+<script>const GAMES = {json.dumps(games)}, NAMES = {json.dumps(NAMES)}, TL = {json.dumps(timelines, separators=(",", ":"))};
+{JS}</script></body></html>"""
 
 
 CSS = """
@@ -88,6 +99,26 @@ main{flex:1;min-height:0;max-width:none;margin:0}
 .tile{padding:8px}
 .tile video{width:100%;display:block;background:#000;image-rendering:pixelated}
 .who{font:700 15px var(--pixel);color:var(--c);margin:0 0 6px;display:flex;gap:6px;align-items:center}
+.vid{position:relative;cursor:zoom-in}
+.cap{position:absolute;left:6px;bottom:6px;font:700 14px/1.2 var(--pixel);color:var(--ink);background:rgba(0,0,0,.72);padding:3px 7px}
+.cap:empty{display:none}
+#big{width:min(1240px,96vw);max-height:94vh;padding:0;color:var(--ink);background:var(--deck);
+  border:3px solid transparent;border-image:var(--frame-hi) 1 / 3px stretch}
+#big::backdrop{background:rgba(0,0,0,.82)}
+.bighead{display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:3px solid var(--line)}
+.bighead h2{flex:1}
+.bigcap{font:700 15px var(--pixel);color:var(--won)}
+.bigbody{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;padding:14px}
+.stage{position:relative;align-self:start}
+.stage video{width:100%;display:block;image-rendering:pixelated;background:#000}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.sensors{display:flex;flex-direction:column;gap:3px;font:600 12.5px/1.3 var(--ui);color:var(--dim);overflow:auto;max-height:76vh}
+.sensors h3{font-size:14px;margin:8px 0 2px;color:var(--ink)}
+.srow{display:grid;grid-template-columns:44px 1fr 44px;gap:6px;align-items:center}
+.sbar{height:8px;background:var(--deck-2);position:relative}
+.sbar i{position:absolute;top:0;bottom:0;background:var(--c,var(--peak))}
+.srow output{text-align:right}
+@media (max-width:820px){.bigbody{grid-template-columns:1fr}}
 .missing .none{display:grid;place-items:center;aspect-ratio:4/3;color:var(--mute);border:2px dashed var(--line)}
 @media (max-width:640px){nav{padding:8px}.wall{grid-template-columns:1fr;padding:12px}}
 """
@@ -135,6 +166,101 @@ document.querySelector('[role=tablist]').addEventListener('keydown', e => {
   document.getElementById('t-' + TABS[i]).focus();
 });
 window.addEventListener('hashchange', show);
+
+// ── captions and the large view (the old live wall's watched view, from the recorded tracks) ──
+const TRACKS = {};
+window.PEAK_TRACK = (key, data) => { TRACKS[key] = data; };     // each <video>.sensors.js calls this
+const PLATFORM = [   // the platformers' 14-slot ray vector (as code/neuro/web/cameras.html lays it out)
+  {g: 'Proximity rays', rows: [{i: 0, l: 'FWD', d: 'Ray straight ahead', inv: true}, {i: 1, l: 'U30', d: 'Ray 30 degrees up', inv: true},
+    {i: 2, l: 'U60', d: 'Ray 60 degrees up', inv: true}, {i: 3, l: 'D30', d: 'Ray 30 degrees down', inv: true},
+    {i: 4, l: 'D60', d: 'Ray 60 degrees down', inv: true}, {i: 5, l: 'BCK', d: 'Ray straight back', inv: true}]},
+  {g: 'Threats', rows: [{i: 6, l: 'NMY', d: 'Enemy ahead', inv: true}, {i: 7, l: 'PIT', d: 'Gap in the floor ahead'}]},
+  {g: 'Kinematics', rows: [{i: 9, l: 'VX', d: 'Horizontal velocity', center: true}, {i: 10, l: 'VY', d: 'Vertical velocity', center: true},
+    {i: 8, l: 'GND', d: 'On the ground'}, {i: 11, l: 'JMP', d: 'Jump held'}]},
+  {g: 'Objectives', rows: [{i: 12, l: 'BLK', d: 'Question blocks ahead'}]},
+];
+const RAY = {0: 'rgba(255,255,255,.35)', 1: '#ef4444', 2: '#ec4899'};
+const levelName = l => /^\d+$/.test(l) ? 'Level ' + (+l + 1) : l;
+function caption(key, frame, total){
+  const tl = TL[key];
+  if (!tl || !tl.attempts.length) return '';
+  const a = tl.attempts;
+  let k = 0;
+  while (k + 1 < a.length && a[k + 1][0] <= frame) k++;
+  const next = k + 1 < a.length ? a[k + 1][0] : total;
+  return levelName(a[k][1]) + (a[k][2] && frame >= next - tl.fps ? ' \u00b7 ' + a[k][2] : '');   // the result shows in its hold
+}
+const big = document.getElementById('big'), bigv = big.querySelector('video'), cv = big.querySelector('canvas');
+const sens = big.querySelector('.sensors');
+let bigKey = null, raf = 0, rows = [];
+function layout(t){
+  const groups = t.labels.length ? t.labels : PLATFORM;
+  sens.innerHTML = '';
+  rows = [];
+  for (const g of groups){
+    const h = document.createElement('h3'); h.textContent = g.g; sens.appendChild(h);
+    for (const r of g.rows){
+      const row = document.createElement('div'); row.className = 'srow'; row.title = r.d || '';
+      row.innerHTML = '<span></span><div class="sbar"><i></i></div><output></output>';
+      row.firstChild.textContent = r.l;
+      sens.appendChild(row);
+      rows.push({r, bar: row.querySelector('i'), out: row.querySelector('output')});
+    }
+  }
+  sens.dataset.key = bigKey;
+}
+function draw(){
+  if (!big.open) return;
+  const fps = (TL[bigKey] || {}).fps || 30, frame = Math.floor(bigv.currentTime * fps), t = TRACKS[bigKey];
+  big.querySelector('.bigcap').textContent = caption(bigKey, frame, (bigv.duration || 0) * fps);
+  if (t){
+    if (sens.dataset.key !== bigKey) layout(t);
+    const [rays, vals] = t.frames[Math.min(t.frames.length - 1, Math.floor(frame / t.every))] || [[], []];
+    const w = bigv.clientWidth, h = bigv.clientHeight, k = w / t.width, ctx = cv.getContext('2d');
+    if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+    ctx.clearRect(0, 0, w, h);
+    ctx.lineWidth = 2;
+    for (const [x1, y1, x2, y2, hit] of rays){
+      ctx.strokeStyle = RAY[hit] || RAY[0];
+      ctx.beginPath(); ctx.moveTo(x1 * k, y1 * k); ctx.lineTo(x2 * k, y2 * k); ctx.stroke();
+    }
+    for (const {r, bar, out} of rows){
+      const v = Math.max(-1, Math.min(1, vals[r.i] ?? 0));
+      if (r.center){ bar.style.left = (50 + Math.min(0, v) * 50) + '%'; bar.style.width = Math.abs(v) * 50 + '%'; }
+      else { bar.style.left = '0'; bar.style.width = Math.max(0, r.inv ? 1 - v : v) * 100 + '%'; }
+      out.textContent = (vals[r.i] ?? 0).toFixed(2);
+    }
+  }
+  raf = requestAnimationFrame(draw);
+}
+function openBig(tile){
+  const key = tile.dataset.key, v = tile.querySelector('video'), [g, p] = key.split('/');
+  bigKey = key;
+  big.querySelector('h2').textContent = NAMES[g] + ', ' + p;
+  bigv.src = v.dataset.src;
+  bigv.currentTime = v.currentTime || 0;
+  bigv.play().catch(() => {});
+  if (!TRACKS[key]){
+    sens.textContent = 'Loading the sensors...';
+    sens.dataset.key = '';
+    const s = document.createElement('script');
+    s.src = 'videos/' + key + '.sensors.js';
+    s.onerror = () => { sens.textContent = 'No sensor track for this video.'; };
+    document.head.appendChild(s);
+  }
+  big.showModal();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(draw);
+}
+big.addEventListener('click', e => { if (e.target === big) big.close(); });     // a click outside the frame
+big.querySelector('.close').addEventListener('click', () => big.close());
+big.addEventListener('close', () => { cancelAnimationFrame(raf); stop(bigv); bigKey = null; });
+for (const tile of document.querySelectorAll('.vid')){
+  const v = tile.querySelector('video'), cap = tile.querySelector('.cap'), fps = (TL[tile.dataset.key] || {}).fps || 30;
+  tile.addEventListener('click', () => openBig(tile));
+  tile.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openBig(tile); } });
+  v.addEventListener('timeupdate', () => { cap.textContent = caption(tile.dataset.key, Math.floor(v.currentTime * fps), (v.duration || 0) * fps); });
+}
 show();
 """
 
@@ -154,7 +280,7 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
         pages[f"{g}-mutations.html"] = ast_page.render(results, only=g, nav=False)
         pages[f"{g}-gasweep.html"] = report.gasweep_page(g, data)
         pages[f"{g}-ablation.html"] = report.ablation_page(g, data)
-    walls: dict[str, dict[str, bool]] = {}
+    walls: dict[str, dict] = {}
     written = []
     for g in GAMES:
         walls[g] = {}
@@ -166,6 +292,17 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copyfile(src, dst)
                 written.append(dst)
+                timeline, track = src[:-len(".webm")] + ".json", src[:-len(".webm")] + ".sensors.json"
+                if os.path.isfile(timeline):
+                    with open(timeline, encoding="utf-8") as f:
+                        walls[g][p] = json.load(f)
+                if os.path.isfile(track):      # a script, not JSON: a page opened from disk may not fetch files
+                    with open(track, encoding="utf-8") as f:
+                        data = json.dumps(json.load(f), separators=(",", ":"))
+                    path = dst[:-len(".webm")] + ".sensors.js"
+                    with open(path, "w", encoding="utf-8", newline="\n") as f:
+                        f.write(f'PEAK_TRACK("{g}/{p}",{data});\n')
+                    written.append(path)
     pages["index.html"] = shell(walls)
     pages[".nojekyll"] = ""                       # GitHub Pages: serve the files as they are
     for name, text in pages.items():

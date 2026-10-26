@@ -79,11 +79,17 @@ def test_the_mutations_sub_page_keeps_the_totals_for_every_game():
 
 def test_the_site_has_every_tab_of_every_game(tmp_path):
     from code.neuro import command_center
-    (tmp_path / "videos" / "mario").mkdir(parents=True)
-    (tmp_path / "videos" / "mario" / "novice.webm").write_bytes(b"x")
+    vids = tmp_path / "videos" / "mario"
+    vids.mkdir(parents=True)
+    (vids / "novice.webm").write_bytes(b"x")
+    (vids / "novice.json").write_text('{"fps": 30, "width": 480, "attempts": [[0, "Mario1-1", "Pit"]]}')
+    (vids / "novice.sensors.json").write_text('{"every": 2, "width": 480, "labels": ["a"], "frames": [[[], [0.5]]]}')
     written = command_center.build_site(str(tmp_path / "site"), str(tmp_path / "videos"))
     names = {os.path.relpath(p, tmp_path / "site") for p in written}
     assert {"index.html", "howitworks.html", ".nojekyll", "videos/mario/novice.webm"} <= names
+    track = (tmp_path / "site" / "videos" / "mario" / "novice.sensors.js").read_text()   # a script: works from file://
+    assert track.startswith('PEAK_TRACK("mario/novice",') and '"labels":["a"]' in track
+    assert '"Mario1-1"' in (tmp_path / "site" / "index.html").read_text()               # the timeline, embedded
     assert {f"{g}-{t}.html" for g in command_center.GAMES for t in ("balance", "mutations", "gasweep", "ablation")} <= names
 
 
@@ -355,3 +361,12 @@ def test_recording_twice_in_one_process_is_allowed(monkeypatch):
     monkeypatch.delenv("PEAK_MM1_ASSETS")
     wall_video.no_ripped_art()
     wall_video.no_ripped_art()                                  # its own setting is not ripped art
+
+
+
+def test_the_wall_has_captions_and_a_large_view_with_rays_and_sensor_bars():
+    from code.neuro import command_center
+    html = command_center.shell({"mario": {"novice": {"fps": 30, "width": 480, "attempts": [[0, "Mario1-1", "WON"]]},
+                                           "clumsy": True}})
+    assert html.count('class="cap"') == 2 and '<dialog id="big"' in html and '<canvas class="rays"' in html
+    assert 'class="sensors"' in html and "PEAK_TRACK" in html and "sensors.js" in html
