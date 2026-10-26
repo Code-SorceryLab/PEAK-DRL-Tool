@@ -867,7 +867,7 @@ def open_balance_command():
     _section("COMMAND CENTER")
     print(_DIM("    Regenerating from runs/balance, runs/probes, and every training run...\n"))
     try:
-        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
+        subprocess.run([sys.executable, "-m", "code.neuro.command_center", "--serve", "--open"])
     except KeyboardInterrupt:
         pass
 
@@ -959,8 +959,8 @@ def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg,
 def _open_command_center(page: str = "report") -> None:
     if input(_DIM("\n    Open the Command Center? [Y/n]: ")).strip().lower() in ("n", "no"):
         return
-    subprocess.run([sys.executable, "-m", "code.neuro.report"])  # regenerates every page
-    webbrowser.open((RUNS_DIR / "balance" / f"{page}.html").resolve().as_uri())
+    subprocess.run([sys.executable, "-m", "code.neuro.command_center"])  # rebuilds runs/site
+    webbrowser.open((RUNS_DIR / "site" / "index.html").resolve().as_uri())
 
 
 def run_sensor_ablation():

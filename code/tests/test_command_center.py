@@ -75,3 +75,21 @@ def test_the_mutations_sub_page_keeps_the_totals_for_every_game():
     page = ast_page.render(res, only="meatboy", nav=False)
     sc = ast_page.scores(res)
     assert f'{sc["good"]}</span>' in page and 'id="meatboy"' in page and 'id="mario"' not in page and "<nav" not in page
+
+
+def test_the_site_has_every_tab_of_every_game(tmp_path):
+    from code.neuro import command_center
+    (tmp_path / "videos" / "mario").mkdir(parents=True)
+    (tmp_path / "videos" / "mario" / "novice.webm").write_bytes(b"x")
+    written = command_center.build_site(str(tmp_path / "site"), str(tmp_path / "videos"))
+    names = {os.path.relpath(p, tmp_path / "site") for p in written}
+    assert {"index.html", "howitworks.html", ".nojekyll", "videos/mario/novice.webm"} <= names
+    assert {f"{g}-{t}.html" for g in command_center.GAMES for t in ("balance", "mutations", "gasweep", "ablation")} <= names
+
+
+def test_the_wall_says_which_videos_are_missing():
+    from code.neuro import command_center
+    html = command_center.shell({"mario": {"novice": True, "clumsy": False}})
+    assert 'data-src="videos/mario/novice.webm"' in html and "not recorded yet" in html
+    assert "PEAK Command Center" in html and "Balance Command" not in html
+    assert "loop" in html and "muted" in html and "playsinline" in html

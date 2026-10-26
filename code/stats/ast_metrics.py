@@ -380,14 +380,13 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="AST evaluation metrics over the playtest attempts")
     ap.add_argument("--game", action="append", choices=GAMES, help="only this game (repeatable)")
     ap.add_argument("--page", action="store_true",
-                    help="also write the Command Center's Mutations page, runs/balance/mutations.html (every game)")
+                    help="also rebuild the Command Center (runs/site/), its Mutations tab included")
     args = ap.parse_args()
     games = args.game or GAMES
     results = {g: evaluate(g) for g in (GAMES if args.page else games)}
     if args.page:
-        from code.neuro.report import BALANCE_DIR
-        from code.stats import ast_page
-        print(f"wrote {ast_page.write(results, os.path.join(BALANCE_DIR, 'mutations.html'))}")
+        from code.neuro import command_center
+        print(f"wrote {len(command_center.build_site())} files to {command_center.SITE_DIR}")
     os.makedirs(ROOT, exist_ok=True)
     path = os.path.join(ROOT, "metrics.json")
     old = {}

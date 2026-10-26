@@ -163,7 +163,7 @@ python -m code.neuro.trainer --game mario --best
 python -m code.neuro.balance --game mario --gens 40 --best
 
 # Report
-python -m code.neuro.report --serve --open                             # command center (▶ Watch needs --serve)
+python -m code.neuro.command_center --serve --open                     # the Command Center (menu 12)
 python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
 streamlit run code/stats/dashboard/app.py                              # B1/B2/B3 stats dashboard
 
@@ -449,7 +449,7 @@ code/neuro/web/index.html   TOPDOWN (which keymap manual takeover uses)
 python -m pytest code/tests/test_<game>.py -q             # levels, rules, sensor dims
 python -m code.games.tools.manual_play --game <game> --random --fps 600
 python -m code.neuro.trainer --game <game> --level 0 --gens 40 --turbo --no-serve
-python -m code.neuro.balance --game <game> --gens 20      # then: python -m code.neuro.report
+python -m code.neuro.balance --game <game> --gens 20      # then: python -m code.neuro.command_center
 ```
 
 Level 0 should be solved within a handful of generations. If it isn't, the problem is the sensors

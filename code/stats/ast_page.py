@@ -1,5 +1,5 @@
-"""The Command Center's Mutations page, runs/balance/mutations.html: the AST evaluation at a glance
-(written by `python -m code.neuro.report` with the other pages, and by ast_metrics --page).
+"""The Command Center's Mutations tab: the AST evaluation at a glance, one page per game in the
+site that `python -m code.neuro.command_center` (and ast_metrics --page) writes to runs/site/.
 
 On top, the board: one cell per game and mutant, saying whether the playtest caught it (a breaking
 or degrading mutant should be caught, a neutral one should stay quiet, the cosmetic copy must

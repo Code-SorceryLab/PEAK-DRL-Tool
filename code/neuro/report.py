@@ -2235,8 +2235,8 @@ def _instructions_page(games: list[str], logo: str | None, nav: bool = True, aft
     high bound and reports which knobs matter per game on the <b>GA sweep</b> page — with a
     recommended config and a first-win-vs-parameters capacity curve.</li>
     <li>Only <b>enabled</b> levels are probed — toggle them with <b>10 Toggle Levels</b>.</li>
-    <li>Regenerate this page any time: <code>python -m code.neuro.report --open</code> — it
-    re-reads every probe under <code>runs/probes/</code>, so it works without a finished sweep.</li>
+    <li>Regenerate the Command Center any time: <code>python -m code.neuro.command_center --open</code>
+    (menu 12). It reads the report each probe run wrote (paper seeds only), so it works without a finished sweep.</li>
     <li>Each distinct config (persona · population · generation budget · sensors) gets its own section
     and its own probe folders; re-running the same config on a level replaces that level only.</li>
   </ul>"""),

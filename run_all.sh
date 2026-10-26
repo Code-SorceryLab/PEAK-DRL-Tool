@@ -34,7 +34,7 @@ sweeps() {
     $PY -m code.neuro.gasweep --game $g --persona $p --gens $GENS --seeds "${SEEDS[@]}" --workers $W --sensors rays --confirm
     stamp "END gasweep $g $p rc=$?"
   done; done
-  $PY -m code.neuro.report
+  $PY -m code.neuro.command_center
   stamp "ALL DONE"
 }
 
