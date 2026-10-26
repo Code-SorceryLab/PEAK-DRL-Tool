@@ -124,3 +124,22 @@ a time, and that never stalls.
 - Whether `cameras.py` keeps its live server for local use or only records.
 - Tests: keep `code/tests/test_report.py` and the AST tests passing; add tests where the build
   changes behaviour (no tracked file written, every game's tabs present, no ripped art).
+
+## Round 2 (2026-10-26, after AL saw the local site)
+
+AL asked for six more things before the first publish. AL's answers to the four questions are marked AL;
+the rest is my call.
+
+| What | Decision | By |
+|---|---|---|
+| Zoom | A click on a wall tile opens it large in a dialog; Esc or a click outside closes it, as the old live wall did | AL |
+| Sensor data | In the large view only: the rays drawn over the video and the sensor bars beside it, in step with the video (the old wall's watched view) | AL |
+| Level names | Every tile shows the level playing and the result of the last attempt, over the video | AL |
+| Mega Man sections | Mega Man's videos play one attempt per section from its start (8 sections), as the 2D games play one per level, so the sections after Street appear | AL |
+| Levels in the Balance tab | A level that the game has but no agent trained on (Bomberman 12 to 14, Mario's practice variants, Mega Man's full stage and practice sections) appears as a "not trained yet" card | AL |
+| Pixel look | The top bar and tabs use the look of the old pages' top bar (PEAK Pixel font, pixel frames, a pixel icon per tab) | AL |
+| Agents to download | Every paper-seed agent under `runs/probes` and `runs/ast`: `agents/<path as in runs>/best.npz` plus a slim `state.json` (persona, seed, network settings, level; no history), so `python -m code.neuro.trainer --game <g> --replay <dir>/best.npz` works on a download unchanged; plus `agents/<game>.zip`. About 2,000 agents, under 10 MB | AL asked; layout my call |
+| Reproduce tab | A new tab before How it works: per game, setting up the repo, replaying any agent (a table of agents with download links and the replay command), retraining it (the balance command with its seed, persona, level, budget and GA setting), and rebuilding the results (the Command Center, the AST evaluation and paper tables) | AL asked; content my call |
+| Video data | Next to each video: `<persona>.json`, a small timeline (level and result per attempt, with the frame it starts) for the captions, and `<persona>.sensors.json` (rays and sensor values every 2nd frame) loaded only when the large view opens | my call |
+| Mega Man video length | 7,200 frames (4 minutes) for 8 sections, 900 each; the 2D games keep 5,400 | my call |
+| Tab order | Replay wall, Balance, Mutations, GA sweep, Sensor ablation, Reproduce, How it works | my call |

@@ -449,3 +449,25 @@ Expected: every tab shows data or its "not run" panel; 24 tiles, each a looping 
 
 Show AL the local page. Only after AL says yes in chat, run: `.venv/bin/python -m code.neuro.command_center --publish --push`.
 Expected: https://code-sorcerylab.github.io/PEAK-DRL-Tool/ shows the Command Center within a few minutes; tag `landing-page-2026-03` exists on origin.
+
+---
+
+## Round 2 (spec: "Round 2" section)
+
+### Task 9: Pixel top bar and tabs
+Files: `code/neuro/command_center.py`, test file. The shell reuses `report.CSS` and the old `nav` markup (`.brand`, `.links`, pixel frames); every tab gets an icon: wall `gamepad`, balance `trophy`, mutations `dna`, gasweep `gear`, ablation `eye`, reproduce `sprout`, howitworks `qblock`. Test: the shell has a `<nav` with `class="brand"`, every tab button holds `<i class="ico `, and the tab order is the spec's.
+
+### Task 10: Balance tab lists untrained levels
+Files: `code/neuro/report.py` (`_game_section` or `balance_page`), test file. `balance_page` adds a "not trained yet" card for every `list_levels(game, include_disabled=True)` level with no report row. Test: `bomberman` page names levels 12, 13, 14 with "not trained yet"; `megaman` page names `CutMan-4-Shaft-Gap`.
+
+### Task 11: Recording writes a timeline and a sensor track; Mega Man per section
+Files: `code/neuro/wall_video.py`, `code/neuro/cameras.py`, test file. `frames()` also collects, per frame, the camera's level, its result when an attempt ends, and every 2nd frame its rays (relative to the view, scaled to the video width) and sensor values; `main` writes `<persona>.json` (`{"fps", "width", "height", "attempts": [[start_frame, level, result]]}`) and `<persona>.sensors.json` (`{"labels", "every": 2, "frames": [[rays, sensors], ...]}`). `MegamanCamera(legs, scopes=[...8 sections])` plays one attempt per section and has `end_attempt()`; Mega Man records with 7,200 frames. Tests: FakeCam timeline (two levels: two attempts with their start frames and results), sensors sampled every 2nd frame, a Mega Man camera with two section scopes ends after two attempts.
+
+### Task 12: Large view with rays and sensor bars; captions on tiles
+Files: `code/neuro/command_center.py`, test file. Tiles show a caption (level, last result) from `<persona>.json`; a click opens a `<dialog>` with the video large, a canvas drawing the rays of the current sampled frame, and the sensor bars (labels from the track), all following `video.currentTime`; Esc or a click outside closes it and pauses nothing else. `build_site` copies the two JSON files next to each video. Test: the shell has the dialog, the copied JSON files are in the site; browser check: opening a tile shows rays moving and bars changing, no console errors.
+
+### Task 13: Hosted agents and the Reproduce tab
+Files: `code/neuro/command_center.py`, `code/neuro/report.py` (or a new `reproduce_page`), test file. `build_site` copies every paper-seed `best.npz` under `runs/probes` and `runs/ast` to `agents/...` with a slim `state.json` (keys: `persona`, `best_level`, `best_fitness`, `config` limited to `seed`, `sensors`, `hidden`, `action_feedback`, `memory`, `pop_size`, `max_frames`) and writes `agents/<game>.zip`; `reproduce_page(game, data)` renders the tab. Tests: a hosted agent's folder has both files, its `state.json` has no `history`, a stray-seed agent is not hosted; the replay command for one hosted Mario agent runs headless for a few frames (`trainer.replay` on the hosted folder) without error.
+
+### Task 14: Re-record, rebuild, check, then ask AL
+Re-record all 24 videos (timelines and sensor tracks), rebuild, run the headless Chrome check over every game and tab plus the large view, then show AL and publish only on AL's yes.
