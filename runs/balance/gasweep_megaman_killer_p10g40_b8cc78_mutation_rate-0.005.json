@@ -1,0 +1,4826 @@
+{
+  "game": "megaman",
+  "persona": "killer",
+  "tag": "p10g40_b8cc78_mutation_rate-0.005",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 6504.3,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.005,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 6,
+    "n_inputs": 26
+  },
+  "levels": [
+    {
+      "level": "CutMan-1-Street",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 12.0,
+      "best_gen_ci": 21.7,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.51,
+      "causes": {
+        "Stall": 616,
+        "Pit": 583,
+        "Blader": 1
+      },
+      "best_x_mean": 542.5,
+      "stuck_frac_mean": 0.513,
+      "trends": [
+        "FLAT",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.007,
+      "train_time_s": 943.0,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.364,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        87,
+        419,
+        11,
+        83,
+        13,
+        560,
+        27,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.331,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "CutMan-2-Climb",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 30.7,
+      "best_gen_ci": 28.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.99,
+      "causes": {
+        "Stall": 1192,
+        "Timeout": 8
+      },
+      "best_x_mean": 147.2,
+      "stuck_frac_mean": 0.993,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0081,
+      "train_time_s": 705.1,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.1,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        626,
+        573,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.139,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "CutMan-3-Ledges",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 19.7,
+      "best_gen_ci": 31.5,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.83,
+      "causes": {
+        "Stall": 997,
+        "Timeout": 3,
+        "Pit": 180,
+        "Octopus Battery": 19,
+        "Flea": 1
+      },
+      "best_x_mean": 512.0,
+      "stuck_frac_mean": 0.831,
+      "trends": [
+        "IMPROVING",
+        "FLAT",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0097,
+      "train_time_s": 690.6,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.21,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        464,
+        252,
+        63,
+        153,
+        32,
+        231,
+        4,
+        1,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.445,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "CutMan-4-Shaft",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 24.7,
+      "best_gen_ci": 45.1,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.95,
+      "causes": {
+        "Stall": 1143,
+        "Timeout": 2,
+        "Octopus Battery": 55
+      },
+      "best_x_mean": 259.4,
+      "stuck_frac_mean": 0.953,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0222,
+      "train_time_s": 791.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.179,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        284,
+        263,
+        653,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.345,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "CutMan-5-Rooftop",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 12.5,
+      "first_win_ci": 133.4,
+      "best_gen_mean": 14.3,
+      "best_gen_ci": 35.5,
+      "win_rate_mean": 0.313,
+      "win_rate_ci": 1.327,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.73,
+      "causes": {
+        "Stall": 549,
+        "Timeout": 52,
+        "Super Cutter": 88,
+        "?": 43,
+        "Blader": 18
+      },
+      "best_x_mean": 766.6,
+      "stuck_frac_mean": 0.54,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.2261,
+      "train_time_s": 859.7,
+      "completion_rate_mean": 0.267,
+      "mean_completion_time": 55.8,
+      "completion_time_stddev": 2.9,
+      "progress_at_death_mean": 0.287,
+      "deaths_per_run_mean": 7.33,
+      "death_hist": [
+        172,
+        74,
+        299,
+        50,
+        44,
+        22,
+        27,
+        20,
+        29,
+        13
+      ],
+      "death_cluster_entropy_mean": 0.665,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.202
+    },
+    {
+      "level": "CutMan-6-Descent",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 5.0,
+      "best_gen_ci": 9.0,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.66,
+      "causes": {
+        "Blader": 10,
+        "Stall": 795,
+        "Spike": 385,
+        "Timeout": 10
+      },
+      "best_x_mean": 114.3,
+      "stuck_frac_mean": 0.662,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.001,
+      "train_time_s": 807.2,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.046,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        1187,
+        13,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.022,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "CutMan-7-Corridor",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 1.7,
+      "first_win_ci": 1.4,
+      "best_gen_mean": 3.0,
+      "best_gen_ci": 4.3,
+      "win_rate_mean": 0.91,
+      "win_rate_ci": 0.138,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.88,
+      "causes": {
+        "Stall": 58,
+        "?": 8
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.163,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.2216,
+      "train_time_s": 251.9,
+      "completion_rate_mean": 0.814,
+      "mean_completion_time": 30.1,
+      "completion_time_stddev": 1.3,
+      "progress_at_death_mean": 0.266,
+      "deaths_per_run_mean": 1.86,
+      "death_hist": [
+        29,
+        5,
+        2,
+        4,
+        2,
+        1,
+        19,
+        4,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.474,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.514
+    },
+    {
+      "level": "CutMan-8-Boss",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 28.3,
+      "best_gen_ci": 26.8,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.61,
+      "causes": {
+        "Stall": 727,
+        "Cut Man": 473
+      },
+      "best_x_mean": 837.9,
+      "stuck_frac_mean": 0.606,
+      "trends": [
+        "FLAT",
+        "IMPROVING",
+        "FLAT"
+      ],
+      "improvement_rate_mean": 0.0018,
+      "train_time_s": 1455.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.566,
+      "deaths_per_run_mean": 10.0,
+      "death_hist": [
+        20,
+        4,
+        5,
+        47,
+        76,
+        559,
+        438,
+        45,
+        6,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.52,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "CutMan-1-Street": [
+      {
+        "level": "CutMan-1-Street",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 622.3,
+        "best_x": 622.3,
+        "stuck_frac": 0.065,
+        "causes": {
+          "Stall": 26,
+          "Pit": 374
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 374.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.547,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          13,
+          2,
+          4,
+          3,
+          0,
+          351,
+          27,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.225,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            622.0,
+            126.8
+          ],
+          [
+            569.3,
+            298.2
+          ],
+          [
+            569.3,
+            473.8
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            568.4
+          ],
+          [
+            622.3,
+            574.4
+          ],
+          [
+            613.4,
+            554.3
+          ],
+          [
+            619.5,
+            573.7
+          ],
+          [
+            620.9,
+            573.8
+          ],
+          [
+            569.3,
+            569.0
+          ],
+          [
+            569.3,
+            549.3
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            569.2
+          ],
+          [
+            569.3,
+            569.0
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            569.0
+          ],
+          [
+            569.3,
+            569.1
+          ],
+          [
+            569.3,
+            568.5
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            569.1
+          ],
+          [
+            569.3,
+            569.2
+          ],
+          [
+            569.3,
+            569.0
+          ],
+          [
+            569.3,
+            568.7
+          ],
+          [
+            569.3,
+            568.9
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            569.3,
+            569.2
+          ],
+          [
+            569.3,
+            550.3
+          ],
+          [
+            621.3,
+            579.6
+          ],
+          [
+            569.3,
+            568.9
+          ],
+          [
+            569.3,
+            569.3
+          ],
+          [
+            617.6,
+            574.0
+          ],
+          [
+            569.6,
+            568.4
+          ],
+          [
+            569.3,
+            568.9
+          ],
+          [
+            618.4,
+            573.6
+          ],
+          [
+            618.3,
+            574.2
+          ],
+          [
+            620.3,
+            581.4
+          ],
+          [
+            622.2,
+            587.4
+          ],
+          [
+            620.1,
+            588.6
+          ],
+          [
+            622.2,
+            599.1
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-1-Street_1234"
+      },
+      {
+        "level": "CutMan-1-Street",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 837.8,
+        "best_x": 562.8,
+        "stuck_frac": 0.4775,
+        "causes": {
+          "Stall": 191,
+          "Pit": 209
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0,
+        "train_time_s": 286.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.418,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          16,
+          85,
+          3,
+          80,
+          7,
+          209,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.533,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            562.8,
+            98.3
+          ],
+          [
+            562.8,
+            201.4
+          ],
+          [
+            562.8,
+            334.5
+          ],
+          [
+            562.8,
+            501.3
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            562.8,
+            562.8
+          ],
+          [
+            822.8,
+            590.8
+          ],
+          [
+            562.8,
+            545.0
+          ],
+          [
+            380.2,
+            380.2
+          ],
+          [
+            697.8,
+            697.8
+          ],
+          [
+            822.8,
+            640.8
+          ],
+          [
+            692.8,
+            591.3
+          ],
+          [
+            692.8,
+            474.0
+          ],
+          [
+            692.8,
+            642.8
+          ],
+          [
+            832.8,
+            738.3
+          ],
+          [
+            837.8,
+            619.0
+          ],
+          [
+            385.2,
+            378.4
+          ],
+          [
+            197.6,
+            193.1
+          ],
+          [
+            395.2,
+            375.7
+          ],
+          [
+            395.2,
+            377.7
+          ],
+          [
+            197.6,
+            197.6
+          ],
+          [
+            197.6,
+            197.1
+          ],
+          [
+            400.2,
+            343.9
+          ],
+          [
+            380.2,
+            329.3
+          ],
+          [
+            380.2,
+            293.3
+          ],
+          [
+            692.8,
+            497.2
+          ],
+          [
+            385.2,
+            372.2
+          ],
+          [
+            562.8,
+            525.8
+          ],
+          [
+            395.2,
+            386.2
+          ],
+          [
+            562.8,
+            453.7
+          ],
+          [
+            832.8,
+            723.0
+          ],
+          [
+            697.8,
+            660.3
+          ],
+          [
+            562.8,
+            477.7
+          ],
+          [
+            385.2,
+            370.2
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-1-Street_2025"
+      },
+      {
+        "level": "CutMan-1-Street",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 8,
+        "win_rate": 0.0,
+        "best": 1225.3,
+        "best_x": 442.4,
+        "stuck_frac": 0.9975,
+        "causes": {
+          "Stall": 399,
+          "Blader": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0211,
+        "train_time_s": 281.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.128,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          58,
+          332,
+          4,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.236,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            421.3,
+            107.3
+          ],
+          [
+            442.4,
+            245.1
+          ],
+          [
+            431.8,
+            223.3
+          ],
+          [
+            539.0,
+            360.3
+          ],
+          [
+            444.7,
+            343.9
+          ],
+          [
+            449.8,
+            234.6
+          ],
+          [
+            636.8,
+            366.7
+          ],
+          [
+            1225.3,
+            723.0
+          ],
+          [
+            551.3,
+            345.7
+          ],
+          [
+            554.3,
+            356.0
+          ],
+          [
+            554.3,
+            504.3
+          ],
+          [
+            551.3,
+            387.0
+          ],
+          [
+            304.3,
+            300.9
+          ],
+          [
+            554.3,
+            541.4
+          ],
+          [
+            554.3,
+            552.3
+          ],
+          [
+            554.3,
+            553.4
+          ],
+          [
+            554.3,
+            552.3
+          ],
+          [
+            554.3,
+            553.7
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            429.3,
+            427.9
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            553.4
+          ],
+          [
+            554.3,
+            545.6
+          ],
+          [
+            554.3,
+            552.1
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            552.0
+          ],
+          [
+            429.3,
+            428.4
+          ],
+          [
+            554.3,
+            552.0
+          ],
+          [
+            554.3,
+            552.5
+          ],
+          [
+            554.3,
+            552.8
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            552.3
+          ],
+          [
+            554.3,
+            545.1
+          ],
+          [
+            554.3,
+            552.5
+          ],
+          [
+            554.3,
+            553.1
+          ],
+          [
+            554.3,
+            552.0
+          ],
+          [
+            554.3,
+            552.5
+          ],
+          [
+            554.3,
+            553.7
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-1-Street_31337"
+      }
+    ],
+    "CutMan-2-Climb": [
+      {
+        "level": "CutMan-2-Climb",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 195.4,
+        "best_x": 195.4,
+        "stuck_frac": 0.99,
+        "causes": {
+          "Stall": 396,
+          "Timeout": 4
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0152,
+        "train_time_s": 274.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.171,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          28,
+          372,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.11,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            88.1,
+            33.5
+          ],
+          [
+            177.4,
+            68.9
+          ],
+          [
+            178.7,
+            111.6
+          ],
+          [
+            173.3,
+            150.2
+          ],
+          [
+            177.3,
+            173.3
+          ],
+          [
+            195.4,
+            159.4
+          ],
+          [
+            171.9,
+            171.8
+          ],
+          [
+            173.3,
+            172.7
+          ],
+          [
+            178.7,
+            176.0
+          ],
+          [
+            178.7,
+            178.2
+          ],
+          [
+            177.5,
+            173.4
+          ],
+          [
+            183.0,
+            178.0
+          ],
+          [
+            177.4,
+            177.4
+          ],
+          [
+            183.0,
+            178.0
+          ],
+          [
+            183.0,
+            183.0
+          ],
+          [
+            177.4,
+            177.0
+          ],
+          [
+            183.6,
+            183.1
+          ],
+          [
+            183.6,
+            183.1
+          ],
+          [
+            183.6,
+            183.3
+          ],
+          [
+            183.8,
+            183.5
+          ],
+          [
+            178.3,
+            178.0
+          ],
+          [
+            183.8,
+            183.6
+          ],
+          [
+            183.8,
+            180.2
+          ],
+          [
+            183.8,
+            183.4
+          ],
+          [
+            183.8,
+            183.6
+          ],
+          [
+            183.8,
+            183.5
+          ],
+          [
+            183.8,
+            183.0
+          ],
+          [
+            183.8,
+            183.8
+          ],
+          [
+            183.8,
+            183.8
+          ],
+          [
+            183.8,
+            183.1
+          ],
+          [
+            183.8,
+            183.7
+          ],
+          [
+            178.3,
+            178.1
+          ],
+          [
+            178.3,
+            178.1
+          ],
+          [
+            178.7,
+            178.4
+          ],
+          [
+            183.8,
+            183.7
+          ],
+          [
+            179.1,
+            178.5
+          ],
+          [
+            183.8,
+            183.6
+          ],
+          [
+            183.8,
+            181.8
+          ],
+          [
+            183.8,
+            179.3
+          ],
+          [
+            195.4,
+            184.3
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-2-Climb_1234"
+      },
+      {
+        "level": "CutMan-2-Climb",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 34,
+        "win_rate": 0.0,
+        "best": 41.9,
+        "best_x": 41.9,
+        "stuck_frac": 0.99,
+        "causes": {
+          "Stall": 396,
+          "Timeout": 4
+        },
+        "trend": "FLAT",
+        "improvement_rate": -0.0,
+        "train_time_s": 184.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.034,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          400,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.0,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            38.6,
+            15.1
+          ],
+          [
+            41.2,
+            35.7
+          ],
+          [
+            40.2,
+            35.1
+          ],
+          [
+            38.8,
+            38.8
+          ],
+          [
+            36.6,
+            34.1
+          ],
+          [
+            36.6,
+            26.8
+          ],
+          [
+            37.8,
+            34.8
+          ],
+          [
+            38.1,
+            37.0
+          ],
+          [
+            38.8,
+            38.7
+          ],
+          [
+            40.4,
+            23.0
+          ],
+          [
+            39.8,
+            37.1
+          ],
+          [
+            40.1,
+            38.6
+          ],
+          [
+            41.1,
+            38.7
+          ],
+          [
+            38.8,
+            34.6
+          ],
+          [
+            38.8,
+            30.5
+          ],
+          [
+            37.8,
+            35.9
+          ],
+          [
+            40.1,
+            34.9
+          ],
+          [
+            37.8,
+            34.3
+          ],
+          [
+            40.1,
+            38.5
+          ],
+          [
+            36.6,
+            32.9
+          ],
+          [
+            40.3,
+            35.7
+          ],
+          [
+            36.6,
+            35.3
+          ],
+          [
+            37.8,
+            33.3
+          ],
+          [
+            38.8,
+            36.8
+          ],
+          [
+            40.3,
+            36.1
+          ],
+          [
+            37.1,
+            32.5
+          ],
+          [
+            39.1,
+            35.9
+          ],
+          [
+            39.6,
+            32.9
+          ],
+          [
+            38.1,
+            33.5
+          ],
+          [
+            36.6,
+            26.8
+          ],
+          [
+            38.8,
+            37.0
+          ],
+          [
+            38.1,
+            35.8
+          ],
+          [
+            38.8,
+            37.6
+          ],
+          [
+            41.9,
+            37.9
+          ],
+          [
+            41.0,
+            37.3
+          ],
+          [
+            40.7,
+            39.3
+          ],
+          [
+            38.8,
+            37.6
+          ],
+          [
+            39.1,
+            27.7
+          ],
+          [
+            38.8,
+            36.8
+          ],
+          [
+            40.5,
+            32.9
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-2-Climb_2025"
+      },
+      {
+        "level": "CutMan-2-Climb",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 393.8,
+        "best_x": 204.4,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0091,
+        "train_time_s": 246.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.094,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          198,
+          201,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.308,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            58.9,
+            21.3
+          ],
+          [
+            58.9,
+            50.7
+          ],
+          [
+            58.9,
+            33.8
+          ],
+          [
+            174.9,
+            65.5
+          ],
+          [
+            127.5,
+            75.0
+          ],
+          [
+            127.5,
+            119.4
+          ],
+          [
+            127.5,
+            120.6
+          ],
+          [
+            127.7,
+            113.8
+          ],
+          [
+            172.3,
+            111.4
+          ],
+          [
+            169.8,
+            107.4
+          ],
+          [
+            167.6,
+            131.8
+          ],
+          [
+            127.5,
+            114.7
+          ],
+          [
+            320.5,
+            158.3
+          ],
+          [
+            179.7,
+            112.0
+          ],
+          [
+            179.7,
+            108.2
+          ],
+          [
+            179.7,
+            128.8
+          ],
+          [
+            205.1,
+            128.6
+          ],
+          [
+            393.8,
+            110.9
+          ],
+          [
+            162.5,
+            114.1
+          ],
+          [
+            262.7,
+            134.2
+          ],
+          [
+            127.5,
+            98.4
+          ],
+          [
+            265.0,
+            189.3
+          ],
+          [
+            135.0,
+            108.2
+          ],
+          [
+            140.2,
+            103.7
+          ],
+          [
+            179.7,
+            102.0
+          ],
+          [
+            179.7,
+            125.4
+          ],
+          [
+            127.7,
+            95.8
+          ],
+          [
+            127.4,
+            119.0
+          ],
+          [
+            179.7,
+            113.6
+          ],
+          [
+            290.8,
+            133.0
+          ],
+          [
+            283.4,
+            150.2
+          ],
+          [
+            235.4,
+            130.3
+          ],
+          [
+            307.2,
+            180.3
+          ],
+          [
+            138.1,
+            104.3
+          ],
+          [
+            179.7,
+            136.3
+          ],
+          [
+            179.7,
+            116.6
+          ],
+          [
+            153.0,
+            122.2
+          ],
+          [
+            179.7,
+            119.6
+          ],
+          [
+            250.7,
+            108.2
+          ],
+          [
+            251.0,
+            154.5
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-2-Climb_31337"
+      }
+    ],
+    "CutMan-3-Ledges": [
+      {
+        "level": "CutMan-3-Ledges",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 10,
+        "win_rate": 0.0,
+        "best": 358.3,
+        "best_x": 216.8,
+        "stuck_frac": 0.9975,
+        "causes": {
+          "Stall": 399,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 210.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.003,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          396,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.027,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            226.8,
+            59.0
+          ],
+          [
+            176.7,
+            111.3
+          ],
+          [
+            176.7,
+            39.7
+          ],
+          [
+            176.7,
+            98.0
+          ],
+          [
+            176.7,
+            125.2
+          ],
+          [
+            181.7,
+            144.8
+          ],
+          [
+            181.7,
+            91.8
+          ],
+          [
+            176.7,
+            89.3
+          ],
+          [
+            348.3,
+            142.3
+          ],
+          [
+            358.3,
+            44.3
+          ],
+          [
+            181.7,
+            176.7
+          ],
+          [
+            176.7,
+            91.3
+          ],
+          [
+            358.3,
+            230.7
+          ],
+          [
+            358.3,
+            322.5
+          ],
+          [
+            348.3,
+            161.5
+          ],
+          [
+            176.7,
+            23.7
+          ],
+          [
+            181.7,
+            131.7
+          ],
+          [
+            358.3,
+            62.5
+          ],
+          [
+            181.7,
+            180.7
+          ],
+          [
+            353.3,
+            95.3
+          ],
+          [
+            353.3,
+            215.0
+          ],
+          [
+            358.3,
+            337.7
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            348.3,
+            197.3
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            181.7,
+            179.7
+          ],
+          [
+            353.3,
+            284.7
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            181.7,
+            181.2
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            353.3,
+            250.3
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            353.3,
+            233.2
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            181.7,
+            181.7
+          ],
+          [
+            358.3,
+            252.3
+          ],
+          [
+            358.3,
+            288.2
+          ],
+          [
+            181.7,
+            181.7
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-3-Ledges_1234"
+      },
+      {
+        "level": "CutMan-3-Ledges",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 15,
+        "win_rate": 0.0,
+        "best": 3067.5,
+        "best_x": 731.8,
+        "stuck_frac": 0.8975,
+        "causes": {
+          "Stall": 359,
+          "Timeout": 1,
+          "Pit": 30,
+          "Octopus Battery": 10
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0206,
+        "train_time_s": 214.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.287,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          26,
+          173,
+          11,
+          106,
+          21,
+          58,
+          4,
+          1,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.646,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            353.3,
+            103.9
+          ],
+          [
+            415.4,
+            263.4
+          ],
+          [
+            353.3,
+            264.5
+          ],
+          [
+            869.1,
+            507.1
+          ],
+          [
+            1102.1,
+            501.7
+          ],
+          [
+            3054.0,
+            926.8
+          ],
+          [
+            516.9,
+            374.5
+          ],
+          [
+            1102.6,
+            686.2
+          ],
+          [
+            1277.1,
+            655.5
+          ],
+          [
+            516.9,
+            466.9
+          ],
+          [
+            770.0,
+            602.0
+          ],
+          [
+            770.0,
+            421.9
+          ],
+          [
+            689.9,
+            404.4
+          ],
+          [
+            1273.9,
+            1022.7
+          ],
+          [
+            3067.5,
+            905.7
+          ],
+          [
+            869.1,
+            666.8
+          ],
+          [
+            1284.4,
+            946.6
+          ],
+          [
+            345.3,
+            328.6
+          ],
+          [
+            999.1,
+            513.1
+          ],
+          [
+            345.3,
+            262.0
+          ],
+          [
+            516.9,
+            500.3
+          ],
+          [
+            1102.7,
+            452.8
+          ],
+          [
+            768.3,
+            511.4
+          ],
+          [
+            1453.3,
+            548.1
+          ],
+          [
+            1335.6,
+            824.5
+          ],
+          [
+            524.1,
+            517.6
+          ],
+          [
+            516.9,
+            399.3
+          ],
+          [
+            752.0,
+            423.1
+          ],
+          [
+            1269.0,
+            602.5
+          ],
+          [
+            872.1,
+            553.7
+          ],
+          [
+            689.9,
+            418.5
+          ],
+          [
+            1273.3,
+            648.6
+          ],
+          [
+            870.0,
+            490.1
+          ],
+          [
+            1040.8,
+            644.0
+          ],
+          [
+            516.9,
+            483.6
+          ],
+          [
+            870.0,
+            505.1
+          ],
+          [
+            531.7,
+            483.5
+          ],
+          [
+            1096.4,
+            470.3
+          ],
+          [
+            762.2,
+            483.5
+          ],
+          [
+            1095.6,
+            535.9
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-3-Ledges_2025"
+      },
+      {
+        "level": "CutMan-3-Ledges",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 34,
+        "win_rate": 0.0,
+        "best": 1107.9,
+        "best_x": 587.3,
+        "stuck_frac": 0.5975,
+        "causes": {
+          "Stall": 239,
+          "Timeout": 1,
+          "Pit": 150,
+          "Octopus Battery": 9,
+          "Flea": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0085,
+        "train_time_s": 266.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.34,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          42,
+          76,
+          51,
+          47,
+          11,
+          173,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.663,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            181.7,
+            28.1
+          ],
+          [
+            500.0,
+            103.7
+          ],
+          [
+            500.0,
+            173.9
+          ],
+          [
+            522.2,
+            175.2
+          ],
+          [
+            870.0,
+            304.9
+          ],
+          [
+            869.2,
+            518.7
+          ],
+          [
+            860.8,
+            594.4
+          ],
+          [
+            1039.6,
+            434.8
+          ],
+          [
+            866.6,
+            523.2
+          ],
+          [
+            858.4,
+            484.7
+          ],
+          [
+            873.7,
+            797.1
+          ],
+          [
+            870.3,
+            554.7
+          ],
+          [
+            874.7,
+            503.6
+          ],
+          [
+            875.8,
+            838.0
+          ],
+          [
+            1099.0,
+            650.3
+          ],
+          [
+            872.1,
+            556.5
+          ],
+          [
+            936.8,
+            617.8
+          ],
+          [
+            1045.4,
+            436.2
+          ],
+          [
+            865.6,
+            478.2
+          ],
+          [
+            890.8,
+            647.9
+          ],
+          [
+            876.6,
+            517.5
+          ],
+          [
+            925.4,
+            585.2
+          ],
+          [
+            875.9,
+            855.0
+          ],
+          [
+            872.0,
+            659.3
+          ],
+          [
+            934.1,
+            848.4
+          ],
+          [
+            873.0,
+            514.6
+          ],
+          [
+            926.7,
+            814.5
+          ],
+          [
+            874.2,
+            801.3
+          ],
+          [
+            875.7,
+            767.7
+          ],
+          [
+            1104.6,
+            870.0
+          ],
+          [
+            927.2,
+            646.4
+          ],
+          [
+            876.2,
+            494.1
+          ],
+          [
+            950.6,
+            877.3
+          ],
+          [
+            1107.9,
+            441.5
+          ],
+          [
+            872.7,
+            706.2
+          ],
+          [
+            1044.6,
+            910.9
+          ],
+          [
+            925.5,
+            611.0
+          ],
+          [
+            928.3,
+            764.0
+          ],
+          [
+            932.0,
+            673.5
+          ],
+          [
+            872.6,
+            631.2
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-3-Ledges_31337"
+      }
+    ],
+    "CutMan-4-Shaft": [
+      {
+        "level": "CutMan-4-Shaft",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 32,
+        "win_rate": 0.0,
+        "best": 291.3,
+        "best_x": 277.1,
+        "stuck_frac": 0.98,
+        "causes": {
+          "Stall": 392,
+          "Timeout": 1,
+          "Octopus Battery": 7
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0022,
+        "train_time_s": 264.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.148,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          97,
+          193,
+          110,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.456,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            162.2,
+            52.2
+          ],
+          [
+            168.1,
+            99.5
+          ],
+          [
+            168.9,
+            144.3
+          ],
+          [
+            170.0,
+            93.5
+          ],
+          [
+            176.8,
+            111.5
+          ],
+          [
+            164.6,
+            157.6
+          ],
+          [
+            228.5,
+            151.7
+          ],
+          [
+            170.7,
+            113.1
+          ],
+          [
+            173.4,
+            136.8
+          ],
+          [
+            203.6,
+            151.1
+          ],
+          [
+            204.6,
+            136.2
+          ],
+          [
+            174.9,
+            119.0
+          ],
+          [
+            180.7,
+            123.9
+          ],
+          [
+            181.4,
+            152.0
+          ],
+          [
+            181.4,
+            133.8
+          ],
+          [
+            214.7,
+            120.4
+          ],
+          [
+            176.9,
+            149.6
+          ],
+          [
+            172.6,
+            105.2
+          ],
+          [
+            168.5,
+            61.0
+          ],
+          [
+            171.6,
+            104.0
+          ],
+          [
+            239.3,
+            132.3
+          ],
+          [
+            209.6,
+            124.3
+          ],
+          [
+            242.8,
+            150.4
+          ],
+          [
+            171.7,
+            96.7
+          ],
+          [
+            202.6,
+            158.4
+          ],
+          [
+            203.2,
+            152.2
+          ],
+          [
+            227.3,
+            201.4
+          ],
+          [
+            198.0,
+            154.4
+          ],
+          [
+            268.5,
+            245.7
+          ],
+          [
+            277.1,
+            226.5
+          ],
+          [
+            235.2,
+            188.9
+          ],
+          [
+            291.3,
+            203.1
+          ],
+          [
+            265.9,
+            210.7
+          ],
+          [
+            236.4,
+            225.2
+          ],
+          [
+            212.1,
+            200.4
+          ],
+          [
+            238.4,
+            210.3
+          ],
+          [
+            204.9,
+            100.7
+          ],
+          [
+            240.4,
+            172.2
+          ],
+          [
+            284.3,
+            196.7
+          ],
+          [
+            216.9,
+            180.3
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-4-Shaft_1234"
+      },
+      {
+        "level": "CutMan-4-Shaft",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 4,
+        "win_rate": 0.0,
+        "best": 249.2,
+        "best_x": 249.2,
+        "stuck_frac": 0.8975,
+        "causes": {
+          "Stall": 359,
+          "Timeout": 1,
+          "Octopus Battery": 40
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0579,
+        "train_time_s": 249.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.231,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          31,
+          2,
+          367,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.132,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            57.0,
+            23.8
+          ],
+          [
+            243.9,
+            68.9
+          ],
+          [
+            246.2,
+            113.1
+          ],
+          [
+            249.2,
+            186.9
+          ],
+          [
+            249.2,
+            206.3
+          ],
+          [
+            249.2,
+            233.0
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            246.0,
+            246.0
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            246.1,
+            245.8
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            248.9
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            242.9,
+            242.9
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            249.2,
+            248.7
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            242.9,
+            242.9
+          ],
+          [
+            239.8,
+            239.8
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            248.8
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            249.2,
+            249.2
+          ],
+          [
+            246.1,
+            246.0
+          ],
+          [
+            246.1,
+            246.0
+          ],
+          [
+            242.9,
+            242.9
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            246.1,
+            246.1
+          ],
+          [
+            249.2,
+            249.2
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-4-Shaft_2025"
+      },
+      {
+        "level": "CutMan-4-Shaft",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 38,
+        "win_rate": 0.0,
+        "best": 329.5,
+        "best_x": 252.0,
+        "stuck_frac": 0.98,
+        "causes": {
+          "Stall": 392,
+          "Octopus Battery": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0065,
+        "train_time_s": 277.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.158,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          156,
+          68,
+          176,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.447,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            246.0,
+            52.5
+          ],
+          [
+            301.1,
+            77.2
+          ],
+          [
+            77.1,
+            70.8
+          ],
+          [
+            76.1,
+            70.5
+          ],
+          [
+            90.3,
+            70.2
+          ],
+          [
+            82.7,
+            73.1
+          ],
+          [
+            75.8,
+            71.3
+          ],
+          [
+            79.6,
+            36.3
+          ],
+          [
+            80.1,
+            75.2
+          ],
+          [
+            82.3,
+            77.8
+          ],
+          [
+            91.6,
+            88.2
+          ],
+          [
+            85.6,
+            78.3
+          ],
+          [
+            147.5,
+            68.3
+          ],
+          [
+            138.9,
+            98.5
+          ],
+          [
+            133.5,
+            105.7
+          ],
+          [
+            189.2,
+            109.4
+          ],
+          [
+            244.3,
+            204.2
+          ],
+          [
+            244.3,
+            153.6
+          ],
+          [
+            245.1,
+            130.5
+          ],
+          [
+            251.5,
+            207.3
+          ],
+          [
+            244.2,
+            210.5
+          ],
+          [
+            244.3,
+            218.1
+          ],
+          [
+            242.1,
+            195.7
+          ],
+          [
+            244.2,
+            239.0
+          ],
+          [
+            241.4,
+            225.0
+          ],
+          [
+            245.7,
+            225.3
+          ],
+          [
+            247.9,
+            244.2
+          ],
+          [
+            244.2,
+            244.0
+          ],
+          [
+            247.9,
+            241.8
+          ],
+          [
+            248.3,
+            244.4
+          ],
+          [
+            235.2,
+            204.4
+          ],
+          [
+            240.4,
+            189.8
+          ],
+          [
+            252.0,
+            230.8
+          ],
+          [
+            251.5,
+            124.9
+          ],
+          [
+            252.0,
+            225.9
+          ],
+          [
+            251.9,
+            200.9
+          ],
+          [
+            248.3,
+            248.0
+          ],
+          [
+            329.5,
+            256.1
+          ],
+          [
+            247.9,
+            247.9
+          ],
+          [
+            237.0,
+            234.3
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-4-Shaft_31337"
+      }
+    ],
+    "CutMan-5-Rooftop": [
+      {
+        "level": "CutMan-5-Rooftop",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 2,
+        "win_rate": 0.0,
+        "best": 348.3,
+        "best_x": 299.9,
+        "stuck_frac": 0.66,
+        "causes": {
+          "Stall": 264,
+          "Timeout": 51,
+          "Super Cutter": 85
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.004,
+        "train_time_s": 404.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.201,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          92,
+          46,
+          262,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.375,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            345.1,
+            67.6
+          ],
+          [
+            348.3,
+            131.7
+          ],
+          [
+            80.8,
+            27.9
+          ],
+          [
+            162.7,
+            37.8
+          ],
+          [
+            174.8,
+            75.5
+          ],
+          [
+            80.8,
+            80.6
+          ],
+          [
+            244.5,
+            105.7
+          ],
+          [
+            259.7,
+            182.2
+          ],
+          [
+            275.5,
+            195.2
+          ],
+          [
+            246.9,
+            163.6
+          ],
+          [
+            246.9,
+            211.1
+          ],
+          [
+            248.0,
+            237.9
+          ],
+          [
+            259.6,
+            189.0
+          ],
+          [
+            256.2,
+            223.0
+          ],
+          [
+            271.4,
+            209.7
+          ],
+          [
+            256.9,
+            198.4
+          ],
+          [
+            273.4,
+            248.4
+          ],
+          [
+            251.4,
+            202.0
+          ],
+          [
+            258.3,
+            242.6
+          ],
+          [
+            258.4,
+            230.5
+          ],
+          [
+            260.3,
+            198.6
+          ],
+          [
+            245.6,
+            223.4
+          ],
+          [
+            264.7,
+            192.0
+          ],
+          [
+            264.2,
+            230.2
+          ],
+          [
+            269.6,
+            224.9
+          ],
+          [
+            272.1,
+            253.1
+          ],
+          [
+            275.0,
+            224.3
+          ],
+          [
+            277.0,
+            266.1
+          ],
+          [
+            277.4,
+            260.8
+          ],
+          [
+            281.8,
+            274.6
+          ],
+          [
+            290.2,
+            279.6
+          ],
+          [
+            291.7,
+            243.1
+          ],
+          [
+            291.2,
+            261.7
+          ],
+          [
+            291.8,
+            205.2
+          ],
+          [
+            293.2,
+            264.8
+          ],
+          [
+            291.1,
+            248.5
+          ],
+          [
+            290.6,
+            240.3
+          ],
+          [
+            293.6,
+            281.6
+          ],
+          [
+            299.4,
+            263.1
+          ],
+          [
+            299.9,
+            291.2
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-5-Rooftop_1234"
+      },
+      {
+        "level": "CutMan-5-Rooftop",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 11,
+        "win_rate": 0.93,
+        "best": 8449.8,
+        "best_x": 1000.0,
+        "stuck_frac": 0.15,
+        "causes": {
+          "Stall": 18,
+          "Super Cutter": 2,
+          "?": 4,
+          "Blader": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.638,
+        "train_time_s": 110.8,
+        "completion_rate": 0.783,
+        "mean_completion_time": 39.0,
+        "completion_time_stddev": 1.8,
+        "progress_at_death": 0.266,
+        "deaths_per_run": 2.17,
+        "death_hist": [
+          12,
+          3,
+          2,
+          3,
+          0,
+          0,
+          4,
+          0,
+          0,
+          2
+        ],
+        "death_cluster_entropy": 0.668,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.55,
+        "curve": [
+          [
+            2377.0,
+            263.0
+          ],
+          [
+            8330.7,
+            1337.1
+          ],
+          [
+            7878.3,
+            5968.6
+          ],
+          [
+            8421.0,
+            8352.7
+          ],
+          [
+            7934.8,
+            7666.8
+          ],
+          [
+            7949.8,
+            7873.1
+          ],
+          [
+            8116.4,
+            7801.9
+          ],
+          [
+            8211.7,
+            7859.9
+          ],
+          [
+            8306.9,
+            8099.1
+          ],
+          [
+            8040.0,
+            7500.6
+          ],
+          [
+            8449.8,
+            8409.3
+          ],
+          [
+            8354.5,
+            8268.8
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-5-Rooftop_2025"
+      },
+      {
+        "level": "CutMan-5-Rooftop",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 33,
+        "first_win_gen": 23,
+        "best_gen": 30,
+        "win_rate": 0.01,
+        "best": 7506.2,
+        "best_x": 1000.0,
+        "stuck_frac": 0.8090909090909091,
+        "causes": {
+          "Timeout": 1,
+          "Stall": 267,
+          "Super Cutter": 1,
+          "Blader": 16,
+          "?": 39
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0364,
+        "train_time_s": 344.6,
+        "completion_rate": 0.018,
+        "mean_completion_time": 72.6,
+        "completion_time_stddev": 4.1,
+        "progress_at_death": 0.394,
+        "deaths_per_run": 9.82,
+        "death_hist": [
+          68,
+          25,
+          35,
+          47,
+          44,
+          22,
+          23,
+          20,
+          29,
+          11
+        ],
+        "death_cluster_entropy": 0.951,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.055,
+        "curve": [
+          [
+            343.3,
+            46.2
+          ],
+          [
+            343.3,
+            91.8
+          ],
+          [
+            69.1,
+            17.9
+          ],
+          [
+            343.3,
+            76.9
+          ],
+          [
+            391.5,
+            169.2
+          ],
+          [
+            390.7,
+            192.8
+          ],
+          [
+            391.1,
+            304.2
+          ],
+          [
+            391.1,
+            280.8
+          ],
+          [
+            433.8,
+            307.0
+          ],
+          [
+            433.5,
+            265.1
+          ],
+          [
+            481.2,
+            335.4
+          ],
+          [
+            433.8,
+            236.3
+          ],
+          [
+            480.8,
+            307.8
+          ],
+          [
+            409.9,
+            205.6
+          ],
+          [
+            477.2,
+            275.5
+          ],
+          [
+            489.1,
+            366.2
+          ],
+          [
+            1443.5,
+            454.0
+          ],
+          [
+            2565.9,
+            529.6
+          ],
+          [
+            4564.5,
+            1146.6
+          ],
+          [
+            2518.3,
+            832.5
+          ],
+          [
+            5761.5,
+            2488.9
+          ],
+          [
+            4778.5,
+            2299.0
+          ],
+          [
+            7025.0,
+            4612.5
+          ],
+          [
+            4564.2,
+            3943.0
+          ],
+          [
+            2853.5,
+            2296.9
+          ],
+          [
+            2629.4,
+            1681.9
+          ],
+          [
+            5145.7,
+            2814.9
+          ],
+          [
+            5098.1,
+            2662.8
+          ],
+          [
+            4878.8,
+            2546.1
+          ],
+          [
+            7506.2,
+            4142.1
+          ],
+          [
+            4405.7,
+            2501.1
+          ],
+          [
+            5121.9,
+            2887.5
+          ],
+          [
+            5696.1,
+            4501.4
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-5-Rooftop_31337"
+      }
+    ],
+    "CutMan-6-Descent": [
+      {
+        "level": "CutMan-6-Descent",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 6,
+        "win_rate": 0.0,
+        "best": 1067.8,
+        "best_x": 183.5,
+        "stuck_frac": 0.9725,
+        "causes": {
+          "Blader": 4,
+          "Stall": 389,
+          "Spike": 3,
+          "Timeout": 4
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0028,
+        "train_time_s": 292.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.027,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          388,
+          12,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.059,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            177.8,
+            69.4
+          ],
+          [
+            711.7,
+            155.5
+          ],
+          [
+            1067.7,
+            405.7
+          ],
+          [
+            1067.7,
+            699.9
+          ],
+          [
+            1067.7,
+            923.8
+          ],
+          [
+            1067.8,
+            1067.2
+          ],
+          [
+            1067.8,
+            818.6
+          ],
+          [
+            1067.8,
+            923.9
+          ],
+          [
+            1067.7,
+            1067.0
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.8,
+            1067.8
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            996.4
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            689.3,
+            689.3
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            960.9
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.7,
+            1067.6
+          ],
+          [
+            1067.5,
+            854.1
+          ],
+          [
+            1067.7,
+            1067.5
+          ],
+          [
+            1067.7,
+            1032.0
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-6-Descent_1234"
+      },
+      {
+        "level": "CutMan-6-Descent",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 8,
+        "win_rate": 0.0,
+        "best": 1067.5,
+        "best_x": 59.0,
+        "stuck_frac": 0.9625,
+        "causes": {
+          "Stall": 385,
+          "Blader": 4,
+          "Timeout": 4,
+          "Spike": 7
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 412.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.023,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          400,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.0,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            719.2,
+            94.5
+          ],
+          [
+            1057.5,
+            236.2
+          ],
+          [
+            719.2,
+            445.4
+          ],
+          [
+            706.7,
+            706.7
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1067.5,
+            754.0
+          ],
+          [
+            719.2,
+            712.7
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1057.5,
+            1057.5
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1057.5,
+            1057.5
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1057.5,
+            1057.5
+          ],
+          [
+            1057.5,
+            1057.5
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1057.5,
+            1020.7
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            719.2,
+            719.2
+          ],
+          [
+            1057.5,
+            1057.5
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-6-Descent_2025"
+      },
+      {
+        "level": "CutMan-6-Descent",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 1,
+        "win_rate": 0.0,
+        "best": 351.8,
+        "best_x": 100.3,
+        "stuck_frac": 0.0525,
+        "causes": {
+          "Blader": 2,
+          "Stall": 21,
+          "Spike": 375,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0003,
+        "train_time_s": 102.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.088,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          399,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.008,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            351.8,
+            64.4
+          ],
+          [
+            77.0,
+            43.2
+          ],
+          [
+            92.6,
+            62.6
+          ],
+          [
+            85.6,
+            78.2
+          ],
+          [
+            94.4,
+            84.8
+          ],
+          [
+            93.2,
+            91.0
+          ],
+          [
+            95.3,
+            91.5
+          ],
+          [
+            95.3,
+            94.2
+          ],
+          [
+            95.6,
+            95.4
+          ],
+          [
+            85.5,
+            85.3
+          ],
+          [
+            94.9,
+            92.5
+          ],
+          [
+            94.1,
+            92.7
+          ],
+          [
+            96.1,
+            85.6
+          ],
+          [
+            96.6,
+            90.8
+          ],
+          [
+            85.5,
+            84.4
+          ],
+          [
+            94.1,
+            89.5
+          ],
+          [
+            96.6,
+            92.3
+          ],
+          [
+            94.3,
+            92.5
+          ],
+          [
+            94.8,
+            94.2
+          ],
+          [
+            94.3,
+            94.3
+          ],
+          [
+            96.6,
+            90.1
+          ],
+          [
+            94.3,
+            94.3
+          ],
+          [
+            95.9,
+            90.9
+          ],
+          [
+            95.9,
+            94.6
+          ],
+          [
+            97.8,
+            87.8
+          ],
+          [
+            98.7,
+            93.5
+          ],
+          [
+            98.2,
+            97.1
+          ],
+          [
+            97.8,
+            93.2
+          ],
+          [
+            100.3,
+            96.4
+          ],
+          [
+            97.8,
+            94.5
+          ],
+          [
+            98.4,
+            97.3
+          ],
+          [
+            99.4,
+            96.2
+          ],
+          [
+            99.9,
+            97.7
+          ],
+          [
+            97.7,
+            95.7
+          ],
+          [
+            98.0,
+            95.5
+          ],
+          [
+            98.4,
+            82.5
+          ],
+          [
+            99.8,
+            85.4
+          ],
+          [
+            97.5,
+            96.5
+          ],
+          [
+            99.0,
+            95.1
+          ],
+          [
+            97.7,
+            95.0
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-6-Descent_31337"
+      }
+    ],
+    "CutMan-7-Corridor": [
+      {
+        "level": "CutMan-7-Corridor",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 4,
+        "win_rate": 0.86,
+        "best": 8220.5,
+        "best_x": 1000.0,
+        "stuck_frac": 0.225,
+        "causes": {
+          "Stall": 27,
+          "?": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3323,
+        "train_time_s": 84.7,
+        "completion_rate": 0.75,
+        "mean_completion_time": 29.8,
+        "completion_time_stddev": 1.0,
+        "progress_at_death": 0.388,
+        "deaths_per_run": 2.5,
+        "death_hist": [
+          11,
+          0,
+          1,
+          2,
+          0,
+          0,
+          16,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.433,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.7,
+        "curve": [
+          [
+            5925.7,
+            1095.1
+          ],
+          [
+            8125.2,
+            4031.9
+          ],
+          [
+            7815.7,
+            5002.7
+          ],
+          [
+            8220.5,
+            6321.3
+          ],
+          [
+            8220.5,
+            7288.9
+          ],
+          [
+            7815.7,
+            7552.8
+          ],
+          [
+            8053.8,
+            8053.8
+          ],
+          [
+            8125.2,
+            8125.2
+          ],
+          [
+            8101.4,
+            8101.4
+          ],
+          [
+            7911.0,
+            7911.0
+          ],
+          [
+            8220.5,
+            8220.5
+          ],
+          [
+            8101.4,
+            8101.4
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-7-Corridor_1234"
+      },
+      {
+        "level": "CutMan-7-Corridor",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 4,
+        "win_rate": 0.9,
+        "best": 8268.1,
+        "best_x": 1000.0,
+        "stuck_frac": 0.2,
+        "causes": {
+          "Stall": 24,
+          "?": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3324,
+        "train_time_s": 87.0,
+        "completion_rate": 0.775,
+        "mean_completion_time": 30.4,
+        "completion_time_stddev": 1.9,
+        "progress_at_death": 0.239,
+        "deaths_per_run": 2.25,
+        "death_hist": [
+          11,
+          5,
+          1,
+          2,
+          2,
+          1,
+          3,
+          2,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.758,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.575,
+        "curve": [
+          [
+            5000.9,
+            809.9
+          ],
+          [
+            8125.2,
+            3461.2
+          ],
+          [
+            7815.7,
+            4637.3
+          ],
+          [
+            8268.1,
+            8122.2
+          ],
+          [
+            8220.5,
+            6482.0
+          ],
+          [
+            7815.7,
+            7548.3
+          ],
+          [
+            8053.8,
+            7195.7
+          ],
+          [
+            8125.2,
+            7503.3
+          ],
+          [
+            8101.4,
+            8101.4
+          ],
+          [
+            7911.0,
+            7911.0
+          ],
+          [
+            8220.5,
+            8220.5
+          ],
+          [
+            8101.4,
+            8101.4
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-7-Corridor_2025"
+      },
+      {
+        "level": "CutMan-7-Corridor",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.97,
+        "best": 8268.1,
+        "best_x": 1000.0,
+        "stuck_frac": 0.06363636363636363,
+        "causes": {
+          "Stall": 7,
+          "?": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 80.2,
+        "completion_rate": 0.918,
+        "mean_completion_time": 30.0,
+        "completion_time_stddev": 1.0,
+        "progress_at_death": 0.172,
+        "deaths_per_run": 0.82,
+        "death_hist": [
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.23,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.267,
+        "curve": [
+          [
+            8268.1,
+            3194.1
+          ],
+          [
+            8125.2,
+            6894.0
+          ],
+          [
+            7815.7,
+            7815.7
+          ],
+          [
+            8220.5,
+            8123.2
+          ],
+          [
+            8220.5,
+            7962.2
+          ],
+          [
+            7815.7,
+            7815.7
+          ],
+          [
+            8053.8,
+            8053.8
+          ],
+          [
+            8125.2,
+            8125.2
+          ],
+          [
+            8101.4,
+            8101.4
+          ],
+          [
+            7911.0,
+            7911.0
+          ],
+          [
+            8220.5,
+            8220.5
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-7-Corridor_31337"
+      }
+    ],
+    "CutMan-8-Boss": [
+      {
+        "level": "CutMan-8-Boss",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 33,
+        "win_rate": 0.0,
+        "best": 803.6,
+        "best_x": 803.6,
+        "stuck_frac": 0.43,
+        "causes": {
+          "Stall": 172,
+          "Cut Man": 228
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0013,
+        "train_time_s": 518.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.59,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          10,
+          0,
+          0,
+          4,
+          21,
+          139,
+          210,
+          15,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.494,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            607.1,
+            167.7
+          ],
+          [
+            696.4,
+            462.0
+          ],
+          [
+            656.1,
+            514.9
+          ],
+          [
+            678.6,
+            614.3
+          ],
+          [
+            732.1,
+            662.5
+          ],
+          [
+            651.4,
+            580.8
+          ],
+          [
+            625.0,
+            598.2
+          ],
+          [
+            607.1,
+            583.4
+          ],
+          [
+            633.9,
+            608.0
+          ],
+          [
+            642.9,
+            594.8
+          ],
+          [
+            625.0,
+            597.1
+          ],
+          [
+            696.4,
+            619.6
+          ],
+          [
+            696.4,
+            603.6
+          ],
+          [
+            696.4,
+            641.1
+          ],
+          [
+            660.7,
+            603.1
+          ],
+          [
+            660.7,
+            628.6
+          ],
+          [
+            714.3,
+            633.9
+          ],
+          [
+            651.3,
+            590.0
+          ],
+          [
+            785.7,
+            648.7
+          ],
+          [
+            603.5,
+            539.2
+          ],
+          [
+            696.4,
+            642.9
+          ],
+          [
+            640.8,
+            582.9
+          ],
+          [
+            660.7,
+            608.9
+          ],
+          [
+            660.7,
+            606.3
+          ],
+          [
+            660.7,
+            637.6
+          ],
+          [
+            642.9,
+            612.0
+          ],
+          [
+            660.7,
+            600.9
+          ],
+          [
+            605.3,
+            438.6
+          ],
+          [
+            696.4,
+            602.2
+          ],
+          [
+            696.4,
+            607.1
+          ],
+          [
+            732.1,
+            628.2
+          ],
+          [
+            660.7,
+            607.3
+          ],
+          [
+            803.6,
+            682.1
+          ],
+          [
+            732.1,
+            626.6
+          ],
+          [
+            660.7,
+            604.4
+          ],
+          [
+            750.0,
+            670.5
+          ],
+          [
+            704.9,
+            588.0
+          ],
+          [
+            676.7,
+            562.6
+          ],
+          [
+            727.6,
+            638.8
+          ],
+          [
+            660.7,
+            579.3
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-8-Boss_1234"
+      },
+      {
+        "level": "CutMan-8-Boss",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 36,
+        "win_rate": 0.0,
+        "best": 1886.0,
+        "best_x": 881.0,
+        "stuck_frac": 0.6475,
+        "causes": {
+          "Stall": 259,
+          "Cut Man": 141
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0033,
+        "train_time_s": 465.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.527,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          3,
+          4,
+          5,
+          29,
+          53,
+          227,
+          66,
+          11,
+          2,
+          0
+        ],
+        "death_cluster_entropy": 0.582,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            625.0,
+            327.6
+          ],
+          [
+            625.0,
+            470.8
+          ],
+          [
+            542.6,
+            482.2
+          ],
+          [
+            571.4,
+            537.5
+          ],
+          [
+            785.7,
+            527.5
+          ],
+          [
+            553.6,
+            449.6
+          ],
+          [
+            589.3,
+            532.1
+          ],
+          [
+            517.9,
+            442.7
+          ],
+          [
+            571.4,
+            472.9
+          ],
+          [
+            573.4,
+            529.4
+          ],
+          [
+            589.3,
+            542.9
+          ],
+          [
+            569.8,
+            529.1
+          ],
+          [
+            607.1,
+            507.3
+          ],
+          [
+            732.1,
+            607.1
+          ],
+          [
+            553.6,
+            460.3
+          ],
+          [
+            589.3,
+            548.2
+          ],
+          [
+            589.3,
+            540.4
+          ],
+          [
+            607.1,
+            511.6
+          ],
+          [
+            607.1,
+            591.1
+          ],
+          [
+            573.9,
+            514.8
+          ],
+          [
+            577.0,
+            526.8
+          ],
+          [
+            535.7,
+            472.4
+          ],
+          [
+            1725.2,
+            658.2
+          ],
+          [
+            625.0,
+            561.7
+          ],
+          [
+            714.3,
+            501.8
+          ],
+          [
+            571.4,
+            474.8
+          ],
+          [
+            585.4,
+            450.1
+          ],
+          [
+            660.7,
+            506.9
+          ],
+          [
+            678.6,
+            598.2
+          ],
+          [
+            625.0,
+            587.5
+          ],
+          [
+            678.6,
+            596.0
+          ],
+          [
+            1743.1,
+            641.9
+          ],
+          [
+            750.0,
+            646.4
+          ],
+          [
+            1640.9,
+            933.7
+          ],
+          [
+            601.9,
+            499.6
+          ],
+          [
+            1886.0,
+            1181.8
+          ],
+          [
+            732.1,
+            511.2
+          ],
+          [
+            678.6,
+            594.6
+          ],
+          [
+            660.7,
+            555.3
+          ],
+          [
+            678.6,
+            589.6
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-8-Boss_2025"
+      },
+      {
+        "level": "CutMan-8-Boss",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 16,
+        "win_rate": 0.0,
+        "best": 1814.5,
+        "best_x": 829.1,
+        "stuck_frac": 0.74,
+        "causes": {
+          "Cut Man": 104,
+          "Stall": 296
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.0007,
+        "train_time_s": 471.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.582,
+        "deaths_per_run": 10.0,
+        "death_hist": [
+          7,
+          0,
+          0,
+          14,
+          2,
+          193,
+          162,
+          19,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.484,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            625.0,
+            247.9
+          ],
+          [
+            607.1,
+            430.4
+          ],
+          [
+            660.7,
+            551.8
+          ],
+          [
+            553.6,
+            535.7
+          ],
+          [
+            642.9,
+            592.9
+          ],
+          [
+            625.0,
+            596.4
+          ],
+          [
+            696.4,
+            614.3
+          ],
+          [
+            642.9,
+            562.5
+          ],
+          [
+            785.7,
+            675.0
+          ],
+          [
+            678.6,
+            631.7
+          ],
+          [
+            696.4,
+            601.8
+          ],
+          [
+            767.9,
+            635.7
+          ],
+          [
+            696.4,
+            617.9
+          ],
+          [
+            678.6,
+            604.6
+          ],
+          [
+            767.9,
+            630.9
+          ],
+          [
+            1814.5,
+            915.7
+          ],
+          [
+            1796.7,
+            699.2
+          ],
+          [
+            714.3,
+            601.2
+          ],
+          [
+            732.1,
+            601.6
+          ],
+          [
+            625.0,
+            566.1
+          ],
+          [
+            714.3,
+            623.2
+          ],
+          [
+            642.9,
+            578.6
+          ],
+          [
+            678.6,
+            596.4
+          ],
+          [
+            615.2,
+            572.2
+          ],
+          [
+            571.4,
+            523.1
+          ],
+          [
+            644.7,
+            597.0
+          ],
+          [
+            607.1,
+            560.7
+          ],
+          [
+            678.6,
+            583.8
+          ],
+          [
+            678.6,
+            558.9
+          ],
+          [
+            678.6,
+            615.6
+          ],
+          [
+            625.0,
+            517.7
+          ],
+          [
+            660.7,
+            575.0
+          ],
+          [
+            1707.4,
+            604.3
+          ],
+          [
+            1738.5,
+            763.7
+          ],
+          [
+            678.6,
+            603.5
+          ],
+          [
+            660.7,
+            617.9
+          ],
+          [
+            642.9,
+            606.4
+          ],
+          [
+            829.1,
+            648.2
+          ],
+          [
+            678.6,
+            639.3
+          ],
+          [
+            607.1,
+            574.7
+          ]
+        ],
+        "dir": "runs/gasweep/megaman/killer/p10g40_b8cc78_mutation_rate-0.005/CutMan-8-Boss_31337"
+      }
+    ]
+  }
+}

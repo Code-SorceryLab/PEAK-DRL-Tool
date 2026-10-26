@@ -10,7 +10,7 @@
 #
 # OFAT composites ignore interactions between knobs — `confirmed_win_rate` is the composite
 # actually probed by `--confirm`, next to the `baseline_win_rate` it has to beat.
-generated: 2026-10-23 20:13
+generated: 2026-10-26 16:35
 baseline:
   pop_size: 10
   elite: 4
@@ -263,5 +263,61 @@ games:
           tournament_k: 2
         baseline_win_rate: 0.19
         confirmed_win_rate: 0.037
+        configs: 24
+    sweeps: 6
+  megaman:
+    recommended:
+      pop_size: 30
+      mutation_rate: 0.5
+      anneal_factor: 0.3
+    per_sweep:
+      clumsy / 40 gens / rays:
+        overrides:
+          anneal_factor: 0.3
+          crossover_rate: 0.95
+          init_sigma: 0.25
+          mutation_rate: 0.5
+          mutation_sigma: 0.5
+        baseline_win_rate: 0.1821
+        confirmed_win_rate: 0.1717
+        configs: 24
+      collector / 40 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          mutation_rate: 0.5
+        baseline_win_rate: 0.2279
+        confirmed_win_rate: 0.2407
+        configs: 24
+      experienced / 40 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          mutation_rate: 0.5
+        baseline_win_rate: 0.2279
+        confirmed_win_rate: 0.2407
+        configs: 24
+      killer / 40 gens / rays:
+        overrides: null
+        baseline_win_rate: 0.2467
+        confirmed_win_rate: null
+        configs: 23
+      novice / 40 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          elite: 1
+          hidden: 8
+          memory: 2
+        baseline_win_rate: 0.2092
+        confirmed_win_rate: 0.2119
+        configs: 24
+      speedrunner / 40 gens / rays:
+        overrides:
+          pop_size: 30
+          anneal_factor: 0.3
+          mutation_rate: 0.5
+        baseline_win_rate: 0.2333
+        confirmed_win_rate: 0.2506
         configs: 24
     sweeps: 6
