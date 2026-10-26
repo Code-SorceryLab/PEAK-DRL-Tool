@@ -1,4 +1,4 @@
-"""PEAK Balance Command: one self-contained HTML command center from runs/.
+"""PEAK Command Center: one self-contained HTML command center from runs/.
 
 Merges the balance report and the stats dashboard: per-game sections with an
 Overview (all personas side by side) and persona tabs whose level cards expand
@@ -466,12 +466,23 @@ _MEATBOY_SVG = (
     "<path d='M9 17.5 q3 2.4 6.5 0' stroke='black' stroke-width='1.3' fill='none' stroke-linecap='round'/>"
     "</svg>")
 
+_MEGAMAN_SVG = (  # a blue helmet of our own: the one blue on these pages, so Mega Man reads at a glance
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 36'>"
+    "<path d='M3 17 Q3 3 14 3 Q25 3 25 17 L25 22 L3 22 Z' fill='%230070ec'/>"
+    "<path d='M11 3.4 Q14 2.6 17 3.4 L16 11 L12 11 Z' fill='%233cbcfc'/>"
+    "<rect x='7' y='12' width='14' height='10' rx='3' fill='%23fcd8a8'/>"
+    "<rect x='9.5' y='14' width='3' height='4' rx='1' fill='white'/><rect x='15.5' y='14' width='3' height='4' rx='1' fill='white'/>"
+    "<rect x='10.6' y='15' width='1.6' height='2.6' fill='black'/><rect x='16.6' y='15' width='1.6' height='2.6' fill='black'/>"
+    "<circle cx='4' cy='17' r='2.6' fill='%233cbcfc'/><circle cx='24' cy='17' r='2.6' fill='%233cbcfc'/>"
+    "<rect x='6' y='23' width='16' height='10' rx='4' fill='%230070ec'/><rect x='10' y='23' width='8' height='4' rx='2' fill='%233cbcfc'/>"
+    "</svg>")
+
 _icon_cache: dict[str, str | None] = {}
 
 
 def _game_icon(game: str) -> str:
-    """Small inline icon per game: the mario sprite from the engine assets, a
-    stylized meat cube for meatboy, a letter badge otherwise."""
+    """Small inline icon per game: the mario sprite from the engine assets, our own SVGs for
+    meatboy (a meat cube), bomberman and megaman (a helmet), a letter badge otherwise."""
     if game in _icon_cache:
         src = _icon_cache[game]
     elif game == "mario":
@@ -491,6 +502,9 @@ def _game_icon(game: str) -> str:
         _icon_cache[game] = src
     elif game == "bomberman":
         src = _BOMBERMAN_SVG
+        _icon_cache[game] = src
+    elif game == "megaman":
+        src = _MEGAMAN_SVG
         _icon_cache[game] = src
     else:
         _icon_cache[game] = None
@@ -573,7 +587,7 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "theme
     THEME_CSS = _f.read()
 
 CSS = THEME_CSS + """
-  /* ── Balance Command on the Night Cartridge tokens above ─────────────────── */
+  /* ── Command Center on the Night Cartridge tokens above ─────────────────── */
   :root{  /* the report's older names, kept so existing markup keeps working */
     --bg:var(--night);--panel:var(--deck);--panel2:var(--deck-2);--line2:var(--line);
     --txt:var(--ink);--faint:var(--mute);--mono:var(--ui);
@@ -600,25 +614,20 @@ CSS = THEME_CSS + """
   nav a .gicon{height:1.3em;margin:0;vertical-align:middle}
 
   /* pixel buttons: theme .btn, on the controls the report already has */
-  nav a,.navbtn,.brainbtn,.tab,.cfgbtn,.watchbtn,.close,.fsbtn,.copybtn,details.more summary{
+  nav a,.navbtn,.brainbtn,.tab,.cfgbtn,.close,.fsbtn,.copybtn,details.more summary{
     display:inline-flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;white-space:nowrap;
     font:600 .87rem/1.2 var(--ui);color:var(--ink);text-decoration:none;
     border:3px solid transparent;border-image:var(--frame) 1 / 3px stretch;
     background:var(--deck-2);background-clip:padding-box}
-  nav a:hover,.navbtn:hover,.brainbtn:hover,.tab:hover,.cfgbtn:hover,.watchbtn:hover,.close:hover,
+  nav a:hover,.navbtn:hover,.brainbtn:hover,.tab:hover,.cfgbtn:hover,.close:hover,
   .fsbtn:hover,.copybtn:hover,details.more summary:hover{background-color:var(--deck-3)}
-  nav a:active,.navbtn:active,.brainbtn:active,.tab:active,.cfgbtn:active,.watchbtn:active,
+  nav a:active,.navbtn:active,.brainbtn:active,.tab:active,.cfgbtn:active,
   .close:active,.fsbtn:active,.copybtn:active{transform:translateY(2px)}
   nav a[aria-current],.tab.active{background-color:var(--ink);color:var(--night)}
   .tab[style*="--c"]::before{content:"";width:8px;height:8px;background:var(--c);flex:none}  /* persona colour */
   .brainbtn svg,.navbtn svg{color:var(--blue)}
   .fsbtn,.copybtn{padding:2px 9px;font-size:.78rem}
   .close{padding:3px 10px}
-  .watchbtn{flex:none;color:var(--run)}
-  .cardfoot .watchbtn{padding:2px 9px;font-size:.8rem}
-  html.file .watchbtn{opacity:.35;pointer-events:none;cursor:not-allowed}
-  html.file nav a.wall{display:none}
-  html.file .served-only,html:not(.file) .file-only{display:none}
 
   /* panels: pixel-notched frames (theme .frame). Containers sit on the deck, read-outs on the night */
   .viz,.stat,.lvlcard,.gloss,details.cfg,.cfgblock,.axiscard,.dverdict,.ablmode,dialog.detail,.card{
@@ -1108,37 +1117,6 @@ def _npz_meta(path: str) -> dict:
         return {}
 
 
-def _watch_cmd(game: str, persona: str, level: str, cells: list[dict]) -> tuple[str, str | None]:
-    """(replay block html, /watch href or None) for the strongest seed whose best.npz is still on disk.
-    Legacy probes (pre-tag layout) live at runs/probes/<game>/<level>_<seed>."""
-    for c in sorted(cells, key=lambda c: -c["best"]):
-        d = c.get("dir") or os.path.join(PROBES_ROOT, game, f"{level}_{c['seed']}".replace(" ", "_"))
-        npz = os.path.join(d, "best.npz")
-        if os.path.exists(npz):
-            break
-    else:
-        return ('<div class="viz"><div class="vt">Watch the best agent</div><div class="caption">'
-                'No saved genome found for this level — re-probe it (menu 13) to get one.</div></div>', None)
-    meta = _npz_meta(npz)
-    note = ""
-    if meta and (meta.get("persona") != persona or str(meta.get("level")) != str(level)):
-        note = (f' <b style="color:var(--yellow)">Note:</b> this folder predates per-config layout and '
-                f'was last written by the <b>{meta.get("persona")}</b> sweep on <b>{meta.get("level")}</b> '
-                f'(fitness {meta.get("fitness"):,}) — re-probe for a genome from this persona.')
-    npz = npz.replace(os.sep, "/")
-    from urllib.parse import urlencode
-    href = "/watch?" + urlencode({"game": game, "npz": npz, "label": f"{game} · {persona} · {level}"})
-    return (f'<div class="viz"><div class="vt">Watch this agent — best genome, seed {c["seed"]}, '
-            f'fitness {c["best"]:,.0f}</div>'
-            f'<div class="cmdrow"><a class="watchbtn" href="{href}" target="_blank" rel="noopener">'
-            f'▶ Watch replay</a><code class="cmd">python -m code.neuro.trainer --game {game} '
-            f'--replay {npz}</code><button class="copybtn" type="button">Copy</button></div>'
-            f'<div class="caption"><span class="served-only">Starts the replay and opens the live dashboard '
-            f'in a new tab; a replay already running is replaced after you confirm.</span><span class="file-only">'
-            f'Open the command center via <b>menu 12</b> for a one-click button; as a plain file, run the command '
-            f'from the repo root (or menu 6 → pick this probe).</span>{note}</div></div>', href)
-
-
 def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None) -> str:
     wr = row["win_rate_mean"]
     fw = (f"first win gen {row['first_win_mean']}" if row["first_win_mean"] is not None
@@ -1194,7 +1172,6 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         stats.append(_stat("Strategies", str(strat[0]), "distinct winning routes"))
         stats.append(_stat("Dominant path", f"{strat[1]:.0%}", "share on the top route"))
     vword, vcolor, vsent = _verdict_sentence(row, strat)
-    watch_html, watch_href = _watch_cmd(game, persona, row["level"], cells)
     did = "d_" + "".join(ch if ch.isalnum() else "_" for ch in f"{game}_{persona}_{tag or 'legacy'}_{row['level']}")
 
     curves = _json([c.get("curve", []) for c in cells])
@@ -1226,9 +1203,6 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
           runs, red = failed runs (drawn faint). Where red lines stop is where agents die.{best_note}
           {'' if routes or best else 'No route traces logged for this level yet.'}</div></div>"""
 
-    foot = (f'<div class="cardfoot"><a class="watchbtn" href="{watch_href}" target="_blank" rel="noopener" '
-            f'aria-label="Watch the best {row["level"]} agent">▶ Watch</a>'
-            f'<small>best seed replay · dashboard</small></div>' if watch_href else "")
     # the level window: the route map large on the left, the read-outs beside it, history below
     return f"""
     <div class="lvlcard">
@@ -1238,7 +1212,6 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         <div class="lvlsub">win rate · {fw}</div>
         <div class="mini"><i style="width:{max(2, wr * 100):.0f}%;background:{color}"></i></div>
       </button>
-      {foot}
       <dialog class="detail" id="{did}" aria-labelledby="{did}_t">
         <div class="dhead">
           <h3 class="lvlname" id="{did}_t"><span>{game} · <i class="ico p-{persona}"></i>{persona} · {row['level']}</span> {_pill(row)}</h3>
@@ -1262,7 +1235,6 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
             <div class="stats headline">{''.join(headline)}</div>
             <div class="viz"><div class="vt">What kills them</div>
               {_causebar(row.get('causes') or {})}</div>
-            {watch_html}
           </div>
           <div class="viz dcurve"><div class="vt">Learning curves — fitness per generation, one color per seed</div>
             <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
@@ -1716,7 +1688,6 @@ def _runs_section() -> str:
 JS = """
 const FONT = '500 12px "Barlow Semi Condensed", Barlow, sans-serif';  // canvas labels: the theme's --dense
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (location.protocol === 'file:') document.documentElement.classList.add('file');  // no /watch endpoint
 
 // nothing is drawn before it can be seen: a dialog paints when it opens, any other canvas when it
 // scrolls into view (a report holds hundreds of level windows; drawing them all at load took seconds)
@@ -2240,13 +2211,11 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
               + '><i class="ico gear"></i>GA sweep</a>')
     links += ('<a class="doc" href="instructions.html"' + (' aria-current="page"' if page == "instructions" else "")
               + '><i class="ico qblock"></i>Instructions</a>')
-    links += '<a class="doc wall" href="/wall" target="_top"><i class="ico gamepad"></i>Replay wall</a>'   # served only: menu 12 starts it
     if page == "report":
         links += '<button class="navbtn" id="toggleAll" type="button">Collapse all</button>'
     return f"""
-  <script>if (location.protocol === 'file:') document.documentElement.classList.add('file');</script>
   <a class="skip" href="#main">Skip to content</a>
-  <nav aria-label="Pages"><h1 class="brand"><span class="wordmark">PEAK</span><em>Balance Command</em></h1>
+  <nav aria-label="Pages"><h1 class="brand"><span class="wordmark">PEAK</span><em>Command Center</em></h1>
     <div class="links">{links}</div>
   </nav>"""
 
@@ -2271,9 +2240,6 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
     high bound and reports which knobs matter per game on the <b>GA sweep</b> page — with a
     recommended config and a first-win-vs-parameters capacity curve.</li>
     <li>Only <b>enabled</b> levels are probed — toggle them with <b>10 Toggle Levels</b>.</li>
-    <li>Each level window has a <b>▶ Watch replay</b> button: it starts the best genome's replay
-    and opens the live dashboard. It works when the page is served by <b>menu 12</b>
-    (<code>python -m code.neuro.report --serve --open</code>); as a plain file, copy the command shown.</li>
     <li>Regenerate this page any time: <code>python -m code.neuro.report --open</code> — it
     re-reads every probe under <code>runs/probes/</code>, so it works without a finished sweep.</li>
     <li>Each distinct config (persona · population · generation budget · sensors) gets its own section
@@ -2351,7 +2317,7 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
                    for a, i, h, b in sections)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEAK Balance Command — Instructions</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center — Instructions</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="instructions")}
 <main id="main" class="doc">
   <div class="toc frame" role="navigation" aria-label="On this page"><h2>Contents</h2><ul>{toc}</ul></div>
@@ -2625,7 +2591,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
                     '<code>--ablation --sensors grid</code>) and rebuild this page.</p>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEAK Balance Command — Sensor Ablation</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center — Sensor Ablation</title><style>{CSS}</style></head><body>
 {_nav(list(games), False, logo, page="ablation")}
 <main id="main">
   <div class="pagehead"><h2><i class="ico eye"></i>Sensor ablation</h2>
@@ -2866,8 +2832,6 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
                      f'won {best_pt["solved"]}/{best_pt["n_levels"]} levels · win rate <b>{best_pt["wr"]:.0%}</b> '
                      f'(baseline {base["wr"] if base else 0:.0%}) · first win gen <b>{best_pt["fw"]:.1f}</b> '
                      f'(baseline {base["fw"] if base else 0:.1f}) · {best_pt["n_params"]:,} weights</div>')
-        lv = max(best_pt["data"]["levels"], key=lambda r: r.get("win_rate_mean") or 0)
-        best_line += _watch_cmd(game, persona, lv["level"], best_pt["data"]["cells"][lv["level"]])[0]
     else:
         best_line = ('<div class="caption" style="margin-top:8px">Not confirmed yet — the composite assumes the axes '
                      'do not interact. Probe it once:</div>'
@@ -3034,7 +2998,7 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><circle cx='8' cy='8' r='4' stroke='%2358d854' stroke-width='2' fill='none'/></svg>">
-<title>PEAK Balance Command — GA Sweep</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center — GA Sweep</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="gasweep")}
 <main id="main">
   <div class="pagehead"><h2><i class="ico gear"></i>GA sweep</h2>
@@ -3080,7 +3044,7 @@ def build(balance_dir: str) -> dict[str, str]:
     report = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
-<title>PEAK Balance Command</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center</title><style>{CSS}</style></head><body>
 {_nav(list(games), bool(runs_html), logo)}
 <main id="main">
   <div style="font:400 .9rem var(--ui);color:var(--dim);margin-bottom:16px">
@@ -3110,138 +3074,10 @@ def _load_json_glob(pattern: str) -> list[dict]:
     return out
 
 
-WALL_PORT = 8010   # code/neuro/cameras.py default
-
-
-def serve(balance_dir: str, port: int, open_browser: bool) -> None:
-    """Serve the command center locally so its ▶ Watch buttons can launch replays.
-    GET /watch?game=G&npz=runs/... starts `trainer --replay` (one at a time) and forwards
-    the tab to the trainer's dashboard. Binds 127.0.0.1 only; replays only files under runs/."""
-    import subprocess
-    import sys
-    import urllib.parse
-    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-
-    from .adapters import _ADAPTERS
-    state: dict = {"proc": None}
-
-    class Handler(SimpleHTTPRequestHandler):
-        def __init__(self, *a, **kw) -> None:
-            super().__init__(*a, directory=balance_dir, **kw)
-
-        def log_message(self, *a) -> None:  # quiet
-            pass
-
-        def _page(self, status: int, title: str, body_html: str, script: str = "") -> None:
-            body = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{title}</title>"
-                    f"<style>{CSS}.card{{max-width:640px;margin:10vh auto 0;padding:26px 30px}}"
-                    f".card h1{{font-size:1.4rem;margin-bottom:12px}}.card p{{color:var(--dim);margin:8px 0}}"
-                    f".card code{{color:var(--ink)}}.row{{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}}"
-                    f".watchbtn.quiet{{color:var(--ink)}}</style></head><body><main id='main'>"
-                    f"<div class='card'>{body_html}</div></main><script>{script}</script></body></html>").encode()
-            self.send_response(status)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _wall(self) -> None:
-            """Start the replay wall (code/neuro/cameras.py) unless it runs, then forward the tab to it."""
-            wall = state.get("wall")
-            if wall is None or wall.poll() is not None:
-                state["wall"] = subprocess.Popen([sys.executable, "-m", "code.neuro.cameras", "--port", str(WALL_PORT)])
-                print("replay wall: starting", flush=True)
-            url = f"http://127.0.0.1:{WALL_PORT}/"
-            script = f"""
-const url = {json.dumps(url)}, t0 = Date.now(), st = document.getElementById('st');
-(async function poll(){{
-  try {{ await fetch(url, {{mode: 'no-cors', cache: 'no-store'}}); location.replace(url); return; }} catch {{}}
-  st.textContent = `Loading the models… ${{Math.round((Date.now() - t0) / 1000)}} s`;
-  setTimeout(poll, 700);
-}})();"""
-            self._page(200, "PEAK — replay wall", "<h1>Starting the replay wall</h1><p id='st'>Loading the models…</p>"
-                       "<p>Every game and persona plays its saved models. Ctrl+C in the menu-12 terminal stops it.</p>"
-                       "<div class='row'><a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>", script)
-
-        def do_GET(self) -> None:
-            u = urllib.parse.urlparse(self.path)
-            if u.path == "/wall":
-                return self._wall()
-            if u.path != "/watch":
-                return super().do_GET()
-            q = urllib.parse.parse_qs(u.query)
-            game, npz = q.get("game", [""])[0], q.get("npz", [""])[0]
-            label = q.get("label", [npz])[0][:120]
-            esc = _html.escape  # everything from the query string is reflected into HTML — escape it all
-            ok = (game in _ADAPTERS and npz.startswith("runs/") and ".." not in npz
-                  and npz.endswith("best.npz") and os.path.exists(npz))
-            if not ok:
-                return self._page(400, "PEAK — replay not found",
-                                  "<h1>That genome isn't on disk any more</h1>"
-                                  f"<p><code>{esc(npz) or '(no file)'}</code> was probably deleted or re-probed. "
-                                  "Regenerate the command center (menu 12) so the buttons point at current files.</p>"
-                                  "<div class='row'><a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>")
-            proc = state["proc"]
-            running = proc is not None and proc.poll() is None
-            if running and q.get("replace", ["0"])[0] != "1":
-                return self._page(200, "PEAK — a replay is already running",
-                                  "<h1>A replay is already running</h1>"
-                                  f"<p>Watching <b>{esc(state.get('label', ''))}</b> right now. Only one replay can use the dashboard at a time.</p>"
-                                  f"<p>Replace it with <b>{esc(label)}</b>?</p>"
-                                  f"<div class='row'><a class='watchbtn' href='{esc(self.path)}&replace=1'>▶ Replace it</a>"
-                                  "<a class='watchbtn quiet' href='http://127.0.0.1:8000/' target='_blank' rel='noopener'>Keep watching the current one</a>"
-                                  "<a class='watchbtn quiet' href='/report.html'>← Back</a></div>")
-            if running:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-            state["proc"] = subprocess.Popen(
-                [sys.executable, "-m", "code.neuro.trainer", "--game", game, "--replay", npz])
-            state["label"] = label
-            print(f"replay: {game} {npz}", flush=True)
-            dash = f"http://127.0.0.1:8000/{game}/index.html"
-            script = f"""
-const dash = {json.dumps(dash)}, t0 = Date.now(), st = document.getElementById('st');
-(async function poll(){{
-  try {{ await fetch(dash, {{mode: 'no-cors', cache: 'no-store'}}); location.replace(dash); return; }} catch {{}}
-  const s = Math.round((Date.now() - t0) / 1000);
-  st.textContent = s < 20 ? `Starting the trainer… ${{s}} s` : `Still waiting after ${{s}} s — check the terminal that runs menu 12 for errors.`;
-  setTimeout(poll, 700);
-}})();"""
-            self._page(200, "PEAK — starting replay",
-                       f"<h1>Starting the replay</h1><p><b>{esc(label)}</b></p>"
-                       f"<p id='st'>Starting the trainer…</p>"
-                       "<p>The live dashboard opens in this tab as soon as it answers. Ctrl+C in the menu-12 terminal stops it.</p>"
-                       f"<div class='row'><a class='watchbtn quiet' href='{dash}'>Open the dashboard now</a>"
-                       "<a class='watchbtn quiet' href='/report.html'>← Back to the report</a></div>", script)
-
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    import signal
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # reach the finally: no orphaned replay
-    url = f"http://127.0.0.1:{port}/report.html"
-    print(f"command center: {url}  (Ctrl+C to close)", flush=True)
-    if open_browser:
-        webbrowser.open(url)
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        srv.server_close()
-        for key in ("proc", "wall"):
-            if state.get(key) is not None and state[key].poll() is None:
-                state[key].terminate()
-
-
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Generate the balance command center")
+    ap = argparse.ArgumentParser(description="Generate the PEAK Command Center")
     ap.add_argument("--dir", default=BALANCE_DIR)
     ap.add_argument("--open", action="store_true", help="open in the default browser")
-    ap.add_argument("--serve", action="store_true",
-                    help="serve the page locally so ▶ Watch buttons can launch replays")
-    ap.add_argument("--port", type=int, default=8001)
     args = ap.parse_args()
 
     pages = build(args.dir)
@@ -3251,9 +3087,7 @@ def main() -> None:
             f.write(html)
     out = os.path.join(args.dir, "report.html")
     print(f"wrote {out} (+ {', '.join(n for n in pages if n != 'report.html')})")
-    if args.serve:
-        serve(args.dir, args.port, args.open)
-    elif args.open:
+    if args.open:
         webbrowser.open("file:///" + os.path.abspath(out).replace(os.sep, "/"))
 
 

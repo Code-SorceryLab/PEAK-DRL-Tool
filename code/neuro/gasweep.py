@@ -8,7 +8,7 @@ Probes reuse balance.probe() and land under runs/gasweep/<game>/<persona>/<tag>/
 with tag = p<pop>g<gens>[_grid]_b<sig>_<axis>-<value>  (baseline: _base, composite: _best; b<sig>
 hashes the baseline so a sweep around new defaults lands beside the old one, not over it), and are
 aggregated into runs/balance/gasweep_<game>_<persona>_<tag>.json — a separate root and prefix so
-the main Balance Command pages never see 23 extra configs.
+the main Command Center pages never see 23 extra configs.
 
     python -m code.neuro.gasweep --game mario --gens 40 --axes hidden memory --confirm
 """

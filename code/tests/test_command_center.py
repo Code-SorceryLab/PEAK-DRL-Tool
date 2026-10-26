@@ -2,6 +2,7 @@
 seeds reach it, every game gets every tab, and the site is static."""
 import os
 import shutil
+import subprocess
 
 from code.neuro import balance, cameras, report
 
@@ -25,3 +26,18 @@ def test_the_wall_and_the_route_traces_skip_extra_seeds():
     assert models and all(d.rsplit("_", 1)[1] in PAPER for d in models.values())
     routes, best = report._collect_routes("bomberman", "experienced", "1", "p10g40")
     assert best is None or best["seed"] in PAPER
+
+
+def test_mega_man_has_a_drawn_icon_not_a_letter():
+    html = report._game_icon("megaman")
+    assert "<img" in html and "svg" in html and "gletter" not in html
+
+
+def test_no_page_offers_a_watch_replay():
+    assert not hasattr(report, "serve") and not hasattr(report, "_watch_cmd")
+
+
+def test_the_old_name_is_gone():
+    hits = subprocess.run(["git", "grep", "-l", "-i", "balance command", "--", "code", "menu.py", "README.md", "docs",
+                           ":!code/tests/test_command_center.py"], capture_output=True, text=True).stdout.split()
+    assert [h for h in hits if not h.startswith("docs/superpowers/")] == []

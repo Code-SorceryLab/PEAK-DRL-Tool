@@ -862,13 +862,12 @@ def run_dashboard():
 
 
 def open_balance_command():
-    """Balance Command — regenerate the command center from runs/, serve it, open it."""
+    """Command Center: regenerate the pages from runs/ and open them."""
     _refresh_screen()
-    _section("BALANCE COMMAND")
-    print(_DIM("    Regenerating from runs/balance, runs/probes, and every training run..."))
-    print(_DIM("    Served locally so ▶ Watch buttons can launch replays. Ctrl+C closes it.\n"))
+    _section("COMMAND CENTER")
+    print(_DIM("    Regenerating from runs/balance, runs/probes, and every training run...\n"))
     try:
-        subprocess.run([sys.executable, "-m", "code.neuro.report", "--serve", "--open"])
+        subprocess.run([sys.executable, "-m", "code.neuro.report", "--open"])
     except KeyboardInterrupt:
         pass
 
@@ -958,7 +957,7 @@ def _sweep(games, personas, gens, seeds, sensors_list, interrupted_msg,
 
 
 def _open_command_center(page: str = "report") -> None:
-    if input(_DIM("\n    Open the Balance Command center? [Y/n]: ")).strip().lower() in ("n", "no"):
+    if input(_DIM("\n    Open the Command Center? [Y/n]: ")).strip().lower() in ("n", "no"):
         return
     subprocess.run([sys.executable, "-m", "code.neuro.report"])  # regenerates every page
     webbrowser.open((RUNS_DIR / "balance" / f"{page}.html").resolve().as_uri())
@@ -1047,7 +1046,7 @@ def run_full_sweep():
 # ============================================================================
 
 AST_GAMES = ["mario", "meatboy", "bomberman", "megaman"]
-AST_PAGE = RUNS_DIR / "balance" / "mutations.html"   # the Balance Command's Mutations page
+AST_PAGE = RUNS_DIR / "balance" / "mutations.html"   # the Command Center's Mutations page
 
 
 def _ast_games():
@@ -1347,7 +1346,7 @@ def main():
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))
         print(_menu_item("10", "Toggle Levels",        "enable / disable levels in config"))
         print(_menu_item("11", "Dashboard",            "live training UI in browser"))
-        print(_menu_item("12", "Balance Command",      "command center (all runs + probes) + ▶ replay wall"))
+        print(_menu_item("12", "Command Center",      "every result, one game at a time"))
 
         _section("BALANCE")
         print(_menu_item("13", "Full Sweep",           "games × personas × seeds, parallel"))

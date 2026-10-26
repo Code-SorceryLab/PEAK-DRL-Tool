@@ -105,7 +105,7 @@ def test_collect_routes_merges_routes_json_and_csv_and_finds_the_fastest_win(tmp
 
 
 def test_mutations_is_a_balance_command_page():
-    """AL: the Balance Command and the mutation page are one site: every page's top bar links the
+    """AL: the Command Center and the mutation page are one site: every page's top bar links the
     Mutations page, and that page carries the same top bar (marked as the current page)."""
     from code.neuro import report
     from code.stats import ast_page

@@ -380,7 +380,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="AST evaluation metrics over the playtest attempts")
     ap.add_argument("--game", action="append", choices=GAMES, help="only this game (repeatable)")
     ap.add_argument("--page", action="store_true",
-                    help="also write the Balance Command's Mutations page, runs/balance/mutations.html (every game)")
+                    help="also write the Command Center's Mutations page, runs/balance/mutations.html (every game)")
     args = ap.parse_args()
     games = args.game or GAMES
     results = {g: evaluate(g) for g in (GAMES if args.page else games)}

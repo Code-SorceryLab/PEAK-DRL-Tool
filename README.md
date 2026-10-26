@@ -43,8 +43,8 @@ same run — bit for bit.
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/img/cc_report.png" alt="Balance Command center: win rate per level per persona, config chips, overview table" width="100%"><br>
-      <sub><b>Balance Command center</b> (menu 12). Every probe on disk: win rate per level per persona, one HTML file.</sub>
+      <img src="docs/img/cc_report.png" alt="Command Center: win rate per level per persona, config chips, overview table" width="100%"><br>
+      <sub><b>Command Center</b> (menu 12). Every probe on disk: win rate per level per persona, one HTML file.</sub>
     </td>
     <td align="center">
       <img src="docs/img/cc_level.png" alt="Level dialog: 16 balance metrics, B1/B2/B3 bands, replay command, agent routes drawn on the level" width="100%"><br>
@@ -126,7 +126,7 @@ center. Every choice in it is the same checklist: type numbers to tick, Enter to
 | 1 | Project status | 5 | Play manually (any game / level) | 9 | Level editor |
 | 2 | Train single (game · level · persona · sensors) | 6 | Watch a trained agent | 10 | Toggle levels |
 | 3 | Train all levels of one game (persona · sensors · tag) | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
-| 4 | Train the full game × level grid (persona · sensors · tag) | 8 | Watch a random agent | 12 | Balance Command center |
+| 4 | Train the full game × level grid (persona · sensors · tag) | 8 | Watch a random agent | 12 | Command Center |
 | P | Train all personas as a curriculum (games · personas · seed): one agent per persona carries on level after level | | | 13 | Full sweep (games × personas × seeds) |
 | | | | | 14 | Sensor ablation (rays vs grid → `runs/ablation`) |
 | | | | | 15 | GA sweep (one knob at a time vs literature bounds) |
@@ -135,7 +135,7 @@ center. Every choice in it is the same checklist: type numbers to tick, Enter to
 | | | | | 18 | Play a mutant yourself (each attempt logged under your name) |
 | | | | | 19 | Retrain on mutants (every persona's three seeds, the baseline's GA setting) |
 | | | | | 20 | Agent playtest: one attempt per agent, learning off, original vs mutants |
-| | | | | 21 | Mutation metrics + the Balance Command's Mutations page (`runs/balance/mutations.html`) |
+| | | | | 21 | Mutation metrics + the Command Center's Mutations page (`runs/balance/mutations.html`) |
 | | | | | D | Delete runs (pick runs / probe trees, or everything) |
 
 <details>
@@ -506,7 +506,7 @@ section by section).
 | Did my edit help? | edit → menu 13 again | same seeds, same GA — the probe is frozen, so the diff is the level |
 | How much skill does the design reward? | menu 13, compare personas | novice vs speedrunner completion on the same level (`skill gap` tile) |
 | Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
-| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the Balance Command's Mutations page: caught / missed per mutant, then where and how play changed |
+| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the Command Center's Mutations page: caught / missed per mutant, then where and how play changed |
 
 ---
 

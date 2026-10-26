@@ -320,7 +320,7 @@ The trainer also skips all frame JPEG encoding while no dashboard tab is connect
 `runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` (sensor ablation: `runs/ablation/…`, GA sweep:
 `runs/gasweep/…`) where `tag = p<pop_size>g<gens>[_grid]` (e.g. `p10g40`),
 so different personas, population sizes, and generation budgets never overwrite each other;
-re-probing a level with the same config replaces just that level. The Balance Command
+re-probing a level with the same config replaces just that level. The Command Center
 (`python -m code.neuro.report --open`, menu 12) re-aggregates every probe on disk into
 `runs/balance/report_<game>_<persona>_<tag>.json` each time it opens — no finished sweep
 needed — and renders one section per (game, tag). Each probe cell records `best_gen`

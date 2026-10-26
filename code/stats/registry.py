@@ -1,7 +1,7 @@
 """The balance metrics: every metric defined once, used by every consumer.
 
 balance.py (probe reports), the trainer and manual play (metrics.json per run / session), the
-Balance Command report and the Streamlit dashboard all call compute_level() on the same
+Command Center report and the Streamlit dashboard all call compute_level() on the same
 episode rows (code/stats/episode_stats.py), so a metric can't mean one thing in the report and
 another on the dashboard.
 

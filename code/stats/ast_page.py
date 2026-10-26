@@ -1,4 +1,4 @@
-"""The Balance Command's Mutations page, runs/balance/mutations.html: the AST evaluation at a glance
+"""The Command Center's Mutations page, runs/balance/mutations.html: the AST evaluation at a glance
 (written by `python -m code.neuro.report` with the other pages, and by ast_metrics --page).
 
 On top, the board: one cell per game and mutant, saying whether the playtest caught it (a breaking
@@ -7,7 +7,7 @@ replay identically; a mutant played section by section is caught where any secti
 Below, per game: the level map with the change, where failed attempts ended and the tiles the
 routes covered; the metric table, grouped by the level played, each mutant naming the original it
 was compared with; win rates per persona; people, when they played; Mega Man's segments. One
-standalone file with the Balance Command's styles and top bar (code/neuro/report.py).
+standalone file with the Command Center's styles and top bar (code/neuro/report.py).
 """
 from __future__ import annotations
 
@@ -484,7 +484,7 @@ show(location.hash.slice(1));
 
 
 def render(results: dict) -> str:
-    from code.neuro import report   # its styles and top bar: one site with the other Balance Command pages
+    from code.neuro import report   # its styles and top bar: one site with the other Command Center pages
     sections = "".join(_game_section(g, res) for g, res in results.items())
     sc = scores(results)
     fa = false_alarms(results)
@@ -497,7 +497,7 @@ def render(results: dict) -> str:
             + "".join(f'<button class="btn g-{g}" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
                       f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in results) + "</div>")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>PEAK Balance Command — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
+            f'<title>PEAK Command Center — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
             f'{report._nav([], False, None, "mutations")}<main id="main">'
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. The original\'s agents, frozen, replay each copy and are compared with their own play on the '
