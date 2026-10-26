@@ -180,7 +180,7 @@ const PLATFORM = [   // the platformers' 14-slot ray vector (as code/neuro/web/c
   {g: 'Objectives', rows: [{i: 12, l: 'BLK', d: 'Question blocks ahead'}]},
 ];
 const RAY = {0: 'rgba(255,255,255,.35)', 1: '#ef4444', 2: '#ec4899'};
-const levelName = l => /^\d+$/.test(l) ? 'Level ' + (+l + 1) : l;
+const levelName = l => /^\\d+$/.test(l) ? 'Level ' + (+l + 1) : l;
 function caption(key, frame, total){
   const tl = TL[key];
   if (!tl || !tl.attempts.length) return '';

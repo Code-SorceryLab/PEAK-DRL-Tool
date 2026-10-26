@@ -370,3 +370,12 @@ def test_the_wall_has_captions_and_a_large_view_with_rays_and_sensor_bars():
                                            "clumsy": True}})
     assert html.count('class="cap"') == 2 and '<dialog id="big"' in html and '<canvas class="rays"' in html
     assert 'class="sensors"' in html and "PEAK_TRACK" in html and "sensors.js" in html
+
+
+def test_the_new_modules_compile_without_warnings():
+    import warnings
+    for path in ("code/neuro/command_center.py", "code/neuro/wall_video.py"):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            compile(open(path, encoding="utf-8").read(), path, "exec")
+        assert not [w for w in caught if issubclass(w.category, SyntaxWarning)], path
