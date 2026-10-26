@@ -416,3 +416,10 @@ def test_the_tabs_run_in_the_spec_order_with_reproduce_before_how_it_works():
     html = command_center.shell({"mario": {"novice": True}})
     assert re.findall(r'<button class="tab"[^>]*data-tab="(\w+)"', html) == [
         "wall", "balance", "mutations", "gasweep", "ablation", "reproduce", "howitworks"]
+
+
+def test_the_untrained_cards_are_not_a_collapsible_game_section():
+    # the report's script wires a collapse button (.chev) on every section.game; these cards have none
+    data = report.load_data()
+    block = report._untrained("bomberman", data["games"]["bomberman"])
+    assert block and not re.search(r'<section class="[^"]*\bgame\b', block)

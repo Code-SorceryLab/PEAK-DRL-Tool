@@ -714,6 +714,7 @@ CSS = THEME_CSS + """
   .lvlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
   .lvlcard{display:flex;flex-direction:column;background-color:var(--deck-2)}
   .lvlcard.untrained .cardbody{padding:10px 12px}
+  .untrainedsec{margin-top:18px;padding:14px 18px}
   .lvlcard:hover,.lvlcard:has(dialog[open]){border-image-source:var(--frame-hi)}
   .lvlcard:has(.cardhead:focus-visible){border-image-source:var(--frame-hi);outline:2px solid var(--won);outline-offset:2px}
   .cardhead{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ink);
@@ -3061,7 +3062,7 @@ def _untrained(game: str, by_tag: dict) -> str:
     cards = "".join(f'<div class="lvlcard untrained" data-untrained="{_html.escape(lv)}"><div class="cardbody">'
                     f'<div class="lvlname">{_html.escape(lv)} {_status_pill("bad", "not trained yet")}</div>'
                     f'<div class="lvlsub">no agent has trained on this level</div></div></div>' for lv in levels)
-    return (f'<section class="game frame stripe g-{game}" aria-label="Levels not trained yet"><div class="body">'
+    return (f'<section class="untrainedsec frame stripe g-{game}" aria-label="Levels not trained yet"><div class="body">'
             f'<div class="tbltitle">Not trained yet<span class="faint">: {len(levels)} level{"s" if len(levels) != 1 else ""} '
             f'of this game with no agent trained on them</span></div><div class="lvlgrid">{cards}</div></div></section>')
 
