@@ -134,3 +134,53 @@ def test_recording_never_uses_ripped_art(monkeypatch):
     monkeypatch.setenv("PEAK_MM1_ASSETS", "/somewhere")
     with pytest.raises(SystemExit, match="megaman-data"):
         wall_video.main(["--game", "megaman"])
+
+
+def git(repo, *args):
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+@pytest.fixture
+def tmp_repo(tmp_path):
+    """A repo with committed results, a one-commit gh-pages (the old landing page), a built site
+    holding a macOS ._ file, and a bare origin."""
+    repo, origin = tmp_path / "repo", tmp_path / "origin.git"
+    git(tmp_path, "init", "--bare", "-q", str(origin))
+    repo.mkdir()
+    git(repo, "init", "-q", "-b", "main")
+    git(repo, "config", "user.email", "t@example.com")
+    git(repo, "config", "user.name", "T")
+    (repo / "runs" / "balance").mkdir(parents=True)
+    (repo / "runs" / "balance" / "report_x.json").write_text("{}")
+    git(repo, "add", ".")
+    git(repo, "commit", "-q", "-m", "results")
+    git(repo, "switch", "-q", "--orphan", "gh-pages")
+    (repo / "landing.html").write_text("old")
+    git(repo, "add", "landing.html")
+    git(repo, "commit", "-q", "-m", "landing page")
+    git(repo, "switch", "-q", "main")
+    git(repo, "remote", "add", "origin", str(origin))
+    (repo / "site" / "videos").mkdir(parents=True)
+    (repo / "site" / "index.html").write_text("new")
+    (repo / "site" / "._index.html").write_text("macOS metadata")
+    return repo
+
+
+def test_publish_refuses_uncommitted_results(tmp_repo):
+    from code.neuro import command_center
+    (tmp_repo / "runs" / "balance" / "report_x.json").write_text("changed")
+    with pytest.raises(SystemExit, match="uncommitted"):
+        command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
+
+
+def test_publish_makes_one_commit_and_keeps_the_old_page_as_a_tag(tmp_repo):
+    from code.neuro import command_center
+    old = git(tmp_repo, "rev-parse", "gh-pages")
+    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
+    assert git(tmp_repo, "rev-list", "--count", "gh-pages") == "1"
+    assert git(tmp_repo, "ls-tree", "--name-only", "gh-pages").split() == ["index.html"]     # no ._ file
+    assert git(tmp_repo, "rev-parse", "landing-page-2026-03^{commit}") == old
+    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)          # a second publish
+    assert git(tmp_repo, "rev-parse", "landing-page-2026-03^{commit}") == old
+    assert git(tmp_repo, "ls-remote", "origin", "refs/heads/gh-pages").split()[0] == git(tmp_repo, "rev-parse", "gh-pages")
+    assert git(tmp_repo, "ls-remote", "origin", "refs/tags/landing-page-2026-03").split()[0] == old
