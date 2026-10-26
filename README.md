@@ -483,14 +483,16 @@ A playtest gives each agent one attempt with learning off: the best genome of ea
 seeds per persona, so a persona's win rate moves in steps of 1/3 (Mega Man plays its relay of
 section agents). `code/stats/ast_metrics.py` reads the attempts, agents' and people's, and reports
 completion, win rate, progress, end location, death cluster, cause mix, time to finish, play
-coverage, effort counts and, for Mega Man, the segment reached. A mutant is caught when completion
-is lost, the win rate changes (Fisher's exact test, p < 0.05), the death cluster moves more than
-three tiles or the top cause of death changes; the cosmetic copy passes when every replay matches
-the original attempt for attempt. A comparison counts only where the original's agents win, and
-each gets one verdict: broken, changed or unchanged (the rule, and how it was fixed:
-`paper-ast/ast_rule.md`). Every retrained mutant is also replayed by the original's frozen agents
-(`play --replay`, `agents_replay.csv`), and `base-reseeded`, the original retrained with three new
-seeds, measures how often each signal fires by chance. Mega Man's relay legs are hand-picked runs
+coverage, effort counts and, for Mega Man, the segment reached. **Replay is the detector**: the
+original's frozen agents play each mutant (`play --replay`, `agents_replay.csv`), and the mutant is
+caught when completion is lost, the win rate changes (Fisher's exact test, p < 0.05), the death
+cluster moves more than three tiles or the top cause of death changes. Frozen agents replay attempt
+for attempt, so seed noise cannot reach the comparison; the cosmetic copy passes when every replay
+matches the original attempt for attempt. **Retraining answers one question**: can agents trained
+on the mutant still finish it? It is not used as a detector: `base-reseeded`, the original retrained
+with three new seeds, sets off the rule in 6 of 10 comparisons on the unchanged level. A comparison
+counts only where the original's agents win, and each gets one verdict: broken, changed or
+unchanged (the rule, and how it was fixed: `paper-ast/ast_rule.md`). Mega Man's relay legs are hand-picked runs
 of an older pipeline, so its mutants are compared with `base-retrained`, the original with every
 section retrained exactly as the mutants were, over the same section (the global jump change
 section by section).

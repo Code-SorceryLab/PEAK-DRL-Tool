@@ -18,9 +18,8 @@ from code.stats import ast_page
 OUT = "paper-ast"
 GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman 09", "megaman": "Mega Man Cut Man"}
 NEAR = 3                                   # tiles: the death cluster's own radius
-MODES = ("static", "random", "replay", "retrain", "replay_strict", "retrain_strict")
-HEAD = {"static": "Static", "random": "Random", "replay": "Replay", "retrain": "Retrain",
-        "replay_strict": "Replay (strict)", "retrain_strict": "Retrain (strict)"}
+MODES = ("static", "random", "replay")              # the detectors compared; retraining only answers "still solvable?"
+HEAD = {"static": "Static", "random": "Random", "replay": "Replay (detector)", "solvable": "Still solvable (retrained)"}
 
 
 # ── small pieces (tested) ────────────────────────────────────────────────────────────────────
@@ -84,11 +83,25 @@ def judgments(results: dict) -> list[dict]:
                 row[mode] = None if tone == "none" else tone == "good"
                 row[mode + "_word"] = word
                 row[mode + "_strict"] = right(m["class"], strict_flag(m, res, mode))
+            word, tone = ast_page.solvable(m, res)
+            row["solvable"], row["solvable_word"] = (None if tone == "none" else tone == "good"), word
             if m["operator"].endswith("cosmetic_tile"):
                 row["replay"], row["replay_word"] = None, "-"
                 row["replay_strict"] = row["retrain_strict"] = None
             rows.append(row)
     return rows
+
+
+def solvability(rows: list[dict]) -> dict:
+    """{breaking mutants found no longer solvable, other mutants found still solvable}: [right, of]."""
+    out = {"breaking": [0, 0], "others": [0, 0]}
+    for r in rows:
+        if r["solvable"] is None:
+            continue
+        k = "breaking" if r["class"] == "breaking" else "others"
+        out[k][0] += bool(r["solvable"])
+        out[k][1] += 1
+    return out
 
 
 def strict_flag(m: dict, res: dict, mode: str) -> bool | None:
@@ -153,10 +166,20 @@ def localization(results: dict) -> list[dict]:
 
 
 def misses(results: dict, rows: list[dict]) -> list[str]:
-    """One plain sentence per wrong call, from the numbers behind it."""
+    """One plain sentence per wrong call (the detector, and retraining's solvability answer)."""
     out = []
     for r in rows:
-        for mode in ("retrain", "replay"):
+        if r["solvable"] is False:
+            want = "no longer solvable" if r["class"] == "breaking" else "still solvable"
+            res = results[r["game"]]
+            lost = [k.split(" @ ")[1] for k, e in res.items() if k.startswith(r["id"] + " @ ") and e.get("agents")
+                    and (e.get("vs_base") or {}).get("counted") and not e["agents"]["completion"]]
+            null = [s for s in lost if not ((res.get(f"{am.RESEEDED} @ {s}") or {}).get("agents") or {}).get("completion", True)]
+            why = (f" Unsolved after retraining: {', '.join(lost)}; the unchanged level also failed to train from new seeds "
+                   f"there ({', '.join(null)}), so this is likely seed noise." if null else
+                   f" Unsolved after retraining: {', '.join(lost)}." if lost else "")
+            out.append(f"{GAME[r['game']]} `{r['id']}` (retrained): {r['solvable_word']}, expected {want}.{why}")
+        for mode in ("replay",):
             if r[mode] is not False:
                 continue
             e = results[r["game"]].get(r["id"]) or {}
@@ -191,22 +214,27 @@ def _tex_mark(ok: bool | None) -> str:
 
 
 def detection_tex(rows: list[dict]) -> str:
-    """Table: every mutant, what each method got right. Needs booktabs and amssymb."""
-    body = []
-    for r in rows:
-        body.append(f"{_tex(GAME[r['game']])} & \\texttt{{{_tex(r['id'])}}} & {r['class']} & "
-                    + " & ".join(_tex_mark(r[m]) for m in MODES) + r" \\")
+    """Table: every mutant, what each detector got right, and whether retrained agents still finish
+    it as they should. Needs booktabs and amssymb."""
+    cols = (*MODES, "solvable")
+    body = [f"{_tex(GAME[r['game']])} & \\texttt{{{_tex(r['id'])}}} & {r['class']} & "
+            + " & ".join(_tex_mark(r[m]) for m in cols) + r" \\" for r in rows]
     tot = {m: tally(rows, m) for m in MODES}
+    sv = solvability(rows)
     caught = " & ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES)
     quiet = " & ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES)
-    return ("\\begin{table*}[t]\\centering\\small\n\\caption{Mutants each method gets right: a breaking or degrading "
-            "mutant flagged, a neutral one left alone (\\checkmark{}), or not ($\\times$). The rule flags any of four signals; "
-            "strict keeps only completion lost and Fisher's test, the two that never fired on an unchanged 2D level.}\n"
-            "\\label{tab:detection}\n\\begin{tabular}{lll" + "c" * len(MODES) + "}\\toprule\nGame & Mutant & Class & "
-            + " & ".join(HEAD[m] for m in MODES) + " \\\\\\midrule\n"
+    return ("\\begin{table*}[t]\\centering\\small\n\\caption{Mutants each detector gets right: a breaking or degrading "
+            "mutant flagged, a neutral one left alone (\\checkmark{}), or not ($\\times$). Replay is the original's frozen "
+            "agents on the mutant. The last column asks agents retrained on the mutant whether it can still be finished: "
+            "right when a breaking mutant no longer can and any other still can.}\n"
+            "\\label{tab:detection}\n\\begin{tabular}{lll" + "c" * len(cols) + "}\\toprule\nGame & Mutant & Class & "
+            + " & ".join(HEAD[m] for m in cols) + " \\\\\\midrule\n"
             + "\n".join(body) + "\n\\midrule\n"
-            f"\\multicolumn{{3}}{{l}}{{Play-changing mutants caught}} & {caught} \\\\\n"
-            f"\\multicolumn{{3}}{{l}}{{Neutral mutants left alone}} & {quiet} \\\\\n\\bottomrule\n\\end{{tabular}}\n\\end{{table*}}\n")
+            f"\\multicolumn{{3}}{{l}}{{Play-changing mutants caught}} & {caught} & -- \\\\\n"
+            f"\\multicolumn{{3}}{{l}}{{Neutral mutants left alone}} & {quiet} & -- \\\\\n"
+            f"\\multicolumn{{3}}{{l}}{{Solvability right (breaking / others)}} & & & & "
+            f"{sv['breaking'][0]}/{sv['breaking'][1]}, {sv['others'][0]}/{sv['others'][1]} \\\\\n"
+            "\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
 
 
 def write(results: dict, out: str = OUT) -> list[str]:
@@ -223,31 +251,40 @@ def write(results: dict, out: str = OUT) -> list[str]:
           "Generated by `python -m code.stats.ast_paper` from the playtests on disk. The rule: `ast_rule.md`; "
           "costs: `ast_costs.md`.", "",
           "## Which method gets each mutant right", "",
-          "Static = the reachability check every mutant passed before it was written (it flags a mutant whose exit "
-          "can no longer be reached). Random = an agent pressing random buttons, played like the agents and "
-          "compared with itself on the original (it never wins, so under the rule nothing it plays counts; shown "
-          "here with the signals it would raise). Replay = the original's frozen agents on the mutant. Retrain = "
-          "agents trained on the mutant.", "",
-          "Strict = only completion lost or Fisher's test (p < .05), the two signals that never fired on an unchanged "
-          "2D level in the false-alarm check below.", "",
-          "| Game | Mutant | Class | " + " | ".join(HEAD[m] for m in MODES) + " |", "|---|---|---|" + "---|" * len(MODES)]
+          "**Replay is the detector**: the original's frozen agents play the mutant and are judged by the rule "
+          "against their own play on the original. Frozen agents replay attempt for attempt, so no seed noise reaches "
+          "them. **Retraining answers one question**: can agents trained on the mutant still finish it? (As a detector it "
+          "is too noisy: see the false alarms below.) Baselines: Static = the reachability check every mutant passed "
+          "before it was written (it flags a mutant whose exit can no longer be reached); Random = an agent pressing "
+          "random buttons, compared with itself on the original (it never wins, so nothing it plays counts under the "
+          "rule; shown with the signals it would raise).", "",
+          "| Game | Mutant | Class | " + " | ".join(HEAD[m] for m in (*MODES, "solvable")) + " |",
+          "|---|---|---|" + "---|" * (len(MODES) + 1)]
     for r in rows:
         md.append(f"| {GAME[r['game']]} | `{r['id']}` | {r['class']} | " + " | ".join(
-            f"{_mark(r[m])} ({r[m + '_word']})" if m in ("replay", "retrain") and r[m] is not None else _mark(r[m])
-            for m in MODES) + " |")
+            f"{_mark(r[m])} ({r[m + '_word']})" if m in ("replay", "solvable") and r[m] is not None else _mark(r[m])
+            for m in (*MODES, "solvable")) + " |")
+    sv = solvability(rows)
     md += ["", "| Totals | " + " | ".join(HEAD[m] for m in MODES) + " |", "|---|" + "---|" * len(MODES),
            "| play-changing caught | " + " | ".join(f"{tot[m]['caught'][0]}/{tot[m]['caught'][1]}" for m in MODES) + " |",
-           "| neutral left alone | " + " | ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES) + " |", ""]
+           "| neutral left alone | " + " | ".join(f"{tot[m]['quiet'][0]}/{tot[m]['quiet'][1]}" for m in MODES) + " |", "",
+           f"Still solvable after retraining, as expected: breaking mutants no longer solvable {sv['breaking'][0]}/"
+           f"{sv['breaking'][1]}, all others still solvable {sv['others'][0]}/{sv['others'][1]}.", ""]
     cos = [r for r in rows if r["operator"].endswith("cosmetic_tile")]
     md.append(f"Cosmetic copies replayed identically: {sum(bool(r['retrain']) for r in cos)}/{len(cos)} games "
               f"({', '.join(r['retrain_word'] for r in cos)}).")
     fa = am.false_alarms(results)
-    md += ["", "## False alarms (the original against itself, three new seeds)", ""]
+    md += ["", "## False alarms: why retraining is not the detector", ""]
     if fa["comparisons"]:
+        rt = tally(rows, "retrain")
         md += ["The original retrained with seeds 1111, 2222 and 3333 and compared with itself, over every level or "
-               "Mega Man section whose original is solved. Every flag is a false alarm. Replay has no such noise: its "
-               "frozen agents replay attempt for attempt (cosmetic copies 4/4 identical), so its alarms can come only "
-               "from the change itself.", "", "| Signal | Fired |", "|---|---|"]
+               "Mega Man section whose original is solved. Every flag is a false alarm. Used as a detector, retraining "
+               f"would catch {rt['caught'][0]}/{rt['caught'][1]} play-changing mutants, but it also flags the unchanged "
+               f"level in {fa['fired']['detected']} of {fa['comparisons']} comparisons, so its catches cannot be told from "
+               "seed noise. Replay has no such noise: its frozen agents replay attempt for attempt (cosmetic copies "
+               "identical in every game), so its alarms can only come from the change itself. Completion lost, the "
+               "signal behind \"still solvable\", fired only in Mega Man sections, whose training from new seeds sometimes "
+               "fails outright.", "", "| Signal | Fired |", "|---|---|"]
         md += [f"| {k} | {v}/{fa['comparisons']} |" for k, v in fa["fired"].items()]
         md.append(f"| win rate outside the seed spread (beside the rule) | {fa['beyond_seeds'][0]}/{fa['beyond_seeds'][1]} |")
         nulls = [(g, k, e["vs_base"]) for g, res in results.items() for k, e in res.items()
@@ -344,7 +381,7 @@ def figures(results: dict, out: str) -> list[str]:
         fig.tight_layout()
         for ext in ("pdf", "png"):
             p = os.path.join(out, f"replay_vs_retrain.{ext}")
-            fig.savefig(p, dpi=200)
+            fig.savefig(p, dpi=200, metadata={"CreationDate": None} if ext == "pdf" else None)   # same bytes for the same figure
             made.append(p)
         plt.close(fig)
 
@@ -380,7 +417,7 @@ def figures(results: dict, out: str) -> list[str]:
         fig.tight_layout()
         for ext in ("pdf", "png"):
             p = os.path.join(out, f"death_maps.{ext}")
-            fig.savefig(p, dpi=200)
+            fig.savefig(p, dpi=200, metadata={"CreationDate": None} if ext == "pdf" else None)   # same bytes for the same figure
             made.append(p)
         plt.close(fig)
     return made

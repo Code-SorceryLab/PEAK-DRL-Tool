@@ -69,6 +69,28 @@ def judge(m: dict, res: dict, replay: bool = False) -> tuple[str, str]:
     return f"{word} in {hits}/{len(counted)} sections", tone
 
 
+def detect(m: dict, res: dict) -> tuple[str, str]:
+    """The detector's verdict: the original's frozen agents replaying the mutant (seed noise
+    cannot reach them); the cosmetic copy, replayed by definition, by its determinism check."""
+    return judge(m, res) if m["operator"].endswith("cosmetic_tile") else judge(m, res, replay=True)
+
+
+def solvable(m: dict, res: dict) -> tuple[str, str]:
+    """What retraining answers: can agents trained on the mutant still finish it? Right (good) when
+    a breaking mutant is no longer solvable and any other mutant still is; judged per section for
+    a global change, over the levels whose original is solved."""
+    if m["operator"].endswith("cosmetic_tile"):
+        return "-", "none"
+    parts = [e for k, e in res.items() if k.startswith(m["id"] + " @ ") and e.get("agents")] or \
+        [res.get(m["id"]) or {}]
+    done = [bool(e["agents"]["completion"]) for e in parts if e.get("agents") and (e.get("vs_base") or {}).get("counted")]
+    if not done:
+        return ("original unsolved" if any(e.get("agents") for e in parts) else "not retrained"), "none"
+    word = (("still solvable" if done[0] else "no longer solvable") if len(done) == 1
+            else f"solvable in {sum(done)}/{len(done)} sections")
+    return word, "good" if (m["class"] == "breaking") == (not all(done)) else "bad"
+
+
 def _null_verdict(e: dict) -> tuple[str, str]:
     """base-reseeded against the original: any flag is a false alarm."""
     s = e.get("vs_base") or {}
@@ -156,7 +178,8 @@ def _summary(v: str, e: dict, m: dict | None, desc: str) -> dict:
     """What the selected-variant card shows."""
     a = e.get("agents") or {}
     null = v.startswith(RESEEDED)
-    word, tone = verdict(m, e) if m else _null_verdict(e) if null else ("the original", "none")
+    replayed = m and not m["operator"].endswith("cosmetic_tile")        # the detector's word for a mutant
+    word, tone = verdict(m, e, replay=bool(replayed)) if m else _null_verdict(e) if null else ("the original", "none")
     w, n = (a.get("win_rate") or {}).get("pooled", [0, 0])
     return {"name": v, "cls": m["class"] if m else "null" if null else "original", "desc": desc, "replay": _replay(e) or "-",
             "word": word, "tone": tone, "wins": f"{w}/{n}", "solved": "yes" if a.get("completion") else "no",
@@ -218,8 +241,8 @@ def _game_section(game: str, res: dict) -> str:
             '<div class="duo"><div class="card vsum" aria-live="polite"></div>' + side + "</div>"
             f'<h3><i class="ico flag"></i>Every variant</h3><div class="scroll"><table class="data"><tr><th>Variant</th><th>Class</th><th class="n"><i class="ico coin"></i> Wins</th><th class="n">Solved</th>'
             f'<th class="n"><i class="ico up"></i> Progress (median / max)</th><th class="n"><i class="ico hourglass"></i> Time to finish</th><th><i class="ico skull"></i> Death cluster</th>'
-            f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Verdict and signals</th>'
-            f'<th>Replay (frozen agents)</th></tr>{"".join(body)}</table></div>'
+            f'<th>Top cause</th><th class="n"><i class="ico eye"></i> Tiles covered</th>{head}<th>Retrained: verdict and signals</th>'
+            f'<th>Replay (the detector)</th></tr>{"".join(body)}</table></div>'
             + human_html + ("" if not pips else seg_html) + "</section>")
 
 
@@ -282,7 +305,7 @@ def scores(results: dict) -> dict:
     out = {"good": 0, "bad": 0, "none": 0}
     for game, res in results.items():
         for m in eval_mutants.eval_set(game):
-            out[judge(m, res)[1]] += 1
+            out[detect(m, res)[1]] += 1
     return out
 
 
@@ -291,11 +314,11 @@ def board(results: dict) -> str:
     for game, res in results.items():
         cells = ["<td></td>"] * len(SLOTS)
         for m in eval_mutants.eval_set(game):
-            word, tone = judge(m, res)
+            word, tone = detect(m, res)
             icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
             slot = _slot(m["id"])
-            rep = "" if m["operator"].endswith("cosmetic_tile") else '<span class="rep {1}">replay: {0}</span>'.format(
-                *map(esc, judge(m, res, replay=True)))
+            rep = "" if m["operator"].endswith("cosmetic_tile") else '<span class="rep {1}">retrained: {0}</span>'.format(
+                *map(esc, solvable(m, res)))
             cells[slot] = (f'<td class="cell {tone}"><a href="#{game}" data-slot="{SLOT_NAMES[slot]}"><span class="v">{icon}{esc(word)}</span>'
                            f'<span class="label">{esc(m["class"])}</span>{rep}</a></td>')
         rows.append(f'<tr><th class="g g-{game}"><a href="#{game}">{_icon(game)}{esc(eval_mutants.EVAL_LEVELS[game][1])}</a></th>'
@@ -420,10 +443,11 @@ function summarize(card, s) {
   card.innerHTML = `<p class="label">Selected variant</p><p class="vname">${esc(s.name)}</p>
     <span class="cls ${esc(s.cls)}">${esc(s.cls)}</span><p class="label">${esc(s.desc)}</p>
     <p class="vverdict ${s.tone}">${ICON[s.tone] || ''}${esc(s.word)}</p>
-    <dl><dt>Wins</dt><dd>${esc(s.wins)}</dd><dt>Solved</dt><dd>${esc(s.solved)}</dd>
+    <dl><dt>Replay (the detector)</dt><dd>${esc(s.replay)}</dd>
+    <dt>Retrained: wins</dt><dd>${esc(s.wins)}</dd><dt>Retrained agents finish it</dt><dd>${esc(s.solved)}</dd>
     <dt>Progress (median / max)</dt><dd>${esc(s.progress)}</dd><dt>Time to finish</dt><dd>${esc(s.tff)}</dd>
     <dt>Death cluster</dt><dd>${esc(s.cluster)}</dd><dt>Top cause</dt><dd>${esc(s.cause)}</dd>
-    <dt>Verdict and signals</dt><dd>${esc(s.signals)}</dd><dt>Replay (frozen agents)</dt><dd>${esc(s.replay)}</dd>
+    <dt>Retrained: verdict and signals</dt><dd>${esc(s.signals)}</dd>
     <dt>Compared with</dt><dd>${esc(s.vs)}</dd></dl>`;
 }
 const redraws = {};
@@ -462,6 +486,7 @@ def render(results: dict) -> str:
     from code.neuro import report   # its styles and top bar: one site with the other Balance Command pages
     sections = "".join(_game_section(g, res) for g, res in results.items())
     sc = scores(results)
+    fa = false_alarms(results)
     strip = ('<div class="scorestrip">'
              f'<div class="frame good"><span class="label">Right</span><span class="num"><i class="ico coin"></i>{sc["good"]}</span></div>'
              f'<div class="frame bad"><span class="label">Wrong</span><span class="num"><i class="ico heartbreak"></i>{sc["bad"]}</span></div>'
@@ -474,8 +499,11 @@ def render(results: dict) -> str:
             f'<title>PEAK Balance Command — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
             f'{report._nav([], False, None, "mutations")}<main id="main">'
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
-            'one-change copies. Agents retrained on a copy, or replaying it, are compared with agents on the original: a sealed '
-            'or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must play out identically.</p></div>'
+            'one-change copies. The original\'s agents, frozen, replay each copy and are compared with their own play on the '
+            'original: a sealed or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must '
+            'play out identically. Agents retrained on a copy answer one question only: can it still be finished?'
+            + (f' (Retrained agents are too noisy to detect with: on the unchanged level, new seeds set off the rule '
+               f'{fa["fired"]["detected"]} times in {fa["comparisons"]}.)' if fa["comparisons"] else "") + '</p></div>'
             f'{strip}</div>{board(results)}{_false_alarm_card(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
 
 
@@ -494,10 +522,11 @@ def _false_alarm_card(results: dict) -> str:
     w, m = fa["beyond_seeds"]
     if m:
         rows += f'<tr><td>win rate outside the seed spread (beside the rule)</td><td class="n">{w}/{m}</td></tr>'
-    return (f'<div class="card fa"><h3><i class="ico eye"></i> False alarms: the original against itself</h3>'
+    return (f'<div class="card fa"><h3><i class="ico eye"></i> Why retraining is not the detector</h3>'
             f'<p class="lede">The original retrained with three new seeds and played like a mutant, over {n} comparisons '
-            '(a level, or a Mega Man section, whose original is solved). Every signal it raises would be a false alarm on a '
-            f'real mutant.</p><table class="data"><tr><th>Signal</th><th class="n">Fired</th></tr>{rows}</table></div>')
+            '(a level, or a Mega Man section, whose original is solved). Every signal it raises is a false alarm: seed noise. '
+            'Replay has none, because frozen agents replay attempt for attempt.</p>'
+            f'<table class="data"><tr><th>Signal</th><th class="n">Fired</th></tr>{rows}</table></div>')
 
 
 def write(results: dict, path: str) -> str:
