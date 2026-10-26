@@ -294,3 +294,11 @@ def test_the_top_bar_and_tabs_are_the_old_pages_pixel_buttons_with_icons():
     tabs = re.findall(r'<button class="tab"[^>]*data-tab="(\w+)"[^>]*>(.*?)</button>', html)
     assert [t for t, _ in tabs][:5] == ["wall", "balance", "mutations", "gasweep", "ablation"]
     assert tabs and all('<i class="ico ' in body for _, body in tabs)
+
+
+def test_the_balance_tab_lists_the_levels_no_agent_trained_on():
+    data = report.load_data()
+    bomberman, megaman = report.balance_page("bomberman", data), report.balance_page("megaman", data)
+    assert all(f'data-untrained="{lv}"' in bomberman for lv in ("12", "13", "14")) and 'data-untrained="8"' not in bomberman
+    assert 'data-untrained="CutMan-4-Shaft-Gap"' in megaman and 'data-untrained="CutMan-3-Ledges"' not in megaman
+    assert "not trained yet" in bomberman

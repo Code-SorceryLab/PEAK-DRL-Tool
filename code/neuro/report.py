@@ -24,7 +24,7 @@ from datetime import datetime
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
-from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
+from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES, list_levels
 from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
@@ -713,6 +713,7 @@ CSS = THEME_CSS + """
   /* level cards and their windows */
   .lvlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
   .lvlcard{display:flex;flex-direction:column;background-color:var(--deck-2)}
+  .lvlcard.untrained .cardbody{padding:10px 12px}
   .lvlcard:hover,.lvlcard:has(dialog[open]){border-image-source:var(--frame-hi)}
   .lvlcard:has(.cardhead:focus-visible){border-image-source:var(--frame-hi);outline:2px solid var(--won);outline-offset:2px}
   .cardhead{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ink);
@@ -3042,12 +3043,27 @@ def balance_page(game: str, data: dict) -> str:
     has_sweep = any(key[0] == game for key in data["gasweep"])
     body = (GLOSSARY + _game_section(game, by_tag, 0, data["thresholds"], "gasweep" if has_sweep else None) if by_tag else
             f"<p style='color:var(--dim)'>No balance data for {game} yet: run a Full Sweep (menu 13) first.</p>")
+    body += _untrained(game, by_tag or {})
     return _scoped(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Command Center: {game} balance</title><style>{CSS}</style></head><body>
 <main id="main">
   {body}
 </main><div class="bricks" aria-hidden="true"></div>{TIP_DESC}{_page_data()}<script>{JS}</script></body></html>""")
+
+
+def _untrained(game: str, by_tag: dict) -> str:
+    """A card for every level the game has (practice and disabled ones too) that no agent trained on."""
+    trained = {str(r["level"]) for personas in by_tag.values() for d in personas.values() for r in d["levels"]}
+    levels = [lv for lv in map(str, list_levels(game, include_disabled=True)) if lv not in trained]
+    if not levels:
+        return ""
+    cards = "".join(f'<div class="lvlcard untrained" data-untrained="{_html.escape(lv)}"><div class="cardbody">'
+                    f'<div class="lvlname">{_html.escape(lv)} {_status_pill("bad", "not trained yet")}</div>'
+                    f'<div class="lvlsub">no agent has trained on this level</div></div></div>' for lv in levels)
+    return (f'<section class="game frame stripe g-{game}" aria-label="Levels not trained yet"><div class="body">'
+            f'<div class="tbltitle">Not trained yet<span class="faint">: {len(levels)} level{"s" if len(levels) != 1 else ""} '
+            f'of this game with no agent trained on them</span></div><div class="lvlgrid">{cards}</div></div></section>')
 
 
 def gasweep_page(game: str, data: dict) -> str:
