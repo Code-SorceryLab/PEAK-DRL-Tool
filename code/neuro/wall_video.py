@@ -56,7 +56,8 @@ def write_webm(surfaces: Iterable[pygame.Surface], path: str, fps: int = cameras
                 proc = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                                          "-s", f"{w}x{h}", "-r", str(fps), "-i", "-",
                                          "-vf", f"scale={width}:-2:flags=neighbor", "-c:v", "libvpx-vp9", "-b:v", "0",
-                                         "-crf", "40", "-pix_fmt", "yuv420p", "-an", path], stdin=subprocess.PIPE)
+                                         "-crf", "40", "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1",
+                                         "-pix_fmt", "yuv420p", "-an", path], stdin=subprocess.PIPE)   # realtime: ~10x faster
             proc.stdin.write(pygame.image.tobytes(surf, "RGB"))
             n += 1
     finally:
