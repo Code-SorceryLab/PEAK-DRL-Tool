@@ -230,7 +230,7 @@ def _game_section(game: str, res: dict) -> str:
                       for i, v in enumerate(order))
     pips = (f'<div class="card"><h3><i class="ico coin"></i> Wins per persona</h3><div class="scroll"><table class="data pips">'
             f'<tr><th>Persona</th>' + "".join(f"<th>{esc(v).replace('_', '_<wbr>')}</th>" for v in order) + f"</tr>{grid}</table></div></div>"
-            if personas and game != "megaman" else "")
+            if personas else "")
     side = pips or (f'<div class="card">{seg_html}</div>' if seg_html else "")
     return (f'<section class="frame stripe g-{game} game" id="{game}" role="tabpanel"><h2>{esc(title)}</h2>'
             f'<div class="mapbar">{buttons}</div>'
@@ -259,7 +259,8 @@ _ICON_OF = {k: f'<i class="ico {v}"></i> ' for k, v in {"jumps": "up", "kills": 
 
 
 def _pips(wn) -> str:
-    """Wins out of attempts as coins: gold for a win, grey for a loss (a persona's three agents)."""
+    """Wins out of attempts as coins: gold for a win, grey for a loss (a persona's three agents; a
+    count for more, as Mega Man's relay attempts)."""
     if not wn:
         return "<td></td>"
     w, n = wn

@@ -6,8 +6,8 @@ the keyboard (manual_play --record runs/ast/<game>/<variant>/human).
 
     metric            what it is                                                         RQ
     completion        solved by at least one agent (yes/no), the strongest signal       1
-    win rate          wins / attempts: agents per persona (steps of 1/3), people per
-                      player, both pooled                                                1, 3
+    win rate          wins / attempts: agents per persona (steps of 1/3; Mega Man: its
+                      relay's attempts), people per player, both pooled                  1, 3
     progress          median and max `progress` over the attempts that did not win      1, 3
     end location      the tile where each failed attempt ended                          1 (localization), 3
     death cluster     the region holding most failed attempts: the mode of the end
@@ -267,12 +267,9 @@ def determinism(base_rows: list[dict], mut_rows: list[dict]) -> dict:
 
 
 # ── one game, every variant ──────────────────────────────────────────────────────────────────
-def evaluate(game: str) -> dict:
-    """{variant: {"agents": metrics, "humans": metrics or None, "vs_base": signals, "vs": the
-    original it was compared with, ...}}. A variant is compared with the original played over the
-    same level, by base-retrained where it played that level. Mega Man's section mutants are played
-    from their section's start, and the originals and the global mutant over each section too,
-    listed as "<variant> @ <section>"."""
+def references(game: str) -> dict:
+    """{level: (name, agent attempts)}: the original each variant is compared with over that level,
+    base-retrained where it played the level, else base."""
     from code.games.eval_mutants import EVAL_LEVELS
     main = EVAL_LEVELS[game][0]
     refs: dict = {}
@@ -282,6 +279,18 @@ def evaluate(game: str) -> dict:
             if r.get("source") == "agent":
                 rows.setdefault(str(r.get("level")), []).append(r)
         refs.update({level: (ref if level == main else f"{ref} @ {level}", rs) for level, rs in rows.items()})
+    return refs
+
+
+def evaluate(game: str) -> dict:
+    """{variant: {"agents": metrics, "humans": metrics or None, "vs_base": signals, "vs": the
+    original it was compared with, ...}}. A variant is compared with the original played over the
+    same level, by base-retrained where it played that level. Mega Man's section mutants are played
+    from their section's start, and the originals and the global mutant over each section too,
+    listed as "<variant> @ <section>". Every persona's attempts are pooled, in every game."""
+    from code.games.eval_mutants import EVAL_LEVELS
+    main = EVAL_LEVELS[game][0]
+    refs = references(game)
     rand_ref: dict = {}
     for r in load(game, "base", "random"):
         rand_ref.setdefault(str(r.get("level")), []).append(r)

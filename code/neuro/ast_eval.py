@@ -3,8 +3,8 @@ mutant, and the metrics of code/stats/ast_metrics.py over them.
 
     python -m code.neuro.ast_eval retrain --game mario --mutant seal_route [--persona novice ...]
     python -m code.neuro.ast_eval play --game mario [--variant base seal_route ...] [--persona ...]
-    python -m code.neuro.ast_eval play --game megaman [--episodes 20]      # the relay of section agents
-    python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained [--level CutMan-1-Street]
+    python -m code.neuro.ast_eval play --game megaman [--episodes 20] [--persona ...]   # the relay of section agents
+    python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained [--level CutMan-1-Street] [--persona ...]
 
 A playtest gives each agent one attempt with learning off: the best genome of each of the three
 seeds of a persona, under the rules it trained with (frame budget, stall rule, the persona's
@@ -205,15 +205,19 @@ def _best_retrained(variant: str, section: str, persona: str = "experienced") ->
     return max(scored)[1] if scored else None
 
 
-def play_megaman(variant: str, episodes: int = 20, replay: bool = False) -> list[dict]:
+def play_megaman(variant: str, episodes: int = 20, replay: bool = False, persona: str = "experienced") -> list[dict]:
     """The relay over the full stage, or over the one section a level mutant changes, from that
     section's start (most full-stage attempts end before segment 3, so they would never meet a
     change there). A global mutant and base-retrained are played over the full stage and over each
     section alone, so every mutant meets the retrained original over the same ground. The relay's
     hand-picked legs (base) are kept as context; the cosmetic copy is replayed by base-retrained's,
-    and so is any mutant with `replay` (the frozen original's agents, not those retrained on it)."""
+    and so is any mutant with `replay` (the frozen original's agents, not those retrained on it).
+    Every leg that plays is `persona`'s best run of that section; the hand-picked relay is experienced
+    only, so another persona plays no `base`, and a persona not trained on a section yet plays nothing."""
     from . import relay
     m = mutant("megaman", variant)
+    if m is None and persona != "experienced":
+        return []
     if m is None:
         scopes = [MEGAMAN_STAGE] + sorted({x["section"] for x in eval_mutants.eval_set("megaman") if x["section"]})
     else:
@@ -223,9 +227,11 @@ def play_megaman(variant: str, episodes: int = 20, replay: bool = False) -> list
         for leg in legs:
             if m and leg.level in m["retrain_levels"]:
                 trained = m["id"] if m["retrain"] and not replay else RETRAINED
-                run = _best_retrained(trained, leg.level)
+                run = _best_retrained(trained, leg.level, persona)
                 if run is None:
-                    raise SystemExit(f"no agent retrained on {trained} for {leg.level}: retrain it first")
+                    print(f"  {variant:<22}{persona:<13}missing: no {persona} agent retrained on {trained} for {leg.level}",
+                          flush=True)
+                    return []
                 leg.run_dir = run
                 leg.net, leg.sensors, leg.persona = relay.load_net(run)
         rows = []
@@ -234,7 +240,7 @@ def play_megaman(variant: str, episodes: int = 20, replay: bool = False) -> list
             for i in range(episodes):
                 row = relay.play(use, scope, 1234 + i, MEGAMAN_FRAMES, MEGAMAN_STALL, session=variant)
                 rows.append(dict(row, variant=variant))
-                print(f"  {variant:<22}{scope:<18} seed {row['seed']}  {row['status']:<6}{row['cause'] or '':<12}"
+                print(f"  {variant:<22}{persona:<13}{scope:<18} seed {row['seed']}  {row['status']:<6}{row['cause'] or '':<12}"
                       f"{100 * (row['progress'] or 0):>4.0f}%  {row.get('section') or ''}", flush=True)
     return rows
 
@@ -258,11 +264,13 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
         return f"wrote {path} ({sum(r['status'] == 'WON' for r in rows)}/{len(rows)} won)"
     if replay and (m is None or not m["retrain"] or variant in (RETRAINED, RESEEDED)):
         return f"skip {variant}: only a retrained mutant has a replay of its own"
-    name = "agents_replay.csv" if replay else "agents.csv"
+    path = os.path.join(variant_dir(game, variant), "agents_replay.csv" if replay else "agents.csv")
+    rows = []
     if game == "megaman":
-        rows, keep = play_megaman(variant, episodes, replay), []
+        for persona in personas:
+            rows += play_megaman(variant, episodes, replay, persona)
     else:
-        level, rows = EVAL_LEVELS[game][0], []
+        level = EVAL_LEVELS[game][0]
         with eval_mutants._named(m["dir"] if m else None):
             for persona in personas:
                 for run in agent_dirs(game, "base" if replay else variant, persona):
@@ -273,9 +281,7 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
                     rows.append(row)
                     print(f"  {variant:<20}{persona:<13}{row['status']:<6}{row['cause'] or '':<10}"
                           f"{100 * (row['progress'] or 0):>4.0f}%  {row['time_s']:>6.1f} s", flush=True)
-        path = os.path.join(variant_dir(game, variant), name)
-        keep = [r for r in (episode_log.read(path) if os.path.exists(path) else []) if r.get("persona") not in personas]
-    path = os.path.join(variant_dir(game, variant), name)
+    keep = [r for r in (episode_log.read(path) if os.path.exists(path) else []) if r.get("persona") not in personas]
     if not rows:
         return f"nothing for {variant}: no agents to play it"
     episode_log.reset(path)
@@ -299,7 +305,7 @@ def main() -> None:
     p.add_argument("--game", required=True, choices=list(EVAL_LEVELS))
     p.add_argument("--variant", nargs="*", default=None, help="base and/or mutant ids (default: all)")
     p.add_argument("--persona", nargs="*", default=None, help="default: all six")
-    p.add_argument("--episodes", type=int, default=20, help="Mega Man relay attempts per variant")
+    p.add_argument("--episodes", type=int, default=20, help="Mega Man relay attempts per variant and persona")
     p.add_argument("--replay", action="store_true",
                    help="the original's frozen agents on each retrained mutant (agents_replay.csv)")
     p.add_argument("--random", action="store_true",

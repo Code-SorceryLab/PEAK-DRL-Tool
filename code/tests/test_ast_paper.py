@@ -33,6 +33,27 @@ def test_the_strict_check_keeps_completion_and_fisher_on_counted_levels():
     assert ap.strict_flag({"id": "x"}, {"x": {"vs_base": dict(s, completion_lost=True)}}, "retrain") is True
 
 
+def test_a_persona_is_judged_alone_by_its_worst_counted_section(tmp_path, monkeypatch):
+    from code.stats import episode_log
+    from code.tests.test_ast_metrics import row
+    monkeypatch.setattr(am, "ROOT", str(tmp_path))
+    monkeypatch.setattr(ap.eval_mutants, "eval_set", lambda game: [{"id": "m-jump", "class": "degrading", "operator": "m-jump"}])
+
+    def put(variant, persona, level, status):
+        episode_log.append(str(tmp_path / "megaman" / variant / "agents.csv"),
+                           [row(status, persona=persona, level=level, game="megaman")] * 6)
+    put("base-retrained", "novice", "A", "WON")
+    put("base-retrained", "novice", "B", "DEAD")               # B unsolved by novice: does not count
+    put("base-retrained", "killer", "A", "WON")
+    put("m-jump", "novice", "A", "DEAD")                       # completion lost on A
+    put("m-jump", "novice", "B", "DEAD")
+    put("m-jump", "killer", "A", "WON")
+    r = ap.personas({"megaman": am.evaluate("megaman")})[0]
+    assert r[("retrain", "novice")] == "broken" and r[("retrain", "killer")] == "unchanged"
+    assert ("replay", "novice") not in r                       # nothing replayed
+    assert ap.worst(["unchanged", "not counted", "changed"]) == "changed" and ap.worst(["not counted"]) == "not counted"
+
+
 def test_the_random_baseline_is_compared_with_itself_on_the_original(tmp_path, monkeypatch):
     from code.stats import episode_log
     from code.tests.test_ast_metrics import row

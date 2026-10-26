@@ -114,25 +114,36 @@ def strict_flag(m: dict, res: dict, mode: str) -> bool | None:
 
 
 def personas(results: dict) -> list[dict]:
-    """Per 2D game, mutant and persona: the verdict of that persona's three agents alone."""
+    """Per game, mutant and persona: the verdict of that persona's agents alone, against the same
+    persona on the original over the same level (Mega Man: base-retrained). A mutant played section
+    by section takes its worst verdict over the sections that count, as the board judges it."""
     out = []
-    for game in results:
-        if game == "megaman":
-            continue                        # one persona only
-        base = [r for r in am.load(game, "base") if r.get("source") == "agent"]
+    for game, res in results.items():
+        refs = am.references(game)
         for m in eval_mutants.eval_set(game):
             if m["operator"].endswith("cosmetic_tile"):
                 continue
             row = {"game": game, "id": m["id"], "class": m["class"]}
+            levels = [e["level"] for k, e in res.items() if k.startswith(m["id"] + " @ ")] or \
+                [(res.get(m["id"]) or {}).get("level")]
             for mode in ("retrain", "replay"):
                 mut = [r for r in am.load(game, m["id"], mode) if r.get("source") == "agent"]
-                for p in am_personas(base):
-                    b = [r for r in base if r.get("persona") == p]
-                    x = [r for r in mut if r.get("persona") == p]
-                    if b and x:
-                        row[(mode, p)] = am.compare(am.summarize(b), am.summarize(x))["verdict"]
+                for p in am_personas(mut):
+                    verdicts = []
+                    for level in levels:
+                        b = [r for r in refs.get(level, (None, []))[1] if r.get("persona") == p]
+                        x = [r for r in mut if r.get("persona") == p and str(r.get("level")) == level]
+                        if b and x:
+                            verdicts.append(am.compare(am.summarize(b), am.summarize(x))["verdict"])
+                    if verdicts:
+                        row[(mode, p)] = worst(verdicts)
             out.append(row)
     return out
+
+
+def worst(verdicts: list[str]) -> str:
+    """The strongest verdict among the counted ones; "not counted" when none counts."""
+    return next((v for v in ("broken", "changed", "unchanged") if v in verdicts), "not counted")
 
 
 def am_personas(rows: list[dict]) -> list[str]:
@@ -295,8 +306,10 @@ def write(results: dict, out: str = OUT) -> list[str]:
     else:
         md.append("Not run yet (`base-reseeded`).")
 
-    md += ["", "## Which persona catches what (2D games, each persona's three agents alone)", "",
-           "Verdict of one persona's agents: B broken, C changed, U unchanged, - its original is unsolved (not counted).", ""]
+    md += ["", "## Which persona catches what (each persona's agents alone)", "",
+           "Verdict of one persona's agents: B broken, C changed, U unchanged, - its original is unsolved (not counted). "
+           "2D games: the persona's three agents. Mega Man: the persona's relay over the section, its jump mutant "
+           "judged by the worst verdict over the sections that count.", ""]
     plist = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
     short = {"broken": "B", "changed": "C", "unchanged": "U", "not counted": "-"}
     for mode in ("retrain", "replay"):
@@ -307,9 +320,9 @@ def write(results: dict, out: str = OUT) -> list[str]:
         md.append("")
         counts = {p: sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
         alarms = {p: sum(1 for r in per if r["class"] == "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
-        n_play = sum(1 for r in per if r["class"] != "neutral")
+        n_play = {p: sum(1 for r in per if r["class"] != "neutral" and (mode, p) in r) for p in plist}  # the mutants it played
         fa_text = ", ".join(f"{p} {alarms[p]}" for p in plist if alarms[p]) or "none"
-        md.append(f"Flags per persona ({mode}): " + ", ".join(f"{p} {counts[p]}/{n_play}" for p in plist)
+        md.append(f"Flags per persona ({mode}): " + ", ".join(f"{p} {counts[p]}/{n_play[p]}" for p in plist)
                   + f"; false alarms on off-route: {fa_text}.")
         md.append("")
 

@@ -36,6 +36,8 @@ from .sensors import SENSOR_MODES
 
 PROBES_ROOT = os.path.join("runs", "probes")
 ABLATION_ROOT = os.path.join("runs", "ablation")  # sensor-ablation probes never mix with the real sweeps
+# Mega Man's only multi-seed probes: the AST's original, every section retrained (code/neuro/ast_eval.py)
+MEGAMAN_ROOT = os.path.join("runs", "ast", "megaman", "base-retrained", "probes")
 BALANCE_DIR = os.path.join("runs", "balance")
 
 # two-sided 95% t critical values for small n (paper used the same approach)
@@ -404,7 +406,7 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
 def rebuild(out_dir: str = BALANCE_DIR) -> list[str]:
     """Regenerate every report JSON from the probe dirs on disk (new layout only)."""
     written = []
-    for root, prefix in ((PROBES_ROOT, "report"), (ABLATION_ROOT, "ablation")):
+    for root, prefix in ((PROBES_ROOT, "report"), (MEGAMAN_ROOT, "report"), (ABLATION_ROOT, "ablation")):
         for d in sorted(glob.glob(os.path.join(root, "*", "*", "p*g*"))):
             tag = os.path.basename(d)
             persona = os.path.basename(os.path.dirname(d))
