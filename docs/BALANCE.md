@@ -38,7 +38,7 @@ probes.*
    own group. First sweep (2026-08-20, 2 games × 3 personas × 23 configs, 32.6 h): capacity flat
    in 6/6, anneal 0.5 > 0.8 in 6/6 (now the default), pop 100 worse in 6/6, elite 6 / σ 0.02 /
    crossover 0 hurt Meat Boy, memory units and action feedback help only the sprinting persona.
-3. **Report** — `python -m code.neuro.command_center --open` renders every game's JSON into the
+3. **Report:** `python -m code.neuro.command_center --open` renders every game's JSON into the
    Command Center, `runs/site/index.html` (its Balance tab): ranked difficulty table, death-location
    heatmaps, failure-mode bars, per-seed fitness curves. Menu [12] opens it; [13], [14] and [15] offer to.
 

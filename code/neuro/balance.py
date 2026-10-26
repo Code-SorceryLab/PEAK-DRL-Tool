@@ -492,7 +492,10 @@ def main() -> None:
 
     # The probe dirs are the source of truth: re-aggregate everything under this config,
     # so earlier levels probed with the same config stay and re-probed levels are replaced.
-    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix, seeds=args.seeds)
+    # the published sweep keeps every paper seed on disk (a one-seed re-run must not drop the others);
+    # other roots keep whatever seeds they hold
+    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix,
+                            seeds=PAPER_SEEDS if root == PROBES_ROOT else None)
     with open(out_path, encoding="utf-8") as f:
         rows = json.load(f)["levels"]
     print("\n" + format_report([r for r in rows if r["level"] in levels], args.game), flush=True)

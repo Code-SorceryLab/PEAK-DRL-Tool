@@ -213,11 +213,19 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
     every clone), after keeping the old landing page as tag LANDING_TAG; with `push`, force-push it
     to origin (GitHub Pages serves that branch). Refuses while the results have uncommitted changes,
     so the site only ever shows committed numbers. Returns the new commit."""
-    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast")
+    meta = (":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store")      # macOS metadata on exFAT, never a result
+    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", *meta)
     if dirty:
         raise SystemExit(f"uncommitted results; commit them first so the site shows committed numbers:\n{dirty}")
     if not os.path.isfile(os.path.join(site_dir, "index.html")):
         raise SystemExit(f"no site in {site_dir}: build it first (python -m code.neuro.command_center)")
+    live = ""                                                            # the gh-pages commit origin serves now
+    if push:
+        out = _git(repo, "ls-remote", "origin", "refs/heads/gh-pages")
+        live = out.split()[0] if out else ""
+        if live and not _git(repo, "ls-remote", "origin", f"refs/tags/{LANDING_TAG}"):
+            _git(repo, "fetch", "-q", "origin", "refs/heads/gh-pages")      # the live page, not a stale local copy
+            _git(repo, "tag", "-f", LANDING_TAG, live)
     if not _git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{LANDING_TAG}", check=False):
         old = next((r for r in ("refs/heads/gh-pages", "refs/remotes/origin/gh-pages")
                     if _git(repo, "rev-parse", "--verify", "--quiet", r, check=False)), None)
@@ -234,7 +242,8 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
         if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{LANDING_TAG}", check=False) and \
                 not _git(repo, "ls-remote", "origin", f"refs/tags/{LANDING_TAG}"):
             _git(repo, "push", "origin", f"refs/tags/{LANDING_TAG}")
-        _git(repo, "push", "--force", "origin", "refs/heads/gh-pages:refs/heads/gh-pages")
+        # replaces exactly the commit read above: a page someone pushed meanwhile is never lost
+        _git(repo, "push", f"--force-with-lease=refs/heads/gh-pages:{live}", "origin", "refs/heads/gh-pages:refs/heads/gh-pages")
     return commit
 
 

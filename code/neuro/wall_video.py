@@ -4,11 +4,11 @@
     python -m code.neuro.wall_video --game megaman --persona novice
 
 Each video is one pass of the live wall's camera (code/neuro/cameras.py): the persona's agents play
-every level once, in level order, with the paper seed that trained best on it, and the result stays
-on screen for a second. Mega Man plays the Cut Man stage as a relay: the hand-picked legs for
-experienced, each section's best retrained run for the other personas. The page loops the video, so
-the wall never stops. Recording refuses the ripped Mega Man art (megaman-data/), which must never
-reach the public site; without it the game draws its own flat shapes.
+every level once, in level order, with the paper seed that trained best on it (an attempt that
+outruns its level's share of the video ends as a stall), and the result stays on screen for a second.
+Mega Man plays the Cut Man stage as a relay of each section's best paper-seed run. The page loops the
+video, so the wall never stops. Recording refuses the ripped Mega Man art (megaman-data/), which must
+never reach the public site; without it the game draws its own flat shapes.
 """
 from __future__ import annotations
 
@@ -32,11 +32,22 @@ RIPPED = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.ab
 def frames(cam, max_frames: int = 5400) -> Iterator[pygame.Surface]:
     """One picture per camera step until the camera has finished one pass (2D: an attempt at each
     of its levels; Mega Man: one stage attempt) and its result hold is over, or `max_frames`.
+    Each level gets an equal share of the frames: a camera that can end an attempt (2D) ends one
+    that runs past its share as a stall, so every level appears before the video loops.
     The same surface is yielded each time: use it before taking the next."""
     target = len(cam.models) if hasattr(cam, "models") else 1
-    surf = None
+    share = max(1, max_frames // target - getattr(cam, "hold", 0))
+    surf, played, attempts = None, 0, cam.attempts
     for _ in range(max_frames):
+        holding = cam.hold_left                 # a step that only runs down the result hold is not play
         cam.step()
+        if cam.attempts != attempts:
+            attempts, played = cam.attempts, 0
+        elif not holding:
+            played += 1
+            if played >= share and hasattr(cam, "end_attempt"):
+                cam.end_attempt()
+                attempts, played = cam.attempts, 0
         core = cam.adapter.core
         if surf is None or surf.get_size() != (core.WIDTH, core.HEIGHT):
             surf = pygame.Surface((core.WIDTH, core.HEIGHT))
@@ -68,13 +79,20 @@ def write_webm(surfaces: Iterable[pygame.Surface], path: str, fps: int = cameras
     return n
 
 
+def no_ripped_art() -> None:
+    """Refuse while the ripped Mega Man art is around, then point the game's art folder at nowhere,
+    so even a config naming another folder (megaman_config.yaml assets.dir) draws flat shapes."""
+    if os.environ.get("PEAK_MM1_ASSETS") or os.path.isdir(RIPPED):
+        raise SystemExit("refusing to record: the ripped Mega Man art (megaman-data/ or PEAK_MM1_ASSETS) would end up "
+                         "on the public site; unset PEAK_MM1_ASSETS and move megaman-data/ away first")
+    os.environ["PEAK_MM1_ASSETS"] = os.path.join(os.path.dirname(RIPPED), ".no-megaman-art")   # never created
+
+
 def camera(game: str, persona: str):
     """The live wall's camera for this game and persona, or None when it has no agents."""
     if game == "megaman":
         from .ast_eval import persona_legs
-        if persona == "experienced":
-            return cameras.MegamanCamera(os.path.join("runs", "megaman", "relay.json"))
-        legs = persona_legs(persona)
+        legs = persona_legs(persona)          # each section's best paper-seed run, every persona (AL: paper seeds only)
         return cameras.MegamanCamera(legs=legs) if legs else None
     models = cameras.pick_models(game, persona)
     return cameras.Camera(game, persona, models) if models else None
@@ -87,9 +105,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--out", default=VIDEOS_DIR)
     ap.add_argument("--max-frames", type=int, default=5400, help="cap per video (30 fps: 5400 = 3 minutes)")
     args = ap.parse_args(argv)
-    if os.environ.get("PEAK_MM1_ASSETS") or os.path.isdir(RIPPED):
-        raise SystemExit("refusing to record: the ripped Mega Man art (megaman-data/ or PEAK_MM1_ASSETS) would end up "
-                         "on the public site; unset PEAK_MM1_ASSETS and move megaman-data/ away first")
+    no_ripped_art()
     pygame.init()
     for game in args.game:
         for persona in args.persona:

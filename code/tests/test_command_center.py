@@ -111,7 +111,10 @@ class FakeCam:
             return
         self.frame += 1
         if self.frame == self.steps:
-            self.attempts, self.frame, self.hold_left = self.attempts + 1, 0, self.hold
+            self.end_attempt()
+
+    def end_attempt(self):
+        self.attempts, self.frame, self.hold_left = self.attempts + 1, 0, self.hold
 
 
 def test_a_video_stops_after_one_pass_and_its_hold():
@@ -190,3 +193,86 @@ def test_the_menu_lists_the_command_center_and_its_two_new_items():
     import menu
     assert menu.DISPATCH["12"][0] == "command_center"
     assert menu.DISPATCH["22"][0] == "record_wall" and menu.DISPATCH["23"][0] == "publish_site"
+
+
+# ── the final review's fixes ─────────────────────────────────────────────────────────────────────
+def test_publish_ignores_macos_metadata_in_the_results(tmp_repo):
+    from code.neuro import command_center
+    (tmp_repo / "runs" / "balance" / "._report_x.json").write_text("macOS metadata")   # exFAT writes these
+    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
+    assert git(tmp_repo, "rev-list", "--count", "gh-pages") == "1"
+
+
+def test_publish_keeps_the_live_landing_page_even_without_a_local_copy(tmp_repo):
+    from code.neuro import command_center
+    old = git(tmp_repo, "rev-parse", "gh-pages")
+    git(tmp_repo, "push", "-q", "origin", "gh-pages")                  # the live site
+    git(tmp_repo, "branch", "-q", "-D", "gh-pages")                    # a clone that never fetched it
+    git(tmp_repo, "update-ref", "-d", "refs/remotes/origin/gh-pages")
+    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)
+    assert git(tmp_repo, "ls-remote", "origin", "refs/tags/landing-page-2026-03").split()[0] == old
+
+
+def test_a_long_pass_still_shows_every_level():
+    from code.neuro import wall_video
+    cam = FakeCam(levels=3, steps=10_000, hold=2)
+    n = sum(1 for _ in wall_video.frames(cam, max_frames=60))
+    assert cam.attempts == 3 and n <= 60
+
+
+def test_a_camera_can_end_an_attempt_as_a_stall(tmp_path):
+    from code.tests.test_cameras import _run
+    for level in ("Mario1-1", "Mario1-2"):
+        _run(str(tmp_path), "mario", "experienced", level, 1234, wins=1)
+    cam = cameras.Camera("mario", "experienced", cameras.pick_models("mario", "experienced", str(tmp_path)), hold=2)
+    cam.step()
+    cam.end_attempt()
+    assert (cam.attempts, cam.last, cam.hold_left) == (1, "Stall", 2)
+    cam.step()
+    cam.step()
+    assert cam.level == "Mario1-2"
+
+
+def test_a_partial_sweep_keeps_every_paper_seed_in_its_report(tmp_path, monkeypatch):
+    import json
+    import sys
+    seen = {}
+
+    def write_report(*a, **k):
+        seen.update(k)
+        path = tmp_path / "r.json"
+        path.write_text(json.dumps({"levels": []}))
+        return str(path)
+    monkeypatch.setattr(balance, "run_jobs", lambda *a, **k: None)
+    monkeypatch.setattr(balance, "write_report", write_report)
+    monkeypatch.setattr(sys, "argv", ["balance", "--game", "mario", "--persona", "novice", "--levels", "Mario1-1",
+                                      "--seeds", "1234", "--gens", "1", "--out", str(tmp_path)])
+    balance.main()
+    assert tuple(seen["seeds"]) == balance.PAPER_SEEDS          # not just the one seed this run probed
+
+
+def test_recording_hides_any_mega_man_art(tmp_path, monkeypatch):
+    from code.games import megaman_assets
+    from code.neuro import wall_video
+    monkeypatch.setenv("PEAK_MM1_ASSETS", "x")
+    monkeypatch.delenv("PEAK_MM1_ASSETS")                       # restored (unset) after the test
+    (tmp_path / "art" / "sprites").mkdir(parents=True)          # a config pointing at ripped art elsewhere
+    wall_video.no_ripped_art()
+    assert megaman_assets.Assets.get({"dir": str(tmp_path / "art")}, 1.0) is None
+
+
+def test_the_experienced_mega_man_video_uses_the_paper_seed_agents(monkeypatch):
+    from code.neuro import ast_eval, wall_video
+    calls = []
+    monkeypatch.setattr(ast_eval, "persona_legs", lambda p, *a, **k: calls.append(p) or ["legs"])
+    monkeypatch.setattr(cameras, "MegamanCamera", lambda *a, legs=None, **k: ("camera", legs))
+    assert wall_video.camera("megaman", "experienced") == ("camera", ["legs"]) and calls == ["experienced"]
+
+
+def test_the_sub_page_titles_carry_no_long_dashes():
+    data = report.load_data()
+    pages = [report.balance_page("mario", data), report.gasweep_page("mario", data), report.ablation_page("mario", data),
+             report.instructions_page(data),
+             ast_page.render({g: ast_metrics.evaluate(g) for g in GAMES}, only="mario", nav=False)]
+    titles = [re.search(r"<title>([^<]*)</title>", p).group(1) for p in pages]
+    assert not any("\u2014" in t or "\u2013" in t for t in titles), titles

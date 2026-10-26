@@ -126,13 +126,18 @@ class Camera:
             self.since_gain += 1
         if not self.adapter.alive or self.since_gain >= STALL:
             won = bool(getattr(self.adapter, "won", False))
-            self.attempts += 1
-            self.wins += won
-            self.last = "WON" if won else (self.adapter.episode_stats().get("cause") or "Stall")
-            if self.hold:
-                self.hold_left = self.hold
-            else:
-                self._next()
+            self.end_attempt(won, None if won else self.adapter.episode_stats().get("cause"))
+
+    def end_attempt(self, won: bool = False, cause: str | None = None) -> None:
+        """Count the attempt and show its result for `hold` frames; a recording ends an overlong one
+        (code/neuro/wall_video.py) as a stall."""
+        self.attempts += 1
+        self.wins += won
+        self.last = "WON" if won else (cause or "Stall")
+        if self.hold:
+            self.hold_left = self.hold
+        else:
+            self._next()
 
     def _next(self) -> None:
         self.i = (self.i + 1) % len(self.models)

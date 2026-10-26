@@ -501,7 +501,7 @@ def render(results: dict, only: str | None = None, nav: bool = True) -> str:
             + "".join(f'<button class="btn g-{g}" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
                       f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in shown) + "</div>")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>PEAK Command Center — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
+            f'<title>PEAK Command Center: Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
             f'{report._nav([], False, None, "mutations") if nav else ""}<main id="main">'
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. The original\'s agents, frozen, replay each copy and are compared with their own play on the '

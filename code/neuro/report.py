@@ -2312,7 +2312,7 @@ def _instructions_page(games: list[str], logo: str | None, nav: bool = True, aft
                    for a, i, h, b in sections)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEAK Command Center — Instructions</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center: Instructions</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="instructions") if nav else ""}
 <main id="main" class="doc">
   <div class="toc frame" role="navigation" aria-label="On this page"><h2>Contents</h2><ul>{toc}</ul></div>
@@ -2586,7 +2586,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str, nav: bool = True) 
                     '<code>--ablation --sensors grid</code>) and rebuild this page.</p>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEAK Command Center — Sensor Ablation</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center: Sensor ablation</title><style>{CSS}</style></head><body>
 {_nav(list(games), False, logo, page="ablation") if nav else ""}
 <main id="main">
   <div class="pagehead"><h2><i class="ico eye"></i>Sensor ablation</h2>
@@ -2994,7 +2994,7 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><circle cx='8' cy='8' r='4' stroke='%2358d854' stroke-width='2' fill='none'/></svg>">
-<title>PEAK Command Center — GA Sweep</title><style>{CSS}</style></head><body>
+<title>PEAK Command Center: GA sweep</title><style>{CSS}</style></head><body>
 {_nav(games, False, logo, page="gasweep") if nav else ""}
 <main id="main">
   <div class="pagehead"><h2><i class="ico gear"></i>GA sweep</h2>
