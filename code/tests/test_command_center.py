@@ -1,10 +1,14 @@
 """The PEAK Command Center (code/neuro/command_center.py and the pages it gathers): only the paper
 seeds reach it, every game gets every tab, and the site is static."""
 import os
+import re
 import shutil
 import subprocess
 
+import pytest
+
 from code.neuro import balance, cameras, report
+from code.stats import ast_metrics, ast_page
 
 PAPER = {"1234", "2025", "31337"}
 
@@ -41,3 +45,33 @@ def test_the_old_name_is_gone():
     hits = subprocess.run(["git", "grep", "-l", "-i", "balance command", "--", "code", "menu.py", "README.md", "docs",
                            ":!code/tests/test_command_center.py"], capture_output=True, text=True).stdout.split()
     assert [h for h in hits if not h.startswith("docs/superpowers/")] == []
+
+
+GAMES = ["mario", "meatboy", "bomberman", "megaman"]
+
+
+def test_every_game_gets_its_four_sub_pages_without_a_rebuild(monkeypatch):
+    from code.neuro import gasweep
+    monkeypatch.setattr(balance, "rebuild", lambda *a, **k: pytest.fail("rebuild called"))
+    monkeypatch.setattr(gasweep, "rebuild", lambda *a, **k: pytest.fail("gasweep rebuild called"))
+    data = report.load_data()
+    for g in GAMES:
+        for page in (report.balance_page(g, data), report.gasweep_page(g, data), report.ablation_page(g, data)):
+            assert page.startswith("<!doctype html>") and "<nav" not in page
+            assert not re.search(r'href="(report|mutations|gasweep|ablation|instructions)\.html|"/wall"|"/watch', page)
+    assert "<nav" not in report.instructions_page(data)
+
+
+def test_mega_man_shows_its_sections_and_says_what_is_not_run():
+    data = report.load_data()
+    assert all(f"CutMan-{i}-" in report.balance_page("megaman", data) for i in range(1, 9))
+    assert "No sensor probes yet" in report.ablation_page("megaman", data)
+    if not any(key[0] == "megaman" for key in data["gasweep"]):    # until jobs 7434840/7434841 come home
+        assert "No GA sweep yet" in report.gasweep_page("megaman", data)
+
+
+def test_the_mutations_sub_page_keeps_the_totals_for_every_game():
+    res = {g: ast_metrics.evaluate(g) for g in GAMES}
+    page = ast_page.render(res, only="meatboy", nav=False)
+    sc = ast_page.scores(res)
+    assert f'{sc["good"]}</span>' in page and 'id="meatboy"' in page and 'id="mario"' not in page and "<nav" not in page

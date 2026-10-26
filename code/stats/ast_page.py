@@ -483,9 +483,13 @@ show(location.hash.slice(1));
 """
 
 
-def render(results: dict) -> str:
+def render(results: dict, only: str | None = None, nav: bool = True) -> str:
+    """The page; with `only`, one game's board row, tab and section (the Command Center's Mutations
+    tab), while the score strip and the false-alarm card still count every game. `nav` off drops
+    the top bar."""
     from code.neuro import report   # its styles and top bar: one site with the other Command Center pages
-    sections = "".join(_game_section(g, res) for g, res in results.items())
+    shown = {g: res for g, res in results.items() if only in (None, g)}
+    sections = "".join(_game_section(g, res) for g, res in shown.items())
     sc = scores(results)
     fa = false_alarms(results)
     strip = ('<div class="scorestrip">'
@@ -495,17 +499,17 @@ def render(results: dict) -> str:
              '</div>')
     tabs = ('<div class="gametabs" role="tablist" aria-label="Games">'
             + "".join(f'<button class="btn g-{g}" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'
-                      f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in results) + "</div>")
+                      f'{esc(eval_mutants.EVAL_LEVELS[g][1].split(",")[0])}</button>' for g in shown) + "</div>")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>PEAK Command Center — Mutations</title><style>{report.CSS}{CSS}</style></head><body>'
-            f'{report._nav([], False, None, "mutations")}<main id="main">'
+            f'{report._nav([], False, None, "mutations") if nav else ""}<main id="main">'
             '<div class="hero"><div><h1>Does a playtest notice one small change?</h1><p class="lede">Each game\'s evaluation level gets five '
             'one-change copies. The original\'s agents, frozen, replay each copy and are compared with their own play on the '
             'original: a sealed or harder level should be caught, an off-route tile should stay quiet, and the cosmetic copy must '
             'play out identically. Agents retrained on a copy answer one question only: can it still be finished?'
             + (f' (Retrained agents are too noisy to detect with: on the unchanged level, new seeds set off the rule '
                f'{fa["fired"]["detected"]} times in {fa["comparisons"]}.)' if fa["comparisons"] else "") + '</p></div>'
-            f'{strip}</div>{board(results)}{_false_alarm_card(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
+            f'{strip}</div>{board(shown)}{_false_alarm_card(results)}{tabs}{sections}<div class="bricks" aria-hidden="true"></div></main><script>{JS}</script></body></html>')
 
 
 def _false_alarm_card(results: dict) -> str:

@@ -1,17 +1,14 @@
-"""PEAK Command Center: one self-contained HTML command center from runs/.
+"""The PEAK Command Center's sub-pages, one per game and tab (code/neuro/command_center.py
+gathers them into one site): Balance, GA sweep, Sensor ablation and How it works.
 
-Merges the balance report and the stats dashboard: per-game sections with an
-Overview (all personas side by side) and persona tabs whose level cards expand
-in place — metrics with hover explanations, B1/B2/B3 verdicts, death maps,
-cause bars, learning curves, and agent routes drawn over the level geometry.
-Also lists every training run found under runs/. A separate instructions page
-is generated alongside.
-
-Run:  python -m code.neuro.report [--dir runs/balance] [--open]
+Balance holds per-game sections with an Overview (all personas side by side) and persona tabs
+whose level cards expand in place: metrics with hover explanations, B1/B2/B3 verdicts, death maps,
+cause bars, learning curves, and agent routes drawn over the level geometry. How it works also
+lists every training run found under runs/. Everything is read from the committed report JSONs
+(load_data); nothing here rebuilds them.
 """
 from __future__ import annotations
 
-import argparse
 import ast
 import base64
 import csv
@@ -22,16 +19,14 @@ import json
 import math
 import os
 import re
-import webbrowser
 from datetime import datetime
 
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES
-from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci, rebuild
+from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci
 from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
-from .gasweep import rebuild as rebuild_gasweep
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -1581,7 +1576,7 @@ def _brain_dialog(sec_id: str, game: str, personas: dict[str, dict]) -> str:
 
 
 def _game_section(game: str, by_tag: dict, idx: int, th: dict, ga_anchor: str | None = None) -> str:
-    ga_link = (f'<a class="navbtn tip" href="gasweep.html#{ga_anchor}" '
+    ga_link = (f'<a class="navbtn tip" href="index.html#{game}/gasweep" target="_top" '
                f'data-tip="GA hyperparameter sweep for {game}: which knobs matter, recommended config">'
                f'{_DIAL_SVG} GA sweep</a>' if ga_anchor else "")
     n_levels = len({r["level"] for p in by_tag.values() for d in p.values() for r in d["levels"]})
@@ -2220,7 +2215,7 @@ def _nav(games: list, has_runs: bool, logo: str | None, page: str = "report") ->
   </nav>"""
 
 
-def _instructions_page(games: list[str], logo: str | None) -> str:
+def _instructions_page(games: list[str], logo: str | None, nav: bool = True, after: str = "") -> str:
     tips = "".join(f"<li><b>{k}</b> — {v}</li>" for k, v in TIPS.items())
     persona = lambda p, text: f'<li><b><i class="ico p-{p}"></i> {p}</b> — {text}</li>'  # noqa: E731
     sections = [  # (anchor, icon, heading, body): the contents rail lists them in this order
@@ -2318,10 +2313,10 @@ def _instructions_page(games: list[str], logo: str | None) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Command Center — Instructions</title><style>{CSS}</style></head><body>
-{_nav(games, False, logo, page="instructions")}
+{_nav(games, False, logo, page="instructions") if nav else ""}
 <main id="main" class="doc">
   <div class="toc frame" role="navigation" aria-label="On this page"><h2>Contents</h2><ul>{toc}</ul></div>
-  <div class="doc-body">{body}</div>
+  <div class="doc-body">{body}{after}</div>
 </main>
 <footer class="docfoot">PEAK engine · instructions</footer>
 <div class="bricks" aria-hidden="true"></div>
@@ -2542,7 +2537,7 @@ def _abl_face(r: dict, g: dict) -> str:
             f'{side("grid", gw, gf, gsv, nl)}</div>')
 
 
-def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
+def _ablation_page(games: dict, logo: str | None, stamp: str, nav: bool = True) -> str:
     from .net import NeuralNet
     from .sensors import sensor_dim
     pairs = _ablation_pairs(games)
@@ -2592,7 +2587,7 @@ def _ablation_page(games: dict, logo: str | None, stamp: str) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Command Center — Sensor Ablation</title><style>{CSS}</style></head><body>
-{_nav(list(games), False, logo, page="ablation")}
+{_nav(list(games), False, logo, page="ablation") if nav else ""}
 <main id="main">
   <div class="pagehead"><h2><i class="ico eye"></i>Sensor ablation</h2>
     <p>Same GA, same seeds, same levels — only what the agent sees changes · generated {stamp}</p></div>
@@ -2965,7 +2960,8 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
   </section>"""
 
 
-def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str | None, stamp: str) -> str:
+def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str | None, stamp: str,
+                  nav: bool = True) -> str:
     n_cfg = sum(len(v) for v in groups.values())
     n_probes = sum(len(lst) for v in groups.values() for d in v for lst in d.get("cells", {}).values())
     total = sum(_train_time(d) for v in groups.values() for d in v)
@@ -2999,7 +2995,7 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><circle cx='8' cy='8' r='4' stroke='%2358d854' stroke-width='2' fill='none'/></svg>">
 <title>PEAK Command Center — GA Sweep</title><style>{CSS}</style></head><body>
-{_nav(games, False, logo, page="gasweep")}
+{_nav(games, False, logo, page="gasweep") if nav else ""}
 <main id="main">
   <div class="pagehead"><h2><i class="ico gear"></i>GA sweep</h2>
     <p>GA hyperparameter ablation · one knob at a time against literature bounds · same seeds, same levels · generated {stamp}</p></div>
@@ -3014,53 +3010,61 @@ def _gasweep_page(groups: dict[tuple, list[dict]], games: list[str], logo: str |
 </main><div class="bricks" aria-hidden="true"></div>{_page_data()}<script>{JS}</script></body></html>"""
 
 
-def build(balance_dir: str) -> dict[str, str]:
-    """{filename: html} for every command-center page."""
-    _page_data()          # start every page's templates and stores empty
-    rebuild(balance_dir)  # probe dirs are the source of truth; JSONs are regenerated from them
-    rebuild_gasweep(balance_dir)
-    gs_groups = _gasweep_groups(_load_json_glob(os.path.join(balance_dir, "gasweep_*.json")))
-    ga_anchor: dict[str, str] = {}
-    for i, key in enumerate(gs_groups):
-        ga_anchor.setdefault(key[0], f"gs_{i}")
-    def _flat(prefix: str) -> dict[tuple[str, str | None], dict[str, dict]]:  # (game, tag) -> persona -> data
+MEGAMAN_REPORTS = os.path.join("runs", "ast", "megaman", "base-retrained")   # Mega Man's probes: every section retrained
+
+
+def load_data(balance_dir: str = BALANCE_DIR) -> dict:
+    """What the Command Center's sub-pages show, read from the committed report JSONs; nothing is
+    rebuilt, so the pages carry the published numbers. games: game -> tag -> persona -> report."""
+    def _flat(*patterns: str) -> dict[tuple[str, str | None], dict[str, dict]]:  # (game, tag) -> persona -> data
         out: dict[tuple[str, str | None], dict[str, dict]] = {}
-        for data in _load_json_glob(os.path.join(balance_dir, f"{prefix}_*.json")):
-            out.setdefault((data["game"], data.get("tag")), {})[data.get("persona") or "experienced"] = data
+        for pattern in patterns:
+            for data in _load_json_glob(pattern):
+                out.setdefault((data["game"], data.get("tag")), {})[data.get("persona") or "experienced"] = data
         return out
-    flat = _flat("report")       # real sweeps
-    flat_abl = _flat("ablation")  # sensor-ablation arms (runs/ablation) — kept apart from the real sweeps
-    games: dict[str, dict] = {}  # game -> tag -> persona -> data (tagged configs first, legacy last)
+    flat = _flat(os.path.join(balance_dir, "report_*.json"), os.path.join(MEGAMAN_REPORTS, "report_megaman_*.json"))
+    games: dict[str, dict] = {}  # tagged configs first, legacy last
     for (g, t), personas in sorted(flat.items(), key=lambda kv: (kv[0][0], kv[0][1] is None, kv[0][1] or "")):
         games.setdefault(g, {})[t] = personas
-    th = _load_thresholds()
-    logo = _logo_b64()
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    sections = [_game_section(g, by_tag, i, th, ga_anchor.get(g)) for i, (g, by_tag) in enumerate(games.items())]
-    runs_html = _runs_section()
-    total = sum(_train_time(d) for by_tag in games.values() for p in by_tag.values() for d in p.values())
-    body = "".join(sections) + runs_html if sections or runs_html else \
-        "<p style='color:var(--dim)'>No balance data yet — run a Full Sweep (menu 13) or Sensor Ablation (menu 14) first.</p>"
-    report = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+    return {"games": games, "ablation": _flat(os.path.join(balance_dir, "ablation_*.json")),
+            "gasweep": _gasweep_groups(_load_json_glob(os.path.join(balance_dir, "gasweep_*.json"))),
+            "thresholds": _load_thresholds(), "stamp": datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+
+def _scoped(html: str) -> str:
+    """Every <th> on these pages heads a column; label the ones the emitters didn't."""
+    return re.sub(r"<th(?=[\s>])(?![^>]*\bscope=)", '<th scope="col"', html)
+
+
+def balance_page(game: str, data: dict) -> str:
+    """The Balance tab of one game: what the balance report showed for it, with no top bar."""
+    by_tag = data["games"].get(game)
+    has_sweep = any(key[0] == game for key in data["gasweep"])
+    body = (GLOSSARY + _game_section(game, by_tag, 0, data["thresholds"], "gasweep" if has_sweep else None) if by_tag else
+            f"<p style='color:var(--dim)'>No balance data for {game} yet: run a Full Sweep (menu 13) first.</p>")
+    return _scoped(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
-<title>PEAK Command Center</title><style>{CSS}</style></head><body>
-{_nav(list(games), bool(runs_html), logo)}
+<title>PEAK Command Center: {game} balance</title><style>{CSS}</style></head><body>
 <main id="main">
-  <div style="font:400 .9rem var(--ui);color:var(--dim);margin-bottom:16px">
-    Multi-seed neuroevolution probes · generated {stamp} · total probe train time {fmt_hms(total)}</div>
-  {GLOSSARY}
   {body}
-  <footer>Generated by PEAK from the balance probes on disk. Regenerate from the menu (12) after a new sweep.</footer>
-</main><div class="bricks" aria-hidden="true"></div>{TIP_DESC}{_page_data()}<script>{JS}</script></body></html>"""
-    from code.stats import ast_metrics, ast_page
-    pages = {"report.html": report,
-             "mutations.html": ast_page.render({g: ast_metrics.evaluate(g) for g in ast_metrics.GAMES}),
-             "instructions.html": _instructions_page(list(games), logo),
-             "ablation.html": _ablation_page(flat_abl, logo, stamp),
-             "gasweep.html": _gasweep_page(gs_groups, list(games), logo, stamp)}
-    # every <th> on these pages heads a column; label the ones the emitters didn't
-    return {k: re.sub(r"<th(?=[\s>])(?![^>]*\bscope=)", '<th scope="col"', v) for k, v in pages.items()}
+</main><div class="bricks" aria-hidden="true"></div>{TIP_DESC}{_page_data()}<script>{JS}</script></body></html>""")
+
+
+def gasweep_page(game: str, data: dict) -> str:
+    """The GA sweep tab of one game."""
+    groups = {k: v for k, v in data["gasweep"].items() if k[0] == game}
+    return _scoped(_gasweep_page(groups, [game], None, data["stamp"], nav=False))
+
+
+def ablation_page(game: str, data: dict) -> str:
+    """The Sensor ablation tab of one game."""
+    arms = {k: v for k, v in data["ablation"].items() if k[0] == game}
+    return _scoped(_ablation_page(arms, None, data["stamp"], nav=False))
+
+
+def instructions_page(data: dict) -> str:
+    """The How it works tab: the instructions, then every training run on this machine."""
+    return _scoped(_instructions_page(list(data["games"]), None, nav=False, after=_runs_section()))
 
 
 def _load_json_glob(pattern: str) -> list[dict]:
@@ -3072,24 +3076,3 @@ def _load_json_glob(pattern: str) -> list[dict]:
         except (OSError, json.JSONDecodeError):
             continue
     return out
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Generate the PEAK Command Center")
-    ap.add_argument("--dir", default=BALANCE_DIR)
-    ap.add_argument("--open", action="store_true", help="open in the default browser")
-    args = ap.parse_args()
-
-    pages = build(args.dir)
-    os.makedirs(args.dir, exist_ok=True)
-    for name, html in pages.items():
-        with open(os.path.join(args.dir, name), "w", encoding="utf-8") as f:
-            f.write(html)
-    out = os.path.join(args.dir, "report.html")
-    print(f"wrote {out} (+ {', '.join(n for n in pages if n != 'report.html')})")
-    if args.open:
-        webbrowser.open("file:///" + os.path.abspath(out).replace(os.sep, "/"))
-
-
-if __name__ == "__main__":
-    main()
