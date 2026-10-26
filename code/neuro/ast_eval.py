@@ -196,11 +196,11 @@ def _attempt(game: str, level: str, cfg, persona, act, reset, seed: int, agent: 
     return row
 
 
-def _best_retrained(variant: str, section: str) -> str | None:
-    """The run trained on this section of the variant that wins most often (relay.py's test)."""
+def _best_retrained(variant: str, section: str, persona: str = "experienced") -> str | None:
+    """The run of this persona trained on this section of the variant that wins most often (relay.py's test)."""
     from .relay import evaluate
     root = os.path.join(variant_dir("megaman", variant), "probes")
-    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", "*", "*", f"{section}_*", "best.npz"))]
+    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, "*", f"{section}_*", "best.npz"))]
     scored = [(evaluate(r, section, 12), r) for r in sorted(runs)]
     return max(scored)[1] if scored else None
 
@@ -289,7 +289,8 @@ def main() -> None:
     r = sub.add_parser("retrain", help="train each persona's three seeds on one mutant")
     r.add_argument("--game", required=True, choices=list(eval_mutants.CHANGES) + ["megaman"])
     r.add_argument("--mutant", required=True)
-    r.add_argument("--persona", nargs="*", default=None, help="default: all six (Mega Man: each section's own)")
+    r.add_argument("--persona", nargs="*", default=None,
+                   help="default: all six (Mega Man: the persona each section's relay leg plays)")
     r.add_argument("--gens", type=int, default=GENS)
     r.add_argument("--workers", type=int, default=None)
     r.add_argument("--level", nargs="*", default=None,
@@ -306,13 +307,14 @@ def main() -> None:
     args = ap.parse_args()
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     if args.cmd == "retrain":
-        if args.game == "megaman":                       # each section with the persona its relay leg plays
+        if args.game == "megaman":                       # each section with --persona, else the persona its relay leg plays
             from .relay import load_legs
             m = mutant("megaman", args.mutant)
             jobs: dict = {}
             for leg in load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE):
                 if leg.level in (m or {}).get("retrain_levels", []) and (not args.level or leg.level in args.level):
-                    jobs.setdefault(leg.persona.name, []).append(leg.level)
+                    for persona in args.persona or [leg.persona.name]:
+                        jobs.setdefault(persona, []).append(leg.level)
         else:
             jobs = {p: None for p in args.persona or PERSONA_ORDER}
         for persona, levels in jobs.items():
