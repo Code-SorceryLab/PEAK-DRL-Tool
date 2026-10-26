@@ -112,6 +112,21 @@ def test_mega_man_mutants_meet_the_retrained_original_section_by_section(tmp_pat
         {"class": "neutral", "operator": "s3-off_route", "id": "s3-off_route", "game": "megaman"}, off) == ("original unsolved", "none")
 
 
+def test_a_variant_meets_only_the_personas_that_played_it(tmp_path, monkeypatch):
+    from code.stats import episode_log
+    monkeypatch.setattr(am, "ROOT", str(tmp_path))
+
+    def rows(persona, status):
+        return [row(status, persona=persona, level="CutMan-4-Shaft", seed=s, game="megaman", end=(1200.0, 1100.0))
+                for s in (1, 2, 3)]
+    episode_log.append(str(tmp_path / "megaman" / "base-retrained" / "agents.csv"),
+                       rows("experienced", "DEAD") + rows("killer", "WON"))      # only killer solves Shaft
+    episode_log.append(str(tmp_path / "megaman" / "base-reseeded" / "agents.csv"), rows("experienced", "DEAD"))
+    res = am.evaluate("megaman")
+    s = (res.get("base-reseeded @ CutMan-4-Shaft") or res["base-reseeded"])["vs_base"]
+    assert not s["counted"] and s["verdict"] == "not counted"    # experienced never solved it: no false alarm
+
+
 def test_a_comparison_counts_only_on_a_solved_original_and_gets_one_verdict():
     solved = am.summarize([row("WON") for _ in range(6)] + [row(end=(64.0, 96.0))])
     unsolved = am.summarize([row(end=(64.0, 96.0)) for _ in range(7)])

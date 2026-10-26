@@ -282,6 +282,13 @@ def references(game: str) -> dict:
     return refs
 
 
+def _alike(ref: list[dict], rows: list[dict]) -> list[dict]:
+    """The original's attempts by the personas that played `rows`: a variant played by fewer personas
+    (Mega Man's base-reseeded: experienced only) is never judged against personas it lacks."""
+    personas = {r.get("persona") for r in rows}
+    return [r for r in ref if r.get("persona") in personas]
+
+
 def evaluate(game: str) -> dict:
     """{variant: {"agents": metrics, "humans": metrics or None, "vs_base": signals, "vs": the
     original it was compared with, ...}}. A variant is compared with the original played over the
@@ -313,14 +320,14 @@ def evaluate(game: str) -> dict:
             entry = {"agents": summarize(agents) if agents else None, "level": level,
                      "humans": dict(summarize(humans), win_rate=win_rate(humans)) if humans else None}
             vs, ref = refs.get(level, (None, None))
-            if v not in ORIGINALS and ref and agents:
-                entry["vs_base"] = compare(summarize(ref), entry["agents"])
+            if v not in ORIGINALS and ref and agents and _alike(ref, agents):
+                entry["vs_base"] = compare(summarize(_alike(ref, agents)), entry["agents"])
                 entry["vs"] = vs
                 if v.endswith("cosmetic_tile"):
-                    entry["determinism"] = determinism(ref, agents)
-                if replayed.get(level):
+                    entry["determinism"] = determinism(_alike(ref, agents), agents)
+                if replayed.get(level) and _alike(ref, replayed[level]):
                     rep = summarize(replayed[level])
-                    entry["replay"] = {"agents": rep, "vs_base": compare(summarize(ref), rep)}
+                    entry["replay"] = {"agents": rep, "vs_base": compare(summarize(_alike(ref, replayed[level])), rep)}
             if v not in ORIGINALS and randoms.get(level) and rand_ref.get(level):
                 rnd = summarize(randoms[level])          # the random baseline against itself on the original
                 entry["random"] = {"agents": rnd, "vs_base": compare(summarize(rand_ref[level]), rnd)}
