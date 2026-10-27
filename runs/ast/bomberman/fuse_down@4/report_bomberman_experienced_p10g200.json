@@ -1,0 +1,372 @@
+{
+  "game": "bomberman",
+  "persona": "experienced",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 40.8,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.0,
+      "first_win_ci": 6.6,
+      "best_gen_mean": 3.0,
+      "best_gen_ci": 6.6,
+      "win_rate_mean": 0.587,
+      "win_rate_ci": 0.607,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.66,
+      "causes": {
+        "Stall": 58,
+        "Bomb": 139,
+        "Timeout": 14
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.151,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1606,
+      "train_time_s": 40.8,
+      "completion_rate_mean": 0.491,
+      "mean_completion_time": 6.7,
+      "completion_time_stddev": 1.2,
+      "progress_at_death_mean": 0.567,
+      "deaths_per_run_mean": 5.09,
+      "death_hist": [
+        40,
+        0,
+        0,
+        3,
+        0,
+        40,
+        14,
+        3,
+        43,
+        68
+      ],
+      "death_cluster_entropy_mean": 0.536,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.661
+    }
+  ],
+  "cells": {
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.32,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.13125,
+        "causes": {
+          "Stall": 21,
+          "Bomb": 93,
+          "Timeout": 13
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0273,
+        "train_time_s": 26.6,
+        "completion_rate": 0.206,
+        "mean_completion_time": 11.2,
+        "completion_time_stddev": 2.4,
+        "progress_at_death": 0.74,
+        "deaths_per_run": 7.94,
+        "death_hist": [
+          17,
+          0,
+          0,
+          2,
+          0,
+          4,
+          9,
+          3,
+          38,
+          54
+        ],
+        "death_cluster_entropy": 0.627,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.5,
+        "curve": [
+          [
+            923.6,
+            255.8
+          ],
+          [
+            963.6,
+            491.5
+          ],
+          [
+            1023.6,
+            868.9
+          ],
+          [
+            1023.6,
+            846.2
+          ],
+          [
+            1023.6,
+            827.1
+          ],
+          [
+            6060.0,
+            1319.5
+          ],
+          [
+            6060.0,
+            1464.9
+          ],
+          [
+            6060.0,
+            1406.2
+          ],
+          [
+            6060.0,
+            1478.7
+          ],
+          [
+            6060.0,
+            2046.9
+          ],
+          [
+            6060.0,
+            2050.9
+          ],
+          [
+            6060.0,
+            2481.1
+          ],
+          [
+            6060.0,
+            3389.8
+          ],
+          [
+            6060.0,
+            4020.0
+          ],
+          [
+            6060.0,
+            3515.5
+          ],
+          [
+            6060.0,
+            4023.1
+          ]
+        ],
+        "dir": "runs/ast/bomberman/fuse_down@4/probes/bomberman/experienced/p10g200/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.64,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.17272727272727273,
+        "causes": {
+          "Stall": 19,
+          "Bomb": 25,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 7.7,
+        "completion_rate": 0.591,
+        "mean_completion_time": 4.7,
+        "completion_time_stddev": 0.8,
+        "progress_at_death": 0.589,
+        "deaths_per_run": 4.09,
+        "death_hist": [
+          9,
+          0,
+          0,
+          1,
+          0,
+          11,
+          5,
+          0,
+          5,
+          14
+        ],
+        "death_cluster_entropy": 0.696,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.733,
+        "curve": [
+          [
+            6060.0,
+            781.6
+          ],
+          [
+            6060.0,
+            1084.0
+          ],
+          [
+            6060.0,
+            1134.2
+          ],
+          [
+            6060.0,
+            2455.3
+          ],
+          [
+            6060.0,
+            4538.2
+          ],
+          [
+            6060.0,
+            5045.8
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            5541.8
+          ],
+          [
+            6060.0,
+            5554.9
+          ],
+          [
+            6060.0,
+            4547.3
+          ],
+          [
+            6060.0,
+            5554.9
+          ]
+        ],
+        "dir": "runs/ast/bomberman/fuse_down@4/probes/bomberman/experienced/p10g200/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.8,
+        "best": 6060.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.15,
+        "causes": {
+          "Stall": 18,
+          "Bomb": 21
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.4545,
+        "train_time_s": 6.5,
+        "completion_rate": 0.675,
+        "mean_completion_time": 4.2,
+        "completion_time_stddev": 0.3,
+        "progress_at_death": 0.373,
+        "deaths_per_run": 3.25,
+        "death_hist": [
+          14,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.284,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.75,
+        "curve": [
+          [
+            605.5,
+            184.7
+          ],
+          [
+            6060.0,
+            969.5
+          ],
+          [
+            6060.0,
+            1599.5
+          ],
+          [
+            6060.0,
+            3300.9
+          ],
+          [
+            6060.0,
+            4973.6
+          ],
+          [
+            6060.0,
+            5454.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            4978.2
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            4978.2
+          ],
+          [
+            6060.0,
+            6060.0
+          ],
+          [
+            6060.0,
+            6060.0
+          ]
+        ],
+        "dir": "runs/ast/bomberman/fuse_down@4/probes/bomberman/experienced/p10g200/4_31337"
+      }
+    ]
+  }
+}

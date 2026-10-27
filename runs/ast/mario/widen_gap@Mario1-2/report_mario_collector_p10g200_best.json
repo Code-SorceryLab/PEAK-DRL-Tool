@@ -1,0 +1,501 @@
+{
+  "game": "mario",
+  "persona": "collector",
+  "tag": "p10g200_best",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 498.8,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.3,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 13.7,
+      "first_win_ci": 2.9,
+      "best_gen_mean": 16.0,
+      "best_gen_ci": 9.0,
+      "win_rate_mean": 0.257,
+      "win_rate_ci": 0.398,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.56,
+      "causes": {
+        "Stall": 353,
+        "Enemy": 133,
+        "Pit": 144
+      },
+      "best_x_mean": 5358.4,
+      "stuck_frac_mean": 0.495,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0365,
+      "train_time_s": 498.8,
+      "completion_rate_mean": 0.113,
+      "mean_completion_time": 45.5,
+      "completion_time_stddev": 0.5,
+      "progress_at_death_mean": 0.378,
+      "deaths_per_run_mean": 8.87,
+      "death_hist": [
+        62,
+        28,
+        84,
+        312,
+        28,
+        0,
+        29,
+        74,
+        13,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.669,
+      "coin_collection_rate_mean": 0.179,
+      "novice_expert_gap_mean": 0.31
+    }
+  ],
+  "cells": {
+    "Mario1-2": [
+      {
+        "level": "Mario1-2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 23,
+        "first_win_gen": 13,
+        "best_gen": 13,
+        "win_rate": 0.1,
+        "best": 12354.4,
+        "best_x": 5355.3,
+        "stuck_frac": 0.6086956521739131,
+        "causes": {
+          "Stall": 140,
+          "Enemy": 39,
+          "Pit": 40
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.036,
+        "train_time_s": 156.3,
+        "completion_rate": 0.048,
+        "mean_completion_time": 51.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.366,
+        "deaths_per_run": 9.52,
+        "death_hist": [
+          22,
+          5,
+          29,
+          123,
+          5,
+          0,
+          6,
+          23,
+          6,
+          0
+        ],
+        "death_cluster_entropy": 0.621,
+        "coin_collection_rate": 0.175,
+        "novice_expert_gap": 0.1,
+        "curve": [
+          [
+            3293.6,
+            446.2
+          ],
+          [
+            3293.6,
+            1482.8
+          ],
+          [
+            3293.6,
+            2431.0
+          ],
+          [
+            3293.6,
+            2844.3
+          ],
+          [
+            3293.6,
+            2880.0
+          ],
+          [
+            3293.6,
+            3132.1
+          ],
+          [
+            3293.6,
+            2706.6
+          ],
+          [
+            3293.6,
+            3260.3
+          ],
+          [
+            3293.6,
+            2814.3
+          ],
+          [
+            3293.6,
+            3293.6
+          ],
+          [
+            4471.6,
+            3080.2
+          ],
+          [
+            4471.6,
+            2779.2
+          ],
+          [
+            12354.4,
+            3827.1
+          ],
+          [
+            12354.4,
+            4249.0
+          ],
+          [
+            12354.4,
+            3847.9
+          ],
+          [
+            12354.4,
+            3869.6
+          ],
+          [
+            12354.4,
+            3839.0
+          ],
+          [
+            12354.4,
+            4636.7
+          ],
+          [
+            12354.4,
+            4945.5
+          ],
+          [
+            12354.4,
+            4573.6
+          ],
+          [
+            12354.4,
+            4790.2
+          ],
+          [
+            12354.4,
+            5204.6
+          ],
+          [
+            12354.4,
+            4474.1
+          ]
+        ],
+        "dir": "runs/ast/mario/widen_gap@Mario1-2/probes/mario/collector/p10g200_best/Mario1-2_1234"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 25,
+        "first_win_gen": 15,
+        "best_gen": 15,
+        "win_rate": 0.25,
+        "best": 12354.9,
+        "best_x": 5355.8,
+        "stuck_frac": 0.56,
+        "causes": {
+          "Enemy": 52,
+          "Stall": 140,
+          "Pit": 32
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0391,
+        "train_time_s": 177.4,
+        "completion_rate": 0.104,
+        "mean_completion_time": 45.5,
+        "completion_time_stddev": 1.0,
+        "progress_at_death": 0.365,
+        "deaths_per_run": 8.96,
+        "death_hist": [
+          17,
+          4,
+          39,
+          132,
+          1,
+          0,
+          6,
+          21,
+          4,
+          0
+        ],
+        "death_cluster_entropy": 0.564,
+        "coin_collection_rate": 0.172,
+        "novice_expert_gap": 0.287,
+        "curve": [
+          [
+            3293.6,
+            856.7
+          ],
+          [
+            3293.6,
+            1842.9
+          ],
+          [
+            3293.6,
+            2402.2
+          ],
+          [
+            3293.6,
+            3293.6
+          ],
+          [
+            3293.6,
+            3117.2
+          ],
+          [
+            3293.6,
+            2888.6
+          ],
+          [
+            3293.6,
+            3260.3
+          ],
+          [
+            3293.6,
+            3118.6
+          ],
+          [
+            3293.6,
+            3001.0
+          ],
+          [
+            3293.6,
+            3293.6
+          ],
+          [
+            3293.6,
+            3293.6
+          ],
+          [
+            5845.8,
+            2955.7
+          ],
+          [
+            5845.8,
+            2856.1
+          ],
+          [
+            5847.0,
+            3385.2
+          ],
+          [
+            12354.9,
+            3790.3
+          ],
+          [
+            12354.9,
+            3550.3
+          ],
+          [
+            12354.9,
+            4443.1
+          ],
+          [
+            12354.9,
+            5583.2
+          ],
+          [
+            12354.9,
+            5032.7
+          ],
+          [
+            12354.9,
+            5288.2
+          ],
+          [
+            12354.9,
+            5092.1
+          ],
+          [
+            12354.9,
+            6077.6
+          ],
+          [
+            12354.9,
+            6814.6
+          ],
+          [
+            12354.9,
+            6095.4
+          ],
+          [
+            12354.9,
+            5923.8
+          ]
+        ],
+        "dir": "runs/ast/mario/widen_gap@Mario1-2/probes/mario/collector/p10g200_best/Mario1-2_2025"
+      },
+      {
+        "level": "Mario1-2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 23,
+        "first_win_gen": 13,
+        "best_gen": 20,
+        "win_rate": 0.42,
+        "best": 12363.1,
+        "best_x": 5364.0,
+        "stuck_frac": 0.3173913043478261,
+        "causes": {
+          "Stall": 73,
+          "Enemy": 42,
+          "Pit": 72
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0343,
+        "train_time_s": 165.1,
+        "completion_rate": 0.187,
+        "mean_completion_time": 39.9,
+        "completion_time_stddev": 0.6,
+        "progress_at_death": 0.403,
+        "deaths_per_run": 8.13,
+        "death_hist": [
+          23,
+          19,
+          16,
+          57,
+          22,
+          0,
+          17,
+          30,
+          3,
+          0
+        ],
+        "death_cluster_entropy": 0.822,
+        "coin_collection_rate": 0.19,
+        "novice_expert_gap": 0.543,
+        "curve": [
+          [
+            3293.6,
+            455.4
+          ],
+          [
+            3293.6,
+            826.6
+          ],
+          [
+            3293.6,
+            1135.6
+          ],
+          [
+            3293.6,
+            1734.2
+          ],
+          [
+            3293.7,
+            2887.0
+          ],
+          [
+            3293.7,
+            2734.5
+          ],
+          [
+            6125.8,
+            3137.8
+          ],
+          [
+            6125.8,
+            2929.2
+          ],
+          [
+            6125.8,
+            3474.6
+          ],
+          [
+            6125.8,
+            3160.5
+          ],
+          [
+            6185.1,
+            4210.9
+          ],
+          [
+            6185.1,
+            4526.4
+          ],
+          [
+            12352.4,
+            5329.9
+          ],
+          [
+            12352.4,
+            5270.7
+          ],
+          [
+            12352.4,
+            4958.5
+          ],
+          [
+            12352.4,
+            6172.2
+          ],
+          [
+            12352.4,
+            7223.8
+          ],
+          [
+            12352.4,
+            8078.8
+          ],
+          [
+            12352.4,
+            7847.5
+          ],
+          [
+            12363.1,
+            9007.7
+          ],
+          [
+            12363.1,
+            10209.7
+          ],
+          [
+            12363.1,
+            8621.3
+          ],
+          [
+            12363.1,
+            7931.2
+          ]
+        ],
+        "dir": "runs/ast/mario/widen_gap@Mario1-2/probes/mario/collector/p10g200_best/Mario1-2_31337"
+      }
+    ]
+  }
+}

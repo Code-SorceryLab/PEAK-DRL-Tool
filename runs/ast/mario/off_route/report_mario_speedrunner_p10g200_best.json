@@ -1,0 +1,360 @@
+{
+  "game": "mario",
+  "persona": "speedrunner",
+  "tag": "p10g200_best",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 315.2,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.3,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 1.7,
+      "first_win_ci": 1.4,
+      "best_gen_mean": 2.7,
+      "best_gen_ci": 5.2,
+      "win_rate_mean": 0.92,
+      "win_rate_ci": 0.025,
+      "dominant_cause": "Enemy",
+      "dominant_cause_frac": 0.48,
+      "causes": {
+        "Enemy": 33,
+        "OOB": 15,
+        "Pit": 12,
+        "Stall": 9
+      },
+      "best_x_mean": 6220.5,
+      "stuck_frac_mean": 0.025,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.1958,
+      "train_time_s": 315.2,
+      "completion_rate_mean": 0.805,
+      "mean_completion_time": 32.9,
+      "completion_time_stddev": 1.5,
+      "progress_at_death_mean": 0.131,
+      "deaths_per_run_mean": 1.95,
+      "death_hist": [
+        48,
+        2,
+        0,
+        9,
+        3,
+        7,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.366,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.617
+    }
+  ],
+  "cells": {
+    "Mario1-1": [
+      {
+        "level": "Mario1-1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.92,
+        "best": 17905.0,
+        "best_x": 6220.4,
+        "stuck_frac": 0.008333333333333333,
+        "causes": {
+          "Enemy": 12,
+          "OOB": 5,
+          "Pit": 9,
+          "Stall": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2343,
+        "train_time_s": 103.9,
+        "completion_rate": 0.775,
+        "mean_completion_time": 32.6,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.194,
+        "deaths_per_run": 2.25,
+        "death_hist": [
+          15,
+          1,
+          0,
+          6,
+          0,
+          5,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.476,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.675,
+        "curve": [
+          [
+            4360.8,
+            534.2
+          ],
+          [
+            17905.0,
+            2982.4
+          ],
+          [
+            17905.0,
+            7378.5
+          ],
+          [
+            17905.0,
+            16550.6
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/speedrunner/p10g200_best/Mario1-1_1234"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.93,
+        "best": 17905.0,
+        "best_x": 6220.4,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Enemy": 11,
+          "OOB": 3,
+          "Pit": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 107.7,
+        "completion_rate": 0.864,
+        "mean_completion_time": 33.0,
+        "completion_time_stddev": 1.8,
+        "progress_at_death": 0.099,
+        "deaths_per_run": 1.36,
+        "death_hist": [
+          12,
+          0,
+          0,
+          2,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.273,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.5,
+        "curve": [
+          [
+            17905.0,
+            3951.3
+          ],
+          [
+            17905.0,
+            11019.1
+          ],
+          [
+            17905.0,
+            12981.3
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/speedrunner/p10g200_best/Mario1-1_2025"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 5,
+        "win_rate": 0.91,
+        "best": 17905.0,
+        "best_x": 6220.8,
+        "stuck_frac": 0.06666666666666667,
+        "causes": {
+          "OOB": 7,
+          "Enemy": 10,
+          "Stall": 8,
+          "Pit": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3532,
+        "train_time_s": 103.6,
+        "completion_rate": 0.775,
+        "mean_completion_time": 33.1,
+        "completion_time_stddev": 2.7,
+        "progress_at_death": 0.099,
+        "deaths_per_run": 2.25,
+        "death_hist": [
+          21,
+          1,
+          0,
+          1,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.35,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.675,
+        "curve": [
+          [
+            3417.7,
+            445.6
+          ],
+          [
+            17904.9,
+            4001.2
+          ],
+          [
+            17904.9,
+            7978.1
+          ],
+          [
+            17904.9,
+            12922.8
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ],
+          [
+            17905.0,
+            17905.0
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/speedrunner/p10g200_best/Mario1-1_31337"
+      }
+    ]
+  }
+}

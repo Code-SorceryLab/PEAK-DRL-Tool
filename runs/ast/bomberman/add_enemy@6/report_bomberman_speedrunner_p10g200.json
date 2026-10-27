@@ -1,0 +1,561 @@
+{
+  "game": "bomberman",
+  "persona": "speedrunner",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 112.5,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 18.7,
+      "first_win_ci": 15.0,
+      "best_gen_mean": 25.0,
+      "best_gen_ci": 26.9,
+      "win_rate_mean": 0.547,
+      "win_rate_ci": 0.654,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.71,
+      "causes": {
+        "Bomb": 490,
+        "Stall": 137,
+        "Enemy": 66
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.171,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0364,
+      "train_time_s": 112.5,
+      "completion_rate_mean": 0.187,
+      "mean_completion_time": 8.5,
+      "completion_time_stddev": 0.6,
+      "progress_at_death_mean": 0.773,
+      "deaths_per_run_mean": 8.13,
+      "death_hist": [
+        23,
+        8,
+        41,
+        9,
+        13,
+        127,
+        49,
+        35,
+        19,
+        369
+      ],
+      "death_cluster_entropy_mean": 0.556,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.569
+    }
+  ],
+  "cells": {
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 28,
+        "first_win_gen": 18,
+        "best_gen": 28,
+        "win_rate": 0.5,
+        "best": 10973.7,
+        "best_x": 1000.0,
+        "stuck_frac": 0.2,
+        "causes": {
+          "Bomb": 150,
+          "Stall": 56,
+          "Enemy": 23
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0306,
+        "train_time_s": 30.9,
+        "completion_rate": 0.182,
+        "mean_completion_time": 8.8,
+        "completion_time_stddev": 0.6,
+        "progress_at_death": 0.777,
+        "deaths_per_run": 8.18,
+        "death_hist": [
+          10,
+          2,
+          18,
+          2,
+          4,
+          1,
+          42,
+          16,
+          2,
+          132
+        ],
+        "death_cluster_entropy": 0.595,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.544,
+        "curve": [
+          [
+            1002.9,
+            403.1
+          ],
+          [
+            1074.3,
+            761.1
+          ],
+          [
+            1074.3,
+            1045.7
+          ],
+          [
+            1074.3,
+            1038.6
+          ],
+          [
+            1074.3,
+            949.0
+          ],
+          [
+            1110.0,
+            984.7
+          ],
+          [
+            1110.0,
+            877.3
+          ],
+          [
+            1110.0,
+            966.9
+          ],
+          [
+            1110.0,
+            1023.6
+          ],
+          [
+            1110.0,
+            1099.3
+          ],
+          [
+            1421.4,
+            1130.4
+          ],
+          [
+            1421.4,
+            937.0
+          ],
+          [
+            1421.4,
+            1033.7
+          ],
+          [
+            1421.4,
+            968.7
+          ],
+          [
+            1421.4,
+            863.1
+          ],
+          [
+            1421.4,
+            868.4
+          ],
+          [
+            1421.4,
+            1004.7
+          ],
+          [
+            10972.1,
+            1754.4
+          ],
+          [
+            10972.1,
+            2242.9
+          ],
+          [
+            10972.1,
+            2216.6
+          ],
+          [
+            10972.1,
+            3197.0
+          ],
+          [
+            10972.1,
+            4231.9
+          ],
+          [
+            10972.9,
+            6153.5
+          ],
+          [
+            10972.9,
+            7049.8
+          ],
+          [
+            10972.9,
+            10005.4
+          ],
+          [
+            10972.9,
+            9061.8
+          ],
+          [
+            10972.9,
+            7083.1
+          ],
+          [
+            10973.7,
+            9976.1
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@6/probes/bomberman/speedrunner/p10g200/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 23,
+        "first_win_gen": 13,
+        "best_gen": 13,
+        "win_rate": 0.31,
+        "best": 10980.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.2391304347826087,
+        "causes": {
+          "Enemy": 28,
+          "Stall": 55,
+          "Bomb": 115
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 25.6,
+        "completion_rate": 0.139,
+        "mean_completion_time": 8.0,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.835,
+        "deaths_per_run": 8.61,
+        "death_hist": [
+          2,
+          2,
+          21,
+          3,
+          6,
+          15,
+          0,
+          1,
+          0,
+          148
+        ],
+        "death_cluster_entropy": 0.408,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.4,
+        "curve": [
+          [
+            1110.0,
+            444.0
+          ],
+          [
+            1140.0,
+            825.0
+          ],
+          [
+            1140.0,
+            886.7
+          ],
+          [
+            1140.0,
+            816.3
+          ],
+          [
+            1140.0,
+            897.9
+          ],
+          [
+            1140.0,
+            807.3
+          ],
+          [
+            1140.0,
+            1024.0
+          ],
+          [
+            1140.0,
+            865.1
+          ],
+          [
+            1140.0,
+            1044.4
+          ],
+          [
+            1140.0,
+            926.7
+          ],
+          [
+            1140.0,
+            994.3
+          ],
+          [
+            1140.0,
+            974.4
+          ],
+          [
+            10980.0,
+            2124.0
+          ],
+          [
+            10980.0,
+            1911.4
+          ],
+          [
+            10980.0,
+            1971.7
+          ],
+          [
+            10980.0,
+            2011.7
+          ],
+          [
+            10980.0,
+            2933.9
+          ],
+          [
+            10980.0,
+            2688.6
+          ],
+          [
+            10980.0,
+            4963.3
+          ],
+          [
+            10980.0,
+            5844.0
+          ],
+          [
+            10980.0,
+            5743.7
+          ],
+          [
+            10980.0,
+            6931.1
+          ],
+          [
+            10980.0,
+            4860.2
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@6/probes/bomberman/speedrunner/p10g200/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 35,
+        "first_win_gen": 25,
+        "best_gen": 34,
+        "win_rate": 0.83,
+        "best": 10980.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07428571428571429,
+        "causes": {
+          "Enemy": 15,
+          "Stall": 26,
+          "Bomb": 225
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0786,
+        "train_time_s": 56.0,
+        "completion_rate": 0.24,
+        "mean_completion_time": 8.8,
+        "completion_time_stddev": 1.1,
+        "progress_at_death": 0.706,
+        "deaths_per_run": 7.6,
+        "death_hist": [
+          11,
+          4,
+          2,
+          4,
+          3,
+          111,
+          7,
+          18,
+          17,
+          89
+        ],
+        "death_cluster_entropy": 0.665,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.764,
+        "curve": [
+          [
+            1002.9,
+            195.1
+          ],
+          [
+            1002.9,
+            358.6
+          ],
+          [
+            1134.3,
+            708.4
+          ],
+          [
+            1134.3,
+            962.1
+          ],
+          [
+            1134.3,
+            1073.1
+          ],
+          [
+            1134.3,
+            1069.6
+          ],
+          [
+            1134.3,
+            1086.3
+          ],
+          [
+            1170.0,
+            1116.1
+          ],
+          [
+            1170.0,
+            1124.6
+          ],
+          [
+            1170.0,
+            1100.7
+          ],
+          [
+            1170.0,
+            1121.0
+          ],
+          [
+            1170.0,
+            1132.9
+          ],
+          [
+            1385.7,
+            1070.9
+          ],
+          [
+            1385.7,
+            1102.0
+          ],
+          [
+            1385.7,
+            1171.6
+          ],
+          [
+            1385.7,
+            1276.9
+          ],
+          [
+            1385.7,
+            1222.0
+          ],
+          [
+            1385.7,
+            1287.7
+          ],
+          [
+            1385.7,
+            1385.7
+          ],
+          [
+            1385.7,
+            1294.9
+          ],
+          [
+            1385.7,
+            1336.7
+          ],
+          [
+            1385.7,
+            1173.0
+          ],
+          [
+            1421.4,
+            1261.4
+          ],
+          [
+            1421.4,
+            1205.3
+          ],
+          [
+            10966.7,
+            2298.4
+          ],
+          [
+            10966.7,
+            4263.3
+          ],
+          [
+            10970.0,
+            8073.6
+          ],
+          [
+            10972.1,
+            9998.0
+          ],
+          [
+            10972.1,
+            10010.9
+          ],
+          [
+            10972.1,
+            9050.2
+          ],
+          [
+            10972.5,
+            10003.9
+          ],
+          [
+            10972.5,
+            10963.4
+          ],
+          [
+            10972.5,
+            9984.5
+          ],
+          [
+            10980.0,
+            10027.6
+          ],
+          [
+            10980.0,
+            10959.0
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@6/probes/bomberman/speedrunner/p10g200/6_31337"
+      }
+    ]
+  }
+}

@@ -1,0 +1,375 @@
+{
+  "game": "bomberman",
+  "persona": "collector",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1111,
+    2222,
+    3333
+  ],
+  "train_time_s": 50.3,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1111,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 3.0,
+      "first_win_ci": 5.0,
+      "best_gen_mean": 3.0,
+      "best_gen_ci": 5.0,
+      "win_rate_mean": 0.673,
+      "win_rate_ci": 0.434,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.74,
+      "causes": {
+        "Bomb": 136,
+        "Stall": 21,
+        "Enemy": 26,
+        "Timeout": 1
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.056,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0357,
+      "train_time_s": 50.3,
+      "completion_rate_mean": 0.55,
+      "mean_completion_time": 11.7,
+      "completion_time_stddev": 1.3,
+      "progress_at_death_mean": 0.495,
+      "deaths_per_run_mean": 4.5,
+      "death_hist": [
+        20,
+        1,
+        26,
+        15,
+        20,
+        37,
+        11,
+        20,
+        11,
+        23
+      ],
+      "death_cluster_entropy_mean": 0.854,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.603
+    }
+  ],
+  "cells": {
+    "6": [
+      {
+        "level": "6",
+        "seed": 1111,
+        "pop_size": 10,
+        "gens_run": 15,
+        "first_win_gen": 5,
+        "best_gen": 5,
+        "win_rate": 0.48,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.03333333333333333,
+        "causes": {
+          "Bomb": 79,
+          "Stall": 5,
+          "Enemy": 16,
+          "Timeout": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 14.2,
+        "completion_rate": 0.327,
+        "mean_completion_time": 5.0,
+        "completion_time_stddev": 1.2,
+        "progress_at_death": 0.546,
+        "deaths_per_run": 6.73,
+        "death_hist": [
+          8,
+          0,
+          15,
+          13,
+          11,
+          13,
+          7,
+          6,
+          9,
+          19
+        ],
+        "death_cluster_entropy": 0.928,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.56,
+        "curve": [
+          [
+            1324.3,
+            594.1
+          ],
+          [
+            1324.3,
+            830.6
+          ],
+          [
+            1324.3,
+            840.9
+          ],
+          [
+            1324.3,
+            1077.6
+          ],
+          [
+            6120.0,
+            1494.4
+          ],
+          [
+            6120.0,
+            1650.3
+          ],
+          [
+            6120.0,
+            2709.4
+          ],
+          [
+            6120.0,
+            2961.7
+          ],
+          [
+            6120.0,
+            3657.9
+          ],
+          [
+            6120.0,
+            4173.1
+          ],
+          [
+            6120.0,
+            4040.7
+          ],
+          [
+            6120.0,
+            4046.1
+          ],
+          [
+            6120.0,
+            2523.0
+          ],
+          [
+            6120.0,
+            3450.1
+          ],
+          [
+            6120.0,
+            5039.1
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@6/probes/bomberman/collector/p10g200/6_1111"
+      },
+      {
+        "level": "6",
+        "seed": 2222,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 3,
+        "win_rate": 0.72,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.06153846153846154,
+        "causes": {
+          "Bomb": 40,
+          "Stall": 8,
+          "Enemy": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.1071,
+        "train_time_s": 25.8,
+        "completion_rate": 0.569,
+        "mean_completion_time": 22.1,
+        "completion_time_stddev": 1.5,
+        "progress_at_death": 0.517,
+        "deaths_per_run": 4.31,
+        "death_hist": [
+          7,
+          1,
+          8,
+          0,
+          4,
+          16,
+          3,
+          12,
+          1,
+          4
+        ],
+        "death_cluster_entropy": 0.827,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.65,
+        "curve": [
+          [
+            1252.9,
+            526.1
+          ],
+          [
+            1252.9,
+            657.0
+          ],
+          [
+            6120.0,
+            2052.9
+          ],
+          [
+            6120.0,
+            3051.3
+          ],
+          [
+            6120.0,
+            5125.1
+          ],
+          [
+            6120.0,
+            4545.3
+          ],
+          [
+            6120.0,
+            4062.1
+          ],
+          [
+            6120.0,
+            4055.0
+          ],
+          [
+            6120.0,
+            5522.3
+          ],
+          [
+            6120.0,
+            5640.4
+          ],
+          [
+            6120.0,
+            5146.6
+          ],
+          [
+            6120.0,
+            4552.4
+          ],
+          [
+            6120.0,
+            5024.9
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@6/probes/bomberman/collector/p10g200/6_2222"
+      },
+      {
+        "level": "6",
+        "seed": 3333,
+        "pop_size": 10,
+        "gens_run": 11,
+        "first_win_gen": 1,
+        "best_gen": 1,
+        "win_rate": 0.82,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.07272727272727272,
+        "causes": {
+          "Enemy": 2,
+          "Bomb": 17,
+          "Stall": 8
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 10.3,
+        "completion_rate": 0.755,
+        "mean_completion_time": 7.9,
+        "completion_time_stddev": 1.1,
+        "progress_at_death": 0.421,
+        "deaths_per_run": 2.45,
+        "death_hist": [
+          5,
+          0,
+          3,
+          2,
+          5,
+          8,
+          1,
+          2,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.807,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.6,
+        "curve": [
+          [
+            6120.0,
+            940.1
+          ],
+          [
+            6120.0,
+            1675.6
+          ],
+          [
+            6120.0,
+            3535.6
+          ],
+          [
+            6120.0,
+            5608.3
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            4634.9
+          ],
+          [
+            6120.0,
+            6120.0
+          ],
+          [
+            6120.0,
+            5615.4
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@6/probes/bomberman/collector/p10g200/6_3333"
+      }
+    ]
+  }
+}

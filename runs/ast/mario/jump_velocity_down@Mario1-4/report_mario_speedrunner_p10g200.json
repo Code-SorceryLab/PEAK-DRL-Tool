@@ -1,0 +1,560 @@
+{
+  "game": "mario",
+  "persona": "speedrunner",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 248.1,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 18.0,
+      "first_win_ci": 45.2,
+      "best_gen_mean": 18.0,
+      "best_gen_ci": 45.2,
+      "win_rate_mean": 0.24,
+      "win_rate_ci": 0.499,
+      "dominant_cause": "Fire",
+      "dominant_cause_frac": 0.59,
+      "causes": {
+        "Stall": 114,
+        "OOB": 16,
+        "Pit": 3,
+        "Spike": 181,
+        "Fire": 451
+      },
+      "best_x_mean": 4517.0,
+      "stuck_frac_mean": 0.101,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0372,
+      "train_time_s": 248.1,
+      "completion_rate_mean": 0.128,
+      "mean_completion_time": 26.4,
+      "completion_time_stddev": 0.1,
+      "progress_at_death_mean": 0.36,
+      "deaths_per_run_mean": 8.72,
+      "death_hist": [
+        128,
+        127,
+        85,
+        134,
+        158,
+        119,
+        0,
+        0,
+        14,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.684,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.273
+    }
+  ],
+  "cells": {
+    "Mario1-4": [
+      {
+        "level": "Mario1-4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 18,
+        "first_win_gen": 8,
+        "best_gen": 8,
+        "win_rate": 0.47,
+        "best": 16477.1,
+        "best_x": 4521.5,
+        "stuck_frac": 0.05,
+        "causes": {
+          "Stall": 9,
+          "OOB": 5,
+          "Pit": 2,
+          "Spike": 7,
+          "Fire": 109
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0426,
+        "train_time_s": 62.6,
+        "completion_rate": 0.267,
+        "mean_completion_time": 22.2,
+        "completion_time_stddev": 0.4,
+        "progress_at_death": 0.435,
+        "deaths_per_run": 7.33,
+        "death_hist": [
+          12,
+          8,
+          1,
+          24,
+          14,
+          68,
+          0,
+          0,
+          5,
+          0
+        ],
+        "death_cluster_entropy": 0.625,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.55,
+        "curve": [
+          [
+            1477.1,
+            223.9
+          ],
+          [
+            2515.6,
+            1082.9
+          ],
+          [
+            2531.0,
+            1820.3
+          ],
+          [
+            2782.2,
+            2189.0
+          ],
+          [
+            2782.2,
+            1890.9
+          ],
+          [
+            2782.2,
+            2346.8
+          ],
+          [
+            2782.2,
+            2217.9
+          ],
+          [
+            16477.1,
+            3763.4
+          ],
+          [
+            16477.1,
+            5187.5
+          ],
+          [
+            16477.1,
+            6928.2
+          ],
+          [
+            16477.1,
+            8280.1
+          ],
+          [
+            16477.1,
+            9485.4
+          ],
+          [
+            16477.1,
+            13467.4
+          ],
+          [
+            16477.1,
+            9123.4
+          ],
+          [
+            16477.1,
+            8080.0
+          ],
+          [
+            16477.1,
+            9272.2
+          ],
+          [
+            16477.1,
+            9534.0
+          ],
+          [
+            16477.1,
+            10823.8
+          ]
+        ],
+        "dir": "runs/ast/mario/jump_velocity_down@Mario1-4/probes/mario/speedrunner/p10g200/Mario1-4_1234"
+      },
+      {
+        "level": "Mario1-4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 17,
+        "first_win_gen": 7,
+        "best_gen": 7,
+        "win_rate": 0.15,
+        "best": 16475.4,
+        "best_x": 4520.8,
+        "stuck_frac": 0.058823529411764705,
+        "causes": {
+          "Fire": 116,
+          "Pit": 1,
+          "OOB": 2,
+          "Stall": 10,
+          "Spike": 25
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0599,
+        "train_time_s": 48.2,
+        "completion_rate": 0.094,
+        "mean_completion_time": 21.8,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.406,
+        "deaths_per_run": 9.06,
+        "death_hist": [
+          7,
+          9,
+          13,
+          19,
+          76,
+          21,
+          0,
+          0,
+          9,
+          0
+        ],
+        "death_cluster_entropy": 0.677,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.2,
+        "curve": [
+          [
+            1916.9,
+            682.7
+          ],
+          [
+            1916.9,
+            1138.3
+          ],
+          [
+            1916.9,
+            1469.2
+          ],
+          [
+            1921.7,
+            1805.4
+          ],
+          [
+            1921.7,
+            1797.0
+          ],
+          [
+            1928.8,
+            1794.2
+          ],
+          [
+            16475.4,
+            3291.2
+          ],
+          [
+            16475.4,
+            3150.7
+          ],
+          [
+            16475.4,
+            3434.6
+          ],
+          [
+            16475.4,
+            3393.7
+          ],
+          [
+            16475.4,
+            3526.3
+          ],
+          [
+            16475.4,
+            3785.2
+          ],
+          [
+            16475.4,
+            3766.3
+          ],
+          [
+            16475.4,
+            3821.8
+          ],
+          [
+            16475.4,
+            5316.6
+          ],
+          [
+            16475.4,
+            6865.9
+          ],
+          [
+            16475.4,
+            6351.1
+          ]
+        ],
+        "dir": "runs/ast/mario/jump_velocity_down@Mario1-4/probes/mario/speedrunner/p10g200/Mario1-4_2025"
+      },
+      {
+        "level": "Mario1-4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 49,
+        "first_win_gen": 39,
+        "best_gen": 39,
+        "win_rate": 0.1,
+        "best": 16130.7,
+        "best_x": 4508.6,
+        "stuck_frac": 0.19387755102040816,
+        "causes": {
+          "OOB": 9,
+          "Spike": 149,
+          "Stall": 95,
+          "Fire": 226
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0092,
+        "train_time_s": 137.3,
+        "completion_rate": 0.022,
+        "mean_completion_time": 35.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.239,
+        "deaths_per_run": 9.78,
+        "death_hist": [
+          109,
+          110,
+          71,
+          91,
+          68,
+          30,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.749,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.069,
+        "curve": [
+          [
+            1096.0,
+            214.6
+          ],
+          [
+            1833.0,
+            564.3
+          ],
+          [
+            1833.0,
+            858.2
+          ],
+          [
+            1833.0,
+            925.1
+          ],
+          [
+            1833.0,
+            886.0
+          ],
+          [
+            1833.0,
+            1160.3
+          ],
+          [
+            1833.0,
+            963.6
+          ],
+          [
+            1833.0,
+            1015.2
+          ],
+          [
+            1833.0,
+            991.3
+          ],
+          [
+            1833.0,
+            1057.6
+          ],
+          [
+            1833.0,
+            1060.1
+          ],
+          [
+            1833.0,
+            1135.7
+          ],
+          [
+            1893.7,
+            1242.9
+          ],
+          [
+            1893.7,
+            1142.1
+          ],
+          [
+            1893.7,
+            1012.9
+          ],
+          [
+            1893.7,
+            1150.1
+          ],
+          [
+            1893.7,
+            1045.7
+          ],
+          [
+            1893.7,
+            1168.7
+          ],
+          [
+            1893.7,
+            955.1
+          ],
+          [
+            2705.4,
+            1137.8
+          ],
+          [
+            2705.4,
+            1005.2
+          ],
+          [
+            2705.4,
+            1148.5
+          ],
+          [
+            2705.4,
+            1149.2
+          ],
+          [
+            2705.4,
+            927.9
+          ],
+          [
+            2705.4,
+            1094.6
+          ],
+          [
+            2705.4,
+            1252.4
+          ],
+          [
+            2705.4,
+            933.6
+          ],
+          [
+            2705.4,
+            1023.3
+          ],
+          [
+            2705.4,
+            1549.6
+          ],
+          [
+            2705.4,
+            1170.6
+          ],
+          [
+            2705.4,
+            1107.8
+          ],
+          [
+            2705.4,
+            1152.5
+          ],
+          [
+            2705.4,
+            1461.1
+          ],
+          [
+            2705.4,
+            1158.6
+          ],
+          [
+            2705.4,
+            1288.9
+          ],
+          [
+            2705.4,
+            1113.7
+          ],
+          [
+            2705.4,
+            1277.6
+          ],
+          [
+            2705.4,
+            1253.5
+          ],
+          [
+            16130.7,
+            2639.6
+          ],
+          [
+            16130.7,
+            2984.6
+          ],
+          [
+            16130.7,
+            2744.6
+          ],
+          [
+            16130.7,
+            2586.4
+          ],
+          [
+            16130.7,
+            2840.1
+          ],
+          [
+            16130.7,
+            2632.8
+          ],
+          [
+            16130.7,
+            2629.7
+          ],
+          [
+            16130.7,
+            2715.7
+          ],
+          [
+            16130.7,
+            2767.9
+          ],
+          [
+            16130.7,
+            2590.8
+          ],
+          [
+            16130.7,
+            2714.1
+          ]
+        ],
+        "dir": "runs/ast/mario/jump_velocity_down@Mario1-4/probes/mario/speedrunner/p10g200/Mario1-4_31337"
+      }
+    ]
+  }
+}

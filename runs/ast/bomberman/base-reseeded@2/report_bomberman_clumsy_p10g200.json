@@ -1,0 +1,669 @@
+{
+  "game": "bomberman",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1111,
+    2222,
+    3333
+  ],
+  "train_time_s": 178.4,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1111,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 28.0,
+      "first_win_ci": 24.0,
+      "best_gen_mean": 28.0,
+      "best_gen_ci": 24.0,
+      "win_rate_mean": 0.05,
+      "win_rate_ci": 0.108,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.98,
+      "causes": {
+        "Bomb": 1103,
+        "Timeout": 18
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.0,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0092,
+      "train_time_s": 178.4,
+      "completion_rate_mean": 0.019,
+      "mean_completion_time": 29.9,
+      "completion_time_stddev": 8.3,
+      "progress_at_death_mean": 0.613,
+      "deaths_per_run_mean": 9.81,
+      "death_hist": [
+        48,
+        38,
+        21,
+        54,
+        79,
+        101,
+        488,
+        102,
+        68,
+        122
+      ],
+      "death_cluster_entropy_mean": 0.728,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.052
+    }
+  ],
+  "cells": {
+    "2": [
+      {
+        "level": "2",
+        "seed": 1111,
+        "pop_size": 10,
+        "gens_run": 27,
+        "first_win_gen": 17,
+        "best_gen": 17,
+        "win_rate": 0.07,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 251,
+          "Timeout": 11
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0189,
+        "train_time_s": 46.6,
+        "completion_rate": 0.03,
+        "mean_completion_time": 30.8,
+        "completion_time_stddev": 12.2,
+        "progress_at_death": 0.611,
+        "deaths_per_run": 9.7,
+        "death_hist": [
+          3,
+          5,
+          6,
+          27,
+          15,
+          10,
+          157,
+          9,
+          28,
+          2
+        ],
+        "death_cluster_entropy": 0.623,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.078,
+        "curve": [
+          [
+            652.6,
+            357.7
+          ],
+          [
+            689.6,
+            420.7
+          ],
+          [
+            689.6,
+            431.8
+          ],
+          [
+            726.7,
+            600.7
+          ],
+          [
+            726.7,
+            619.3
+          ],
+          [
+            726.7,
+            700.7
+          ],
+          [
+            726.7,
+            623.0
+          ],
+          [
+            726.7,
+            711.9
+          ],
+          [
+            1011.9,
+            714.4
+          ],
+          [
+            1011.9,
+            743.0
+          ],
+          [
+            726.7,
+            660.0
+          ],
+          [
+            726.7,
+            689.6
+          ],
+          [
+            726.7,
+            693.3
+          ],
+          [
+            988.9,
+            715.9
+          ],
+          [
+            1011.9,
+            638.1
+          ],
+          [
+            1048.9,
+            751.5
+          ],
+          [
+            6160.0,
+            1268.9
+          ],
+          [
+            1011.9,
+            703.3
+          ],
+          [
+            1011.9,
+            780.0
+          ],
+          [
+            6160.0,
+            1229.3
+          ],
+          [
+            1011.9,
+            687.4
+          ],
+          [
+            1011.9,
+            743.0
+          ],
+          [
+            6160.0,
+            1361.9
+          ],
+          [
+            1011.9,
+            855.6
+          ],
+          [
+            6160.0,
+            1848.1
+          ],
+          [
+            6160.0,
+            1807.4
+          ],
+          [
+            6160.0,
+            1423.7
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@2/probes/bomberman/clumsy/p10g200/2_1111"
+      },
+      {
+        "level": "2",
+        "seed": 2222,
+        "pop_size": 10,
+        "gens_run": 42,
+        "first_win_gen": 32,
+        "best_gen": 32,
+        "win_rate": 0.08,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 407,
+          "Timeout": 3
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0066,
+        "train_time_s": 69.9,
+        "completion_rate": 0.024,
+        "mean_completion_time": 37.2,
+        "completion_time_stddev": 12.6,
+        "progress_at_death": 0.568,
+        "deaths_per_run": 9.76,
+        "death_hist": [
+          21,
+          23,
+          8,
+          14,
+          18,
+          56,
+          227,
+          15,
+          4,
+          24
+        ],
+        "death_cluster_entropy": 0.684,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.071,
+        "curve": [
+          [
+            504.4,
+            310.1
+          ],
+          [
+            726.7,
+            347.1
+          ],
+          [
+            800.7,
+            481.3
+          ],
+          [
+            689.6,
+            552.6
+          ],
+          [
+            726.7,
+            500.7
+          ],
+          [
+            1025.9,
+            503.9
+          ],
+          [
+            726.7,
+            574.8
+          ],
+          [
+            689.6,
+            589.6
+          ],
+          [
+            726.7,
+            623.0
+          ],
+          [
+            726.7,
+            563.7
+          ],
+          [
+            726.7,
+            630.4
+          ],
+          [
+            726.7,
+            685.9
+          ],
+          [
+            726.7,
+            537.8
+          ],
+          [
+            726.7,
+            693.3
+          ],
+          [
+            726.7,
+            609.6
+          ],
+          [
+            689.6,
+            667.4
+          ],
+          [
+            689.6,
+            589.6
+          ],
+          [
+            689.6,
+            663.7
+          ],
+          [
+            726.7,
+            693.3
+          ],
+          [
+            726.7,
+            523.0
+          ],
+          [
+            726.7,
+            697.0
+          ],
+          [
+            726.7,
+            682.2
+          ],
+          [
+            726.7,
+            619.3
+          ],
+          [
+            689.6,
+            605.9
+          ],
+          [
+            689.6,
+            634.1
+          ],
+          [
+            1025.9,
+            621.0
+          ],
+          [
+            726.7,
+            697.0
+          ],
+          [
+            726.7,
+            693.3
+          ],
+          [
+            1025.9,
+            719.6
+          ],
+          [
+            1025.9,
+            705.0
+          ],
+          [
+            1025.9,
+            745.5
+          ],
+          [
+            6160.0,
+            1659.8
+          ],
+          [
+            6160.0,
+            1289.1
+          ],
+          [
+            1025.9,
+            723.6
+          ],
+          [
+            6160.0,
+            1193.9
+          ],
+          [
+            6160.0,
+            1865.8
+          ],
+          [
+            6160.0,
+            1235.0
+          ],
+          [
+            6160.0,
+            1270.3
+          ],
+          [
+            6160.0,
+            1201.3
+          ],
+          [
+            1025.9,
+            739.0
+          ],
+          [
+            6160.0,
+            1249.8
+          ],
+          [
+            1025.9,
+            691.9
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@2/probes/bomberman/clumsy/p10g200/2_2222"
+      },
+      {
+        "level": "2",
+        "seed": 3333,
+        "pop_size": 10,
+        "gens_run": 45,
+        "first_win_gen": 35,
+        "best_gen": 35,
+        "win_rate": 0.0,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 445,
+          "Timeout": 4
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.002,
+        "train_time_s": 61.9,
+        "completion_rate": 0.002,
+        "mean_completion_time": 21.6,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.659,
+        "deaths_per_run": 9.98,
+        "death_hist": [
+          24,
+          10,
+          7,
+          13,
+          46,
+          35,
+          104,
+          78,
+          36,
+          96
+        ],
+        "death_cluster_entropy": 0.876,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.007,
+        "curve": [
+          [
+            800.7,
+            414.7
+          ],
+          [
+            800.7,
+            541.5
+          ],
+          [
+            1025.9,
+            723.3
+          ],
+          [
+            1025.9,
+            676.5
+          ],
+          [
+            1025.9,
+            604.1
+          ],
+          [
+            1025.9,
+            602.4
+          ],
+          [
+            988.9,
+            693.6
+          ],
+          [
+            1025.9,
+            598.7
+          ],
+          [
+            1048.9,
+            806.2
+          ],
+          [
+            1025.9,
+            835.6
+          ],
+          [
+            1025.9,
+            764.3
+          ],
+          [
+            1025.9,
+            442.3
+          ],
+          [
+            1025.9,
+            636.1
+          ],
+          [
+            1025.9,
+            651.2
+          ],
+          [
+            1025.9,
+            684.2
+          ],
+          [
+            1025.9,
+            746.1
+          ],
+          [
+            1048.9,
+            867.2
+          ],
+          [
+            1025.9,
+            645.8
+          ],
+          [
+            1025.9,
+            677.1
+          ],
+          [
+            1025.9,
+            695.9
+          ],
+          [
+            1025.9,
+            773.7
+          ],
+          [
+            1025.9,
+            846.4
+          ],
+          [
+            1025.9,
+            669.1
+          ],
+          [
+            1025.9,
+            816.4
+          ],
+          [
+            1025.9,
+            777.4
+          ],
+          [
+            1025.9,
+            835.6
+          ],
+          [
+            1048.9,
+            837.9
+          ],
+          [
+            1025.9,
+            801.9
+          ],
+          [
+            1048.9,
+            915.9
+          ],
+          [
+            1025.9,
+            776.0
+          ],
+          [
+            1025.9,
+            755.5
+          ],
+          [
+            1025.9,
+            658.3
+          ],
+          [
+            988.9,
+            664.0
+          ],
+          [
+            1025.9,
+            782.8
+          ],
+          [
+            6160.0,
+            1296.8
+          ],
+          [
+            988.9,
+            749.2
+          ],
+          [
+            1025.9,
+            709.0
+          ],
+          [
+            1025.9,
+            751.5
+          ],
+          [
+            1025.9,
+            827.6
+          ],
+          [
+            1025.9,
+            727.9
+          ],
+          [
+            1025.9,
+            902.5
+          ],
+          [
+            1025.9,
+            839.0
+          ],
+          [
+            1025.9,
+            775.7
+          ],
+          [
+            1025.9,
+            776.3
+          ],
+          [
+            1025.9,
+            760.6
+          ]
+        ],
+        "dir": "runs/ast/bomberman/base-reseeded@2/probes/bomberman/clumsy/p10g200/2_3333"
+      }
+    ]
+  }
+}
