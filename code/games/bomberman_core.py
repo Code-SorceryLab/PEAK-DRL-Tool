@@ -18,6 +18,7 @@ import pygame
 import yaml
 
 from . import mutants
+from .modules.System.nes_font import nes_text
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(_HERE, "bomberman_config.yaml")
@@ -114,7 +115,6 @@ class BombermanCore:
         self._level_idx = level_idx
         self._seed = seed
         self.rng = random.Random(seed)
-        self._font = None
         self.won = False
         self.reset()
 
@@ -626,17 +626,20 @@ class BombermanCore:
         return surface
 
     def _hud(self, surface) -> None:
-        if self._font is None:
-            pygame.font.init()
-            self._font = pygame.font.SysFont("consolas,dejavusansmono,monospace", 14, bold=True)
+        """NES Bomberman's grey band across the top: TIME, score, bombs, fire, enemies LEFT."""
         alive = sum(1 for e in self.enemies if e.alive)
-        txt = f"Score:{self.score}  Bombs:{self.player.bombs_max - len(self.bombs)}/{self.player.bombs_max}  " \
-              f"Fire:{self.player.blast_range}  Enemies:{alive}  Time:{int(self.timer)}"
-        img = self._font.render(txt, True, (255, 255, 255))
-        bg = pygame.Surface((img.get_width() + 12, img.get_height() + 6), pygame.SRCALPHA)
-        bg.fill((0, 0, 0, 150))
-        surface.blit(bg, (6, 6))
-        surface.blit(img, (12, 9))
+        cells = [f"TIME {max(0, int(self.timer)):03d}", f"{self.score:06d}",
+                 f"BOMB {self.player.bombs_max - len(self.bombs)}/{self.player.bombs_max}",
+                 f"FIRE {self.player.blast_range}", f"LEFT {alive}"]
+        imgs = [nes_text(c, 2, (255, 255, 255), (0, 0, 0)) for c in cells]
+        w = surface.get_width()
+        pygame.draw.rect(surface, (188, 188, 188), (0, 0, w, 28))
+        pygame.draw.line(surface, (116, 116, 116), (0, 27), (w, 27), 2)
+        gap = (w - 16 - sum(i.get_width() for i in imgs)) // (len(imgs) - 1)
+        x = 8
+        for img in imgs:
+            surface.blit(img, (x, 7))
+            x += img.get_width() + gap
 
 
 if __name__ == "__main__":  # smoke: walk level 0 to the exit with a scripted path

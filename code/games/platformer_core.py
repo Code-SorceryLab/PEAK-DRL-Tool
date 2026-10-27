@@ -3,6 +3,7 @@ import os
 import math
 import importlib
 import heapq
+import re
 from collections import deque
 from typing import List, Tuple, Dict, Set
 import numpy as np
@@ -30,6 +31,7 @@ from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager
 from . import mutants
 from .modules.System.debugging_mods.manager import DebugManager
+from .modules.System.nes_font import nes_text
 from .modules.Objects.Spike import Spike
 from .modules.Objects.MovingPlatform import MovingPlatform
 
@@ -1942,6 +1944,8 @@ class PlatformerCore(gymnasium.Env):
         self._draw_player(game_surf)
 
         if self.debug_manager:
+            if self.skip_obs and self.render_mode == "human":
+                self._obs()   # step() skipped it: refresh the window caches Agent Vision draws from
             self.debug_manager.render_overlays(surface, self)
 
             if self.debug_manager.show_sensors and hasattr(self, 'last_rays'):
@@ -2033,19 +2037,25 @@ class PlatformerCore(gymnasium.Env):
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
     def _draw_ui(self, surface: pygame.Surface):
-        status = "STAR" if (self.player and self.player.star_timer > 0) else \
-                ("SUPER" if (self.player and self.player.powered_up) else "SMALL")
-        text = self.ui_font.render(
-            f"Lives:{self.lives}  Score:{self.score}  Coins:{self.coins_total}  {status}  Time:{int(self.timer)}",
-            True, COLOR_WHITE
-        )
-        bg = pygame.Surface((text.get_width() + 10, text.get_height() + 6), pygame.SRCALPHA)
-        bg.fill((0, 0, 0, 170))
-
-        y = 5
-        if self.debug_manager.show_obs_panel: y = self.HEIGHT - text.get_height() - 10
-        surface.blit(bg, (5, y))
-        surface.blit(text, (10, y + 3))
+        """SMB1's HUD across the top: MARIO / score, coins, WORLD, TIME, plus lives.
+        The power state (small / super / star) lives in the debug panel's STATUS."""
+        m = re.search(r"\d+-\d+", str(self.world))
+        world = m.group(0) if m else str(self.world)[-5:]
+        shadow = (0, 0, 0)
+        columns = [("MARIO", f"{self.score:06d}"), ("", f"$*{self.coins_total:02d}"),
+                   ("WORLD", world), ("TIME", f"{max(0, int(self.timer)):03d}"), ("LIVES", f"*{self.lives}")]
+        step = self.WIDTH // len(columns)
+        for i, (label, value) in enumerate(columns):
+            x = 36 + i * step
+            if label:
+                surface.blit(nes_text(label, 3, COLOR_WHITE, shadow), (x, 14))
+            img = nes_text(value, 3, COLOR_WHITE, shadow)
+            if value.startswith("$"):   # the coin glyph in coin gold, the count in white
+                surface.blit(nes_text("$", 3, (252, 188, 60), shadow), (x, 42))
+                img = nes_text(value[1:], 3, COLOR_WHITE, shadow)
+                surface.blit(img, (x + 18, 42))
+            else:
+                surface.blit(img, (x, 42))
 
     def _world_to_screen(self, gObj: GameObject) -> Tuple[float, float, bool]:
         screen_x = gObj.x - self.camera_x

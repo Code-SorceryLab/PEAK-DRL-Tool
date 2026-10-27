@@ -35,6 +35,8 @@ class Coin():
             self.gObj.y += self.vy * dt
             self.vy += grav * dt 
             self.life -= dt
+            if self.life <= 0:
+                self.gObj.active = False   # the pop is over
         
         self.animation = (self.animation + 1) % 60
 

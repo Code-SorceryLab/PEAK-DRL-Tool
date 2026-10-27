@@ -545,19 +545,21 @@ class SonicPhysicsManager:
         if hasattr(coin, 'can_collect') and not coin.can_collect:
             return
 
-        if not getattr(coin, 'collected', False):
-            is_lost_ring = bool(getattr(coin, "is_lost", False))
+        if not getattr(coin, 'collected', False) and not getattr(coin, 'auto_collect', False):
             coin.gObj.active = False
             if hasattr(coin, 'collected'):
                 coin.collected = True
-            core.score += 10
-            if hasattr(player, 'rings'):
-                player.rings += 1
-            if not is_lost_ring:
-                core.coins_step += 1
-                core.coins_total += 1
-            if hasattr(core, 'ring_total') and not is_lost_ring:
-                core.ring_total += 1
+            self._credit_coin(core, player, bool(getattr(coin, "is_lost", False)))
+
+    def _credit_coin(self, core, player, is_lost_ring=False):
+        core.score += 10
+        if hasattr(player, 'rings'):
+            player.rings += 1
+        if not is_lost_ring:
+            core.coins_step += 1
+            core.coins_total += 1
+        if hasattr(core, 'ring_total') and not is_lost_ring:
+            core.ring_total += 1
 
     def _handle_projectile_enemy(self, core, proj, enemy):
         enemy.gObj.active = False
@@ -621,7 +623,8 @@ class SonicPhysicsManager:
                     c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
                              flyup=True, vy=-280.0, life=0.3, auto_collect=True)
                     c.gObj.type_id = EntityType.COIN
-                    core.level_data.coins.append(c)
+                    core.level_data.coins.append(c)   # just the pop: the coin counts now
+                    self._credit_coin(core, core.player)
                 elif block.contains == "mushroom":
                     p = Mushroom(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
                     p.gObj.type_id = EntityType.POWERUP

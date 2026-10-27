@@ -270,13 +270,16 @@ class Player():
             skidding = (self.vx > 0 and self.input_dir < 0) or \
                        (self.vx < 0 and self.input_dir > 0)
 
+            # speed along the held direction (negative while still moving the other way)
+            along = self.input_dir * self.vx
             if self.on_ground and skidding:
                 self.vx += self.input_dir * ctx.SKID_DECEL * dt
-            else:
-                if self.input_dir > 0:
-                    self.vx = min(self.vx + accel_rate * dt,  target_max)
-                else:
-                    self.vx = max(self.vx - accel_rate * dt, -target_max)
+            elif along < target_max:
+                self.vx = self.input_dir * min(along + accel_rate * dt, target_max)
+            elif self.on_ground:
+                # Over the cap (run released): ease down to it instead of snapping.
+                self.vx = self.input_dir * max(target_max, along - ctx.GROUND_FRICTION * dt)
+            # Airborne over the cap: keep the takeoff momentum, as on the NES.
         else:
             friction = (ctx.GROUND_FRICTION if self.on_ground else ctx.AIR_FRICTION) * dt
             if self.vx > 0:   self.vx = max(0.0, self.vx - friction)

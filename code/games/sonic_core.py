@@ -1327,10 +1327,7 @@ class SonicCore(gymnasium.Env):
         if p and abs(p.vx) > 30:
             pygame.draw.rect(surface, (40, 40, 40), (8, y + 2, 102, 8))
             pygame.draw.rect(surface, (50, 255, 50) if speed_pct < 60 else ((255, 255, 0) if speed_pct < 85 else (255, 50, 50)), (9, y + 3, min(100, int(abs(p.vx) / 5.6)), 6))
-
-        if p:
-            st = self.hud_font.render(p.state.name + (f" [{p.spin_dash_charge}]" if p.state == SonicState.SPIN_DASH else ""), True, (200, 200, 255))
-            surface.blit(st, (self.WIDTH - st.get_width() - 10, 8))
+        # the movement state (IDLE, FALLING, SPIN_DASH...) is shown in the debug panel's STATE
 
     def close(self):
         if self.render_mode == "human": pygame.quit()

@@ -710,7 +710,8 @@ _PLAY_CONTROLS = {
                  ("I", "Toggle invincibility (debug)"), ("", "A game controller works too: stick / d-pad, Cross, Square")],
 }
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
-               ("F4", "Hitboxes"), ("F5", "Agent max view")]
+               ("F4", "Hitboxes"), ("F5", "Agent max view"), ("F6", "Background grid"),
+               ("F7", "Close / open the debug panel")]
 
 
 def _print_controls(game, level):
@@ -835,11 +836,10 @@ def run_user_study():
         print(f"    {_YEL(f'{key:<16}')}{what}")
 
     input(_BOLD(f"\n  ⟫ Warm-up: play the game normally for {WARMUP_MINUTES:g} min (not recorded). Enter to start "))
-    cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game), "--fps", "60"]
-    try:
-        subprocess.run(cmd, env=_study_env(), timeout=WARMUP_MINUTES * 60)
-    except subprocess.TimeoutExpired:
-        print(_DIM("    Warm-up time is up."))
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game), "--fps", "60",
+           "--quit-after", str(WARMUP_MINUTES)]   # counts down on screen, pauses excluded
+    subprocess.run(cmd, env=_study_env())
+    print(_DIM("    Warm-up time is up."))
 
     _study_attempts(game, participant, "baseline", [None] * BASELINE_RUNS)
     random.shuffle(mutants)                 # the participant isn't told which mutant is which
@@ -849,41 +849,23 @@ def run_user_study():
 
 
 def run_manual_play():
-    """Play Manually — pick a game and level, drive it with the keyboard."""
+    """Play Manually — a game selection screen; quitting a game comes back to it, ESC there exits."""
     _refresh_screen()
     _section("PLAY  ›  Manual")
-
-    game = pick_one("GAME", get_available_games(), default="mario")
-    if not game:
-        return
-    levels = get_levels_for_game(game)
-    level = None
-    if levels:
-        level = pick_one(f"LEVEL  ·  {game}", ["auto (first level)"] + levels, default="auto (first level)")
-        if level is None:
-            return
-        if level.startswith("auto"):
-            level = None
-
-    _print_controls(game, level)
-
     # Strip the dummy SDL driver so a real window opens.
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
-    cmd = [sys.executable, "-m", "code.games.tools.manual_play",
-           "--game", CONFIG_KEY.get(game, game), "--fps", "60"]
-    if level:
-        cmd += ["--level", level]
-    record_dir = None
+    cmd = [sys.executable, "-m", "code.games.tools.game_select"]
+    player = None
     if input(_DIM("    Record this session like an agent run? [y/N]: ")).strip().lower().startswith("y"):
         raw = input(_DIM("    Player name [human]: ")).strip()
         player = "".join(c if c.isalnum() or c in "-_" else "_" for c in raw) or "human"  # it becomes a folder name
         cmd += ["--record", "--player", player]
-        record_dir = Path("runs") / "manual" / game / player
-    print(_DIM(f"    Launching {game}... (ESC to quit)\n"))
+    print(_DIM("    Pick a game on screen: d-pad / arrows, A / Enter to play, B to go back, ESC to exit."))
+    print()
     subprocess.run(cmd, env=proc_env)
-    if record_dir:
-        print(f"    Recorded attempts  →  {_CYAN(str(record_dir / 'episodes.csv'))}")
+    if player:
+        print(f"    Recorded attempts  →  {_CYAN(str(Path('runs') / 'manual' / '<game>' / player / 'episodes.csv'))}")
 
 
 def _pick_run(title="RUN  ·  strongest first"):

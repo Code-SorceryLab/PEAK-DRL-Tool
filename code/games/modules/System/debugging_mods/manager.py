@@ -1,5 +1,6 @@
 import pygame
 import math
+from collections import deque
 from .overlays import (
     HitboxOverlay, GridOverlay, AgentViewOverlay, InfoPanelOverlay, ObsValuesOverlay,
     ArchOverlay, JumpArcOverlay,
@@ -7,7 +8,7 @@ from .overlays import (
     _card, _section_hdr,
     _C_BG, _C_CARD, _C_HDR, _C_BORDER, _C_SEP,
     _C_LBL, _C_VAL, _C_POS, _C_NEG, _C_ACT, _C_ACCENT,
-    _reward_y,
+    _reward_y, draw_nes_pad, PAD_W,
     RAY_EMPTY, RAY_SOLID, RAY_HAZARD, RAY_COIN, RAY_GOAL,
 )
 
@@ -31,10 +32,14 @@ class DebugManager:
         self.slow_motion     = False   # F3 — slow motion
         self.show_hitboxes   = True    # F4 — hitboxes (default on)
         # F5 max-view is owned by agent_view_overlay.max_view (toggled below)
+        # F6 toggles show_grid; F7 (manual play) closes the panel and resizes the window
+        self.show_panel      = True
 
         self.cam_move_speed   = 600.0
         self.current_cam_move = [0.0, 0.0]
         self.last_action_name = "None"
+        self.pad_input = None   # (dx, dy, a, b, select, start), set by manual play each frame
+        self._speed = deque(maxlen=150)
 
         self.font       = pygame.font.SysFont("segoeui", 13, bold=True)
         self.small_font = pygame.font.SysFont("segoeui", 11)
@@ -66,7 +71,7 @@ class DebugManager:
             self._print_help_to_terminal()
 
     def _sensor_short_label(self):
-        return "shot+arc" if self.sensor_mode == "shot" else "rays+arc"
+        return "shot" if self.sensor_mode == "shot" else "rays"
 
     def _sensor_row_label(self):
         return "Shot Line + Arc   (toggle)" if self.sensor_mode == "shot" else "Rays + Jump Arc   (toggle)"
@@ -114,6 +119,8 @@ class DebugManager:
         row("F3", "Slow motion       (0.5×)")
         row("F4", "Hitboxes          (toggle)")
         row("F5", "Agent Vision      (Max View toggle)")
+        row("F6", "Background grid   (toggle)")
+        row("F7", "Debug panel       (close / open)")
         row("Esc", "Max View off      (if open)")
         print(dim("    ╚" + "═" * W + "╝"))
         print()
@@ -153,6 +160,10 @@ class DebugManager:
             self.agent_view_overlay.max_view = not self.agent_view_overlay.max_view
             state = grn("ON") if self.agent_view_overlay.max_view else dim("off")
             print(f"  {dim('F5')}  Agent Max View   →  {state}")
+        if rising(pygame.K_F6):
+            self.show_grid = not self.show_grid
+            state = grn("ON") if self.show_grid else dim("off")
+            print(f"  {dim('F6')}  Grid             →  {state}")
         if rising(pygame.K_ESCAPE) and self.agent_view_overlay.max_view:
             self.agent_view_overlay.max_view = False
             print(f"  {dim('Esc')} Agent Max View   →  {dim('closed')}")
@@ -172,9 +183,9 @@ class DebugManager:
 
     # ─────────────────────────────────────────────────────────
     def render_overlays(self, surface: pygame.Surface, core):
-        if core.render_mode != "human":
-            # Headless: only the game-area overlays are safe (panel overlays would
-            # draw at DEBUG_PANEL_X == 0, straight over the game frame).
+        if core.render_mode != "human" or not self.show_panel:
+            # Headless or panel closed: only the game-area overlays (panel overlays
+            # would draw at DEBUG_PANEL_X, outside or over the game frame).
             if self.show_grid:
                 self._safe_overlay("grid", self.grid_overlay.render, surface, core)
             if self.show_hitboxes:
@@ -203,7 +214,6 @@ class DebugManager:
         pygame.draw.rect(surface, _C_ACCENT, (debug_x, 0, 3, _BANNER_H))
 
         title = self.font.render("DEBUG", True, (130, 135, 170))
-        surface.blit(title, (debug_x + 10, (_BANNER_H - title.get_height()) // 2))
 
         # F-key hint chips (right-aligned in banner)
         toggles = [
@@ -212,6 +222,8 @@ class DebugManager:
             ("F3", "slow",     self.slow_motion),
             ("F4", "hbox",     self.show_hitboxes),
             ("F5", "max",      self.agent_view_overlay.max_view),
+            ("F6", "grid",     self.show_grid),
+            ("F7", "close",    False),
         ]
         hx = debug_x + panel_w - 6
         sf = self.small_font
@@ -223,7 +235,9 @@ class DebugManager:
             surface.blit(ds, (hx, (_BANNER_H - ds.get_height()) // 2 + 1))
             hx -= ks.get_width() + 3
             surface.blit(ks, (hx, (_BANNER_H - ks.get_height()) // 2))
-            hx -= 8
+            hx -= 7
+        if hx > debug_x + 18 + title.get_width():   # the title only where the chips leave room
+            surface.blit(title, (debug_x + 10, (_BANNER_H - title.get_height()) // 2))
 
         # ── HUD strip (lives / score / coins / status / time) ─────────────
         self._render_hud_strip(surface, core, debug_x, panel_w)
@@ -356,13 +370,14 @@ class DebugManager:
         pw = panel_w - _PAD * 2
         ph = core.HEIGHT - py - _GAP
 
-        _card(surface, px, py, pw, ph)
-        cy = _section_hdr(surface, self.font, "Reward Trace", px, py, pw, accent=(200, 80, 60))
-
-        # Reward hub died with the RL stack; the strip only renders when a hub is injected.
+        # Reward hub died with the RL stack; without one the card shows live input instead.
         hub = self.hub
+        _card(surface, px, py, pw, ph)
         if hub is None:
+            cy = _section_hdr(surface, self.font, "Input  ·  Speed", px, py, pw, accent=(60, 190, 210))
+            self._render_input(surface, core, px, cy, pw, py + ph - cy)
             return
+        cy = _section_hdr(surface, self.font, "Reward Trace", px, py, pw, accent=(200, 80, 60))
         sf  = self.small_font
 
         persona = getattr(core, "persona", "?").replace("_", " ").title()
@@ -402,6 +417,33 @@ class DebugManager:
             pygame.draw.lines(surface, (55, 200, 100), False, pts, 1)
         if pts:
             pygame.draw.circle(surface, r_col, pts[-1], 3)
+
+    # ─────────────────────────────────────────────────────────
+    def _render_input(self, surface, core, px, cy, pw, ch):
+        """A mini NES pad lit by pad_input, beside a sparkline of the player's horizontal speed."""
+        bw, bh = PAD_W, min(40, ch - 6)
+        bx = px + 6
+        draw_nes_pad(surface, bx, cy + (ch - bh) // 2, bh, self.pad_input, self.small_font)
+
+        # Speed sparkline
+        p = getattr(core, "player", None)
+        self._speed.append(abs(float(getattr(p, "vx", 0.0) or 0.0)) if p else 0.0)
+        sx0, sx1 = bx + bw + 10, px + pw - 6
+        top, bot = cy + 4, cy + ch - 6
+        if sx1 - sx0 < 30 or bot - top < 14:
+            return
+        val = self.small_font.render(f"{self._speed[-1]:.0f} px/s", True, _C_VAL)
+        surface.blit(self.small_font.render("Speed", True, _C_LBL), (sx0, top - 2))
+        surface.blit(val, (sx1 - val.get_width(), top - 2))
+        top += 12
+        peak = max(max(self._speed), 1.0)
+        n = len(self._speed)
+        pts = [(sx0 + int(i / max(n - 1, 1) * (sx1 - sx0)), bot - int(v / peak * (bot - top)))
+               for i, v in enumerate(self._speed)]
+        pygame.draw.line(surface, _C_SEP, (sx0, bot), (sx1, bot))
+        if n > 1:
+            pygame.draw.lines(surface, (60, 190, 210), False, pts, 1)
+        pygame.draw.circle(surface, (60, 190, 210), pts[-1], 2)
 
     # ─────────────────────────────────────────────────────────
     def _badge(self, surface, core, text, color, y=6):

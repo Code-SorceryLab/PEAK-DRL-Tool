@@ -259,19 +259,14 @@ class PlayerStateMachine:
         player.iframes_timer = self._iframes_timer
         player.invincible_timer = max(self._star_timer, self._iframes_timer)
 
-        # Height — only shift y when GROWING (BIG/FIRE) so the feet stay
-        # anchored to the ground. When SHRINKING, leave gObj.y untouched —
-        # shifting it down embeds the player in the floor, which causes the
-        # wall resolver to push them out sideways, snapping the x position.
+        # Height — shift y by the change so the feet stay anchored to the ground
         new_height = SMALL_HEIGHT if s == PowerState.SMALL else BIG_HEIGHT
         old_height = player.gObj.height
 
         if new_height != old_height:
-            if new_height > old_height:
-                # Growing: shift y up so feet stay on the ground
-                player.gObj.y -= (new_height - old_height)
-            # Shrinking: leave y alone — top of hitbox just drops down,
-            # feet naturally stay at the same position without any y correction
+            # Feet stay where they are both ways (y is the top of the hitbox). Leaving y
+            # alone on a shrink lifted the feet off the ground: a hop when hit standing still.
+            player.gObj.y -= (new_height - old_height)
             player.gObj.height = new_height
 
     # ── Reset ────────────────────────────────────────────────────────────────

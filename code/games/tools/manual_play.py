@@ -8,9 +8,12 @@ import sys
 from pathlib import Path
 
 import pygame
-from pygame._sdl2 import controller as sdl_controller
 
-os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
+from code.games.modules.System.debugging_mods.overlays import PAD_W, draw_nes_pad
+from code.games.tools import gamepad
+from code.games.modules.System.nes_font import nes_text
+
+os.environ["SDL_VIDEO_CENTERED"] = "1"
 
 # The debug help banner prints box glyphs; legacy consoles default to cp1252.
 for _stream in (sys.stdout, sys.stderr):
@@ -31,6 +34,8 @@ parser.add_argument("--episodes", type=int, default=0, help="with --record: quit
 parser.add_argument("--warmup", type=float, default=0.0, metavar="MINUTES",
                     help="with --record / --demo: play this long first without anything being recorded; "
                          "then the level restarts and recording begins")
+parser.add_argument("--quit-after", type=float, default=0.0, metavar="MINUTES",
+                    help="count down this much play time on screen (pauses excluded), then quit")
 parser.add_argument("--demo", nargs="?", const="runs/demos", default=None, metavar="DIR",
                     help="megaman: record demonstrations for the agents to learn from — every frame's "
                          "sensor reading and buttons, one file per attempt under DIR/megaman/<player>/<level>/. "
@@ -73,7 +78,7 @@ def _platformer_action(keys) -> list:
       fire : 0=idle  1=fire   (Z key)
     """
     k = pygame.key.get_pressed()
-    px, _, pjump, pfire, prun = _pad_state()
+    px, _, pjump, pfire, prun = gamepad.pad_state()
 
     left  = k[pygame.K_a] or px < 0
     right = k[pygame.K_d] or px > 0
@@ -98,7 +103,7 @@ def _sonic_action(keys) -> list:
     Return a Sonic action [move, jump, down].
     """
     k = pygame.key.get_pressed()
-    px, py, pjump, _, prun = _pad_state()
+    px, py, pjump, _, prun = gamepad.pad_state()
 
     left = k[pygame.K_a] or px < 0
     right = k[pygame.K_d] or px > 0
@@ -121,7 +126,7 @@ def _sonic_action(keys) -> list:
 def _bomberman_action(keys) -> list:
     """[dx, dy, bomb] — arrows / WASD move, SPACE (or Z) drops a bomb."""
     k = pygame.key.get_pressed()
-    px, py, pjump, pfire, _ = _pad_state()
+    px, py, pjump, pfire, _ = gamepad.pad_state()
     dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
     dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
     return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z] or pjump or pfire))]
@@ -129,50 +134,15 @@ def _bomberman_action(keys) -> list:
 
 def _meatboy_action(keys) -> list:
     """[move, run, jump] from the controller only — MeatboyPlayer adds the keyboard itself in human mode."""
-    px, _, pjump, _, prun = _pad_state()
+    px, _, pjump, _, prun = gamepad.pad_state()
     return [{-1: 1, 1: 2}.get(px, 0), int(prun), int(pjump)]
-
-
-_pad = None                      # the first connected game controller, if any
-# SDL's GameController layout gives every common pad (Xbox, PlayStation, Switch, 8BitDo...) Xbox-style
-# names: A is Cross on a PlayStation pad, B is Circle, X is Square.
-PAD_JUMP = (pygame.CONTROLLER_BUTTON_A,)
-PAD_FIRE = (pygame.CONTROLLER_BUTTON_B,)
-PAD_RUN = (pygame.CONTROLLER_BUTTON_X, pygame.CONTROLLER_BUTTON_RIGHTSHOULDER)
-PAD_DEADZONE = 0.5
-
-
-def _open_pad() -> None:
-    """(Re)open the first controller; called at start and whenever one is plugged or unplugged."""
-    global _pad
-    sdl_controller.init()
-    idx = next((i for i in range(sdl_controller.get_count()) if sdl_controller.is_controller(i)), None)
-    # shortcut: a pad missing from SDL's mapping database is ignored, add a raw-joystick fallback if one turns up
-    _pad = sdl_controller.Controller(idx) if idx is not None else None
-    if _pad:
-        print(f"[Play] Controller: {_pad.name} (stick / d-pad move, A/Cross jump, B/Circle fire, "
-              f"X/Square or RB run; Mega Man fires with X/Square too)")
-
-
-def _pad_state() -> tuple[int, int, bool, bool, bool]:
-    """(dx, dy, jump, fire, run) from the controller: left stick or d-pad, plus the face buttons."""
-    if _pad is None:
-        return 0, 0, False, False, False
-    held = lambda ids: any(_pad.get_button(b) for b in ids)
-    x = _pad.get_axis(pygame.CONTROLLER_AXIS_LEFTX) / 32767
-    y = _pad.get_axis(pygame.CONTROLLER_AXIS_LEFTY) / 32767
-    dx = (held((pygame.CONTROLLER_BUTTON_DPAD_RIGHT,)) - held((pygame.CONTROLLER_BUTTON_DPAD_LEFT,))
-          or (x > PAD_DEADZONE) - (x < -PAD_DEADZONE))
-    dy = (held((pygame.CONTROLLER_BUTTON_DPAD_DOWN,)) - held((pygame.CONTROLLER_BUTTON_DPAD_UP,))
-          or (y > PAD_DEADZONE) - (y < -PAD_DEADZONE))
-    return dx, dy, held(PAD_JUMP), held(PAD_FIRE), held(PAD_RUN)
 
 
 def _megaman_action(keys) -> list:
     """[dx, dy, jump, fire] — arrows / WASD move and climb, SPACE jumps, Z (or J) fires;
     a controller works alongside the keyboard."""
     k = pygame.key.get_pressed()
-    px, py, pjump, pfire, prun = _pad_state()
+    px, py, pjump, pfire, prun = gamepad.pad_state()
     pfire = pfire or prun                        # no run in Mega Man: Square / X fires as well
     dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
     dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
@@ -232,7 +202,7 @@ elif args.game == "sonic":
 if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
 
-_open_pad()
+gamepad.open_pad()
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
     core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
@@ -461,6 +431,97 @@ def _banner(text: str, colour) -> None:
     screen.blit(label, ((screen.get_width() - label.get_width()) // 2, 5))
 
 
+_fonts = {}
+
+
+def _font(size: int, bold: bool = False) -> pygame.font.Font:
+    if (size, bold) not in _fonts:
+        _fonts[size, bold] = pygame.font.SysFont("segoeui", size, bold=bold)
+    return _fonts[size, bold]
+
+
+def _view_w() -> int:
+    """Width of the game view (the window minus any debug panel)."""
+    return min(getattr(core_game, "WIDTH", screen.get_width()), screen.get_width())
+
+
+def _toggle_panel() -> None:
+    """F7: close or reopen the debug panel, resizing the window to fit and re-centring it."""
+    global screen
+    dm = core_game.debug_manager
+    dm.show_panel = not dm.show_panel
+    size = (core_game.TOTAL_WIDTH if dm.show_panel else core_game.WIDTH, core_game.HEIGHT)
+    screen = core_game._surf = pygame.display.set_mode(size)   # SDL_VIDEO_CENTERED re-centres it
+
+
+# What A and B do in each game, for the controls overlay
+PAD_LABELS = {"platformer": ("Jump", "Run · Fire"), "megaman": ("Jump", "Fire"), "bomberman": ("Bomb", "Bomb")}
+
+
+def _draw_controls(state) -> None:
+    """Always-on controls card, bottom-right of the game view: the pad lit by what is held."""
+    a_lbl, b_lbl = PAD_LABELS.get(args.game, ("Jump", "Run"))
+    w, h = PAD_W + 128, 54
+    x, y = _view_w() - w - 10, screen.get_height() - h - 10
+    card = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(card, (14, 15, 22, 205), card.get_rect(), border_radius=8)
+    screen.blit(card, (x, y))
+    draw_nes_pad(screen, x + 7, y + 7, h - 14, state, _font(11, True))
+    ty = y + 6
+    for key, what in (("A", a_lbl), ("B", b_lbl), ("SELECT", "Pause")):
+        screen.blit(_font(11, True).render(key, True, (150, 170, 235)), (x + PAD_W + 16, ty))
+        screen.blit(_font(11).render(what, True, (205, 210, 228)), (x + PAD_W + 66, ty))
+        ty += 14
+
+
+TIMER_Y = {"platformer": 74, "bomberman": 40}   # clear of each game's own HUD
+
+
+def _draw_timer(ms: int, label: str) -> None:
+    """A m:ss pill, top-right of the game view."""
+    s = max(0, ms) // 1000
+    lbl = _font(10, True).render(label, True, (130, 140, 180))
+    val = _font(18, True).render(f"{s // 60}:{s % 60:02d}", True, (235, 238, 250))
+    w, h = lbl.get_width() + val.get_width() + 30, 32
+    x, y = _view_w() - w - 10, TIMER_Y.get(args.game, 10)
+    pill = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(pill, (14, 15, 22, 205), pill.get_rect(), border_radius=16)
+    screen.blit(pill, (x, y))
+    screen.blit(lbl, (x + 12, y + (h - lbl.get_height()) // 2))
+    screen.blit(val, (x + w - 12 - val.get_width(), y + (h - val.get_height()) // 2))
+
+
+PAUSE_ITEMS = ("CONTINUE", "QUIT")
+
+
+def _draw_pause(frozen: pygame.Surface, choice: int) -> None:
+    """The paused frame, dimmed, under an NES-style box: black, white border, a blinking > on the choice."""
+    screen.blit(frozen, (0, 0))
+    veil = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+    veil.fill((0, 0, 0, 150))
+    screen.blit(veil, (0, 0))
+
+    cw, ch = min(400, _view_w() - 32), 236
+    cx, cy = (_view_w() - cw) // 2, (screen.get_height() - ch) // 2
+    pygame.draw.rect(screen, (0, 0, 0), (cx, cy, cw, ch))
+    pygame.draw.rect(screen, (252, 252, 252), (cx + 6, cy + 6, cw - 12, ch - 12), 4)
+    centre = lambda img, y: screen.blit(img, (cx + (cw - img.get_width()) // 2, y))
+
+    centre(nes_text("PAUSE", 5), cy + 26)
+    level = level_id or (Path(level_file).stem if level_file else getattr(core_game, "world", ""))
+    centre(nes_text(str(level or ("mario" if args.game == "platformer" else args.game)), 2, (188, 188, 188)), cy + 74)
+
+    blink = (pygame.time.get_ticks() // 400) % 2 == 0
+    items = [nes_text(item, 3) for item in PAUSE_ITEMS]
+    x = cx + (cw - max(i.get_width() for i in items)) // 2
+    for i, img in enumerate(items):
+        y = cy + 110 + i * 36
+        screen.blit(img, (x, y))
+        if i == choice and blink:
+            screen.blit(nes_text(">", 3, (252, 188, 60)), (x - 30, y))
+    centre(nes_text("SELECT  RESUME", 2, (188, 188, 188)), cy + ch - 36)
+
+
 # Warm-up: time to get used to the controls before anything counts. Wall-clock, so it runs out
 # whatever the player does; the level then restarts and the first recorded attempt begins.
 warm_until = pygame.time.get_ticks() + int(args.warmup * 60000) if args.warmup > 0 and (args.record or args.demo) else 0
@@ -472,25 +533,71 @@ else:
 running = True
 random_action = _random_action()
 frame = 0
+paused_frame = None     # the frozen screen while paused (Select on the pad, or P)
+paused_at = 0
+pause_choice, pause_prev, pause_armed = 0, (0, False), False   # the pause menu cursor and its input edges
+select_was_held = False
+play_ms = attempt_ms = 0   # play time (pauses excluded): this session / this attempt
 
 while running:
-    clock.tick(args.fps)
-    frame += 1
+    tick_ms = clock.tick(args.fps)
+    if paused_frame is None:
+        play_ms += tick_ms
+        attempt_ms += tick_ms
+    if args.quit_after and play_ms >= args.quit_after * 60000:
+        print("[Play] Time is up", flush=True)
+        break
 
+    toggle_pause = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             running = False
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+            toggle_pause = True
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_F7 and hasattr(core_game, "debug_manager") \
+                and hasattr(core_game, "TOTAL_WIDTH") and paused_frame is None:
+            _toggle_panel()
         elif event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
-            _open_pad()
+            gamepad.open_pad()
         elif args.game == "megaman" and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             core_game.invincible = not core_game.invincible
             print(f"[Play] Invincible: {'on' if core_game.invincible else 'off'}")
 
+    select_held = gamepad.button(pygame.CONTROLLER_BUTTON_BACK)
+    toggle_pause |= select_held and not select_was_held
+    select_was_held = select_held
+    resume = False
+    if toggle_pause and paused_frame is None:
+        paused_frame, paused_at = screen.copy(), pygame.time.get_ticks()
+        pause_choice, pause_prev, pause_armed = 0, gamepad.menu_input(), False
+    elif toggle_pause:
+        resume = True
+    elif paused_frame is not None:            # d-pad / arrows move the cursor, A / Start / Enter choose
+        dy, confirm = gamepad.menu_input()
+        if dy and dy != pause_prev[0]:
+            pause_choice = (pause_choice + dy) % len(PAUSE_ITEMS)
+        pause_armed |= confirm and not pause_prev[1]
+        if pause_armed and not confirm:       # act on release, so the press never reaches the game
+            if PAUSE_ITEMS[pause_choice] == "QUIT":
+                running = False
+            resume = True
+        pause_prev = (dy, confirm)
+    if resume:
+        paused_frame = None
+        if warm_until:   # the warm-up clock stops while paused
+            warm_until += pygame.time.get_ticks() - paused_at
+    if paused_frame is not None:
+        _draw_pause(paused_frame, pause_choice)
+        pygame.display.flip()
+        continue
+    frame += 1
+
     if warm_until and pygame.time.get_ticks() >= warm_until:
         warm_until, recording_since = 0, pygame.time.get_ticks()
         _restart_level()
+        attempt_ms = 0
         _start_recording()
         print("[Play] Warm-up over: recording starts now", flush=True)
 
@@ -519,12 +626,23 @@ while running:
         if done:
             break
 
+    held = None if args.random else gamepad.held()
+    if hasattr(core_game, "debug_manager"):
+        core_game.debug_manager.pad_input = held
     core_game.render(screen, blit_only=True)
+    dm = getattr(core_game, "debug_manager", None)
+    if not (dm and dm.show_panel and getattr(core_game, "render_mode", None) == "human"):
+        _draw_controls(held)   # the open debug panel already shows the pad in its Input card
     if warm_until:
         left = max(0, warm_until - pygame.time.get_ticks()) // 1000
         _banner(f"Warm-up, not recorded: {left // 60}:{left % 60:02d} left", (255, 210, 90))
-    elif recording_since and pygame.time.get_ticks() - recording_since < 4000:
-        _banner("Recording starts now", (120, 230, 150))
+    else:
+        if recording_since and pygame.time.get_ticks() - recording_since < 4000:
+            _banner("Recording starts now", (120, 230, 150))
+        if args.quit_after:
+            _draw_timer(int(args.quit_after * 60000) - play_ms, "TIME LEFT")
+        else:
+            _draw_timer(attempt_ms, "TIME")
     pygame.display.flip()
 
     if info.get("episode_end", False) or done:
@@ -537,6 +655,7 @@ while running:
             if args.episodes and demo.attempts_done >= args.episodes:
                 running = False
         _restart_level()
+        attempt_ms = 0
         if recorder:
             recorder.begin()
         if demo:

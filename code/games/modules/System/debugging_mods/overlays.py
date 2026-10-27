@@ -92,6 +92,36 @@ def _card(surface, x, y, w, h):
     pygame.draw.rect(surface, _C_BORDER, (x, y, w, h), 1)
 
 
+PAD_W = 150
+
+
+def draw_nes_pad(surface, x, y, h, state, font):
+    """A PAD_W-wide NES pad lit by state = (dx, dy, a, b, select, start); None draws it idle."""
+    dx, dy, a, b, sel, start = state or (0, 0, False, False, False, False)
+    lit, dim = (85, 190, 255), (58, 62, 80)
+    pygame.draw.rect(surface, (34, 36, 48), (x, y, PAD_W, h), border_radius=6)
+    pygame.draw.rect(surface, _C_BORDER, (x, y, PAD_W, h), 1, border_radius=6)
+
+    # D-pad: a cross of four arms around a hub
+    ox, oy, arm, w = x + 24, y + h // 2, 12, 9
+    for (ax, ay), on in (((-1, 0), dx < 0), ((1, 0), dx > 0), ((0, -1), dy < 0), ((0, 1), dy > 0)):
+        r = pygame.Rect(0, 0, arm if ax else w, w if ax else arm)
+        r.center = (ox + ax * (arm // 2 + w // 2), oy + ay * (arm // 2 + w // 2))
+        pygame.draw.rect(surface, lit if on else dim, r, border_radius=2)
+    pygame.draw.rect(surface, dim, (ox - w // 2, oy - w // 2, w, w))
+
+    # Select / Start pills
+    for i, on in enumerate((sel, start)):
+        pygame.draw.rect(surface, lit if on else dim, (x + 52 + i * 24, oy - 3, 18, 6), border_radius=3)
+
+    # B and A: NES red when held
+    for i, (name, on) in enumerate((("B", b), ("A", a))):
+        c = (x + 108 + i * 26, oy)
+        pygame.draw.circle(surface, (225, 55, 60) if on else (88, 34, 40), c, 10)
+        t = font.render(name, True, (245, 235, 235) if on else (150, 110, 115))
+        surface.blit(t, (c[0] - t.get_width() // 2, c[1] - t.get_height() // 2))
+
+
 def _section_hdr(surface, font, title, x, y, w, accent=None):
     """Draw a section header bar. Returns y for content start."""
     hdr = pygame.Surface((w, _HDR_H))
@@ -177,12 +207,14 @@ class AgentViewOverlay(DebugOverlay):
         'goal':   ( 35, 160,  65), 'empty': (  8,   8,  14),
         'oob':    (  4,   4,   6), 'enemy': (215,  45,  45),
         'coin':   (215, 175,  18), 'player':( 35, 135, 255),
-        'visited':(  30,  60, 90), 'pit':   ( 90,  30, 120),
+        'visited':(  30,  60, 90), 'pit':   ( 58,  24,  80),
+        'path':   ( 30, 120, 125),
     }
+    _PATH_RGB = (40, 200, 200)   # Dijkstra "closer to goal" tint; kept off the legend's red/green
     _BC = {
         'enemy':  (255, 100, 100), 'coin':  (255, 225,  70),
         'goal':   ( 70, 255, 110), 'player':(100, 190, 255),
-        'pit':    (190,  80, 255),
+        'pit':    ( 95,  50, 130),
         'default':( 32,  34,  44),
     }
     _LEGEND = [
@@ -193,6 +225,7 @@ class AgentViewOverlay(DebugOverlay):
         ('goal',   "Goal"),
         ('spike',  "Spike"),
         ('pit',    "Pit"),
+        ('path',   "Path"),
     ]
 
     # Lazily initialised fonts
@@ -349,14 +382,13 @@ class AgentViewOverlay(DebugOverlay):
                 pygame.draw.rect(surface, col,  (dx, dy, cw - 1, ch - 1))
                 pygame.draw.rect(surface, bcol, (dx, dy, cw - 1, ch - 1), 1)
 
-                # Dijkstra tint only — no numbers in compact view (12px cells unreadable)
-                if (cost_cache is not None and
-                        0 <= r < cost_cache.shape[0] and 0 <= c < cost_cache.shape[1]):
-                    val = float(cost_cache[r, c]) * 10
-                    if abs(val) > 0.01:
-                        intensity = min(90, int(abs(val) * 90))
+                # Dijkstra tint on open air only — no numbers in compact view (12px cells unreadable)
+                if col == self._TC['empty'] and cost_cache is not None and \
+                        0 <= r < cost_cache.shape[0] and 0 <= c < cost_cache.shape[1]:
+                    val = float(cost_cache[r, c])
+                    if val > 0.01:
                         tint = pygame.Surface((cw - 1, ch - 1), pygame.SRCALPHA)
-                        tint.fill((0, 200, 80, intensity) if val > 0 else (255, 60, 30, intensity))
+                        tint.fill((*self._PATH_RGB, min(150, int(val * 300))))
                         surface.blit(tint, (dx, dy))
 
     # ── Max-View overlay ──────────────────────────────────────────────────────
@@ -527,11 +559,9 @@ class AgentViewOverlay(DebugOverlay):
                 if (cost_cache is not None and in_nbhd and
                         0 <= r < cost_cache.shape[0] and 0 <= c < cost_cache.shape[1]):
                     val = float(cost_cache[r, c])
-                    if abs(val) > 0.01:
-                        intensity = min(70, int(abs(val) * 10 * 70))
+                    if val > 0.01 and col == self._TC['empty']:
                         tint = pygame.Surface((cw, cw), pygame.SRCALPHA)
-                        tint.fill((0, 210, 90, intensity) if val > 0
-                                  else (255, 55, 30, intensity))
+                        tint.fill((*self._PATH_RGB, min(150, int(val * 300))))
                         surface.blit(tint, (dx, dy))
 
                     # Number label (only in neighbourhood and only if cell is big)
@@ -704,12 +734,16 @@ class ObsValuesOverlay(DebugOverlay):
         cy = _section_hdr(surface, core.debug_manager.font,
                           "Obs Values", px, py, half_w, accent=(160, 90, 200))
 
-        sf   = core.debug_manager.small_font
-        rx   = px + half_w - 5
+        sf     = core.debug_manager.small_font
+        col_w  = half_w // 2
+        n_rows = (len(data) + 1) // 2   # fill the left column first, then the right
+        pygame.draw.line(surface, _C_SEP, (px + col_w, cy + 2), (px + col_w, py + ph - 4))
 
-        for label, val in data:
-            if cy + _VEC_LINE_H > py + ph - 2:
-                break
+        for i, (label, val) in enumerate(data):
+            cx = px + (i // n_rows) * col_w
+            ry = cy + (i % n_rows) * _VEC_LINE_H
+            if ry + _VEC_LINE_H > py + ph - 2 or i // n_rows > 1:
+                continue
 
             # Colour-code by semantic meaning
             if label in ("GoalDst", "EnmDst") and 0 < val < 0.15:
@@ -725,11 +759,10 @@ class ObsValuesOverlay(DebugOverlay):
             else:
                 vc = _C_LBL
 
-            ls = sf.render(label + ":", True, _C_LBL)
+            ls = sf.render(label, True, _C_LBL)
             vs = sf.render(f"{val:.2f}",  True, vc)
-            surface.blit(ls, (px + 5, cy))
-            surface.blit(vs, (rx - vs.get_width(), cy))
-            cy += _VEC_LINE_H
+            surface.blit(ls, (cx + 5, ry))
+            surface.blit(vs, (cx + col_w - 5 - vs.get_width(), ry))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ArchOverlay — compact pill strip showing the active feature extractor
