@@ -28,6 +28,7 @@ import yaml
 from . import megaman_enemies as en
 from . import mutants
 from .megaman_assets import Assets
+from .modules.System.nes_font import nes_text
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(_HERE, "megaman_config.yaml")
@@ -127,7 +128,8 @@ class MegamanCore:
     WIDTH, HEIGHT = 16 * 32, 15 * 32   # one NES screen at 2x
 
     def __init__(self, render_mode: str = "none", max_steps=None, level_idx: int = 0, seed: int = 0,
-                 level_file: str | None = None, invincible: bool = False, level: str | None = None) -> None:
+                 level_file: str | None = None, invincible: bool = False, level: str | None = None,
+                 time_limit: float | None = None) -> None:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
         self.mutant = active_mutant()
@@ -151,7 +153,9 @@ class MegamanCore:
         self.scale = self.tile_size / 16.0          # world px per NES px
         self.fps = int(self.cfg.get("fps", 60))
         self.dt = 1.0 / self.fps
-        self.max_steps = int(max_steps) if max_steps else int(self.cfg.get("time_limit", 300) * self.fps)
+        # seconds an attempt may last; 0 = no clock, as on the console (manual play)
+        self.time_limit = float(self.cfg.get("time_limit", 300) if time_limit is None else time_limit)
+        self.max_steps = int(max_steps) if max_steps else int(self.time_limit * self.fps) if self.time_limit else None
         self.screen_cols = int(self.cfg["screen"]["cols"])
         self.screen_rows = int(self.cfg["screen"]["rows"])
         self.WIDTH = self.screen_cols * self.tile_size
@@ -210,20 +214,22 @@ class MegamanCore:
             self._seed = seed
         self.rng = random.Random(self._seed)
         self.level_data = self._load_level()
+        self._order = None                              # screen_order() of this stage, worked out on demand
         self._art = self.art_entry()
         ts, s = self.tile_size, self.scale
         pc = self.cfg["player"]
         self.k = {name: float(pc[name]) * s for name in (
             "run_speed", "air_speed", "step_speed", "slide_speed", "jump_velocity", "jump_cut_velocity",
-            "gravity", "max_fall_speed", "ladder_speed", "ladder_mount_drop",
+            "jump_cut_above", "gravity", "max_fall_speed", "ladder_speed", "ladder_mount_drop",
             "knockback_speed", "knockback_hop")}
+        self.k["rest_speed"] = en.REST_SPEED * s      # the fall a tile leaves a body with ($FF.40)
         self.hurt_blink = int(pc.get("hurt_invulnerable_frames", 111))
         self.knock_frames = int(pc.get("knockback_frames", 29))
         self.step_frames = int(pc.get("step_frames", 7))
         self.slide_frames = int(pc.get("slide_frames", 8))
         w, h = int(pc["width"] * s), int(pc["height"] * s)
         sec = (self.level_entry().get("section") or {}) if not self._level_file else {}
-        tx, ty = sec.get("start") or self.level_data.start
+        tx, ty = (options or {}).get("start") or sec.get("start") or self.level_data.start
         self.player = Player(tx * ts + (ts - w) / 2, (ty + 1) * ts - h, w, h,
                              hp=int(pc.get("hp", 28)), hp_max=int(pc.get("hp", 28)))
         self.player.climbing = bool(sec.get("climbing"))     # a section entered up a ladder starts on it
@@ -238,6 +244,7 @@ class MegamanCore:
                 self.level_data.grid[r][c] = DOOR_SHUT
         bc = self.cfg["buster"]
         self.shot_speed = float(bc["speed"]) * s
+        self.shot_offset = float(bc.get("offset", 16)) * s
         self.max_shots = int(bc["max_shots"])
         self.shot_size = (int(bc["size"][0] * s), int(bc["size"][1] * s))
         self.shots: list[Shot] = []
@@ -253,6 +260,13 @@ class MegamanCore:
         self.boss_cutter: en.RollingCutter | None = None
         self.boss_intro = 0             # frames of the boss-room intro left (no control)
         self.boss_dead = False
+        self.refill = 0                 # energy units still to add from a capsule (the game waits)
+        self.gate = None                # the shutter sequence under way: open, walk through, close
+        self.intro = 0                  # manual play: frames of READY, then the beam drop (start_intro)
+        self.beam_y = 0.0
+        self.death_t = 0                # manual play: frames of the death sequence shown (death_tick)
+        self.orbs: list[list] = []      # [x, y, vx, vy] of each explosion orb, NES px
+        self.halt = 0                   # frames everything stands still (Cut Man's defeat)
         self.fx: list[list] = []        # [x, y, frames left] of each explosion puff
         self.sfx("start")
         self.screen = (tx // self.screen_cols, ty // self.screen_rows)
@@ -265,7 +279,7 @@ class MegamanCore:
         self.score = 0
         self.coins_total = 0
         self.kills_total = 0
-        self.timer = float(self.cfg.get("time_limit", 300))
+        self.timer = self.time_limit or math.inf
         self.won = False
         self.alive = True
         self.death_cause = ""
@@ -395,7 +409,7 @@ class MegamanCore:
         bottom = p.y + p.height
         if p.grounded:
             if self._floor_under(bottom + 1.0, bottom) is None:
-                p.grounded = False                 # walked off a ledge
+                p.grounded, p.vy = False, self.k["rest_speed"]   # walked off a ledge: falls from 0.75
             return
         ny = p.y + p.vy
         if p.vy >= 0:
@@ -407,7 +421,7 @@ class MegamanCore:
         else:
             ty = int(ny // ts)
             if any(self.solid(tx, ty) for tx in self._columns()):
-                ny, p.vy = (ty + 1) * ts, 0.0      # bumped a ceiling
+                ny, p.vy = (ty + 1) * ts, self.k["rest_speed"]   # bumped a ceiling: falls from 0.75
         p.y = ny
         p.vy = min(p.vy + self.k["gravity"], self.k["max_fall_speed"])
 
@@ -426,6 +440,8 @@ class MegamanCore:
             return self._mount(int(cx // ts))
         if dy > 0 and p.grounded and self.ladder_top(int(cx // ts), int((p.y + p.height + 1) // ts)):
             return self._mount(int(cx // ts), k["ladder_mount_drop"])
+        if dy > 0 and not p.grounded and self.tile_at(cx, cy) == LADDER and self.tile_at(cx, cy + ts) == LADDER:
+            return self._mount(int(cx // ts))       # down grabs a ladder mid-air too, if it goes on below
 
         if dx:
             p.facing = dx
@@ -438,8 +454,11 @@ class MegamanCore:
             p.vx = dx * speed
             p.slide_frames = self.slide_frames if p.moving_frames > self.step_frames else 0
         else:
+            was_running = p.moving_frames > self.step_frames
             p.moving_frames = 0
-            if p.grounded and p.slide_frames > 0:
+            if p.grounded and was_running:
+                p.vx = p.facing * k["run_speed"]    # the frame the pad is let go still runs; then the slide
+            elif p.grounded and p.slide_frames > 0:
                 p.slide_frames -= 1
                 p.vx = p.facing * k["slide_speed"]
             else:
@@ -448,18 +467,20 @@ class MegamanCore:
 
         if jump_edge and p.grounded:
             p.vy, p.grounded = -k["jump_velocity"], False
-        elif not jump and p.vy < -k["jump_cut_velocity"]:
+        elif not jump and p.vy <= -k["jump_cut_above"]:
             p.vy = -k["jump_cut_velocity"]          # letting go early cuts the jump short
         self._move_x()
         self._move_y()
 
-    def _climb(self, dx: int, dy: int, jump_edge: bool) -> None:
+    def _climb(self, dx: int, dy: int, jump_edge: bool, fire_edge: bool) -> None:
         p, k, ts = self.player, self.k, self.tile_size
-        if dx:
+        if dx and fire_edge:                        # on a ladder he turns only to shoot (Ladder_B_Pressed)
             p.facing = dx
         tx = int((p.x + p.width / 2.0) // ts)
         if jump_edge and not dy:                    # jump lets go of the ladder
             p.climbing, p.vy = False, k["ladder_speed"]
+            return
+        if p.shoot_timer > 0 or fire_edge:          # the arm is out: he hangs still (L15838)
             return
         if dy < 0:
             ny = p.y - k["ladder_speed"]
@@ -486,9 +507,9 @@ class MegamanCore:
         w, h = self.shot_size
         p.shoot_timer = max(0, p.shoot_timer - 1)
         if fire_edge and len(self.shots) < self.max_shots:
-            x = p.x + p.width if p.facing > 0 else p.x - w
-            self.shots.append(Shot(x, p.y + p.height / 2.0 - h, p.facing * self.shot_speed))
-            p.shoot_timer = 16
+            cx, cy = self._centre()                 # 16 px ahead of his centre, at its height (FireData P)
+            self.shots.append(Shot(cx + p.facing * self.shot_offset - w / 2.0, cy - h / 2.0, p.facing * self.shot_speed))
+            p.shoot_timer = 15
             self.sfx("shoot")
         kept = []
         for s in self.shots:
@@ -534,8 +555,25 @@ class MegamanCore:
         self.timer = max(0.0, self.timer - self.dt)
         p, ts = self.player, self.tile_size
 
+        if self.intro:                                  # READY, then the beam: no control yet
+            self._run_intro()
+            return self._finish()
         if self.camera_y != self._camera_target()[1]:   # flipping to the next screen: the world holds still
             self._update_camera()
+            return self._finish()
+        if self.gate:                                   # a shutter: the game waits while it runs
+            self._run_gate()
+            return self._finish()
+        if self.refill > 0:                             # a capsule fills the meter one unit every 4 frames,
+            if self._steps % 4 == 0:                    # the game frozen meanwhile (MeterRefill)
+                p.hp += 1
+                self.refill = 0 if p.hp >= p.hp_max else self.refill - 1
+                self.sfx("heal")
+            return self._finish()
+        if self.halt > 0:                               # everything stands still, then the boss blows up
+            self.halt -= 1
+            if self.halt == 0:
+                self._boss_explodes()
             return self._finish()
         if self.boss_intro > 0:                         # the boss-room intro takes the pad away
             self.boss_intro -= 1
@@ -551,7 +589,7 @@ class MegamanCore:
             self._move_x()
             self._move_y()
         elif p.climbing:
-            self._climb(dx, dy, jump_edge)
+            self._climb(dx, dy, jump_edge, fire_edge)
         else:
             self._walk(dx, dy, jump, jump_edge)
         self._track_screen()
@@ -564,10 +602,10 @@ class MegamanCore:
                         self._die("Spike")              # spikes ignore the invulnerability blink
         if self.alive:
             grid = self.level_data.grid
-            for (r, c) in self.level_data.doors:      # a shutter seals once the player is through
-                if grid[r][c] == DOOR and p.x >= (c + 1) * ts and r // self.screen_rows == self.screen[1]:
-                    grid[r][c] = DOOR_SHUT
-                    self.sfx("gate")
+            for (r, c) in self.level_data.doors:      # walking into a shutter starts its sequence
+                if grid[r][c] == DOOR and r // self.screen_rows == self.screen[1] and c * ts < p.x + p.width                         and p.y < (r + 1) * ts and p.y + p.height > r * ts:
+                    self._open_gate(c)
+                    break
             if self.tile_at(*self._centre()) == GOAL or self.screen in self.goal_screens:
                 self.won = True                         # the goal tile, or the next section's first screen
                 self.score += 1000
@@ -576,8 +614,131 @@ class MegamanCore:
         self._update_camera()
         return self._finish()
 
+    # ── the console's start, death and restart, for manual play (agents never call these) ──
+    READY_FRAMES = 192          # "READY" stays up 3.2 s (bank5.s, MiscCounter1 = $C0)
+    BEAM_SPEED = 16             # then Mega Man drops in at 16 px a frame (TeleportToStage)
+    DEATH_HALT = 32             # everything stands still (TimeDelayWithAllObjectsHalted $20) ...
+    DEATH_PUFF = 12             # ... a burst of puffs (AtomicExplodeActor) ...
+    DEATH_FRAMES = DEATH_HALT + DEATH_PUFF + 192   # ... then the orbs fly out for 192 frames
+    # The 12 orbs, NES px/frame with y down (F88A/F896/F8A2/F8AE/F8BA tables, CreateExplosionObject)
+    DEATH_ORBS = [(0, -2), (2, 0), (0, 2), (-2, 0), (1.375, -1.375), (1.375, 1.375), (-1.375, 1.375),
+                  (-1.375, -1.375), (0, -0.75), (0.75, 0), (0, 0.75), (-0.875, 0)]
+
+    def start_intro(self) -> None:
+        """READY, then the teleport beam drops from the top of the screen to where he stands."""
+        self.intro, self.beam_y = self.READY_FRAMES, self.camera_y
+
+    def _run_intro(self) -> None:
+        if self.intro > 1:
+            self.intro -= 1
+            return
+        if self.beam_y == self.camera_y:
+            self.sfx("start")
+        self.beam_y += self.BEAM_SPEED * self.scale
+        if self.beam_y >= self.player.y:
+            self.intro = 0
+
+    def death_tick(self) -> bool:
+        """One frame of the death sequence; False once it is over."""
+        self.death_t += 1
+        if self.death_t == self.DEATH_HALT:
+            self.sfx("death")
+        if self.death_t == self.DEATH_HALT + self.DEATH_PUFF:
+            x, y = self.nes_player()
+            self.orbs = [[x, y, vx, vy] for vx, vy in self.DEATH_ORBS]
+            self.sfx("explosion")
+        for o in self.orbs:
+            o[0] += o[2]
+            o[1] += o[3]
+        return self.death_t < self.DEATH_FRAMES
+
+    def screen_order(self) -> list:
+        """The stage's screens in the order it chains them (right, or up / down a ladder or drop),
+        from the start screen to the boss's: index n is the console's screen number n."""
+        if getattr(self, "_order", None) is None:
+            screens, sc, sr = self.level_data.screens, self.screen_cols, self.screen_rows
+            start = (self.level_data.start[0] // sc, self.level_data.start[1] // sr)
+            path = [start]
+
+            def walk(at):                           # the one path through every screen
+                if len(path) == len(screens):
+                    return True
+                for dx, dy in ((1, 0), (0, -1), (0, 1)):
+                    nxt = (at[0] + dx, at[1] + dy)
+                    if nxt in screens and nxt not in path:
+                        path.append(nxt)
+                        if walk(nxt):
+                            return True
+                        path.pop()
+                return False
+            self._order = path if walk(start) else []
+        return self._order
+
+    def checkpoint(self) -> tuple[int, int] | None:
+        """Where a life lost here restarts: the stand cell at x $80 of the last restart screen reached,
+        or None for the stage's start."""
+        cps = (self.cfg.get("checkpoints") or {}).get((self._art or {}).get("stage"), [])
+        order = self.screen_order()
+        if self.screen not in order:
+            return None
+        reached = [n for n in cps if n <= order.index(self.screen)]
+        if not reached:
+            return None
+        sx, sy = order[max(reached)]
+        col = sx * self.screen_cols + 8
+        for row in range(sy * self.screen_rows + 0x94 // 16, (sy + 1) * self.screen_rows - 1):
+            if self.tile(col, row) == AIR and self.solid(col, row + 1):
+                return col, row
+        return None
+
+    GATE_BLOCK_FRAMES = 6       # a 32 px block of shutter opens or closes every 6 frames (AnimateDoor)
+    GATE_SCROLL_FRAMES = 64     # the screen scrolls 4 px a frame while Mega Man walks through on his own
+
+    def _open_gate(self, col: int) -> None:
+        cells = sorted(r for r, c in self.level_data.doors
+                       if c == col and r // self.screen_rows == self.screen[1])
+        edge = (col // self.screen_cols + 1) * self.screen_cols * self.tile_size   # the screen it opens onto
+        p = self.player
+        self.gate = {"cells": cells, "col": col, "phase": "open", "t": 0, "x0": p.x, "cam0": self.camera_x,
+                     "x1": edge + 24 * self.scale - p.width / 2.0, "edge": float(edge)}
+        p.vx = 0.0
+        self.shots.clear()
+        self.sfx("gate")
+
+    def _run_gate(self) -> None:
+        """Open bottom-up a block per 6 frames, scroll 64 frames with Mega Man walking in to x 24,
+        close top-down the same way (HorizontalScrollPoint, AnimateDoor). Everything else waits."""
+        g, p, grid = self.gate, self.player, self.level_data.grid
+        g["t"] += 1
+        cells, blocks = g["cells"], max(1, len(g["cells"]) // 2)
+        step = self.GATE_BLOCK_FRAMES
+        if g["phase"] == "open":
+            shown = blocks - min(blocks, g["t"] // step)        # blocks still standing, from the top
+            for i, r in enumerate(cells):
+                grid[r][g["col"]] = DOOR if i < shown * 2 else AIR
+            if g["t"] >= blocks * step:
+                g["phase"], g["t"] = "walk", 0
+        elif g["phase"] == "walk":
+            f = g["t"] / self.GATE_SCROLL_FRAMES
+            p.x = g["x0"] + (g["x1"] - g["x0"]) * f
+            p.facing, p.moving_frames = 1, self.step_frames + 1  # the run frames play as he walks
+            self.camera_x = g["cam0"] + (g["edge"] - g["cam0"]) * f
+            self.screen = (int((p.x + p.width / 2.0) // self.WIDTH), self.screen[1])
+            if g["t"] >= self.GATE_SCROLL_FRAMES:
+                p.moving_frames = 0
+                g["phase"], g["t"] = "close", 0
+                self.sfx("gate")
+        else:
+            shown = min(blocks, g["t"] // step + 1)              # blocks back down, from the top
+            for i, r in enumerate(cells):
+                grid[r][g["col"]] = DOOR_SHUT if i < shown * 2 else AIR
+            if g["t"] >= blocks * step:
+                for r in cells:
+                    grid[r][g["col"]] = DOOR_SHUT
+                self.gate = None
+
     def _finish(self):
-        if self.alive and not self.won and (self.timer <= 0 or self._steps >= self.max_steps):
+        if self.alive and not self.won and (self.timer <= 0 or self.max_steps and self._steps >= self.max_steps):
             self._die("Timeout")
         done = (not self.alive) or self.won
         return self._obs(), 0.0, done, False, self._info()
@@ -683,9 +844,8 @@ class MegamanCore:
             self.score += en.PEARL_SCORE
             self.coins_total += 1
             self.sfx("pearl")
-        else:
-            p.hp = min(p.hp_max, p.hp + en.ITEM_HEAL[it.kind])
-            self.sfx("heal")
+        elif p.hp < p.hp_max:
+            self.refill = en.ITEM_HEAL[it.kind]         # step() pays it out, the game frozen
 
     def _hurt(self, amount: int, cause: str, facing: int) -> None:
         """Damage from an enemy or its shot: thrown back the way the attacker faces, then a
@@ -732,6 +892,11 @@ class MegamanCore:
         return True
 
     def _boss_defeated(self) -> None:
+        """Everything stands still for 32 frames (TimeDelayWithAllObjectsHalted), then he explodes."""
+        self.halt = 32
+        self.boss_cutter = None
+
+    def _boss_explodes(self) -> None:
         cam_x, cam_y = self.nes_view()
         self.fx.append([self.boss.x, self.boss.y, 24])
         self.sfx("explosion")
@@ -902,11 +1067,24 @@ class MegamanCore:
             w, h = self.shot_size
             if not put("shot", (s.x + w / 2) / sc, (s.y + h / 2) / sc):
                 pygame.draw.ellipse(surface, pal["shot"], (int(s.x) - camx, int(s.y) - camy, w, h))
+        for x, y, _, _ in self.orbs:               # Mega Man's explosion
+            pygame.draw.circle(surface, pal["body_hi"], (int(x * sc) - camx, int(y * sc) - camy), int(6 * sc))
+            pygame.draw.circle(surface, pal["clear"], (int(x * sc) - camx, int(y * sc) - camy), int(3 * sc))
         for x, y, _ in self.fx:
             if not put("boom", x, y):
                 pygame.draw.circle(surface, pal["clear"], (int(x * sc) - camx, int(y * sc) - camy), int(10 * sc), 3)
         p = self.player
-        if (self.alive or self.won) and not (p.blink and (tick // 2) % 2):
+        dying = not self.alive and self.death_t < self.DEATH_HALT and self.death_cause != "Pit"
+        if self.intro:                              # READY, then the beam; he isn't there yet
+            if self.intro > 1:
+                img = nes_text("READY", int(sc))
+                surface.blit(img, ((vw - img.get_width()) // 2, (vh - img.get_height()) // 2))
+            else:
+                bx = int(p.x + p.width / 2.0) - camx
+                beam = pygame.Rect(bx - int(2 * sc), int(self.beam_y) - camy, int(4 * sc), int(24 * sc))
+                pygame.draw.rect(surface, pal["body_hi"], beam)
+                pygame.draw.rect(surface, pal["body"], beam.inflate(-int(2 * sc), 0))
+        elif (self.alive or self.won or dying) and not (p.blink and (tick // 2) % 2):
             if not put(*self._player_sprite()):
                 body = pygame.Rect(int(p.x) - camx, int(p.y) - camy, p.width, p.height)
                 pygame.draw.rect(surface, pal["body"], body, border_radius=4)
@@ -992,9 +1170,12 @@ class MegamanCore:
         return ("bullet", e.x, e.y, "cc", False, False)
 
     def _hud(self, surface) -> None:
-        """The console's vertical energy meter, top left."""
+        """The console's HUD (DrawScoreAndMeters): the 7-digit score at the top, 8 px a digit from
+        x 104, and the vertical energy meter, top left, its 56 px spanning y 24-80."""
         p, s = self.player, int(self.scale)
-        x, y, w = 24 * s, 16 * s, 6 * s
+        for i, digit in enumerate(f"{min(self.score, 9_999_999):07d}"):
+            surface.blit(nes_text(digit, s), ((104 + 8 * i + 1) * s, 16 * s))
+        x, y, w = 24 * s, 24 * s, 6 * s
         pygame.draw.rect(surface, self.PAL["hp_bg"], (x - s, y - s, w + 2 * s, p.hp_max * 2 * s + s))
         colour = self.PAL["goal"] if self.invincible else self.PAL["hp"]   # green meter: debug invincibility
         for i in range(p.hp):
@@ -1031,10 +1212,11 @@ if __name__ == "__main__":  # smoke: movement numbers, ladders, screen flips, bo
         core.step(IDLE)
     assert p.grounded and p.y == y0, (p.grounded, p.y, y0)
 
-    x0 = p.x                                         # 7 frames of inching, then 1.375 px/frame
+    x0 = p.x                                         # the inch (step_frames), then 1.375 px/frame
     for _ in range(27):
         core.step(RIGHT)
-    assert abs((p.x - x0) / s - (7 * 0.125 + 20 * 1.375)) < 1e-6, (p.x - x0) / s
+    n = core.step_frames                             # the inch, then running, over 27 frames
+    assert abs((p.x - x0) / s - (n * 0.125 + (27 - n) * 1.375)) < 1e-6, (p.x - x0) / s
 
     core = MegamanCore(level="CutMan")
     p = core.player

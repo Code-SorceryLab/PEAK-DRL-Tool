@@ -11,16 +11,17 @@ scroll_speed: 4.0          # NES px/frame the camera moves between screens (a 60
 # 8.8 fixed point in the ROM: $04.DF = 4 + 223/256.
 player:
   width: 14                # hitbox; the sprite is 16 x 24
-  height: 23
+  height: 22               # damage box: x +-7, y -11..+11 (RunCollisionChecks)
   hp: 28
   run_speed: 1.375         # $01.60  ground, running
   air_speed: 1.3125        # $01.50  steering in the air
   step_speed: 0.125        # $00.20  the first-step "inch" after standing still
-  step_frames: 7           # approximate: the ROM times it off the animation counter
+  step_frames: 9           # sprite $03's animation, 3 frames x 3 ticks (MajObj_FrameIdcs_3)
   slide_speed: 0.5         # $00.80  the slide after letting go of the pad
-  slide_frames: 8          # approximate, same reason
+  slide_frames: 13         # sprite $0C's animation, 2 frames x 7 ticks; the release frame itself still runs
   jump_velocity: 4.871     # $04.DF  about 3.1 tiles at full hold
-  jump_cut_velocity: 1.0   # releasing jump while rising caps the upward speed here
+  jump_cut_velocity: 1.0   # releasing jump while rising at jump_cut_above or more sets the upward speed here
+  jump_cut_above: 2.0      # (L15559: only when the whole-pixel part of the speed is 2 or more)
   gravity: 0.25            # $00.40 per frame
   max_fall_speed: 12.0     # $0C.00
   ladder_speed: 0.75       # $00.C0, up and down
@@ -29,10 +30,17 @@ player:
   knockback_frames: 29     # no control and no firing while thrown back
   knockback_speed: 0.5625  # $00.90, the way the attacker faces
   knockback_hop: 1.25      # $01.40 upward on the first frame
+# Manual play only (agents get one life and start in control): the console's lives and restart points.
+lives: 3                   # ExtraLives = 2, so three tries
+# Dying on or past screen A restarts there, on or past B there (StageCheckPointA/B, bank7.s). A screen's
+# number counts the stage's screens in the order it chains them, from 0 at the start.
+checkpoints:
+  cutman: [0x0A, 0x14]
 buster:
   speed: 4.0               # px/frame
   max_shots: 3             # on screen at once
-  size: [8, 6]
+  size: [8, 8]             # collision half-size $04/$04
+  offset: 16               # spawns this far ahead of Mega Man's centre, at his centre height (FireData P)
 
 # How fast an agent may work the pad (frames at 60 fps). A net decides every frame, which no
 # hand can do; these caps hold it to what a quick human manages. They apply to agents only —

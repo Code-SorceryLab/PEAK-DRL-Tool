@@ -210,6 +210,13 @@ def _dx(e: Enemy, core) -> float:
     return core.nes_player()[0] - e.x
 
 
+def _on_screen(e: Enemy, core) -> bool:
+    """Enemies that never move are removed too once the screen leaves them, as every object is
+    (EnemyAI_MovementsAndDamageCheck), so their spawn points re-arm."""
+    cam_x = core.nes_view()[0]
+    return cam_x <= e.x <= cam_x + 255
+
+
 def _face(e: Enemy, core) -> float:
     """Turn toward Mega Man; returns the horizontal distance."""
     dx = _dx(e, core)
@@ -291,7 +298,7 @@ def beak(e: Enemy, core) -> bool:
         core.enemy_bullets.append(Bullet(e.x + 7 * e.facing, e.y, along * e.facing, down, e.name, e.facing))
         core.sfx("enemy_shoot")
     e.t = (e.t + 1) % 206
-    return True
+    return _on_screen(e, core)
 
 
 def screw_bomber(e: Enemy, core) -> bool:
@@ -301,7 +308,7 @@ def screw_bomber(e: Enemy, core) -> bool:
             e.fd -= 1
         elif abs(_dx(e, core)) < 80:
             e.state, e.t, e.y = "up", 0, e.home[1] + out
-        return True
+        return _on_screen(e, core)
     e.t += 1
     if e.t in (32, 64):
         sign = 1 if e.kind == "w" else -1
@@ -311,7 +318,7 @@ def screw_bomber(e: Enemy, core) -> bool:
     elif e.t == 96:
         e.state, e.y = "", e.home[1]
         e.fd = (0x20, 0x3F, 0x7D)[core.rng.randrange(3)]
-    return True
+    return _on_screen(e, core)
 
 
 def flying_shell(e: Enemy, core) -> bool:
@@ -350,7 +357,7 @@ def cutter_launcher(e: Enemy, core) -> bool:
             core.enemies.append(Enemy("cutter", e.x, e.y, hw, hh, facing=e.facing, gravity=True,
                                       vx=int(dist * 256 / 51) / 256, vy=-4.8984375))
             e.fd = 32
-    return True
+    return _on_screen(e, core)
 
 
 def cutter(e: Enemy, core) -> bool:

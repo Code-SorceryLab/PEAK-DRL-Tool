@@ -35,6 +35,9 @@ parser.add_argument("--episodes", type=int, default=0, help="with --record: quit
 parser.add_argument("--warmup", type=float, default=0.0, metavar="MINUTES",
                     help="with --record / --demo: play this long first without anything being recorded; "
                          "then the level restarts and recording begins")
+parser.add_argument("--lives", type=int, default=3,
+                    help="lives per run (0 = unlimited, for practice); a run ends on a win or when they "
+                         "are gone, and --episodes counts runs. Each life is its own recorded row")
 parser.add_argument("--quit-after", type=float, default=0.0, metavar="MINUTES",
                     help="count down this much play time on screen (pauses excluded), then quit")
 parser.add_argument("--demo", nargs="?", const="runs/demos", default=None, metavar="DIR",
@@ -189,8 +192,8 @@ if args.game == "bomberman":
     env_kwargs = {"level_idx": int(level_id)} if level_id else {}
 elif args.game == "megaman":
     env_kwargs = {"level": level_id} if level_id else {"level": "CutMan"}   # default: the whole stage
-    if True:
-        env_kwargs["invincible"] = args.invincible
+    env_kwargs["invincible"] = args.invincible
+    env_kwargs["time_limit"] = 0                # no clock, as on the console
     if args.game == "megaman" and level_file:
         env_kwargs["level_file"] = level_file   # the core loads an unlisted file itself
         print(f"[Play] Loaded editor file: {Path(level_file).name}")
@@ -202,6 +205,11 @@ elif args.game == "sonic":
     env_kwargs['curriculum_enabled'] = False
 if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
+    env_kwargs['curriculum_enabled'] = False  # levels in campaign order, not the training curriculum's
+    env_kwargs['anti_stall'] = False          # standing still is allowed: the stall death is for agents
+    # One chosen level (the study, or a level picked): clearing it ends the run. Otherwise the
+    # regular game: the core moves straight on to the next level.
+    env_kwargs['terminate_on_goal'] = bool(level_id or level_file)
 
 gamepad.open_pad()
 core_game = GameCls(render_mode="human", **env_kwargs)
@@ -236,7 +244,8 @@ JUMP_IDX = {"bomberman": 2, "megaman": 2, "meatboy": 2}   # where "jump" (bomber
 
 
 class _Recorder:
-    """Tracks one attempt on the live core and appends it to episodes.csv when it ends."""
+    """Tracks one life on the live core and appends it to episodes.csv when it ends: a row per life,
+    as an agent's episode is one life, though a run gives the player the game's usual lives."""
 
     def __init__(self) -> None:
         self.player = args.player or ("random" if args.random else "human")
@@ -250,9 +259,14 @@ class _Recorder:
         g = getattr(p, "gObj", p)
         return g.x + g.width / 2.0, g.y + g.height / 2.0
 
+    def _clears(self) -> int:
+        return sum(getattr(core_game, "_level_wins", {}).values())
+
     def begin(self) -> None:
-        if hasattr(core_game, "lives"):   # agents get one life per episode; so does a recorded attempt
-            core_game.lives = 1
+        self.lives_seen = getattr(core_game, "lives", None)
+        self.clears = self._clears()
+        self.last_xy = self._xy()
+        self.base = [int(getattr(core_game, k, 0) or 0) for k in ("coins_total", "kills_total", "bricks_destroyed")]
         self.frames = 0
         self.jumps = 0
         self.prev_jump = False
@@ -263,6 +277,15 @@ class _Recorder:
             self.best_cost = self.start_cost
 
     def step(self, action) -> None:
+        lives = getattr(core_game, "lives", None)
+        if lives is not None and self.lives_seen is not None and lives < self.lives_seen and core_game.alive:
+            self.end(self.last_xy)             # Mario lost a life and the core already restarted the level
+            self.begin()
+            return
+        if self._clears() > self.clears and not getattr(core_game, "terminate_on_goal", False):
+            self.end(self.last_xy, won=True)   # Mario cleared the level and the core moved on to the next
+            self.begin()
+            return
         jump = bool(action[JUMP_IDX.get(args.game, 1)])
         if args.game == "meatboy" and not args.random:   # MeatboyPlayer reads the keyboard itself
             k = pygame.key.get_pressed()
@@ -275,26 +298,29 @@ class _Recorder:
             self.route.append(tuple(round(v, 1) for v in self._xy()))
         if args.game == "bomberman":
             self.best_cost = min(self.best_cost, core_game.goal_cost())
+        self.last_xy = self._xy()
 
-    def end(self) -> None:
-        won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
+    def end(self, xy=None, won=None) -> None:
+        xy = xy or self._xy()
+        if won is None:
+            won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
         cause = "Success" if won else str(getattr(core_game, "death_cause", "")
                                           or getattr(core_game, "last_cause", "") or "Dead")
         if args.game == "bomberman":
             progress = 1.0 - self.best_cost / self.start_cost
         else:
-            progress = self._xy()[0] / (core_game.level_data.width or 1.0)
+            progress = xy[0] / (core_game.level_data.width or 1.0)
         progress = min(max(progress, 0.0), 1.0)
         world = level_id or (Path(level_file).stem if level_file else None) \
             or getattr(core_game, "world", None) or getattr(core_game, "_level_idx", "auto")
+        coins, kills, bricks = (int(getattr(core_game, k, 0) or 0) - b for k, b in
+                                zip(("coins_total", "kills_total", "bricks_destroyed"), self.base))
         path = append_rows(self.run_dir, [[
-            self.player, self.game, world, cause, self.jumps,
-            int(getattr(core_game, "coins_total", 0) or 0),
+            self.player, self.game, world, cause, self.jumps, coins,
             round(self.vx_sum / max(self.frames, 1), 2), round(progress, 3),
-            repr(self.route), int(getattr(core_game, "kills_total", 0) or 0),
-            int(getattr(core_game, "bricks_destroyed", 0) or 0), round(self.frames / 60.0, 2)]])
+            repr(self.route + [tuple(round(v, 1) for v in xy)]), kills, bricks, round(self.frames / 60.0, 2)]])
         self.recorded += 1
-        print(f"[Record] attempt {self.recorded}: {cause}, {progress:.0%} -> {path}")
+        print(f"[Record] life {self.recorded}: {cause}, {progress:.0%} -> {path}")
 
 
 class _StatsRecorder:
@@ -391,16 +417,55 @@ class _DemoRecorder:
 
 core_game.reset()
 demo = recorder = None
+MEGAMAN_NES = args.game == "megaman" and not args.demo   # READY, the death sequence and restart points
+UNLIMITED_LIVES = 99                                      # what Mario's HUD shows when lives never run out
+lives_left = args.lives
+runs_done = 0
+if args.game == "platformer":                             # Mario's core counts its own lives
+    core_game.max_lives = core_game.lives = args.lives or UNLIMITED_LIVES
+if MEGAMAN_NES:
+    core_game.start_intro()
+
+
+class _InputLog:
+    """inputs.csv beside episodes.csv: one row per played frame with the buttons held, e.g.
+    "[up, left, b]". `life` is the matching row of episodes.csv (1 = its first row)."""
+    BUTTONS = ("up", "down", "left", "right", "a", "b", "select", "start")
+
+    def __init__(self, folder: str) -> None:
+        import csv
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, "inputs.csv")
+        new = not os.path.exists(path)
+        self.f = open(path, "a", newline="", encoding="utf-8")
+        self.w = csv.writer(self.f)
+        if new:
+            self.w.writerow(["run", "life", "frame", "buttons"])
+        self.frame = 0
+
+    def log(self, run: int, life: int, held) -> None:
+        dx, dy, a, b, sel, start = held
+        on = (dy < 0, dy > 0, dx < 0, dx > 0, a, b, sel, start)
+        self.frame += 1
+        self.w.writerow([run, life, self.frame, "[" + ", ".join(n for n, h in zip(self.BUTTONS, on) if h) + "]"])
+
+    def close(self) -> None:
+        self.f.close()
+
+
+input_log = None
 
 
 def _start_recording() -> None:
-    global demo, recorder, append_rows
+    global demo, recorder, append_rows, input_log
     demo = _DemoRecorder() if args.demo and args.game == "megaman" else None
     if args.record and args.game == "megaman":
         recorder = _StatsRecorder()
     elif args.record:
         from code.neuro.episodes import append_rows
         recorder = _Recorder()
+    if recorder and not args.random:
+        input_log = _InputLog(os.path.dirname(recorder.path) if args.game == "megaman" else recorder.run_dir)
 
 
 def _restart_level() -> None:
@@ -420,6 +485,45 @@ def _restart_level() -> None:
                 core_game.locked_level = active_id.lower()
             if hasattr(core_game, 'load_level'):
                 core_game.load_level()
+    if MEGAMAN_NES:
+        core_game.start_intro()
+
+
+def _megaman_death() -> None:
+    """Play the console's death sequence (halt, puffs, orbs) before anything restarts."""
+    global running
+    while running and core_game.death_tick():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                running = False
+        core_game.render(screen, blit_only=True)
+        pygame.display.flip()
+        clock.tick(args.fps)
+
+
+def _next_life() -> None:
+    """A life lost mid-run: Mega Man restarts from the last restart point he reached with his score;
+    the other games restart the level."""
+    if MEGAMAN_NES:
+        start, score = core_game.checkpoint(), core_game.score
+        core_game.won = False
+        core_game.reset(options={"start": start} if start else None)
+        core_game.score = score
+        core_game.start_intro()
+    else:
+        _restart_level()
+
+
+def _game_over() -> None:
+    """GAME OVER over the last frame for three seconds."""
+    frozen = screen.copy()
+    for _ in range(180):
+        screen.blit(frozen, (0, 0))
+        img = nes_text("GAME OVER", 4)
+        screen.blit(img, ((_view_w() - img.get_width()) // 2, (screen.get_height() - img.get_height()) // 2))
+        pygame.event.pump()
+        pygame.display.flip()
+        clock.tick(args.fps)
 
 
 def _banner(text: str, colour) -> None:
@@ -623,12 +727,14 @@ while running:
         else:
             _, _, terminated, truncated, info = core_game.step(action)
         done = terminated or truncated
-        if recorder:
+        if recorder and not getattr(core_game, "intro", 0):   # READY is not part of the attempt
             recorder.step(action)
         if done:
             break
 
     held = None if args.random else gamepad.held()
+    if input_log and not getattr(core_game, "intro", 0):
+        input_log.log(runs_done + 1, recorder.recorded + 1, held)
     if hasattr(core_game, "debug_manager"):
         core_game.debug_manager.pad_input = held
     core_game.render(screen, blit_only=True)
@@ -647,15 +753,43 @@ while running:
             _draw_timer(attempt_ms, "TIME")
     pygame.display.flip()
 
+    if args.game == "platformer" and (not args.lives or warm_until):
+        core_game.lives = core_game.max_lives          # practice: lives never run out
+
     if info.get("episode_end", False) or done:
+        won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
+        if MEGAMAN_NES and not core_game.alive:
+            _megaman_death()
         if recorder:
-            recorder.end()   # before reset() clears the outcome
-            if args.episodes and recorder.recorded >= args.episodes:
-                running = False
+            recorder.end()   # this life's row, before reset() clears the outcome
         if demo:
             demo.end()
             if args.episodes and demo.attempts_done >= args.episodes:
                 running = False
+        if won and not (level_id or level_file) and not demo:
+            print("[Play] Level cleared: on to the next", flush=True)
+            _restart_level()                           # the regular game: next level, lives kept
+            if recorder:
+                recorder.begin()
+            continue
+        if not won and args.game != "platformer" and args.lives and not warm_until:
+            lives_left -= 1                            # (Mario's core counted its own)
+        run_over = won or bool(demo) or args.game == "platformer" or (args.lives and not warm_until and lives_left <= 0)
+        if not run_over:
+            if running:
+                _next_life()                           # same run, next life
+                if recorder:
+                    recorder.begin()
+            continue
+        runs_done += 1
+        if input_log:
+            input_log.frame = 0                        # frames count from 1 in each run
+        print("[Play] Level cleared" if won else "[Play] Game over", flush=True)
+        if recorder and args.episodes and runs_done >= args.episodes:
+            running = False
+        if not won and not demo and running:
+            _game_over()
+        lives_left = args.lives
         _restart_level()
         attempt_ms = 0
         if recorder:
@@ -663,4 +797,6 @@ while running:
         if demo:
             demo.begin()
 
+if input_log:
+    input_log.close()
 pygame.quit()

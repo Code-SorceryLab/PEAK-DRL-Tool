@@ -772,7 +772,8 @@ def _study_env(mutant: dict | None = None) -> dict:
 
 
 def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant: dict | None = None) -> bool:
-    """Play one recorded attempt on the evaluation level (or its mutant); store it as
+    """Play one recorded run on the evaluation level (or its mutant) with the game's usual 3 lives,
+    a row per life; store it as
     runs/user_study/<participant>/<game>/<phase>/run<run>/episodes.csv. False if none was recorded."""
     import csv
     import tempfile
@@ -788,15 +789,24 @@ def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant
     if found:
         with open(found[0], encoding="utf-8", newline="") as f:
             rows = list(csv.DictReader(f)) if game != "megaman" else episode_log.read(str(found[0]))
+    inputs = found[0].with_name("inputs.csv") if found else None
+    inputs_text = inputs.read_text(encoding="utf-8") if inputs and inputs.exists() else None
     shutil.rmtree(tmp, ignore_errors=True)
     if not rows:
         return False
     rows = [_study_row(r, game, participant, phase, run) for r in rows]
+    result = "cleared" if any(r["status"] == "WON" for r in rows) else "game_over"   # a run ends on either
+    rows = [{**r, "run_result": result, "lives_used": len(rows)} for r in rows]
     if mutant:
         rows = [{**r, "mutant": mutant["id"], "mutant_class": mutant["class"]} for r in rows]
     out = STUDY_DIR / participant / game / phase / f"run{run}" / "episodes.csv"
     episode_log.append(str(out), rows)
-    print(f"    Saved  →  {_CYAN(str(out))}")
+    if inputs_text:                                 # the buttons held each frame, beside the rows
+        log = out.with_name("inputs.csv")
+        with open(log, "a", encoding="utf-8", newline="") as f:
+            f.write(inputs_text if not log.exists() or not log.stat().st_size else inputs_text.split("\n", 1)[1])
+    print(f"    {_GRN('Cleared the level') if result == 'cleared' else _RED('Game over')} "
+          f"({len(rows)} {'life' if len(rows) == 1 else 'lives'})   Saved  →  {_CYAN(str(out))}")
     return True
 
 
@@ -854,7 +864,8 @@ def study_session(ui) -> bool:
                   f"{WARMUP_MINUTES:g} MIN, NOT RECORDED      A  START", size=2) is None:
         return True
     ui.run_game([sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
-                 "--fps", "60", "--quit-after", str(WARMUP_MINUTES)], _study_env())   # counts down on screen, pauses excluded
+                 "--fps", "60", "--quit-after", str(WARMUP_MINUTES),   # counts down on screen, pauses excluded
+                 "--lives", "0"], _study_env())                        # practice: lives never run out
     if _study_attempts(ui, game, participant, "baseline", [None] * BASELINE_RUNS):
         random.shuffle(mutants)             # the participant isn't told which mutant is which
         if _study_attempts(ui, game, participant, "mutation", mutants):
