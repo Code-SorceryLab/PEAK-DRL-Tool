@@ -70,8 +70,9 @@ def list_levels(game: str, include_disabled: bool = False) -> list[str]:
             data = yaml.safe_load(f) or {}
         n = len(data.get("levels") or [])
         if include_disabled:      # disabled entries follow the enabled ones, so ids stay stable
-            n += len(data.get("disabled_levels") or [])
-        return [str(i) for i in range(n)]
+            return [str(i) for i in range(n + len(data.get("disabled_levels") or []))]
+        active = data.get("active_levels")  # only these ids are trained and swept; all stay loadable
+        return [str(i) for i in range(n) if active is None or i in active]
     if game in OWN_LEVEL_FILES:
         with open(os.path.join(games_dir, OWN_LEVEL_FILES[game]), encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}

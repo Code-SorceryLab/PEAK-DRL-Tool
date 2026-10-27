@@ -4,204 +4,247 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEAK Evolution Lab</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2309090b'/><path d='M3 12 L8 4 L13 12' stroke='%23ef4444' stroke-width='2' fill='none'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000000'/><path d='M3 12 L8 4 L13 12' stroke='%23f83800' stroke-width='2' fill='none'/></svg>">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<!-- theme.css styles the page (night tile grid, type, frames, .btn, .label, .num, table.data, .c-*); this only fits Tailwind to it -->
 <style type="text/tailwindcss">
   @layer base {
-    body {
-      @apply bg-[#09090b] text-zinc-300 font-sans antialiased selection:bg-red-500/30 selection:text-red-100 overflow-y-scroll;
-      caret-color: #ef4444;
-    }
-    canvas { image-rendering: pixelated; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { @apply bg-transparent; }
-    ::-webkit-scrollbar-thumb { @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors; }
-    :focus-visible { @apply outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-[#09090b]; }
-
+    body { overflow-y: scroll; }
+    h2 { font-size: 16px; font-weight: 700; }   /* theme.css gives headings the pixel face; Tailwind's reset drops its size */
     select {
-      @apply bg-zinc-900/50 border border-white/10 rounded-md text-zinc-200 px-2 py-1 font-mono text-xs appearance-none cursor-pointer hover:bg-zinc-800/50 transition-colors;
+      appearance: none; cursor: pointer; color: var(--ink); font: 500 13px/1.2 var(--ui);
+      padding: 4px 26px 4px 9px;
+      border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch;
+      background: var(--deck-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0h10v2H0zM2 2h6v2H2zM4 4h2v2H4z' fill='%23bcbcbc'/%3E%3C/svg%3E") no-repeat right 8px center;
+      background-clip: padding-box;
     }
-    kbd {
-      @apply font-mono text-[10px] text-zinc-400 bg-zinc-900 border border-white/10 rounded px-1 py-px leading-none;
-    }
+    select:hover { background-color: var(--deck-3); }
+    option { background: var(--deck); color: var(--ink); }
   }
 
   @layer components {
-    .eyebrow { @apply text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-400; }
     .metric-group { @apply flex flex-col gap-1; }
-    .metric-val { @apply font-mono text-lg font-medium text-zinc-100 tabular-nums; }
-    .btn-sleek {
-      @apply inline-flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold tracking-widest uppercase text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-white/20 transition-colors;
+
+    /* the results ledger is a theme table.data: keep its header pinned and the numbers right-aligned */
+    .table-header { position: sticky; top: 0; z-index: 10; background: var(--deck); }
+    .table-cell { text-align: right; white-space: nowrap; color: var(--dim); }
+
+    .confirm-strip {
+      display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 8px 12px; font-size: 14px;
+      border: 3px solid transparent; border-image: var(--frame-hi) 1 / 3px stretch;
+      background: var(--deck-2); background-clip: padding-box;
     }
-    .btn-sleek.on { @apply bg-zinc-800 text-white border-white/30; }
-    .btn-sleek kbd { @apply text-zinc-500 bg-black/40; }
-    .btn-sleek.on kbd { @apply text-zinc-300; }
-    #b_manual { @apply text-red-400 border-red-500/30; }
-    #b_manual.on { @apply bg-red-500/15 text-red-400 border-red-500/50 hover:bg-red-500/25; }
 
-    .table-header { @apply sticky top-0 bg-[#09090b] z-10 text-left px-3 py-2.5 eyebrow !text-[9px] border-b border-white/10 whitespace-nowrap; }
-    .table-cell { @apply px-3 py-2.5 border-b border-white/5 font-mono text-xs text-zinc-400 text-right tabular-nums whitespace-nowrap group-hover:text-zinc-200 transition-colors; }
+    #h_game { padding: 3px 8px 3px 12px; font: 700 18px/1.2 var(--pixel); text-transform: capitalize; }
+    /* the feed is a black screen in a frame; the script's manual-mode glow is dropped, the frame lights instead */
+    #bezel { background-color: #000; box-shadow: none; }
+    #feedwrap:has(#b_manual[aria-pressed="true"]) #bezel { border-image-source: var(--frame-hi); }
+    #boottext { text-transform: lowercase; }
+    #boottext::first-letter, #sensewho::first-letter, #chartread::first-letter { text-transform: uppercase; }
+    #bootsub span { font-family: var(--code); color: var(--ink); }
+    /* the script's zinc-900 tracks are the panel colour now: raise them so the bars read */
+    #sensors .bg-zinc-900, .spec .bg-zinc-900 { background-color: var(--deck-2); }
 
-    .confirm-strip { @apply flex items-center gap-3 mt-3 px-3 py-2 rounded border border-amber-500/30 bg-amber-500/5 text-xs text-amber-200; }
+    /* markup the script builds: status words arrive in capitals and labels at 9-10px */
+    #f_status, .status-text, #census div span { text-transform: lowercase; }
+    #f_status { font: 600 14px/1 var(--ui); }
+    #connlabel { font: 600 12.5px/1 var(--ui); }
+    #census b { font: 700 18px/1 var(--pixel); font-variant-numeric: tabular-nums; }
+    #census div span { font: 500 12.5px/1.3 var(--ui); color: var(--dim); }
+    #census b.c-WON::before, #census b.c-DEAD::before, #census b.c-STUCK::before {   /* coin, skull, hourglass */
+      content: ""; display: inline-block; height: 14px; margin-right: 5px; vertical-align: -2px;
+      background: center / contain no-repeat; image-rendering: pixelated; }
+    #census b.c-WON::before { aspect-ratio: 1; background-image: var(--i-coin); }
+    #census b.c-DEAD::before { aspect-ratio: 12 / 11; background-image: var(--i-skull); }
+    #census b.c-STUCK::before { aspect-ratio: 10 / 13; background-image: var(--i-hourglass); }
+    #sensors > div:not(.flex) { font: 600 12.5px/1.3 var(--ui); color: var(--dim); }
+    #sensors abbr, #sensors output { font-size: 12px; }
+    .spec .canvas-wrap { border: 3px solid transparent; border-image: var(--frame) 1 / 3px stretch; background-color: #000; box-shadow: none; }
+    .spec.watched .canvas-wrap { border-image-source: var(--frame-hi); }
+    .spec b { font: 700 18px/1 var(--pixel); }
+    .spec .status-text, .spec .nx, .spec .nf { font-size: 12px; }
+    .spec .frozen { font: 600 12px/1.2 var(--ui); }
   }
 
   @layer utilities {
-    .c-RUNNING { @apply text-emerald-400; }
-    .c-STUCK { @apply text-amber-400; }
-    .c-DEAD { @apply text-red-400; }
-    .c-WON { @apply text-sky-400; }
-    .d-RUNNING { @apply bg-emerald-400; }
-    .d-STUCK { @apply bg-amber-400; }
-    .d-DEAD { @apply bg-red-500; }
-    .d-WON { @apply bg-sky-400; }
+    .d-RUNNING { background-color: var(--run); }
+    .d-STUCK { background-color: var(--stuck); }
+    .d-DEAD { background-color: var(--dead); }
+    .d-WON { background-color: var(--won); }
 
     .s-DEAD canvas { filter: grayscale(1) brightness(0.3); }
     .s-STUCK canvas { filter: saturate(0.2) brightness(0.5); }
-    .spec.watched .canvas-wrap { @apply ring-1 ring-red-500/60; }
     .spec.watched .canvas-wrap canvas { @apply opacity-100; }
     .spec .frozen { @apply hidden; }
     body.turbo .spec:not(.watched) .frozen { @apply flex; }
     body.turbo .spec:not(.watched) canvas { @apply opacity-30; }
 
-    .stale .sbar-fill { @apply bg-zinc-800 !important; }
+    .stale .sbar-fill { @apply bg-zinc-700 !important; }
     .stale .sbar-out { @apply text-zinc-600 !important; }
 
     /* offline: numbers are history, not a live reading */
     body.offline .live-num { @apply opacity-40; }
     body.offline #bezel, body.offline #wall { @apply grayscale; }
 
-    @keyframes firstwin { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.7); } 100% { box-shadow: 0 0 0 18px rgba(56,189,248,0); } }
-    .won-flash { animation: firstwin 1.2s cubic-bezier(.16,1,.3,1) 1; }
+    /* the one motion moment: a coin-gold ring stepping out from the feed on the first win */
+    @keyframes firstwin { 0% { box-shadow: 0 0 0 0 rgba(248,216,120,.8); } 100% { box-shadow: 0 0 0 15px rgba(248,216,120,0); } }
+    .won-flash { animation: firstwin 1.2s steps(5) 1; }
   }
 </style>
 <script>
-  tailwind.config = { theme: { extend: { fontFamily: {
-    sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
-    mono: ['JetBrains Mono', 'ui-monospace', 'Cascadia Mono', 'Consolas', 'monospace'],
-  } } } }
+  // Tailwind's colour names, the theme's black and red, so the markup and the classes the script writes keep working.
+  // Hex, not var(), so opacity modifiers (/80) still apply. zinc: neutral greys down to black (900 is the panel
+  // colour, 950 the page); red: the NES reds (500 is --peak); sky is the coin gold (WON); orange-400 (a sensor group
+  // the server sends) is $15 so it stays apart from the red. Case, tracking and corners belong to the theme:
+  // the script's uppercase / tracking-widest / rounded-full do nothing.
+  tailwind.config = {
+    corePlugins: { textTransform: false, letterSpacing: false, borderRadius: false },
+    theme: { extend: {
+      colors: {
+        zinc: { 100: "#ededed", 200: "#e4e4e4", 300: "#d8d8d8", 400: "#cfcfcf", 500: "#a0a0a0",
+                600: "#4a4a4a", 700: "#2e2e2e", 800: "#1c1c1c", 900: "#0e0e0e", 950: "#000000" },
+        red: { 400: "#f87858", 500: "#e0442e", 600: "#c4361f", 900: "#3a0c06", 950: "#3a0c06" },
+        orange: { 400: "#e40058" },
+        amber: { 300: "#fce0a8", 400: "#fca044" },
+        emerald: { 400: "#58d854" },
+        sky: { 400: "#f8d878" },
+      },
+      fontFamily: {
+        sans: ["Barlow", "system-ui", "Segoe UI", "sans-serif"],
+        mono: ["Barlow Semi Condensed", "Barlow", "system-ui", "sans-serif"],
+      },
+    } },
+  };
+  // the game chip wears its game's stripe colour; the page script only ever sets its text
+  addEventListener("DOMContentLoaded", () => {
+    const chip = document.getElementById("h_game");
+    const tint = () => chip.style.setProperty("--stripe", `var(--g-${chip.textContent.trim()}, var(--line))`);
+    new MutationObserver(tint).observe(chip, {childList: true, characterData: true, subtree: true});
+    tint();
+  });
 </script>
 </head>
-<body class="p-4 md:p-8 max-w-[1600px] mx-auto flex flex-col gap-8">
+<body class="p-4 md:p-8 max-w-[1600px] mx-auto flex flex-col gap-6">
 
-  <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/5">
+  <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
 
     <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
-      <h1 class="pr-8 border-r border-white/10 text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-        PEAK <span id="h_game" class="text-red-400 uppercase text-[10px] tracking-widest px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30">mario</span>
+      <h1 class="pr-8 border-r-2 border-zinc-700 flex items-center gap-4">
+        <span class="wordmark">PEAK</span> <span id="h_game" class="frame stripe">mario</span>
       </h1>
 
-      <div class="metric-group items-center pr-8 border-r border-white/10">
-        <span class="eyebrow">Generation</span>
-        <b id="s_gen" class="live-num font-mono text-3xl font-medium text-red-500 leading-none tabular-nums">0</b>
+      <div class="metric-group items-center pr-8 border-r-2 border-zinc-700">
+        <span class="label"><i class="ico dna"></i> Generation</span>
+        <b id="s_gen" class="live-num num text-[36px] text-red-500">0</b>
       </div>
 
-      <div class="flex items-center gap-6">
-        <div class="metric-group"><span class="eyebrow">Level best</span><b class="live-num metric-val text-white" id="s_lvb">–</b></div>
-        <div class="metric-group"><span class="eyebrow">Last gen</span><b class="live-num metric-val" id="s_lgb">–</b></div>
-        <div class="metric-group"><span class="eyebrow">Average</span><b class="live-num metric-val text-zinc-400" id="s_avg">–</b></div>
+      <div class="flex flex-wrap items-center gap-6">
+        <div class="metric-group"><span class="label"><i class="ico star"></i> Level best</span><b class="live-num num text-[18px]" id="s_lvb">–</b></div>
+        <div class="metric-group"><span class="label"><i class="ico up"></i> Last gen</span><b class="live-num num text-[18px]" id="s_lgb">–</b></div>
+        <div class="metric-group"><span class="label">Average</span><b class="live-num num text-[18px] text-zinc-400" id="s_avg">–</b></div>
         <div class="metric-group hidden md:flex" title="Share of the last 10 generations' episodes that reached the goal">
-          <span class="eyebrow">Win rate · 10 gens</span><b class="live-num metric-val text-zinc-400" id="s_wr">–</b></div>
+          <span class="label"><i class="ico coin"></i> Win rate · 10 gens</span><b class="live-num num text-[18px] text-zinc-400" id="s_wr">–</b></div>
         <div class="metric-group hidden sm:flex" title="Simulation steps per second across the whole population">
-          <span class="eyebrow">Steps / s</span><b class="live-num metric-val text-zinc-400" id="s_sps">–</b></div>
+          <span class="label"><i class="ico bolt"></i> Steps / s</span><b class="live-num num text-[18px] text-zinc-400" id="s_sps">–</b></div>
       </div>
     </div>
 
     <div class="flex items-center gap-2 flex-wrap" role="group" aria-label="View toggles">
-      <button id="b_turbo" class="btn-sleek" aria-pressed="false" title="Max speed: only the watched specimen keeps streaming frames">Turbo <kbd>T</kbd></button>
-      <button id="b_sensors" class="btn-sleek on" aria-pressed="true" title="Draw the agent's raycasts on the feed">Sensors <kbd>S</kbd></button>
-      <button id="b_hitboxes" class="btn-sleek" aria-pressed="false" title="Show collision boxes">Hitboxes <kbd>H</kbd></button>
-      <button id="b_grid" class="btn-sleek" aria-pressed="false" title="Show the tile grid">Grid <kbd>G</kbd></button>
+      <button id="b_turbo" class="btn" aria-pressed="false" title="Max speed: only the watched specimen keeps streaming frames"><i class="ico bolt"></i>Turbo <kbd>T</kbd></button>
+      <button id="b_sensors" class="btn on" aria-pressed="true" title="Draw the agent's raycasts on the feed"><i class="ico eye"></i>Sensors <kbd>S</kbd></button>
+      <button id="b_hitboxes" class="btn" aria-pressed="false" title="Show collision boxes">Hitboxes <kbd>H</kbd></button>
+      <button id="b_grid" class="btn" aria-pressed="false" title="Show the tile grid">Grid <kbd>G</kbd></button>
 
-      <div class="flex items-center gap-2 ml-2 pl-4 border-l border-white/5" id="conn" role="status" aria-live="polite">
-        <i class="w-1.5 h-1.5 rounded-full bg-zinc-600 inline-block transition-colors duration-300"></i>
-        <span id="connlabel" class="font-mono text-[10px] tracking-widest uppercase text-zinc-400">Connecting</span>
+      <div class="flex items-center gap-2 ml-2 pl-4 border-l-2 border-zinc-700" id="conn" role="status" aria-live="polite">
+        <i class="w-1.5 h-1.5 bg-zinc-600 inline-block transition-colors duration-300"></i>
+        <span id="connlabel" class="text-zinc-400">Connecting</span>
       </div>
     </div>
   </header>
 
-  <main class="grid grid-cols-1 xl:grid-cols-12 gap-8 lg:gap-12">
+  <main class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
-    <div class="xl:col-span-8 flex flex-col gap-8 min-w-0">
+    <div class="xl:col-span-8 flex flex-col gap-6 min-w-0">
 
       <!-- Watched specimen -->
-      <section id="feedwrap" class="flex flex-col relative">
+      <section id="feedwrap" class="frame flex flex-col relative p-4">
         <div class="flex items-end justify-between mb-3 gap-4 flex-wrap">
-          <div class="flex items-baseline gap-4">
-            <h2 class="eyebrow">Watched specimen</h2>
-            <b id="f_env" class="font-mono text-lg font-medium text-white">#01</b>
-            <b id="f_status" class="font-mono text-[10px] font-bold tracking-widest c-RUNNING" role="status" aria-live="polite">RUNNING</b>
-            <span id="f_firstwin" class="hidden font-mono text-[10px] tracking-widest uppercase text-sky-400">first win · gen <span></span></span>
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <h2><i class="ico eye"></i>Watched specimen</h2>
+            <b id="f_env" class="num text-[18px]">#01</b>
+            <b id="f_status" class="c-RUNNING" role="status" aria-live="polite">RUNNING</b>
+            <span id="f_firstwin" class="hidden banner"><i class="ico coin"></i>First win · gen <span></span></span>
           </div>
-          <button id="b_manual" class="btn-sleek" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD (turbo pauses while you drive; Esc releases)">Take control <kbd>M</kbd></button>
+          <button id="b_manual" class="btn" aria-pressed="false" title="Drive this specimen yourself with arrows / WASD (turbo pauses while you drive; Esc releases)"><i class="ico cursor"></i>Take control <kbd>M</kbd></button>
         </div>
 
-        <div id="bezel" class="relative bg-black rounded-lg overflow-hidden ring-1 ring-white/10 transition-shadow">
+        <div id="bezel" class="frame relative overflow-hidden">
           <canvas id="watch" width="800" height="600" class="w-full h-auto block" role="img" aria-label="Live view of the watched specimen playing the level"></canvas>
-          <div id="boot" class="absolute inset-0 flex flex-col items-center justify-center gap-2 font-mono text-xs font-bold tracking-widest text-zinc-400 bg-black/90 z-10 text-center px-6">
-            <span id="boottext">WAITING FOR TRAINER</span>
-            <span id="bootsub" class="text-[10px] font-normal tracking-wider text-zinc-500 normal-case">Start one from <span class="text-zinc-300">python menu.py</span> → Train, then this page fills in.</span>
+          <div id="boot" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/90 z-10 text-center px-6">
+            <span id="boottext" class="text-[17px] font-semibold">Waiting for trainer</span>
+            <span id="bootsub" class="text-[13.5px] text-zinc-400">Start one from <span class="text-zinc-300">python menu.py</span> → Train, then this page fills in.</span>
           </div>
-          <div id="ribbon" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase bg-red-500/15 text-red-300 border border-red-500/40 rounded whitespace-nowrap">
+          <div id="ribbon" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 frame lit px-4 py-1.5 text-[13px] font-semibold whitespace-nowrap">
             Manual control — arrows / WASD move, space jumps, Esc releases · turbo paused
           </div>
         </div>
 
         <!-- Level progress: the number the whole run is about -->
         <div class="mt-3 flex items-center gap-4" title="How far along the level the watched specimen is; the tick marks the best reach this generation">
-          <div class="flex-1 relative h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
-            <i id="p_fill" class="absolute inset-y-0 left-0 bg-red-500 rounded-full transition-[width] duration-300" style="width:0%"></i>
-            <i id="p_best" class="absolute inset-y-0 w-px bg-sky-400" style="left:0%"></i>
+          <div class="flex-1 relative h-2 bg-zinc-800 overflow-hidden">
+            <i id="p_fill" class="absolute inset-y-0 left-0 bg-red-500 transition-[width] duration-300" style="width:0%"></i>
+            <i id="p_best" class="absolute inset-y-0 w-[3px] bg-sky-400" style="left:0%"></i>
           </div>
-          <b id="p_pct" class="live-num font-mono text-sm font-medium text-white tabular-nums w-16 text-right">0 %</b>
-          <span class="eyebrow hidden sm:inline">of level</span>
+          <b id="p_pct" class="live-num num text-[18px] w-16 text-right">0 %</b>
+          <span class="label hidden sm:inline">of level</span>
         </div>
-        <div id="f_meta" class="mt-2 font-mono text-xs text-zinc-400 tabular-nums flex flex-wrap gap-x-4 gap-y-1">
+        <div id="f_meta" class="mt-2 font-mono text-[13px] text-zinc-400 tabular-nums flex flex-wrap gap-x-4 gap-y-1">
           <span id="m_x_wrap" title="Horizontal position in pixels"><span id="m_x_lbl">x</span> <b class="text-zinc-200" id="m_x">–</b></span>
           <span title="Fitness = distance covered + win / score bonuses">fitness <b class="text-zinc-200" id="m_fit">–</b></span>
           <span title="In-game score">score <b class="text-zinc-200" id="m_score">–</b></span>
           <span title="Coins collected this episode">coins <b class="text-zinc-200" id="m_coins">–</b></span>
           <span title="In-game timer remaining">time <b class="text-zinc-200" id="m_time">–</b></span>
           <span id="m_energy_wrap" class="hidden" title="Energy (life) the watched specimen has left">energy <b class="text-zinc-200" id="m_energy">–</b></span>
-          <span id="m_cause_wrap" class="hidden">ended by <b class="text-red-300" id="m_cause">–</b></span>
+          <span id="m_cause_wrap" class="hidden">ended by <b class="text-red-400" id="m_cause">–</b></span>
         </div>
       </section>
 
       <!-- Population wall -->
-      <section id="wallwrap" class="flex flex-col pt-4 border-t border-white/5">
+      <section id="wallwrap" class="frame flex flex-col p-4">
         <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <div class="flex items-baseline gap-3">
-            <h2 class="eyebrow">Population</h2>
-            <span class="font-mono text-xs text-zinc-400">gen <span id="wallgen" class="text-zinc-200">0</span></span>
-            <span id="turbonote" class="hidden font-mono text-[10px] tracking-widest uppercase text-amber-400">turbo · only the watched specimen streams</span>
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <h2><i class="ico dna"></i>Population</h2>
+            <span class="font-mono text-[13px] text-zinc-400">gen <span id="wallgen" class="text-zinc-200">0</span></span>
+            <span id="turbonote" class="hidden text-[13px] font-semibold text-amber-400">Turbo: only the watched specimen streams</span>
           </div>
-          <div id="census" class="font-mono text-[10px] tracking-widest flex gap-4"></div>
+          <div id="census" class="flex items-baseline gap-3"></div>
         </div>
         <p class="sr-only">Click a specimen to watch it. <kbd>[</kbd> and <kbd>]</kbd> cycle specimens.</p>
         <div id="wall" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" role="group" aria-label="Specimens this generation"></div>
       </section>
 
       <!-- Results ledger -->
-      <section id="resultswrap" class="flex flex-col pt-4 border-t border-white/5">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="eyebrow">Results ledger</h2>
-          <span id="census2" class="font-mono text-[10px] text-zinc-400"></span>
+      <section id="resultswrap" class="frame flex flex-col pb-2">
+        <div class="flex items-center justify-between px-4 pt-4 pb-2">
+          <h2><i class="ico trophy"></i>Results ledger</h2>
+          <span id="census2" class="label"></span>
         </div>
-        <div id="resultsbox" class="max-h-[300px] overflow-auto rounded-lg border border-white/5 bg-[#0a0a0c]">
-          <table id="results" class="w-full border-collapse min-w-[640px]">
+        <div id="resultsbox" class="max-h-[300px] overflow-auto">
+          <table id="results" class="data min-w-[640px]">
             <thead>
               <tr>
                 <th scope="col" class="table-header !pl-4">Gen</th>
                 <th scope="col" class="table-header">Level</th>
-                <th scope="col" class="table-header text-right">Best</th>
-                <th scope="col" class="table-header text-right">Avg</th>
-                <th scope="col" class="table-header text-right" title="Furthest point reached, as a share of the level">Reach</th>
-                <th scope="col" class="table-header text-right">Wins</th>
-                <th scope="col" class="table-header text-right">Stuck</th>
-                <th scope="col" class="table-header text-right">Dead</th>
-                <th scope="col" class="table-header text-right !pr-4">Coins</th>
+                <th scope="col" class="table-header n">Best</th>
+                <th scope="col" class="table-header n">Avg</th>
+                <th scope="col" class="table-header n" title="Furthest point reached, as a share of the level">Reach</th>
+                <th scope="col" class="table-header n">Wins</th>
+                <th scope="col" class="table-header n">Stuck</th>
+                <th scope="col" class="table-header n">Dead</th>
+                <th scope="col" class="table-header n !pr-4">Coins</th>
               </tr>
             </thead>
             <tbody class="text-zinc-300"></tbody>
@@ -210,56 +253,57 @@
       </section>
     </div>
 
-    <div id="side" class="xl:col-span-4 flex flex-col gap-8 min-w-0">
+    <div id="side" class="xl:col-span-4 flex flex-col gap-6 min-w-0">
 
       <!-- Telemetry -->
-      <section id="sensorcard">
-        <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
-          <h2 class="eyebrow">Telemetry</h2>
-          <small id="sensewho" class="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">specimen 01</small>
+      <section id="sensorcard" class="frame p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2><i class="ico gamepad"></i>Telemetry</h2>
+          <small id="sensewho" class="label">specimen 01</small>
         </div>
         <div id="sensors" class="flex flex-col gap-1.5"></div>
       </section>
 
       <!-- Fitness -->
-      <section>
-        <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
-          <h2 class="eyebrow">Fitness trajectory</h2>
-          <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
-            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-red-500"></i> best</span>
-            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-zinc-500"></i> avg</span>
-            <span class="flex items-center gap-1.5"><i class="w-1.5 h-1.5 rounded-full bg-sky-400"></i> first win</span>
+      <section class="frame p-4">
+        <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+          <h2><i class="ico star"></i>Fitness trajectory</h2>
+          <!-- swatches match the colours the chart script draws with -->
+          <div class="flex items-center gap-3 label">
+            <span class="flex items-center gap-1.5"><i class="w-2 h-2 bg-[#ef4444]"></i> Best</span>
+            <span class="flex items-center gap-1.5"><i class="w-2 h-2 bg-[#71717a]"></i> Average</span>
+            <span class="flex items-center gap-1.5"><i class="w-2 h-2 bg-[#f8d878]"></i> First win</span>
           </div>
         </div>
-        <div class="bg-[#0a0a0c] rounded-lg border border-white/5 p-3">
+        <div class="bg-zinc-950 p-3">
           <canvas id="chart" width="680" height="300" class="w-full h-auto block cursor-crosshair" role="img" aria-label="Best and average fitness per generation"></canvas>
-          <div id="chartread" class="mt-2 font-mono text-[10px] text-zinc-400 tabular-nums h-4">hover for a generation's numbers</div>
+          <div id="chartread" class="mt-2 font-mono text-[12.5px] text-zinc-400 tabular-nums h-5">hover for a generation's numbers</div>
         </div>
       </section>
 
       <!-- Run configuration -->
-      <section>
-        <div class="mb-4 pb-2 border-b border-white/5"><h2 class="eyebrow">Run configuration</h2></div>
+      <section class="frame p-4">
+        <div class="mb-4"><h2><i class="ico gear"></i>Run configuration</h2></div>
         <div class="grid grid-cols-2 gap-y-4 gap-x-4">
-          <div class="flex flex-col gap-1"><label for="k_levelsel" class="eyebrow">Level</label><select id="k_levelsel"></select></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-200">real-time</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Network</span><b id="k_hidden" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Population</span><b id="k_pop" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Elite · mutation</span><b class="font-mono text-sm font-medium text-zinc-200"><span id="k_elite">–</span> · <span id="k_mut">–</span></b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Wins this gen</span><b id="k_wins" class="live-num font-mono text-sm font-medium text-sky-400">0</b></div>
-          <div class="flex flex-col gap-1" title="Best fitness across every level this run has trained on"><span class="eyebrow">All-time best</span><b id="k_atb" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
-          <div class="flex flex-col gap-1"><span class="eyebrow">Frames simulated</span><b id="k_frames" class="live-num font-mono text-sm font-medium text-zinc-400">–</b></div>
-          <div class="flex flex-col gap-1" title="Cumulative evolution time, survives --resume"><span class="eyebrow">Train time</span><b id="k_traintime" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><label for="k_levelsel" class="label">Level</label><select id="k_levelsel"></select></div>
+          <div class="flex flex-col gap-1"><span class="label">Mode</span><b id="k_mode" class="font-mono text-sm font-medium text-zinc-200">real-time</b></div>
+          <div class="flex flex-col gap-1"><span class="label">Persona</span><b id="k_persona" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="label">Network</span><b id="k_hidden" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="label">Population</span><b id="k_pop" class="font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="label">Elite · mutation</span><b class="font-mono text-sm font-medium text-zinc-200"><span id="k_elite">–</span> · <span id="k_mut">–</span></b></div>
+          <div class="flex flex-col gap-1"><span class="label">Wins this gen</span><b id="k_wins" class="live-num font-mono text-sm font-medium text-sky-400">0</b></div>
+          <div class="flex flex-col gap-1" title="Best fitness across every level this run has trained on"><span class="label">All-time best</span><b id="k_atb" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
+          <div class="flex flex-col gap-1"><span class="label">Frames simulated</span><b id="k_frames" class="live-num font-mono text-sm font-medium text-zinc-400">–</b></div>
+          <div class="flex flex-col gap-1" title="Cumulative evolution time, survives --resume"><span class="label">Train time</span><b id="k_traintime" class="live-num font-mono text-sm font-medium text-zinc-200">–</b></div>
         </div>
         <div id="levelconfirm" class="confirm-strip hidden" role="alertdialog" aria-labelledby="levelconfirmtext" aria-describedby="levelconfirmtext">
           <span id="levelconfirmtext" class="flex-1">Switch to <b></b> at the next generation? The population carries over.</span>
-          <button id="levelyes" class="btn-sleek !border-amber-500/40 !text-amber-200">Switch</button>
-          <button id="levelno" class="btn-sleek">Keep</button>
+          <button id="levelyes" class="btn">Switch</button>
+          <button id="levelno" class="btn">Keep</button>
         </div>
         <div id="levelpend" class="confirm-strip hidden" role="status" aria-live="polite">
           <span class="flex-1">Switching to <b></b> at generation <em class="not-italic tabular-nums"></em> — this one finishes first.</span>
-          <button id="levelcancel" class="btn-sleek">Cancel</button>
+          <button id="levelcancel" class="btn">Cancel</button>
         </div>
       </section>
     </div>
@@ -269,7 +313,7 @@
 "use strict";
 
 const RAY_COLORS = {0:"rgba(255,255,255,.10)", 1:"#ef4444", 2:"#ec4899"};
-const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(59,130,246,.15)", line:"rgba(59,130,246,.5)"}};
+const TILE_STYLES = {1:{fill:"rgba(239,68,68,.15)", line:"#ef4444"}, 2:{fill:"rgba(248,216,120,.15)", line:"rgba(248,216,120,.5)"}};
 const STATUS = ["RUNNING","STUCK","DEAD","WON"];
 
 const SENSORS = [
@@ -360,7 +404,7 @@ function buildWall(n){
     wall.appendChild(b);
     const pctx = b.querySelector("canvas").getContext("2d");
     pctx.fillStyle = "#09090b"; pctx.fillRect(0, 0, 280, 210);
-    pctx.fillStyle = "#52525b"; pctx.font = "500 12px 'JetBrains Mono', monospace";
+    pctx.fillStyle = "#52525b"; pctx.font = "500 12px 'Barlow Semi Condensed', sans-serif";
     pctx.textAlign = "center"; pctx.fillText("no frame yet", 140, 110);
     specEls.push({el:b, cv:b.querySelector("canvas"), dot:b.querySelector(".dot"), st:b.querySelector(".status-text"),
                   nx:b.querySelector(".nx"), nf:b.querySelector(".nf"), rail:b.querySelector(".rail")});
@@ -445,7 +489,7 @@ function chartGeom(){
 function drawChart(hover){
   const {cv, W, H, max, px, py} = chartGeom(), ctx = cv.getContext("2d");
   ctx.clearRect(0,0,W,H);
-  ctx.font = "400 13px 'JetBrains Mono', monospace";
+  ctx.font = "400 13px 'Barlow Semi Condensed', sans-serif";
   if (history.length < 2){
     ctx.fillStyle = "#71717a"; ctx.textAlign = "center";
     ctx.fillText("two generations in, the curve starts", W/2, H/2);
@@ -490,7 +534,7 @@ function drawChart(hover){
   history.forEach((h,i)=>{
     if (!h[2] || seen.has(h[3])) return;
     seen.add(h[3]);
-    ctx.fillStyle = "#38bdf8"; ctx.beginPath(); ctx.arc(px(i), py(h[0]), 3.5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#f8d878"; ctx.beginPath(); ctx.arc(px(i), py(h[0]), 3.5, 0, 7); ctx.fill();
   });
 
   if (hover !== undefined && history[hover]){
@@ -769,5 +813,6 @@ function connect(){
 }
 connect();
 </script>
+  <div class="bricks" aria-hidden="true"></div>
 </body>
 </html>

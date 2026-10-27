@@ -15,10 +15,12 @@ import argparse
 import base64
 import functools
 import glob
+import itertools
 import json
 import multiprocessing as mp
 import os
 import queue
+import re
 import threading
 import time
 import urllib.parse
@@ -32,14 +34,16 @@ import pygame
 
 from . import relay
 from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, list_levels, make_adapter
-from .balance import BALANCE_DIR, PROBES_ROOT
+from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT
 from .evolution import GAConfig
 from .net import make_net
-from .personas import COLORS, PERSONAS, Hands
+from .personas import PERSONAS, Hands
 from .sensors import read_sensors
 from .trainer import THUMB_SCALE, _encode
 
 GAMES = ["mario", "meatboy", "bomberman"]
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "theme.css"), encoding="utf-8") as _f:
+    COLORS = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", _f.read()))   # the dashboards' persona colours
 ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
 TAG = "p10g40"              # the full sweep's run tag (rays, pop 10, 40 generations)
 FPS = 30
@@ -50,13 +54,15 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 NET_KEYS = ("sensors", "hidden", "action_feedback", "memory")
 
 
-def pick_models(game: str, persona: str, root: str = PROBES_ROOT) -> list[tuple[str, str]]:
-    """[(level, run dir)] in level order: per level, the seed with the best training record.
-    A level without a saved model is left out."""
+def pick_models(game: str, persona: str, root: str = PROBES_ROOT, seeds=PAPER_SEEDS) -> list[tuple[str, str]]:
+    """[(level, run dir)] in level order: per level, the seed (of `seeds`) with the best training
+    record. A level without a saved model is left out."""
+    keep = {str(s) for s in seeds}
     out = []
-    for level in list_levels(game):
-        runs = [s for s in map(relay.run_summary, sorted(glob.glob(os.path.join(root, game, persona, TAG, f"{level}_*"))))
-                if s]
+    for level in list_levels(game, include_disabled=True):  # every level that has trained agents
+        dirs = [d for d in sorted(glob.glob(os.path.join(root, game, persona, TAG, f"{level}_*")))
+                if d.rsplit("_", 1)[-1] in keep]
+        runs = [s for s in map(relay.run_summary, dirs) if s]
         if runs:
             out.append((level, max(runs, key=lambda s: (s["win_rate"], s["best"]))["run"]))
     return out
@@ -121,13 +127,18 @@ class Camera:
             self.since_gain += 1
         if not self.adapter.alive or self.since_gain >= STALL:
             won = bool(getattr(self.adapter, "won", False))
-            self.attempts += 1
-            self.wins += won
-            self.last = "WON" if won else (self.adapter.episode_stats().get("cause") or "Stall")
-            if self.hold:
-                self.hold_left = self.hold
-            else:
-                self._next()
+            self.end_attempt(won, None if won else self.adapter.episode_stats().get("cause"))
+
+    def end_attempt(self, won: bool = False, cause: str | None = None) -> None:
+        """Count the attempt and show its result for `hold` frames; a recording ends an overlong one
+        (code/neuro/wall_video.py) as a stall."""
+        self.attempts += 1
+        self.wins += won
+        self.last = "WON" if won else (cause or "Stall")
+        if self.hold:
+            self.hold_left = self.hold
+        else:
+            self._next()
 
     def _next(self) -> None:
         self.i = (self.i + 1) % len(self.models)
@@ -135,18 +146,31 @@ class Camera:
         self._start()
 
 
+class _Ended(Exception):
+    """Raised inside relay.play to end an attempt early (MegamanCamera.end_attempt)."""
+
+
 class MegamanCamera:
     """The Cut Man stage played as a relay (one network per section). relay.play runs in its own
-    thread and pauses after every frame, so the worker steps it like any other camera."""
+    thread and pauses after every frame, so the worker steps it like any other camera. With
+    `scopes` (section names), it plays one attempt per section from that section's start, in turn,
+    as ast_eval.play_megaman does; `models` then lists them, like a 2D camera's levels."""
 
     game = "megaman"
     persona = PERSONAS["experienced"]
 
-    def __init__(self, manifest: str, stage: str = "CutMan", hold: int = FPS) -> None:
-        self.legs, self.stage, self.hold = relay.load_legs(manifest, stage), stage, hold
+    def __init__(self, manifest: str | None = None, stage: str = "CutMan", hold: int = FPS, legs: list | None = None,
+                 scopes: list[str] | None = None) -> None:
+        """`legs` (one persona's section agents, code/neuro/ast_eval.py persona_legs) replaces the manifest's."""
+        self.legs = legs if legs is not None else relay.load_legs(manifest, stage)
+        self.stage, self.hold, self.persona = stage, hold, self.legs[0].persona
+        self.scopes = list(scopes) if scopes else [stage]
+        if scopes:
+            self.models = self.scopes
         self.wins = self.attempts = self.hold_left = 0
-        self.last, self.level = "", self.legs[0].level
+        self.last, self.level = "", self.scopes[0] if scopes else self.legs[0].level
         self.adapter, self.rays, self.tiles, self.vec = None, [], [], None
+        self._abort = False
         self._go, self._done = threading.Semaphore(0), threading.Semaphore(0)
         threading.Thread(target=self._run, daemon=True).start()
         self._done.acquire()                            # the first frame
@@ -158,17 +182,31 @@ class MegamanCamera:
     def _on_frame(self, adapter, leg, rays, tiles, vec) -> None:
         self.adapter, self.level, self.rays, self.tiles, self.vec = adapter, leg.level, rays, tiles, vec
         self._pause()
+        if self._abort:
+            raise _Ended
 
     def _run(self) -> None:
         seed = 1234
-        while True:
-            e = relay.play(self.legs, self.stage, seed, 18000, STALL, on_frame=self._on_frame)
+        for n in itertools.count():
+            scope = self.scopes[n % len(self.scopes)]
+            use = self.legs if scope == self.stage else [leg for leg in self.legs if leg.level == scope]
+            try:
+                e = relay.play(use, scope, seed, 18000, STALL, on_frame=self._on_frame)
+                won, cause = e["status"] == "WON", e.get("cause") or e["status"]
+            except _Ended:
+                won, cause = False, "Stall"
+            self._abort = False
             self.attempts += 1
-            self.wins += e["status"] == "WON"
-            self.last = "WON" if e["status"] == "WON" else (e.get("cause") or e["status"])
+            self.wins += won
+            self.last = "WON" if won else cause
+            self.level = self.scopes[(n + 1) % len(self.scopes)]   # the next attempt's, once the hold is over
             self.hold_left = self.hold
             seed += 1
             self._pause()
+
+    def end_attempt(self) -> None:
+        """End the attempt on the next step, counted as a stall (a recording's share of frames ran out)."""
+        self._abort = True
 
     def step(self) -> None:
         if self.hold_left:
@@ -357,7 +395,10 @@ async def _serve_ws(wall: Wall, port: int) -> None:
 
     stop = asyncio.get_running_loop().create_future()
     for sig in (signal.SIGTERM, signal.SIGINT):        # wakes the loop even with no page connected
-        asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
+        try:
+            asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
+        except NotImplementedError:                    # Windows: Ctrl+C reaches asyncio.run as KeyboardInterrupt
+            break
     async with websockets.serve(handler, "127.0.0.1", port, max_size=None):
         await stop
 

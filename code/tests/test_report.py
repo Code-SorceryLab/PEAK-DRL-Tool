@@ -51,7 +51,7 @@ def test_indexed_entry_handles_both_entry_shapes():
     Reading only the bare form silently dropped the route/config panels for 6 onward."""
     from code.neuro.report import _indexed_entry, _level_file, _level_grid
     from code.neuro.adapters import list_levels
-    for lvl in list_levels("bomberman"):
+    for lvl in list_levels("bomberman", include_disabled=True):
         entry = _indexed_entry("bomberman", lvl)
         assert entry.get("file", "").endswith(".txt"), f"level {lvl} has no file: {entry}"
         assert _level_file("bomberman", lvl), f"level {lvl} resolved to no path"
@@ -69,3 +69,48 @@ def test_indexed_entry_reaches_disabled_levels_and_rejects_bad_ids():
     assert _indexed_entry("bomberman", str(every)) == {}
     assert _indexed_entry("bomberman", "-1") == {}
     assert _indexed_entry("meatboy", "0").get("file", "").endswith(".txt")   # bare-path game
+
+
+# ── route traces: episodes.csv where a probe kept one, else the cluster's routes.json sample ──
+
+def test_collect_routes_merges_routes_json_and_csv_and_finds_the_fastest_win(tmp_path, monkeypatch):
+    """200-generation probes come back from the cluster with only a compact routes.json; their maps
+    must still show wins, deaths and the fastest win (from best_time_s, or a CSV's smallest elapsed_time)."""
+    import json
+    from code.neuro import report
+    monkeypatch.setattr(report, "PROBES_ROOT", str(tmp_path))
+    probe = tmp_path / "mario" / "novice" / "p10g200"
+    won = [[[0, 400], [100, 380], [200, 400]], [[0, 400], [150, 300], [300, 400]]]
+    lost = [[[0, 400], [40, 410]], [[0, 400], [60, 420], [61, 440]]]
+    for seed, best, t in (("1234", won[0], 31.8), ("2025", won[1], 24.5)):
+        (probe / f"Mario1-1_{seed}").mkdir(parents=True)
+        (probe / f"Mario1-1_{seed}" / "routes.json").write_text(json.dumps(
+            {"level": "Mario1-1", "persona": "novice", "won": won, "lost": lost, "best": best, "best_time_s": t}))
+    routes, best = report._collect_routes("mario", "novice", "Mario1-1", "p10g200")
+    assert [r["p"] for r in routes if r["w"]] == won + won           # wins first, merged over seeds in order
+    assert [r["p"] for r in routes if not r["w"]] == lost + lost
+    assert best == {"p": won[1], "t": 24.5, "seed": "2025"}          # the faster of the two seeds' bests
+
+    # a seed with an episode log is read from it; its quicker win becomes the fastest
+    (probe / "Mario1-1_31337").mkdir()
+    (probe / "Mario1-1_31337" / "episodes.csv").write_text(
+        "persona,game,world,cause_of_death,route,elapsed_time\n"
+        'novice,mario,Mario1-1,Success,"[(0.0, 400.0), (90.4, 350.2)]",20.3\n'
+        'novice,mario,Mario1-1,Pit,"[(0.0, 400.0), (30.0, 470.0)]",3.0\n', encoding="utf-8")
+    routes, best = report._collect_routes("mario", "novice", "Mario1-1", "p10g200")
+    assert sum(r["w"] for r in routes) == 5 and len(routes) == 10
+    assert best == {"p": [[0, 400], [90, 350]], "t": 20.3, "seed": "31337"}
+    assert report._collect_routes("mario", "killer", "Mario1-1", "p10g200") == ([], None)   # nothing on disk
+    assert report._pack([[3, 4], [5, 1], [5, 1]]) == [3, 4, 2, -3, 0, 0]   # what the page embeds: steps
+
+
+def test_mutations_is_a_balance_command_page():
+    """AL: the Command Center and the mutation page are one site: every page's top bar links the
+    Mutations page, and that page carries the same top bar (marked as the current page)."""
+    from code.neuro import report
+    from code.stats import ast_page
+    for page in ("report", "ablation", "gasweep", "instructions"):
+        assert 'href="mutations.html"' in report._nav(["mario"], True, None, page)
+    html = ast_page.render({})                       # no playtests yet: the page still renders
+    assert report._nav([], False, None, "mutations") in html
+    assert 'href="mutations.html" aria-current="page"' in html

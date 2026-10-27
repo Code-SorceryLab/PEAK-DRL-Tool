@@ -1,0 +1,161 @@
+{
+  "game": "meatboy",
+  "stage": "5",
+  "base_file": "meatboy/world1_06_bladecatcher.txt",
+  "mutants": [
+    {
+      "id": "seal_route@5",
+      "game": "meatboy",
+      "stage": "5",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall along row 3, 3 tiles: the goal can no longer be reached",
+      "retrain": true,
+      "base_file": "meatboy/world1_06_bladecatcher.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          18,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          19,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          20,
+          3,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 19,
+        "row": 3
+      },
+      "parameter": {
+        "tiles": 3
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down@5",
+      "game": "meatboy",
+      "stage": "5",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "retrain": true,
+      "base_file": "meatboy/world1_06_bladecatcher.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "jump.jump_vel": 408.0
+      },
+      "parameter": {
+        "key": "jump.jump_vel",
+        "from": 480.0,
+        "to": 408.0
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "jump.jump_vel": 408.0
+        }
+      }
+    },
+    {
+      "id": "off_route@5",
+      "game": "meatboy",
+      "stage": "5",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 16, column 8 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "meatboy/world1_06_bladecatcher.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          8,
+          16,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 8,
+        "row": 16
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@5",
+      "game": "meatboy",
+      "stage": "5",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 0, column 9 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "meatboy/world1_06_bladecatcher.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          9,
+          0,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 9,
+        "row": 0
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "operator": "widen_gap",
+      "reason": "no gap with a ledge on each side and a drop under it"
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "game": "bomberman",
+  "stage": "5",
+  "base_file": "bomberman/06_hidden_exit.txt",
+  "mutants": [
+    {
+      "id": "seal_route@5",
+      "game": "bomberman",
+      "stage": "5",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "Hard walls on the 3 tiles next to the exit close it in",
+      "retrain": true,
+      "base_file": "bomberman/06_hidden_exit.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          10,
+          11,
+          "?",
+          "#"
+        ],
+        [
+          11,
+          10,
+          ".",
+          "#"
+        ],
+        [
+          12,
+          11,
+          "?",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 11,
+        "row": 10
+      },
+      "parameter": {
+        "tiles": 3
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "add_enemy@5",
+      "game": "bomberman",
+      "stage": "5",
+      "section": null,
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Ballom at row 6, column 7",
+      "retrain": true,
+      "base_file": "bomberman/06_hidden_exit.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          7,
+          6,
+          ".",
+          "E"
+        ]
+      ],
+      "location": {
+        "col": 7,
+        "row": 6
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "fuse_down@5",
+      "game": "bomberman",
+      "stage": "5",
+      "section": null,
+      "operator": "fuse_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Bomb fuse 240 -> 150 frames on this level",
+      "retrain": true,
+      "base_file": "bomberman/06_hidden_exit.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "bomb.fuse_frames": 150
+      },
+      "parameter": {
+        "key": "bomb.fuse_frames",
+        "from": 240,
+        "to": 150
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "bomb.fuse_frames": 150
+        }
+      }
+    },
+    {
+      "id": "off_route@5",
+      "game": "bomberman",
+      "stage": "5",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 0, column 0 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "bomberman/06_hidden_exit.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          0,
+          0,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 0,
+        "row": 0
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@5",
+      "game": "bomberman",
+      "stage": "5",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 1, column 2 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "bomberman/06_hidden_exit.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          2,
+          1,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 2,
+        "row": 1
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

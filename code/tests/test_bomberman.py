@@ -9,7 +9,7 @@ from code.games.bomberman_core import BRICK, EXIT, EXIT_HIDDEN, POWERUPS, WALL, 
 from code.neuro.adapters import N_INPUTS_BY_GAME, list_levels, make_adapter
 from code.neuro.sensors import read_sensors, sensor_dim
 
-LEVELS = list_levels("bomberman")
+LEVELS = [str(i) for i in range(len(BombermanCore(render_mode="none").cfg["levels"]))]  # the whole ladder, not just the active level
 LEGAL = set("#.?GE kKMB") | set(POWERUPS) | {EXIT_HIDDEN}
 
 

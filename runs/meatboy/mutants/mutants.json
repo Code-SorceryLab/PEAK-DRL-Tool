@@ -1,0 +1,258 @@
+{
+  "game": "meatboy",
+  "stage": "2",
+  "base_file": "meatboy/world1_03_the_gap.txt",
+  "mutants": [
+    {
+      "id": "seal_route",
+      "game": "meatboy",
+      "stage": "2",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall down column 28, rows 6-10, from the ceiling to the floor just before the goal: the goal is closed in",
+      "retrain": true,
+      "base_file": "meatboy/world1_03_the_gap.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          28,
+          6,
+          ".",
+          "#"
+        ],
+        [
+          28,
+          7,
+          ".",
+          "#"
+        ],
+        [
+          28,
+          8,
+          ".",
+          "#"
+        ],
+        [
+          28,
+          9,
+          ".",
+          "#"
+        ],
+        [
+          28,
+          10,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 28,
+        "row": 8
+      },
+      "parameter": {
+        "tiles": 5
+      },
+      "note": "Spec: column 33, rows 0-8, on the June layout. Column 28 is the last one before the goal and meets the roof at row 5, so no wall jump can climb over it.",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap",
+      "game": "meatboy",
+      "stage": "2",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The take-off side of the gap cut back by 2 tiles in every floor row: 12 tiles -> 14 at the surface",
+      "retrain": true,
+      "base_file": "meatboy/world1_03_the_gap.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          5,
+          14,
+          "#",
+          "."
+        ],
+        [
+          5,
+          15,
+          "#",
+          "."
+        ],
+        [
+          6,
+          13,
+          "#",
+          "."
+        ],
+        [
+          6,
+          14,
+          "#",
+          "."
+        ],
+        [
+          6,
+          15,
+          "#",
+          "."
+        ],
+        [
+          7,
+          12,
+          "#",
+          "."
+        ],
+        [
+          7,
+          13,
+          "#",
+          "."
+        ],
+        [
+          8,
+          11,
+          "#",
+          "."
+        ],
+        [
+          8,
+          12,
+          "#",
+          "."
+        ],
+        [
+          9,
+          11,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 7,
+        "row": 12
+      },
+      "parameter": {
+        "tiles": 10
+      },
+      "note": "Spec: columns 12-13, rows 9-13 (gap 14 -> 16) on the June layout. Here the gap's left wall steps out one tile per row, so each row loses the 2 tiles next to the gap.",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down",
+      "game": "meatboy",
+      "stage": "2",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "retrain": true,
+      "base_file": "meatboy/world1_03_the_gap.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "jump.jump_vel": 408.0
+      },
+      "parameter": {
+        "key": "jump.jump_vel",
+        "from": 480.0,
+        "to": 408.0
+      },
+      "note": "The spec edits meatboy_config.yaml and reverts it; the mutant sets the value only in the process that plays it, so the shared config never changes.",
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "jump.jump_vel": 408.0
+        }
+      }
+    },
+    {
+      "id": "off_route",
+      "game": "meatboy",
+      "stage": "2",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The floor tile at row 12, column 5 hollowed out, under the start ledge and closed on all four sides",
+      "retrain": true,
+      "base_file": "meatboy/world1_03_the_gap.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          5,
+          12,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 5,
+        "row": 12
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "The spec's cell. On this layout it lies 1 tile under the surface (3 on the June one); the agents' rays and pit probe stop at the first solid tile, so they never reach it.",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile",
+      "game": "meatboy",
+      "stage": "2",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The air cell at row 0, column 6 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "meatboy/world1_03_the_gap.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          6,
+          0,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 6,
+        "row": 0
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "Spec: row 0, column 0, a wall tile on this layout. Column 6 is the top row's first air cell.",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

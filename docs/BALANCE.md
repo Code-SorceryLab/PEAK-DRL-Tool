@@ -38,8 +38,8 @@ probes.*
    own group. First sweep (2026-08-20, 2 games × 3 personas × 23 configs, 32.6 h): capacity flat
    in 6/6, anneal 0.5 > 0.8 in 6/6 (now the default), pop 100 worse in 6/6, elite 6 / σ 0.02 /
    crossover 0 hurt Meat Boy, memory units and action feedback help only the sprinting persona.
-3. **Report** — `python -m code.neuro.report --open` renders every game's JSON into one
-   self-contained page, `runs/balance/report.html`: ranked difficulty table, death-location
+3. **Report:** `python -m code.neuro.command_center --open` renders every game's JSON into the
+   Command Center, `runs/site/index.html` (its Balance tab): ranked difficulty table, death-location
    heatmaps, failure-mode bars, per-seed fitness curves. Menu [12] opens it; [13], [14] and [15] offer to.
 
 ## The metric table
@@ -320,10 +320,10 @@ The trainer also skips all frame JPEG encoding while no dashboard tab is connect
 `runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` (sensor ablation: `runs/ablation/…`, GA sweep:
 `runs/gasweep/…`) where `tag = p<pop_size>g<gens>[_grid]` (e.g. `p10g40`),
 so different personas, population sizes, and generation budgets never overwrite each other;
-re-probing a level with the same config replaces just that level. The Balance Command
-(`python -m code.neuro.report --open`, menu 12) re-aggregates every probe on disk into
-`runs/balance/report_<game>_<persona>_<tag>.json` each time it opens — no finished sweep
-needed — and renders one section per (game, tag). Each probe cell records `best_gen`
+re-probing a level with the same config replaces just that level. The Command Center
+(`python -m code.neuro.command_center --open`, menu 12) reads the committed
+`runs/balance/report_<game>_<persona>_<tag>.json` files (each probe run writes its own, paper
+seeds only) and renders one section per (game, tag). Each probe cell records `best_gen`
 (generation the record genome appeared), `improvement_rate` (slope of best progress per
 generation until the peak, as a share of the level), win-time std, and wall-clock train time;
 a `STUCK` episode counts as the `Stall` cause alongside Enemy/Pit/Saw/Spike.

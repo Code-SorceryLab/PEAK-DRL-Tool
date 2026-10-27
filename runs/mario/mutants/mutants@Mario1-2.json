@@ -1,0 +1,198 @@
+{
+  "game": "mario",
+  "stage": "Mario1-2",
+  "base_file": "platformer/world1_2.txt",
+  "mutants": [
+    {
+      "id": "seal_route@Mario1-2",
+      "game": "mario",
+      "stage": "Mario1-2",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A wall along column 167, 8 tiles: the goal can no longer be reached",
+      "retrain": true,
+      "base_file": "platformer/world1_2.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          167,
+          0,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          2,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          3,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          5,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          6,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          7,
+          ".",
+          "#"
+        ],
+        [
+          167,
+          8,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 167,
+        "row": 5
+      },
+      "parameter": {
+        "tiles": 8
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap@Mario1-2",
+      "game": "mario",
+      "stage": "Mario1-2",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The gap at row 1, columns 1-5, widened by 2 to the right: 5 tiles -> 7",
+      "retrain": true,
+      "base_file": "platformer/world1_2.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          6,
+          1,
+          "=",
+          "."
+        ],
+        [
+          7,
+          1,
+          "=",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 7,
+        "row": 1
+      },
+      "parameter": {
+        "tiles": 2
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "jump_velocity_down@Mario1-2",
+      "game": "mario",
+      "stage": "Mario1-2",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: take-off -495 -> -420.75 px/s, the cap -800 -> -680",
+      "retrain": true,
+      "base_file": "platformer/world1_2.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "player.jump.min_velocity": -420.75,
+        "player.jump.max_velocity": -680.0
+      },
+      "parameter": {
+        "key": "player.jump.min_velocity",
+        "from": -495.0,
+        "to": -420.75
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "player.jump.min_velocity": -420.75,
+          "player.jump.max_velocity": -680.0
+        }
+      }
+    },
+    {
+      "id": "cosmetic_tile@Mario1-2",
+      "game": "mario",
+      "stage": "Mario1-2",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 0, column 0 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "platformer/world1_2.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          0,
+          0,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 0,
+        "row": 0
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "operator": "off_route",
+      "reason": "no solid tile closed on all four sides"
+    }
+  ]
+}

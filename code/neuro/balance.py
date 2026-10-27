@@ -36,6 +36,8 @@ from .sensors import SENSOR_MODES
 
 PROBES_ROOT = os.path.join("runs", "probes")
 ABLATION_ROOT = os.path.join("runs", "ablation")  # sensor-ablation probes never mix with the real sweeps
+# The seeds behind every published number; runs/probes also holds 300 older runs with seeds 1, 3, 8, 7689798
+PAPER_SEEDS = (1234, 2025, 31337)
 BALANCE_DIR = os.path.join("runs", "balance")
 
 # two-sided 95% t critical values for small n (paper used the same approach)
@@ -344,9 +346,10 @@ def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR, pref
     return format_compare(by_mode, game)
 
 
-def load_probe_cells(game: str, persona: str, tag: str,
-                     root: str = PROBES_ROOT) -> dict[str, list[dict]]:
-    """Re-summarize every probe dir under one (game, persona, tag) from its state.json."""
+def load_probe_cells(game: str, persona: str, tag: str, root: str = PROBES_ROOT,
+                     seeds=None) -> dict[str, list[dict]]:
+    """Re-summarize every probe dir under one (game, persona, tag) from its state.json; with
+    `seeds`, only the dirs trained with one of them."""
     cells: dict[str, list[dict]] = {}
     for sp in sorted(glob.glob(os.path.join(root, game, persona, tag, "*", "state.json"))):
         try:
@@ -358,6 +361,8 @@ def load_probe_cells(game: str, persona: str, tag: str,
         if not hist:
             continue
         cfg = st.get("config", {})
+        if seeds is not None and int(cfg.get("seed", 0)) not in {int(s) for s in seeds}:
+            continue
         cell = summarize(hist, int(cfg.get("pop_size", 10)), str(hist[-1].get("level")),
                          int(cfg.get("seed", 0)), float(st.get("best_fitness", 0.0)),
                          int(st.get("best_gen", 0)))
@@ -377,9 +382,9 @@ def load_probe_cells(game: str, persona: str, tag: str,
 
 
 def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
-                 root: str = PROBES_ROOT, prefix: str = "report") -> str | None:
-    """Aggregate one (game, persona, tag) probe set into <out_dir>/<prefix>_*.json."""
-    cells = load_probe_cells(game, persona, tag, root)
+                 root: str = PROBES_ROOT, prefix: str = "report", seeds=None) -> str | None:
+    """Aggregate one (game, persona, tag) probe set into <out_dir>/<prefix>_*.json (only `seeds`, if given)."""
+    cells = load_probe_cells(game, persona, tag, root, seeds)
     if not cells:
         return None
     parsed = _parse_tag(tag) or (next(iter(cells.values()))[0]["pop_size"], 0)
@@ -404,14 +409,14 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
 def rebuild(out_dir: str = BALANCE_DIR) -> list[str]:
     """Regenerate every report JSON from the probe dirs on disk (new layout only)."""
     written = []
-    for root, prefix in ((PROBES_ROOT, "report"), (ABLATION_ROOT, "ablation")):
+    for root, prefix, seeds in ((PROBES_ROOT, "report", PAPER_SEEDS), (ABLATION_ROOT, "ablation", None)):
         for d in sorted(glob.glob(os.path.join(root, "*", "*", "p*g*"))):
             tag = os.path.basename(d)
             persona = os.path.basename(os.path.dirname(d))
             game = os.path.basename(os.path.dirname(os.path.dirname(d)))
             if _parse_tag(tag) is None:
                 continue
-            path = write_report(game, persona, tag, out_dir, root=root, prefix=prefix)
+            path = write_report(game, persona, tag, out_dir, root=root, prefix=prefix, seeds=seeds)
             if path:
                 written.append(path)
     return written
@@ -439,8 +444,12 @@ def main() -> None:
                     help="regenerate report JSONs from runs/probes and exit (no training)")
     ap.add_argument("--ablation", action="store_true",
                     help="sensor-ablation arm: probes under runs/ablation, JSONs as ablation_*.json")
+    ap.add_argument("--root", default=None,
+                    help="where the probes go (default runs/probes); agents trained on a mutant "
+                         "go under runs/ast/<game>/<mutant>/probes (code/neuro/ast_eval.py)")
     args = ap.parse_args()
     root, prefix = (ABLATION_ROOT, "ablation") if args.ablation else (PROBES_ROOT, "report")
+    root = args.root or root
 
     if args.rebuild:
         for path in rebuild(args.out):
@@ -483,7 +492,10 @@ def main() -> None:
 
     # The probe dirs are the source of truth: re-aggregate everything under this config,
     # so earlier levels probed with the same config stay and re-probed levels are replaced.
-    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix)
+    # the published sweep keeps every paper seed on disk (a one-seed re-run must not drop the others);
+    # other roots keep whatever seeds they hold
+    out_path = write_report(args.game, persona.name, tag, args.out, root=root, prefix=prefix,
+                            seeds=PAPER_SEEDS if root == PROBES_ROOT else None)
     with open(out_path, encoding="utf-8") as f:
         rows = json.load(f)["levels"]
     print("\n" + format_report([r for r in rows if r["level"] in levels], args.game), flush=True)

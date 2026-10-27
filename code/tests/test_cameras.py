@@ -27,9 +27,10 @@ def _run(root, game, persona, level, seed, wins, max_frames=3600):
 
 def test_each_level_plays_its_best_seed_and_a_level_without_a_model_is_skipped(tmp_path):
     root = str(tmp_path)
-    _run(root, "mario", "clumsy", "Mario1-1", 1, wins=1)
-    best = _run(root, "mario", "clumsy", "Mario1-1", 2, wins=7)
-    _run(root, "mario", "clumsy", "Mario1-1", 3, wins=0)
+    _run(root, "mario", "clumsy", "Mario1-1", 1234, wins=1)       # the wall plays the paper seeds only
+    best = _run(root, "mario", "clumsy", "Mario1-1", 2025, wins=7)
+    _run(root, "mario", "clumsy", "Mario1-1", 31337, wins=0)
+    _run(root, "mario", "clumsy", "Mario1-1", 8, wins=9)           # a stray seed: never picked
     assert pick_models("mario", "clumsy", root) == [("Mario1-1", best)]   # Mario1-2 has no model
     assert pick_models("mario", "novice", root) == []
 
@@ -37,7 +38,7 @@ def test_each_level_plays_its_best_seed_and_a_level_without_a_model_is_skipped(t
 def test_the_camera_loops_through_the_levels(tmp_path):
     root = str(tmp_path)
     for level in ("Mario1-1", "Mario1-2"):
-        _run(root, "mario", "experienced", level, 1, wins=1, max_frames=20)
+        _run(root, "mario", "experienced", level, 1234, wins=1, max_frames=20)
     cam = Camera("mario", "experienced", pick_models("mario", "experienced", root), hold=0)
     seen = [cam.level]
     for _ in range(200):
@@ -50,7 +51,7 @@ def test_the_camera_loops_through_the_levels(tmp_path):
 
 def test_a_frame_carries_the_picture_and_for_the_watched_camera_the_rays(tmp_path):
     root = str(tmp_path)
-    _run(root, "mario", "experienced", "Mario1-1", 1, wins=1)
+    _run(root, "mario", "experienced", "Mario1-1", 1234, wins=1)
     cam = Camera("mario", "experienced", pick_models("mario", "experienced", root))
     for _ in range(5):
         cam.step()

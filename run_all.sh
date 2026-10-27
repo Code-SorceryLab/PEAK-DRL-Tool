@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PEAK runs: ./run_all.sh sweeps | megaman | test   (inside a Slurm job, or locally: WORKERS=4 ./run_all.sh ...)
+# PEAK runs: ./run_all.sh sweeps | megaman | ast-megaman | test   (inside a Slurm job, or locally: WORKERS=4 ./run_all.sh ...)
 cd "$(dirname "$0")"
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
 PY=.venv/bin/python; [[ -x $PY ]] || PY=.venv/Scripts/python.exe  # Windows venv layout
@@ -34,7 +34,7 @@ sweeps() {
     $PY -m code.neuro.gasweep --game $g --persona $p --gens $GENS --seeds "${SEEDS[@]}" --workers $W --sensors rays --confirm
     stamp "END gasweep $g $p rc=$?"
   done; done
-  $PY -m code.neuro.report
+  $PY -m code.neuro.command_center
   stamp "ALL DONE"
 }
 
@@ -54,6 +54,20 @@ megaman() {
   stamp "MM ALL DONE"
 }
 
+ast_megaman() {  # one Slurm array task (--array=0-$((19 * personas - 1))): a persona's section of base-retrained or a Mega Man mutant
+  local tasks=() p v s
+  for p in "${PERSONAS[@]}"; do
+    for v in base-retrained m-jump_velocity_down; do for s in "${SECTIONS[@]}"; do tasks+=("$p $v $s"); done; done
+    for v in s3-seal_route s3-widen_gap s3-off_route; do tasks+=("$p $v CutMan-3-Ledges"); done
+  done
+  local id=${SLURM_ARRAY_TASK_ID:?run it as an array task}
+  (( id < ${#tasks[@]} )) || { echo "task $id: there are only ${#tasks[@]} (0-$(( ${#tasks[@]} - 1 )))"; exit 2; }
+  set -- ${tasks[$id]}
+  stamp "START ast megaman $*"
+  $PY -m code.neuro.ast_eval retrain --game megaman --persona "$1" --mutant "$2" --level "$3" --workers $W
+  stamp "END ast megaman $* rc=$?"
+}
+
 smoke() {  # a few minutes: proves the install, the personas and Mega Man work on this machine
   $PY -m pytest code/tests -q -p no:debugging || exit 1
   GENS=5; SEEDS=(1234)
@@ -64,6 +78,6 @@ smoke() {  # a few minutes: proves the install, the personas and Mega Man work o
 }
 
 case "$1" in
-  sweeps) sweeps ;; megaman) megaman ;; test) smoke ;;
-  *) echo "usage: $0 sweeps|megaman|test"; exit 2 ;;
+  sweeps) sweeps ;; megaman) megaman ;; ast-megaman) ast_megaman ;; test) smoke ;;
+  *) echo "usage: $0 sweeps|megaman|ast-megaman|test"; exit 2 ;;
 esac
