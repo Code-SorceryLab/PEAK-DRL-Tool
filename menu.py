@@ -694,7 +694,7 @@ def train_all_personas():
     def run_args(game, persona, seed):
         run_dir = _run_dir(game, None, persona, "rays", f"curriculum_seed{seed}")
         cmd = _trainer_cmd(game, None, gens, turbo=True, serve=workers == 1, run_dir=run_dir,
-                           extra=("--persona", persona, "--seed", seed))
+                           extra=("--persona", persona, "--seed", seed, "--best"))  # GA-sweep config per game
         return f"{game} | {persona} | seed {seed} | all levels", cmd, run_dir
 
     if workers > 1:

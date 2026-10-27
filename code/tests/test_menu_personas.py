@@ -19,6 +19,7 @@ def test_train_all_personas_runs_one_curriculum_per_game_and_persona(monkeypatch
     for cmd, (game, persona) in zip(cmds, [("mario", "novice"), ("mario", "clumsy"),
                                            ("meatboy", "novice"), ("meatboy", "clumsy")]):
         assert "--level" not in cmd                        # no level: the trainer walks them all, nets carry over
+        assert "--best" in cmd                             # the GA sweep's recommended config for the game
         assert cmd[cmd.index("--game") + 1] == game and cmd[cmd.index("--persona") + 1] == persona
         assert cmd[cmd.index("--seed") + 1] == "7" and cmd[cmd.index("--gens") + 1] == "800"
         assert cmd[cmd.index("--run-dir") + 1].endswith(f"{game}_{persona}_curriculum_seed7")

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pygame
+from pygame._sdl2 import controller as sdl_controller
 
 os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
 
@@ -72,12 +73,13 @@ def _platformer_action(keys) -> list:
       fire : 0=idle  1=fire   (Z key)
     """
     k = pygame.key.get_pressed()
+    px, _, pjump, pfire, prun = _pad_state()
 
-    left  = k[pygame.K_a]
-    right = k[pygame.K_d]
-    jump  = k[pygame.K_SPACE] or k[pygame.K_w]
-    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
-    fire  = k[pygame.K_z]
+    left  = k[pygame.K_a] or px < 0
+    right = k[pygame.K_d] or px > 0
+    jump  = k[pygame.K_SPACE] or k[pygame.K_w] or pjump
+    run   = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j] or prun
+    fire  = k[pygame.K_z] or pfire
 
     if left and right:
         move = 0                        # cancel out
@@ -96,12 +98,13 @@ def _sonic_action(keys) -> list:
     Return a Sonic action [move, jump, down].
     """
     k = pygame.key.get_pressed()
+    px, py, pjump, _, prun = _pad_state()
 
-    left = k[pygame.K_a]
-    right = k[pygame.K_d]
-    jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP]
-    run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j]
-    down = k[pygame.K_s] or k[pygame.K_DOWN]
+    left = k[pygame.K_a] or px < 0
+    right = k[pygame.K_d] or px > 0
+    jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP] or pjump
+    run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j] or prun
+    down = k[pygame.K_s] or k[pygame.K_DOWN] or py > 0
 
     if left and right:
         move = 0
@@ -118,45 +121,59 @@ def _sonic_action(keys) -> list:
 def _bomberman_action(keys) -> list:
     """[dx, dy, bomb] — arrows / WASD move, SPACE (or Z) drops a bomb."""
     k = pygame.key.get_pressed()
-    dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT])
-    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP])
-    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z]))]
+    px, py, pjump, pfire, _ = _pad_state()
+    dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
+    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
+    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z] or pjump or pfire))]
+
+
+def _meatboy_action(keys) -> list:
+    """[move, run, jump] from the controller only — MeatboyPlayer adds the keyboard itself in human mode."""
+    px, _, pjump, _, prun = _pad_state()
+    return [{-1: 1, 1: 2}.get(px, 0), int(prun), int(pjump)]
 
 
 _pad = None                      # the first connected game controller, if any
-PAD_JUMP = (0,)                  # DualSense on Linux: 0 Cross, 1 Circle, 2 Triangle, 3 Square
-PAD_FIRE = (1, 3)
+# SDL's GameController layout gives every common pad (Xbox, PlayStation, Switch, 8BitDo...) Xbox-style
+# names: A is Cross on a PlayStation pad, B is Circle, X is Square.
+PAD_JUMP = (pygame.CONTROLLER_BUTTON_A,)
+PAD_FIRE = (pygame.CONTROLLER_BUTTON_B,)
+PAD_RUN = (pygame.CONTROLLER_BUTTON_X, pygame.CONTROLLER_BUTTON_RIGHTSHOULDER)
 PAD_DEADZONE = 0.5
 
 
 def _open_pad() -> None:
     """(Re)open the first controller; called at start and whenever one is plugged or unplugged."""
     global _pad
-    pygame.joystick.init()
-    _pad = pygame.joystick.Joystick(0) if pygame.joystick.get_count() else None
+    sdl_controller.init()
+    idx = next((i for i in range(sdl_controller.get_count()) if sdl_controller.is_controller(i)), None)
+    # shortcut: a pad missing from SDL's mapping database is ignored, add a raw-joystick fallback if one turns up
+    _pad = sdl_controller.Controller(idx) if idx is not None else None
     if _pad:
-        print(f"[Play] Controller: {_pad.get_name()} (stick / d-pad move, Cross jump, Square or Circle fire)")
+        print(f"[Play] Controller: {_pad.name} (stick / d-pad move, A/Cross jump, B/Circle fire, "
+              f"X/Square or RB run; Mega Man fires with X/Square too)")
 
 
-def _pad_state() -> tuple[int, int, bool, bool]:
-    """(dx, dy, jump, fire) from the controller: left stick or d-pad, plus the face buttons."""
+def _pad_state() -> tuple[int, int, bool, bool, bool]:
+    """(dx, dy, jump, fire, run) from the controller: left stick or d-pad, plus the face buttons."""
     if _pad is None:
-        return 0, 0, False, False
-    x, y = _pad.get_axis(0), _pad.get_axis(1)
-    dx = (x > PAD_DEADZONE) - (x < -PAD_DEADZONE)
-    dy = (y > PAD_DEADZONE) - (y < -PAD_DEADZONE)
-    if _pad.get_numhats():
-        hx, hy = _pad.get_hat(0)
-        dx, dy = hx or dx, -hy or dy             # the hat's y points up
-    held = lambda ids: any(b < _pad.get_numbuttons() and _pad.get_button(b) for b in ids)
-    return dx, dy, held(PAD_JUMP), held(PAD_FIRE)
+        return 0, 0, False, False, False
+    held = lambda ids: any(_pad.get_button(b) for b in ids)
+    x = _pad.get_axis(pygame.CONTROLLER_AXIS_LEFTX) / 32767
+    y = _pad.get_axis(pygame.CONTROLLER_AXIS_LEFTY) / 32767
+    dx = (held((pygame.CONTROLLER_BUTTON_DPAD_RIGHT,)) - held((pygame.CONTROLLER_BUTTON_DPAD_LEFT,))
+          or (x > PAD_DEADZONE) - (x < -PAD_DEADZONE))
+    dy = (held((pygame.CONTROLLER_BUTTON_DPAD_DOWN,)) - held((pygame.CONTROLLER_BUTTON_DPAD_UP,))
+          or (y > PAD_DEADZONE) - (y < -PAD_DEADZONE))
+    return dx, dy, held(PAD_JUMP), held(PAD_FIRE), held(PAD_RUN)
 
 
 def _megaman_action(keys) -> list:
     """[dx, dy, jump, fire] — arrows / WASD move and climb, SPACE jumps, Z (or J) fires;
     a controller works alongside the keyboard."""
     k = pygame.key.get_pressed()
-    px, py, pjump, pfire = _pad_state()
+    px, py, pjump, pfire, prun = _pad_state()
+    pfire = pfire or prun                        # no run in Mega Man: Square / X fires as well
     dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
     dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
     return [dx, dy, int(bool(k[pygame.K_SPACE]) or pjump), int(bool(k[pygame.K_z] or k[pygame.K_j]) or pfire)]
@@ -168,7 +185,7 @@ ACTION_MAPPING = {
     "megaman": _megaman_action,
     "mario": _platformer_action,
     "sonic": _sonic_action,
-    "meatboy": lambda k: [0, 0, 0],   # MeatboyPlayer reads the keyboard itself in human mode
+    "meatboy": _meatboy_action,
 }
 
 _IDLE = {"megaman": [0, 0, 0, 0]}
@@ -203,7 +220,6 @@ elif args.game == "megaman":
     env_kwargs = {"level": level_id} if level_id else {"level": "CutMan"}   # default: the whole stage
     if True:
         env_kwargs["invincible"] = args.invincible
-        _open_pad()
     if args.game == "megaman" and level_file:
         env_kwargs["level_file"] = level_file   # the core loads an unlisted file itself
         print(f"[Play] Loaded editor file: {Path(level_file).name}")
@@ -216,6 +232,7 @@ elif args.game == "sonic":
 if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
 
+_open_pad()
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
     core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
@@ -244,7 +261,7 @@ if level_file and args.game != "megaman":
     print(f"[Play] Loaded editor file: {fp.name} as '{TEMP_ID}'")
 
 # ── Recording: the same per-episode row an agent run writes ──────
-JUMP_IDX = {"bomberman": 2, "megaman": 2}   # where "jump" (bomberman: bomb) sits in the action
+JUMP_IDX = {"bomberman": 2, "megaman": 2, "meatboy": 2}   # where "jump" (bomberman: bomb) sits in the action
 
 
 class _Recorder:
@@ -275,11 +292,10 @@ class _Recorder:
             self.best_cost = self.start_cost
 
     def step(self, action) -> None:
+        jump = bool(action[JUMP_IDX.get(args.game, 1)])
         if args.game == "meatboy" and not args.random:   # MeatboyPlayer reads the keyboard itself
             k = pygame.key.get_pressed()
-            jump = bool(k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP])
-        else:
-            jump = bool(action[JUMP_IDX.get(args.game, 1)])
+            jump = jump or bool(k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP])
         self.jumps += int(jump and not self.prev_jump)
         self.prev_jump = jump
         self.frames += 1
@@ -466,7 +482,7 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             running = False
-        elif args.game == "megaman" and event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
+        elif event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
             _open_pad()
         elif args.game == "megaman" and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             core_game.invincible = not core_game.invincible
