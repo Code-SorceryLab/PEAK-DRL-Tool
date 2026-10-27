@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -119,11 +120,9 @@ def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, 
             w.writerow({"world": "Mario1-1", "cause_of_death": "Pit", "route": "[(1.0, 2.0)]", "elapsed_time": 3})
 
     monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
-    monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
-    monkeypatch.setattr(menu, "pick_one", lambda *a, **k: "mario")
-    monkeypatch.setattr("builtins.input", lambda *a: "P1" if "Participant" in a[0] else "")
-    monkeypatch.setattr(menu.subprocess, "run", fake_run)
-    menu.run_user_study()
+    popup = SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=lambda *a, **k: 0,   # A on every screen
+                            run_game=lambda cmd, env: fake_run(cmd, env=env))
+    menu.study_session(popup)
     ids = {m["dir"]: m["id"] for m in eval_set("mario")}
     assert played[:3] == [None] * 3                        # baseline: the unchanged level
     assert sorted(played[3:]) == sorted(ids) and len(played) == 8

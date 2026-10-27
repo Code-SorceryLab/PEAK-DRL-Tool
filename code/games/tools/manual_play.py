@@ -11,6 +11,7 @@ import pygame
 
 from code.games.modules.System.debugging_mods.overlays import PAD_W, draw_nes_pad
 from code.games.tools import gamepad
+from code.games.modules.System import music
 from code.games.modules.System.nes_font import nes_text
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
@@ -530,6 +531,7 @@ if warm_until:
     print(f"[Play] Warm-up: {args.warmup:g} min, not recorded", flush=True)
 else:
     _start_recording()
+music.play(args.game)
 running = True
 random_action = _random_action()
 frame = 0
