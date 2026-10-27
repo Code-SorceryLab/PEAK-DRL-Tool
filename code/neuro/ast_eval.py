@@ -120,14 +120,15 @@ def agent_dirs(game: str, variant: str, persona: str) -> list[str]:
 def retrain_job(game: str, variant: str, persona: str, gens: int = GENS, workers: int | None = None,
                 levels: list[str] | None = None):
     """(command, environment) that trains this persona's three seeds on the mutant, as balance.py
-    trained the baseline. Mega Man retrains only the sections the mutant changes (`levels`)."""
+    trained the baseline. Mega Man retrains only the sections the mutant changes (`levels`), always
+    on its GA-sweep winners (--best)."""
     m = mutant(game, variant)
     if m is None or not m["retrain"]:
         raise SystemExit(f"{game} {variant} is not retrained (the baseline agents replay it)")
     cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
            "--levels", *(levels or m["retrain_levels"]), "--seeds", *map(str, m.get("seeds", SEEDS)), "--gens", str(gens),
            "--root", os.path.join(variant_dir(game, variant), "probes"), "--out", variant_dir(game, variant)]
-    if game != "megaman" and baseline_tag(game, persona, level_of(game, variant)).endswith("_best"):
+    if game == "megaman" or baseline_tag(game, persona, level_of(game, variant)).endswith("_best"):
         cmd.append("--best")
     if workers:
         cmd += ["--workers", str(workers)]
@@ -216,10 +217,11 @@ def _attempt(game: str, level: str, cfg, persona, act, reset, seed: int, agent: 
 
 
 def _best_retrained(variant: str, section: str, persona: str = "experienced") -> str | None:
-    """The run of this persona trained on this section of the variant that wins most often (relay.py's test)."""
+    """The run of this persona trained on this section of the variant with the GA-sweep winners
+    (a *_best tag) that wins most often (relay.py's test); older p10 runs never mix in."""
     from .relay import evaluate
     root = os.path.join(variant_dir("megaman", variant), "probes")
-    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, "*", f"{section}_*", "best.npz"))]
+    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, "*_best", f"{section}_*", "best.npz"))]
     scored = [(evaluate(r, section, 12), r) for r in sorted(runs)]
     return max(scored)[1] if scored else None
 

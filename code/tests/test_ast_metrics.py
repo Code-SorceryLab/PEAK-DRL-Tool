@@ -188,6 +188,7 @@ def test_mega_mans_original_is_retrained_with_the_mutants_command():
     cmd, env = ast_eval.retrain_job("megaman", "base-retrained", "experienced", levels=["CutMan-3-Ledges"])
     arg = {k: cmd[cmd.index(k) + 1] for k in ("--levels", "--gens", "--root")}
     assert env["PEAK_MUTANT"] == "" and cmd[cmd.index("--seeds") + 1:][:3] == list(map(str, ast_eval.SEEDS))
+    assert "--best" in cmd                                                   # Mega Man trains on its GA-sweep winners
     assert arg == {"--levels": "CutMan-3-Ledges", "--gens": "200",
                    "--root": os.path.join("runs", "ast", "megaman", "base-retrained", "probes")}
 
