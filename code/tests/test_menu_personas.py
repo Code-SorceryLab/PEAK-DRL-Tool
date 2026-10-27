@@ -121,6 +121,7 @@ def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, 
 
     monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
     popup = SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=lambda *a, **k: 0,   # A on every screen
+                            show_game=lambda game: None,
                             run_game=lambda cmd, env: fake_run(cmd, env=env))
     menu.study_session(popup)
     ids = {m["dir"]: m["id"] for m in eval_set("mario")}

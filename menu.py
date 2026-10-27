@@ -820,10 +820,12 @@ def study_session(ui) -> None:
     if not participant:
         return
     games = [g for g in get_available_games() if g in EVAL_LEVELS]
-    pick = ui.ask("SELECT GAME", [ui.NAMES.get(g, g) for g in games], 0, "A  START      ESC  EXIT", b_backs=False)
+    pick = ui.ask("SELECT GAME", [ui.NAMES.get(g, g) for g in games], 0, "A  START      ESC  EXIT", b_backs=False,
+                  games=games)
     if pick is None:
         return
     game = games[pick]
+    ui.show_game(game)
     mutants = eval_set(game)
     if len(mutants) < 5:
         print(_RED(f"\n    Only {len(mutants)} of {game}'s 5 mutants are on disk. Make them first: "

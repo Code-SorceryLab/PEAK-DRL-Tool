@@ -2,9 +2,11 @@
 # Each game runs in its own manual_play window; quitting it comes back to SELECT GAME. ESC here exits.
 # --study: the whole User Study runs in this window (menu.study_session), so the participant never needs the terminal.
 import argparse
+import json
 import os
 import subprocess
 import sys
+import threading
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
 
@@ -25,6 +27,9 @@ NAMES = {"mario": "MARIO", "sonic": "SONIC", "megaman": "MEGA MAN", "meatboy": "
 SIZE = (800, 600)
 ROWS = 8                          # list rows shown at once; longer lists scroll
 GOLD, GREY = (252, 188, 60), (188, 188, 188)
+CLIP_BOX, CLIP_FPS, CLIP_S = (240, 200), 12, 6   # the gameplay clip: its decoded size, rate and length
+game_shown = None                # once the study has a game, its name heads every screen
+_clips, _frames = {}, {}         # game -> (size, raw RGB frames) from the decoder thread; -> Surfaces
 
 
 def run_game(cmd: list, env: dict) -> None:
@@ -45,8 +50,40 @@ def _play(game: str, level: str | None) -> None:
     run_game(cmd, {k: v for k, v in os.environ.items() if k not in ("SDL_VIDEODRIVER", "MARIO_MANUAL_PLAY")})
 
 
-def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4) -> None:
-    """The framed screen: a title, a list (with a blinking cursor unless choice is None) and a hint."""
+def show_game(game: str) -> None:
+    """Head every later screen with this game's name and play its clip there."""
+    global game_shown
+    game_shown = game
+
+
+def _decode_clip(game: str) -> None:
+    """CLIP_S seconds of a trained agent's replay (runs/videos/<game>, menu 22), from a level other than the
+    study's own where there is one, so the clip shows the game without the route. None without the video or ffmpeg."""
+    from code.games.eval_mutants import EVAL_LEVELS
+    video = menu.RUNS_DIR / "videos" / game / "experienced.webm"
+    try:
+        meta = json.loads(video.with_suffix(".json").read_text())
+        tries = meta["attempts"]          # [start frame, level, outcome] per attempt
+        i = next((k for k, a in enumerate(tries) if a[1] != EVAL_LEVELS.get(game, ("",))[0]), 0)
+        start = tries[i][0] / meta["fps"]
+        length = min(CLIP_S, (tries[i + 1][0] / meta["fps"] - start) if i + 1 < len(tries) else CLIP_S)
+        w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                        "stream=width,height", "-of", "csv=p=0", str(video)],
+                                       capture_output=True, text=True, check=True).stdout.split(","))
+        scale = min(CLIP_BOX[0] / w, CLIP_BOX[1] / h)
+        size = (int(w * scale) // 2 * 2, int(h * scale) // 2 * 2)
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{length:.2f}", "-i", str(video),
+                              "-vf", f"fps={CLIP_FPS},scale={size[0]}:{size[1]}:flags=neighbor",
+                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+    except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError):
+        return
+    n = size[0] * size[1] * 3
+    _clips[game] = (size, [raw[k:k + n] for k in range(0, len(raw) - n + 1, n)])
+
+
+def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4, game: str | None = None) -> None:
+    """The framed screen: the game (or PEAK), a title, a list (with a blinking cursor unless choice is None),
+    the game's clip (beside a list with a cursor, under a message) and a hint."""
     screen = pygame.display.get_surface()
     if screen is None:                 # the first screen, or the first after a game closed the window
         screen = pygame.display.set_mode(SIZE)
@@ -55,30 +92,46 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4)
     w, h = SIZE
     pygame.draw.rect(screen, (252, 252, 252), (16, 16, w - 32, h - 32), 4)
     centre = lambda img, y: screen.blit(img, ((w - img.get_width()) // 2, y))
-    centre(nes_text("PEAK", 3, GREY), 48)
+    centre(nes_text(NAMES.get(game_shown, game_shown), 3, GOLD) if game_shown else nes_text("PEAK", 3, GREY), 48)
     centre(nes_text(title, 5), 84)
     at = choice or 0
     top = min(max(0, at - ROWS // 2), max(0, len(items) - ROWS))
     shown = items[top:top + ROWS]
-    x = (w - max(nes_text(i, size).get_width() for i in shown)) // 2
+    if game in _clips:                  # decoded in the background: turn it into Surfaces once
+        dims, raw = _clips.pop(game)
+        _frames[game] = [pygame.image.frombytes(f, dims, "RGB") for f in raw]
+    clip = _frames.get(game)
+    widest = max(nes_text(i, size).get_width() for i in shown)
+    side = bool(clip) and choice is not None and widest <= w // 2 - 80
+    x = (w // 2 - widest) // 2 + 30 if side else (w - widest) // 2
     blink = (pygame.time.get_ticks() // 400) % 2 == 0
+    step = 10 * size + 2
     for row, item in enumerate(shown):
-        y = 170 + row * 42
+        y = 170 + row * step
         screen.blit(nes_text(item, size), (x, y))
         if choice is not None and top + row == choice and blink:
             screen.blit(nes_text(">", size, GOLD), (x - 40, y))
     if top > 0:
         centre(nes_text("-", 3, GREY), 150)
     if top + ROWS < len(items):
-        centre(nes_text("-", 3, GREY), 170 + ROWS * 42 - 6)
+        centre(nes_text("-", 3, GREY), 170 + ROWS * step - 6)
+    if clip:
+        img = clip[pygame.time.get_ticks() * CLIP_FPS // 1000 % len(clip)]
+        cx, y0 = (w * 3 // 4 - 20, 170) if side else (w // 2, 170 + len(shown) * step + 20)
+        fit = min((w // 2 - 60 if side else w - 120) / img.get_width(), (h - 84 - y0) / img.get_height())
+        img = pygame.transform.scale(img, (int(img.get_width() * fit), int(img.get_height() * fit)))
+        box = img.get_rect(midtop=(cx, y0))
+        screen.blit(img, box)
+        pygame.draw.rect(screen, GREY, box.inflate(8, 8), 2)
     centre(nes_text(hint, 2, GREY), h - 64)
     pygame.display.flip()
 
 
 def ask(title: str, items: list, choice: int | None = 0, hint: str = "A  OK", size: int = 4,
-        b_backs: bool = True) -> int | None:
+        b_backs: bool = True, games: list | None = None) -> int | None:
     """Show a list until A picks a row (its index), or ESC (or B / Backspace, if b_backs) backs out (None).
-    choice None: a message with no cursor, A goes on (0). Closing the window quits."""
+    choice None: a message with no cursor, A goes on (0). games: each row's game, whose clip plays while
+    it is highlighted (else the shown game's). Closing the window quits."""
     clock = pygame.time.Clock()
     prev, armed, back_prev = (0, True), False, True   # wait for keys from the last screen to be let go
     while True:
@@ -105,7 +158,7 @@ def ask(title: str, items: list, choice: int | None = 0, hint: str = "A  OK", si
         prev = (dy, confirm)
         if armed and not confirm:          # act on release, so the press never reaches the game
             return choice or 0
-        _draw(title, items, choice, hint, size)
+        _draw(title, items, choice, hint, size, games[choice] if games else game_shown)
 
 
 def ask_text(title: str, hint: str = "TYPE IT      ENTER  OK      ESC  BACK") -> str | None:
@@ -133,12 +186,15 @@ def main() -> None:
     pygame.init()
     gamepad.open_pad(quiet=True)
     music.play("menu")
+    for g in menu.get_available_games():   # the clips decode in the background; a screen shows one when ready
+        threading.Thread(target=_decode_clip, args=(g,), daemon=True).start()
     if args.study:
         menu.study_session(sys.modules[__name__])
         return
     games, pick = menu.get_available_games(), 0
     while True:
-        pick = ask("SELECT GAME", [NAMES.get(g, g) for g in games], pick, "A  PLAY      ESC  EXIT", b_backs=False)
+        pick = ask("SELECT GAME", [NAMES.get(g, g) for g in games], pick, "A  PLAY      ESC  EXIT", b_backs=False,
+                   games=games)
         if pick is None:
             return
         levels = menu.get_levels_for_game(games[pick])
