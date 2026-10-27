@@ -43,7 +43,7 @@ parser.add_argument("--demo", nargs="?", const="runs/demos", default=None, metav
                          "You play through the agent's own input limits, so what you show it can do")
 parser.add_argument("--invincible", action="store_true",
                     help="megaman debug: take no damage from enemies, shots or spikes (toggle in game with I)")
-args = parser.parse_args()
+args = parser.parse_known_args()[0]   # menu.NO_RESTORE rides along on macOS
 
 # Level ID priority: CLI arg > env var > default
 level_id  = args.level or os.environ.get('PEAK_PLAY_LEVEL', None)

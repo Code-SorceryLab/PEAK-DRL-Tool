@@ -101,12 +101,11 @@ def test_manual_play_records_nothing_by_default(monkeypatch):
     assert "--record" not in cmds[0]
 
 
-def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, tmp_path):
+def _study_popup(played: list, ask=lambda *a, **k: 0) -> SimpleNamespace:
+    """A fake game select pop-up: A on every screen (or ask), and each attempt recorded as a Mario death."""
     import csv
-    from code.games.eval_mutants import eval_set
-    played = []                                            # (phase folder, PEAK_MUTANT) per recorded attempt
 
-    def fake_run(cmd, env=None, **k):
+    def run_game(cmd, env):
         if "--record" not in cmd:                          # the warm-up
             return
         played.append(env.get("PEAK_MUTANT"))
@@ -119,11 +118,16 @@ def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, 
             w.writeheader()
             w.writerow({"world": "Mario1-1", "cause_of_death": "Pit", "route": "[(1.0, 2.0)]", "elapsed_time": 3})
 
+    return SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=ask, show_game=lambda game: None,
+                           run_game=run_game)
+
+
+def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, tmp_path):
+    import csv
+    from code.games.eval_mutants import eval_set
+    played = []                                            # PEAK_MUTANT per recorded attempt
     monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
-    popup = SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=lambda *a, **k: 0,   # A on every screen
-                            show_game=lambda game: None,
-                            run_game=lambda cmd, env: fake_run(cmd, env=env))
-    menu.study_session(popup)
+    menu.study_session(_study_popup(played))
     ids = {m["dir"]: m["id"] for m in eval_set("mario")}
     assert played[:3] == [None] * 3                        # baseline: the unchanged level
     assert sorted(played[3:]) == sorted(ids) and len(played) == 8
@@ -131,6 +135,25 @@ def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, 
         (row,) = csv.DictReader(open(tmp_path / "P1" / "mario" / "mutation" / f"run{run}" / "episodes.csv"))
         assert row["mutant"] == ids[folder] and row["session"] == "P1/mutation"
     assert len(list((tmp_path / "P1" / "mario" / "baseline").glob("run*/episodes.csv"))) == 3
+
+
+def test_esc_or_b_on_a_study_screen_ends_the_session_only_when_confirmed(monkeypatch, tmp_path):
+    monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
+    asked, played = [], []
+    answers = {"BASELINE": [None], "END SESSION?": [0]}    # ESC (the games' quit key) on attempt 1, then NO
+
+    def ask(title, items, choice=0, hint="", size=4, b_backs=True, games=None):
+        asked.append((title, b_backs))
+        return answers[title].pop(0) if answers.get(title) else 0
+
+    menu.study_session(_study_popup(played, ask))
+    assert len(played) == 8                                # the session went on: 3 baseline + 5 mutants
+    assert not any(b for title, b in asked)                # B runs and fires in the games: never "back" here
+    played.clear()
+    answers.update({"BASELINE": [None], "END SESSION?": [1]})   # ESC, then YES: nothing more is played
+    menu.study_session(_study_popup(played, ask))
+    assert played == []
+    assert menu.study_session(SimpleNamespace(ask_text=lambda title: None)) is False   # ESC on the ID: close the pop-up
 
 
 def test_ga_sweep_passes_the_chosen_worker_count(monkeypatch):

@@ -2,6 +2,7 @@
 # Each game runs in its own manual_play window; quitting it comes back to SELECT GAME. ESC here exits.
 # --study: the whole User Study runs in this window (menu.study_session), so the participant never needs the terminal.
 import argparse
+import faulthandler
 import json
 import os
 import subprocess
@@ -9,6 +10,8 @@ import sys
 import threading
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
+# macOS may not focus this window when a game closes; the pad must still work (SDL drops unfocused pad input).
+os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
 import pygame
 
@@ -21,7 +24,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--record", action="store_true", help="record every attempt like an agent run")
 parser.add_argument("--player", default=None, help="player label for --record")
 parser.add_argument("--study", action="store_true", help="run the User Study in this window")
-args = parser.parse_args()
+args = parser.parse_known_args()[0]   # menu.NO_RESTORE rides along on macOS
 
 NAMES = {"mario": "MARIO", "sonic": "SONIC", "megaman": "MEGA MAN", "meatboy": "MEAT BOY", "bomberman": "BOMBERMAN"}
 SIZE = (800, 600)
@@ -36,7 +39,7 @@ def run_game(cmd: list, env: dict) -> None:
     """Run one game in its own window until it is quit, then come back to this one."""
     pygame.display.quit()          # one window at a time
     music.stop()
-    subprocess.run(cmd, env=env)
+    subprocess.run(cmd + menu.NO_RESTORE, env=env)
     pygame.display.init()
     music.play("menu")
 
@@ -189,7 +192,8 @@ def main() -> None:
     for g in menu.get_available_games():   # the clips decode in the background; a screen shows one when ready
         threading.Thread(target=_decode_clip, args=(g,), daemon=True).start()
     if args.study:
-        menu.study_session(sys.modules[__name__])
+        while menu.study_session(sys.modules[__name__]):
+            show_game(None)                # the next participant starts at the ID screen
         return
     games, pick = menu.get_available_games(), 0
     while True:
@@ -206,4 +210,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # shortcut: a pygame.quit() that hangs (seen once with a USB pad, not reproduced) is cut off after 5 s with
+    # a stack dump, so the menu comes back; drop this once the dump shows the cause.
+    faulthandler.dump_traceback_later(5, exit=True)
     pygame.quit()

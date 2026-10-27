@@ -29,6 +29,9 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 RUNS_DIR = Path("runs")
+# macOS: after any Python crash, AppKit asks "reopen windows?" before the next pygame window opens, and that
+# hidden dialog looks like a frozen game. The game select pop-up and its games skip it (they ignore unknown args).
+NO_RESTORE = ["-ApplePersistenceIgnoreState", "YES"] if sys.platform == "darwin" else []
 DASHBOARD_URL = "http://127.0.0.1:8000/mario/index.html"
 DISABLED_LEVELS_KEY = "disabled_levels"
 CHIME_PATH = Path("chime.wav")
@@ -797,56 +800,67 @@ def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant
     return True
 
 
+def _study_ask(ui, *a, **k):
+    """ui.ask on a study screen. B runs and fires in the games, so it never backs out here; ESC (also
+    the games' quit key) ends the session (None) only when the experimenter confirms it."""
+    while True:
+        got = ui.ask(*a, b_backs=False, **k)
+        if got is not None or ui.ask("END SESSION?", ["NO, GO ON", "YES, END IT"], 0, "A  OK", b_backs=False) == 1:
+            return got
+
+
 def _study_attempts(ui, game: str, participant: str, phase: str, plays: list) -> bool:
     """Each play (None, or a mutant) once, as run1, run2, ...; a window closed before an attempt
-    ended asks to try that one again. False if ESC ended the session."""
+    ended asks to try that one again. False if the experimenter ended the session."""
     for run, mutant in enumerate(plays, 1):
-        if ui.ask(phase.upper(), [f"ATTEMPT {run} OF {len(plays)}"], None, "A  START") is None:
+        if _study_ask(ui, phase.upper(), [f"ATTEMPT {run} OF {len(plays)}"], None, "A  START") is None:
             return False
         while not _study_attempt(ui, game, participant, phase, run, mutant):
-            if ui.ask("NOT RECORDED", ["TRY AGAIN", "SKIP"], 0, "WINDOW CLOSED EARLY", b_backs=False) != 0:
+            if _study_ask(ui, "NOT RECORDED", ["TRY AGAIN", "SKIP"], 0, "WINDOW CLOSED EARLY") != 0:
                 break
     return True
 
 
-def study_session(ui) -> None:
-    """The User Study, run in the game select pop-up (ui: code/games/tools/game_select.py's ask, ask_text
-    and run_game): participant ID, game, a timed warm-up playthrough, the evaluation level BASELINE_RUNS
-    times, then its five mutants once each in a random order; each attempt in its own run folder."""
+def study_session(ui) -> bool:
+    """One participant's User Study, run in the game select pop-up (ui: code/games/tools/game_select.py's
+    ask, ask_text, show_game and run_game): participant ID, game, a timed warm-up playthrough, the evaluation
+    level BASELINE_RUNS times, then its five mutants once each in a random order; each attempt in its own
+    run folder. False when the ID screen was left with ESC (close the pop-up), else True (next participant)."""
     import random
     import re
     from code.games.eval_mutants import EVAL_LEVELS, eval_set
     participant = "".join(c if c.isalnum() or c in "-_" else "_" for c in ui.ask_text("PARTICIPANT ID") or "")
     if not participant:
-        return
+        return False
     games = [g for g in get_available_games() if g in EVAL_LEVELS]
     pick = ui.ask("SELECT GAME", [ui.NAMES.get(g, g) for g in games], 0, "A  START      ESC  EXIT", b_backs=False,
                   games=games)
     if pick is None:
-        return
+        return True
     game = games[pick]
     ui.show_game(game)
     mutants = eval_set(game)
     if len(mutants) < 5:
         print(_RED(f"\n    Only {len(mutants)} of {game}'s 5 mutants are on disk. Make them first: "
                    + ("python -m code.games.megaman_mutants" if game == "megaman" else "python -m code.games.eval_mutants")))
-        ui.ask("NOT READY", [f"ONLY {len(mutants)} OF 5 MUTANTS", "SEE THE TERMINAL"], None, "A  EXIT")
-        return
+        ui.ask("NOT READY", [f"ONLY {len(mutants)} OF 5 MUTANTS", "SEE THE TERMINAL"], None, "A  BACK", b_backs=False)
+        return True
     where = STUDY_DIR / participant / game
-    if where.exists() and ui.ask("ALREADY RECORDED", [f"ADD TO {participant}", "CANCEL"], 1) != 0:
-        return
+    if where.exists() and ui.ask("ALREADY RECORDED", [f"ADD TO {participant}", "CANCEL"], 1, b_backs=False) != 0:
+        return True
     # The pixel font has no arrows or brackets: drop them, as the pad overlay in the game shows the buttons.
     plain = lambda t: re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ./:-]", " ", t)).strip(" /")
-    if ui.ask("WARM-UP", [f"{plain(key):<10}{plain(what)}" for key, what in _PLAY_CONTROLS[game]], None,
-              f"{WARMUP_MINUTES:g} MIN, NOT RECORDED      A  START", size=2) is None:
-        return
+    if _study_ask(ui, "WARM-UP", [f"{plain(key):<10}{plain(what)}" for key, what in _PLAY_CONTROLS[game]], None,
+                  f"{WARMUP_MINUTES:g} MIN, NOT RECORDED      A  START", size=2) is None:
+        return True
     ui.run_game([sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
                  "--fps", "60", "--quit-after", str(WARMUP_MINUTES)], _study_env())   # counts down on screen, pauses excluded
     if _study_attempts(ui, game, participant, "baseline", [None] * BASELINE_RUNS):
         random.shuffle(mutants)             # the participant isn't told which mutant is which
         if _study_attempts(ui, game, participant, "mutation", mutants):
-            ui.ask("SESSION DONE", ["THANK YOU"], None, "A  EXIT")
+            ui.ask("SESSION DONE", ["THANK YOU"], None, "A  NEXT PARTICIPANT", b_backs=False)
     print(f"\n    {_GRN('Session over.')}  Data  →  {_CYAN(str(where))}")
+    return True
 
 
 def run_user_study():
@@ -854,9 +868,10 @@ def run_user_study():
     only ever looks at the game windows."""
     _refresh_screen()
     _section("USER STUDY")
-    print(_DIM("    The study runs in the pop-up window: type the participant ID there, then pick the game."))
+    print(_DIM("    The study runs in the pop-up window: type the participant ID there, then pick the game.\n"
+               "    After each session it asks for the next ID; ESC there closes it."))
     env = {k: v for k, v in os.environ.items() if k != "SDL_VIDEODRIVER"}   # a real window
-    subprocess.run([sys.executable, "-m", "code.games.tools.game_select", "--study"], env=env)
+    subprocess.run([sys.executable, "-m", "code.games.tools.game_select", "--study"] + NO_RESTORE, env=env)
 
 
 def run_manual_play():
@@ -872,6 +887,7 @@ def run_manual_play():
         raw = input(_DIM("    Player name [human]: ")).strip()
         player = "".join(c if c.isalnum() or c in "-_" else "_" for c in raw) or "human"  # it becomes a folder name
         cmd += ["--record", "--player", player]
+    cmd += NO_RESTORE
     print(_DIM("    Pick a game on screen: d-pad / arrows, A / Enter to play, B to go back, ESC to exit."))
     print()
     subprocess.run(cmd, env=proc_env)
