@@ -729,6 +729,125 @@ def _print_controls(game, level):
     print()
 
 
+# ── User study ────────────────────────────────────────────────────────────────
+WARMUP_MINUTES = 5          # warm-up: a normal playthrough of the game, stopped after this long, not recorded
+BASELINE_RUNS = 3           # recorded attempts on the evaluation level
+STUDY_DIR = RUNS_DIR / "user_study"
+
+
+def _study_row(old: dict, game: str, participant: str, phase: str, run: int) -> dict:
+    """One manual-play row in the telemetry schema the website reads (code/stats/episode_log.py).
+    Mario / Meat Boy / Bomberman manual play still writes the older agent CSV; Mega Man already
+    writes this schema and only gets the study's labels."""
+    import ast
+    labels = {"persona": participant, "source": "human", "session": f"{participant}/{phase}",
+              "gen": 0, "agent": run}
+    if "status" in old:
+        return {**old, **labels}
+    won = old.get("cause_of_death") == "Success"
+    route = [list(p) for p in ast.literal_eval(old["route"] or "[]")]
+    secs = float(old.get("elapsed_time") or 0)
+    row = {"game": game, "level": str(old.get("world")), **labels,
+           "status": "WON" if won else "DEAD", "cause": "" if won else old.get("cause_of_death", ""),
+           "frames": round(secs * 60), "time_s": secs, "progress": float(old.get("progress_ratio") or 0),
+           "jumps": int(old.get("jump_count") or 0), "coins": int(old.get("coins_collected") or 0),
+           "kills": int(old.get("enemies_killed") or 0), "avg_speed": float(old.get("avg_vx") or 0),
+           "end_x": route[-1][0] if route else None, "end_y": route[-1][1] if route else None,
+           "tile": 32, "route": route}
+    if game == "bomberman":
+        row["bricks"] = int(old.get("bricks_destroyed") or 0)
+    return row
+
+
+def _study_env(mutant: dict | None = None) -> dict:
+    """A real window, playing the given mutant (or the unchanged game)."""
+    env = {k: v for k, v in os.environ.items() if k not in ("SDL_VIDEODRIVER", "PEAK_MUTANT", "PEAK_MM1_MUTANT")}
+    if mutant:
+        env["PEAK_MUTANT"] = str(mutant["dir"])
+    return env
+
+
+def _study_attempt(game: str, participant: str, phase: str, run: int, mutant: dict | None = None) -> bool:
+    """Play one recorded attempt on the evaluation level (or its mutant); store it as
+    runs/user_study/<participant>/<game>/<phase>/run<run>/episodes.csv. False if none was recorded."""
+    import csv
+    import tempfile
+    from code.games.eval_mutants import EVAL_LEVELS
+    from code.stats import episode_log
+    tmp = Path(tempfile.mkdtemp(prefix="study_"))
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
+           "--fps", "60", "--level", EVAL_LEVELS[game][0], "--record", str(tmp), "--player", participant,
+           "--episodes", "1"]
+    subprocess.run(cmd, env=_study_env(mutant))
+    found = list(tmp.glob("*/*/episodes.csv"))
+    rows = []
+    if found:
+        with open(found[0], encoding="utf-8", newline="") as f:
+            rows = list(csv.DictReader(f)) if game != "megaman" else episode_log.read(str(found[0]))
+    shutil.rmtree(tmp, ignore_errors=True)
+    if not rows:
+        return False
+    rows = [_study_row(r, game, participant, phase, run) for r in rows]
+    if mutant:
+        rows = [{**r, "mutant": mutant["id"], "mutant_class": mutant["class"]} for r in rows]
+    out = STUDY_DIR / participant / game / phase / f"run{run}" / "episodes.csv"
+    episode_log.append(str(out), rows)
+    print(f"    Saved  →  {_CYAN(str(out))}")
+    return True
+
+
+def _study_attempts(game: str, participant: str, phase: str, plays: list) -> None:
+    """Each play (None, or a mutant) once, as run1, run2, ...; a window closed before an attempt
+    ended asks to try that one again."""
+    for run, mutant in enumerate(plays, 1):
+        input(_BOLD(f"\n  ⟫ {phase.capitalize()} attempt {run} of {len(plays)}. Enter to start "))
+        while not _study_attempt(game, participant, phase, run, mutant):
+            if input(_RED("    No attempt was recorded (window closed early). Try again? [Y/n]: ")
+                     ).strip().lower() in ("n", "no"):
+                break
+
+
+def run_user_study():
+    """User Study — participant ID, a timed warm-up playthrough, the evaluation level BASELINE_RUNS
+    times, then its five mutants once each in a random order; each attempt in its own run folder."""
+    import random
+    from code.games.eval_mutants import EVAL_LEVELS, eval_set
+    _refresh_screen()
+    _section("USER STUDY")
+    raw = input(_BOLD("\n  Participant ID: ")).strip()
+    participant = "".join(c if c.isalnum() or c in "-_" else "_" for c in raw)
+    if not participant:
+        return
+    game = pick_one("GAME", [g for g in get_available_games() if g in EVAL_LEVELS], default="mario")
+    if not game:
+        return
+    mutants = eval_set(game)
+    if len(mutants) < 5:
+        print(_RED(f"\n    Only {len(mutants)} of {game}'s 5 mutants are on disk. Make them first: "
+                   + ("python -m code.games.megaman_mutants" if game == "megaman" else "python -m code.games.eval_mutants")))
+        input(_DIM("\n    Enter to return to the menu "))
+        return
+    where = STUDY_DIR / participant / game
+    if where.exists() and input(_YEL(f"\n    {where} already exists — add to it? [y/N]: ")).strip().lower() != "y":
+        return
+    print(f"\n    Controls ({game}):")
+    for key, what in _PLAY_CONTROLS[game]:
+        print(f"    {_YEL(f'{key:<16}')}{what}")
+
+    input(_BOLD(f"\n  ⟫ Warm-up: play the game normally for {WARMUP_MINUTES:g} min (not recorded). Enter to start "))
+    cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game), "--fps", "60"]
+    try:
+        subprocess.run(cmd, env=_study_env(), timeout=WARMUP_MINUTES * 60)
+    except subprocess.TimeoutExpired:
+        print(_DIM("    Warm-up time is up."))
+
+    _study_attempts(game, participant, "baseline", [None] * BASELINE_RUNS)
+    random.shuffle(mutants)                 # the participant isn't told which mutant is which
+    _study_attempts(game, participant, "mutation", mutants)
+    print(f"\n    {_GRN('✓ Session done.')}  Data  →  {_CYAN(str(where))}")
+    input(_DIM("\n    Enter to return to the menu "))
+
+
 def run_manual_play():
     """Play Manually — pick a game and level, drive it with the keyboard."""
     _refresh_screen()
@@ -1378,6 +1497,7 @@ DISPATCH = {
     "4":  ("train_grid",           train_complete_grid),
     "p":  ("train_all_personas",   train_all_personas),
     "5":  ("manual_play",          run_manual_play),
+    "u":  ("user_study",           run_user_study),
     "6":  ("watch_agent",          watch_trained_agent),
     "7":  ("watch_all",            watch_all_models),
     "8":  ("watch_random",         watch_random_agent),
@@ -1428,6 +1548,7 @@ def main():
         print(_menu_item("6",  "Watch Agent",         "visualize a trained model"))
         print(_menu_item("7",  "Watch All Models",    "resume a run with the dashboard grid"))
         print(_menu_item("8",  "Watch Random Agent",  "random actions"))
+        print(_menu_item(" U", "User Study",          "participant ID, warm-up, eval level ×3, its 5 mutants"))
 
         _section("TOOLS")
         print(_menu_item("9",  "Level Editor",         "paint tiles, place entities"))

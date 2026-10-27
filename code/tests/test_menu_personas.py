@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -80,7 +81,7 @@ def test_manual_play_records_like_an_agent_when_asked(monkeypatch):
     answers = iter(["y", "Kevin C!"])                      # record? then the player name
     cmds = []
     monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
-    monkeypatch.setattr(menu, "ask_index", lambda *a, **k: next(picks))
+    monkeypatch.setattr(menu, "pick_one", lambda *a, **k: next(picks))
     monkeypatch.setattr("builtins.input", lambda *a: next(answers))
     monkeypatch.setattr(menu.subprocess, "run", lambda cmd, **k: cmds.append(cmd))
     menu.run_manual_play()
@@ -92,20 +93,53 @@ def test_manual_play_records_nothing_by_default(monkeypatch):
     picks = iter(["mario", "Mario1-1"])
     cmds = []
     monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
-    monkeypatch.setattr(menu, "ask_index", lambda *a, **k: next(picks))
+    monkeypatch.setattr(menu, "pick_one", lambda *a, **k: next(picks))
     monkeypatch.setattr("builtins.input", lambda *a: "")
     monkeypatch.setattr(menu.subprocess, "run", lambda cmd, **k: cmds.append(cmd))
     menu.run_manual_play()
     assert "--record" not in cmds[0]
 
 
+def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, tmp_path):
+    import csv
+    from code.games.eval_mutants import eval_set
+    played = []                                            # (phase folder, PEAK_MUTANT) per recorded attempt
+
+    def fake_run(cmd, env=None, **k):
+        if "--record" not in cmd:                          # the warm-up
+            return
+        played.append(env.get("PEAK_MUTANT"))
+        out = Path(cmd[cmd.index("--record") + 1]) / "mario" / "p1" / "episodes.csv"
+        out.parent.mkdir(parents=True)
+        with open(out, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, ["persona", "game", "world", "cause_of_death", "jump_count", "coins_collected",
+                                   "avg_vx", "progress_ratio", "route", "enemies_killed", "bricks_destroyed",
+                                   "elapsed_time"])
+            w.writeheader()
+            w.writerow({"world": "Mario1-1", "cause_of_death": "Pit", "route": "[(1.0, 2.0)]", "elapsed_time": 3})
+
+    monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
+    monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
+    monkeypatch.setattr(menu, "pick_one", lambda *a, **k: "mario")
+    monkeypatch.setattr("builtins.input", lambda *a: "P1" if "Participant" in a[0] else "")
+    monkeypatch.setattr(menu.subprocess, "run", fake_run)
+    menu.run_user_study()
+    ids = {m["dir"]: m["id"] for m in eval_set("mario")}
+    assert played[:3] == [None] * 3                        # baseline: the unchanged level
+    assert sorted(played[3:]) == sorted(ids) and len(played) == 8
+    for run, folder in enumerate(played[3:], 1):
+        (row,) = csv.DictReader(open(tmp_path / "P1" / "mario" / "mutation" / f"run{run}" / "episodes.csv"))
+        assert row["mutant"] == ids[folder] and row["session"] == "P1/mutation"
+    assert len(list((tmp_path / "P1" / "mario" / "baseline").glob("run*/episodes.csv"))) == 3
+
+
 def test_ga_sweep_passes_the_chosen_worker_count(monkeypatch):
-    picks = iter(["rays"])
+    picks = iter(["rays", "stop"])                  # sensors, no --confirm
     toggles = iter([["gens_dummy"], ["meatboy"], ["experienced"]])   # GA axes, games, personas
-    answers = iter(["n", "", "", "10", "y"])        # no --confirm, default gens, default seeds, 10 at once, proceed
+    answers = iter(["", "", "10", "y"])             # default gens, default seeds, 10 at once, proceed
     cmds = []
     monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
-    monkeypatch.setattr(menu, "ask_index", lambda *a, **k: next(picks))
+    monkeypatch.setattr(menu, "pick_one", lambda *a, **k: next(picks))
     monkeypatch.setattr(menu, "toggle_select", lambda *a, **k: next(toggles))
     monkeypatch.setattr("builtins.input", lambda *a: next(answers))
     monkeypatch.setattr(menu.subprocess, "run", lambda cmd, **k: cmds.append(cmd))
