@@ -33,7 +33,7 @@ def test() -> list[str]:
 
 def quick_sweep() -> list[str]:
     """Step 7, run in its own copy (PEAK_DIR=$SCRATCH/peak_quick): the GA-sweep pipeline at 5 gens."""
-    return ([f"GAMES={g} PERSONAS={p} {QUICK} ./run_all.sh sweeps" for g in GAMES_2D for p in PERSONAS]
+    return ([f"GAMES={g} PERSONAS={p} {QUICK} bash run_all.sh sweeps" for g in GAMES_2D for p in PERSONAS]
             + [f"$PY -m code.neuro.balance --game megaman --persona {p} --gens 5 --seeds 1234 --workers $W && "
                f"$PY -m code.neuro.gasweep --game megaman --persona {p} --levels {' '.join(SECTIONS)} --gens 5 "
                f"--seeds 1234 --workers $W --confirm" for p in PERSONAS])
@@ -47,7 +47,7 @@ def quick_best() -> list[str]:
 
 def sweep2d() -> list[str]:
     """Step 8: 40-gen probes, sensor ablation and the GA sweep with its confirm, one game x persona a task."""
-    return [f"GAMES={g} PERSONAS={p} ./run_all.sh sweeps" for g in GAMES_2D for p in PERSONAS]
+    return [f"GAMES={g} PERSONAS={p} bash run_all.sh sweeps" for g in GAMES_2D for p in PERSONAS]
 
 
 def sweep_mm() -> list[str]:

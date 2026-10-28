@@ -520,6 +520,10 @@ def main() -> None:
         from .gasweep import load_best
         best_ov = load_best(args.game)
         print(f"--best: {args.game} -> {best_ov or 'baseline (this game has no sweep yet)'}", flush=True)
+        if not best_ov and root == PROBES_ROOT:
+            # no winners: --best would train the default tag's own dirs, beside the default task doing the same
+            print("nothing to do: the default task trains these probes", flush=True)
+            return
     # A different GA is a different experiment: tag it apart so it never lands on baseline probes.
     tag = config_tag(best_ov.get("pop_size", GAConfig().pop_size), args.gens, args.sensors)
     if best_ov:

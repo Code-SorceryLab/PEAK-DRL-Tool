@@ -8,7 +8,7 @@ GAMES=(${GAMES:-mario meatboy bomberman})  # GAMES=meatboy ./run_all.sh sweeps: 
 PERSONAS=(${PERSONAS:-novice clumsy experienced speedrunner killer collector})  # PERSONAS=clumsy: one persona per job
 SEEDS=(${SEEDS:-1234 2025 31337}); GENS=${GENS:-40}  # GENS=2 SEEDS=1234: a quick derisking sweep
 SECTIONS=(CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss)
-stamp() { echo "[$(date '+%F %T')] $*"; }
+stamp() { [[ $* =~ rc=[1-9] ]] && fail=1; echo "[$(date '+%F %T')] $*"; }  # a failed step fails the run (exit below)
 throttle() { while (( $(jobs -rp | wc -l) >= W )); do wait -n; done; }
 probe() { $PY -m code.neuro.balance --game "$1" --persona "$2" --gens $GENS --seeds "${SEEDS[@]}" --workers $W "${@:3}"; }
 train() {  # section seed gens [warm-start run]
@@ -27,14 +27,14 @@ sweeps() {
   for g in "${GAMES[@]}"; do for p in "${PERSONAS[@]}"; do for s in rays grid; do
     stamp "START ablation $g $p $s"; probe $g $p --sensors $s --ablation; stamp "END ablation $g $p $s rc=$?"
   done; done; done
-  for g in "${GAMES[@]}"; do for p in "${PERSONAS[@]}"; do probe $g $p --compare --ablation; done; done
+  for g in "${GAMES[@]}"; do for p in "${PERSONAS[@]}"; do probe $g $p --compare --ablation || fail=1; done; done
   stamp "PHASE 3 GA sweep"
   for g in "${GAMES[@]}"; do for p in "${PERSONAS[@]}"; do
     stamp "START gasweep $g $p"
     $PY -m code.neuro.gasweep --game $g --persona $p --gens $GENS --seeds "${SEEDS[@]}" --workers $W --sensors rays --confirm
     stamp "END gasweep $g $p rc=$?"
   done; done
-  [[ -z $SLURM_ARRAY_TASK_ID ]] && $PY -m code.neuro.command_center  # an array builds the site once, after its last task
+  [[ -z $SLURM_ARRAY_TASK_ID ]] && { $PY -m code.neuro.command_center || fail=1; }  # an array builds the site once, after its last task
   stamp "ALL DONE"
 }
 
@@ -81,3 +81,4 @@ case "$1" in
   sweeps) sweeps ;; megaman) megaman ;; ast-megaman) ast_megaman ;; test) smoke ;;
   *) echo "usage: $0 sweeps|megaman|ast-megaman|test"; exit 2 ;;
 esac
+exit ${fail:-0}

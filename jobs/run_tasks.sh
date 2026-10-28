@@ -13,7 +13,9 @@ W=${SLURM_CPUS_PER_TASK:-1}
 n=$((SLURM_ARRAY_TASK_ID + ${OFFSET:-0} + 1))      # OFFSET=500: a long file in chunks (arrays count against the job limit)
 line=$(sed -n "${n}p" "$1")
 [ -n "$line" ] || { echo "no line $n in $1"; exit 2; }
-echo "[$(date '+%F %T')] START $line"
+echo "[$(date '+%F %T')] START n=$n host=$(hostname) $line"
+# a broken node (its /cvmfs python fails: rc=126 at once) would grab task after task: hold it 10 min instead
+$PY -c "" || { echo "$(hostname): $PY does not start"; sleep 600; exit 126; }
 eval "$line"
 rc=$?
 echo "[$(date '+%F %T')] END rc=$rc $line"
