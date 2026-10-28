@@ -39,7 +39,7 @@ from .modules.Objects.MovingPlatform import MovingPlatform
 
 # Parameters
 from .modules.Parameters.Map_parameters import(TILE_AIR, TILE_GROUND, TILE_PLATFORM, TILE_GOAL, TILE_SPIKE, TILE_QBLOCK,
-    COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE,
+    TILE_PIT, COLOR_SKY, COLOR_GROUND, COLOR_PLATFORM, COLOR_GOAL, COLOR_SPIKE,
     COLOR_WHITE, COLOR_BLACK, COLOR_QBLOCK, COLOR_EMPTY, COLOR_ENEMY,
     COLOR_POWERUP_MUSH, COLOR_POWERUP_STAR, COLOR_COIN, COLOR_HITBOX,
     COLOR_SENSOR, COLOR_AGENT_PANEL, COLOR_STREAK, TILE_SIZE)
@@ -1018,8 +1018,16 @@ class PlatformerCore(gymnasium.Env):
         self.best_dist_to_goal = self._get_dist_to_goal()
         self.best_path_dist = float('inf')   # re-anchor path-stall on level (re)load
 
+        # SMB framing: the screen's bottom edge shows at most 1.5 rows of the solid ground / pit rows that fill
+        # the level below the floor, so the floor sits 13/15 down the screen as on the NES (1-1: 2.5 rows of ground).
+        filler = 0
+        for row in reversed(self.level_data.grid):
+            if not all(c in (TILE_GROUND, TILE_PIT) for c in row):
+                break
+            filler += 1
+        self.view_bottom = self.level_data.height - max(0.0, filler - 1.5) * TILE_SIZE
         self.camera_x = 0.0
-        self.camera_y = 0.0
+        self.camera_y = min(0.0, self.view_bottom - self.HEIGHT)   # shorter than the screen: hung from the bottom
         self.last_score = 0
         self.last_x = self.player.gObj.x
 
@@ -1109,18 +1117,18 @@ class PlatformerCore(gymnasium.Env):
         if not self.camera_lock or not self.player: return
 
         level_w = self.level_data.width
-        level_h = self.level_data.height
+        max_y = self.view_bottom - self.HEIGHT   # < 0: the view fits, so it stays put with sky above, as SMB's does
 
         target_x = max(0, min(self.player.gObj.x - self.WIDTH // 3, level_w - self.WIDTH))
         self.camera_x += (target_x - self.camera_x) * self.camera_smoothing
         self.camera_x = max(0, min(self.camera_x, max(0, level_w - self.WIDTH)))
 
-        target_y = 0.0
-        if level_h > self.HEIGHT:
-            target_y = max(0, min(self.player.gObj.y - self.HEIGHT // 2, level_h - self.HEIGHT))
+        target_y = max_y
+        if max_y > 0:
+            target_y = max(0, min(self.player.gObj.y - self.HEIGHT // 2, max_y))
 
         self.camera_y += (target_y - self.camera_y) * self.camera_smoothing
-        self.camera_y = max(0, min(self.camera_y, max(0, level_h - self.HEIGHT)))
+        self.camera_y = max(min(0, max_y), min(self.camera_y, max_y))
 
     def _get_dist_to_goal(self) -> float:
         if not self.player: return float('inf')
