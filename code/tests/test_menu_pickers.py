@@ -48,3 +48,15 @@ def test_the_menu_turns_enter_back_on_when_a_game_left_the_terminal_raw(monkeypa
     os.close(master)
     os.close(slave)
     assert iflag & termios.ICRNL and lflag & termios.ICANON and lflag & termios.ECHO
+
+
+def test_the_loading_bar_runs_until_the_program_says_it_is_up():
+    """A window program touches PEAK_READY_FILE when it is up: the bar stops, on_ready runs once, the exit code
+    comes back; a program that never says so just ends the bar when it exits."""
+    up = []
+    code = menu.run_with_loading([sys.executable, "-c", "import os, time; time.sleep(0.3); "
+                                  "open(os.environ['PEAK_READY_FILE'], 'a').close(); time.sleep(0.2)"],
+                                 on_ready=lambda: up.append(1))
+    assert code == 0 and up == [1]
+    assert menu.run_with_loading([sys.executable, "-c", "raise SystemExit(3)"], on_ready=lambda: up.append(2)) == 3
+    assert up == [1]

@@ -119,6 +119,8 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4,
         screen = pygame.display.set_mode(SIZE)
         pygame.display.set_caption("PEAK  User Study" if args.study else "PEAK  Manual Play")
         Window.from_display_module().focus()   # macOS leaves a reopened window without the keyboard
+        if os.environ.get("PEAK_READY_FILE"):  # up: the menu's loading bar stops
+            open(os.environ["PEAK_READY_FILE"], "a").close()
     screen.fill((0, 0, 0))
     w, h = SIZE
     pygame.draw.rect(screen, (252, 252, 252), (16, 16, w - 32, h - 32), 4)

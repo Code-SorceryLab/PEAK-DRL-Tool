@@ -35,6 +35,16 @@ and the comparison with the real game: `docs/MEATBOY_SMB_RESEARCH.md`. Nothing h
 | Levels, round 2 | 1-4 Nutshell (the spiral, a closed pit of saws under it), 1-6 Bladecatcher (three shelves in a zig-zag, a saw at each open end, the top one bigger), 1-7 Diverge (the cliff outside and the tunnel inside, three saws) and 1-9 Safety Third (the crumbling wall in front of a saw wall, a crumbling floor over a saw pit) redrawn from the start screens of AL's copy; 1-5 got the start shed | `levels/meatboy/` |
 | NES pad | macOS gives the USB NES pad to one process at a time, so a game started from the picker could not read it; the picker now lets go of it while a game runs | `gamepad.py` (`release_pad`), `game_select.py` |
 
+### Third round (same night)
+
+| Area | Change | Files |
+|---|---|---|
+| Levels | All ten levels but 1-3 redrawn as whole levels: one-screen levels from the wiki's 1920 x 1080 captures, scrolling ones stitched from a 1080p60 World 1 playthrough (YouTube g5nzkzyZmAc); sources and confidence per level in `MEATBOY_SMB_RESEARCH.md`. Slopes become steps; the 1-5 warp portal is not built. Only flood-fill reachability is checked: the long climbs (1-5, the 1-8 pillar, 1-9, 1-11) are not yet proven solvable in PEAK | `levels/meatboy/`, `runs/meatboy/mutants/` |
+| Quit | A game started by hand goes back to SELECT GAME on quit; the game select, the study, recordings, demos, random play and the editor's play-test keep their own flow | `manual_play.py` |
+| Loading | `menu.run_with_loading`: a bar in the terminal until the window or dashboard is up (the program touches `PEAK_READY_FILE`): game select, study, Watch Agent (opens the browser then), Watch All, Watch Random, Level Editor, Play a Mutant | `menu.py`, `game_select.py`, `level_editor.py`, `trainer.py` |
+| Terminal | The menu turns newlines back on before each prompt (Enter had shown `^M`); the clip decoders keep off the terminal | `menu.py`, `game_select.py` |
+| Music | A new original tune for every game in its style (no real melody copied: the repo is public); sawtooth and FM voices, chord arpeggios, swing | `modules/System/music.py`, `code/tests/test_music.py` |
+
 ## What needs retraining
 
 Everything Meat Boy: the physics, the body, the view, the levels and the network input (14 to 21) all

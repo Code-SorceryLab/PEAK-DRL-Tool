@@ -85,11 +85,33 @@ beyond the 11 levels PEAK plays and are not built.
 
 PEAK plays World 1 levels 1-1 to 1-11, in the game's order (level ids 0 to 10). The study's evaluation level
 is id 2, **1-3 The Gap**. Every layout is our own ASCII drawing; no level data from the game is copied.
-Redrawn on 27 Oct at the game's scale: 1-1, 1-2, 1-3, 1-4, 1-6, 1-7 and 1-9 from the start screens of
-AL's installed copy (1-4, 1-7 and 1-9 scroll, so their parts off the start screen follow the wiki); 1-8,
-1-10 and 1-11 from the playthrough video [VID] and the wiki. 1-5 keeps Kevin's 13 Oct climb with the
-start shed from AL's copy (only its bottom room is on the start screen). The old 1-11 "Salt Factory" is
-not a World 1 level; it is now 1-11 Fired.
+The old 1-11 "Salt Factory" is not a World 1 level; it is now 1-11 Fired.
+
+Redrawn again on 27 Oct (evening), whole levels this time, one tile of the game to one PEAK tile. A level
+that scrolls was put together from the 1080p playthrough [VID1080]: its frames, 15 a second, laid over each
+other as the camera moves. The tile size was measured on each image (Meat Boy is 0.69 tile tall, a metal
+block is one tile); the wiki captures are about 4 percent bigger than the video.
+
+| Level | Source | Tile in the source | Confidence |
+|---|---|---|---|
+| 1-1 Hello World | wiki capture [SHOT], one screen | 65 px | high |
+| 1-2 Upward | [VID1080] 119 to 122 s, stitched; the wiki capture for the saw | 49.8 px | high |
+| 1-3 The Gap | AL's copy (unchanged) | 48 px | high |
+| 1-4 Nutshell | [VID1080] 139 to 148 s, stitched | 61.5 px | high |
+| 1-5 Holy Mountain | [VID1080] 240 to 247 s, stitched | 49.8 px | medium |
+| 1-6 Bladecatcher | wiki capture, one screen | 50.25 px | high |
+| 1-7 Diverge | [VID1080] 260 to 265 s, stitched | 49.8 px | high |
+| 1-8 The Bit | wiki capture, one screen | 65.25 px | high |
+| 1-9 Safety Third | [VID1080] 286 to 291 s, stitched | 49.8 px | medium |
+| 1-10 The Levee | wiki capture, one screen | 58 px | high |
+| 1-11 Fired | [VID1080] 307 to 313 s, stitched | 49.8 px | medium |
+
+Saws sit where the source shows them, at the size it shows. A saw inside solid rock (1-2, 1-4) cannot be
+touched, as in the game. What PEAK cannot draw: slopes (a slope is a step of whole tiles), half tiles (the
+right ledge in 1-1 is 2.5 tiles high, 2 in PEAK; the floor of the 1-4 top chamber sits half a tile low), the
+warp zone hut's portal in 1-5 (its roof is a platform, the portal is not built), and the saws behind the
+windows of the 1-8 pillar (left out: they are inside solid metal). The rock outlines of 1-5, 1-9 and 1-11
+are organic and were read by eye from the stitched images, so a tile here or there may differ.
 
 | Level | A+ par (s) | Record (s) | What it teaches (stated [WIKI]) |
 |---|---|---|---|
@@ -113,7 +135,9 @@ in a metal housing at its top, facing the gap.
 ## Local reference data (not in git)
 
 `meatboy-data/` (git-ignored, like `megaman-data/`) holds the screenshots taken from AL's installed game
-(`screens/`) and the playthrough video [VID] (`video/`). Nothing in PEAK needs the folder at run time.
+(`screens/`), the playthrough videos [VID] and [VID1080] (`video/`), and in `web/` the wiki captures, the
+stitched levels, the scripts that made them and side by side comparisons with PEAK (`web/compare/`).
+Nothing in PEAK needs the folder at run time.
 
 ## Sources
 
@@ -134,6 +158,8 @@ in a metal housing at its top, facing the gap.
 - [PCGW] https://www.pcgamingwiki.com/wiki/Super_Meat_Boy (60 fps cap)
 - [SHOT] Wiki screenshots, e.g. https://static.wikia.nocookie.net/supermeatboy/images/f/f9/SMB_1-3_LW.png
 - [VID] Mastermaxify, "Super Meat Boy World 1 100% (Forest)", 2015. https://youtu.be/J4_yb6JX3rQ
+- [VID1080] "Super Meat Boy Chapter 1: The Forest Full Playthrough (No Commentary) 1080p 60FPS".
+  https://youtu.be/g5nzkzyZmAc
 - Kevin's measurements: commit `f177d6e39` (run acceleration, fall cap, wall jump, from a 1-13 walkthrough).
 
 Full research notes with every quote: the session notes file `smb_research.md` (outside the repo).

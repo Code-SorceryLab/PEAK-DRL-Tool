@@ -446,6 +446,30 @@ def _trainer_cmd(game, level=None, gens=None, turbo=False, serve=True, run_dir=N
     return cmd
 
 
+def run_with_loading(cmd, env=None, label="Loading", on_ready=None) -> int:
+    """Run a PEAK program that opens a window or a dashboard, with a loading bar in the terminal until it
+    is up (the program touches PEAK_READY_FILE then) or it ends; on_ready runs once it is up."""
+    import tempfile
+    ready = Path(tempfile.gettempdir()) / f"peak_ready_menu_{os.getpid()}"
+    ready.unlink(missing_ok=True)
+    proc = subprocess.Popen(cmd, env={**(env or os.environ), "PEAK_READY_FILE": str(ready)})
+    start, width = time.time(), 24
+    try:
+        while proc.poll() is None and not ready.exists():
+            done = int(width * min(0.95, (time.time() - start) / 5))   # about 5 s for the slowest to show
+            print(f"\r    {_DIM(label)}  {_CYAN('█' * done + '·' * (width - done))}", end="", flush=True)
+            time.sleep(0.1)
+        print("\r" + " " * (width + len(label) + 8) + "\r", end="", flush=True)
+        if ready.exists() and on_ready:
+            on_ready()
+        return proc.wait()
+    except KeyboardInterrupt:
+        proc.terminate()
+        return proc.wait()
+    finally:
+        ready.unlink(missing_ok=True)
+
+
 def execute_training_run(cmd) -> bool:
     """Run one trainer subprocess; echo the command like classic PEAK did."""
     print(_DIM("  >>> " + " ".join(cmd)))
@@ -888,7 +912,8 @@ def run_user_study():
     print(_DIM("    The study runs in the pop-up window: type the participant ID there, then pick the game.\n"
                "    After each session it asks for the next ID; ESC there closes it."))
     env = {k: v for k, v in os.environ.items() if k != "SDL_VIDEODRIVER"}   # a real window
-    subprocess.run([sys.executable, "-m", "code.games.tools.game_select", "--study"] + NO_RESTORE, env=env)
+    run_with_loading([sys.executable, "-m", "code.games.tools.game_select", "--study"] + NO_RESTORE, env=env,
+                     label="Loading the study")
 
 
 def run_manual_play():
@@ -907,7 +932,7 @@ def run_manual_play():
     cmd += NO_RESTORE
     print(_DIM("    Pick a game on screen: d-pad / arrows, A / Enter to play, B to go back, ESC to exit."))
     print()
-    subprocess.run(cmd, env=proc_env)
+    run_with_loading(cmd, env=proc_env, label="Loading the games")
     if player:
         print(f"    Recorded attempts  →  {_CYAN(str(Path('runs') / 'manual' / '<game>' / player / 'episodes.csv'))}")
 
@@ -945,10 +970,8 @@ def watch_trained_agent():
     game = guess_game_for_run(run_dir)
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print(_DIM("    Ctrl+C to stop the replay.\n"))
-    threading.Timer(2.0, lambda: webbrowser.open(DASHBOARD_URL)).start()  # after the server is up
-    execute_training_run(
-        [sys.executable, "-m", "code.neuro.trainer", "--game", game,
-         "--replay", str(best)])
+    run_with_loading([sys.executable, "-m", "code.neuro.trainer", "--game", game, "--replay", str(best)],
+                     label="Loading the agent", on_ready=lambda: webbrowser.open(DASHBOARD_URL))
 
 
 def watch_all_models():
@@ -967,9 +990,8 @@ def watch_all_models():
     game = guess_game_for_run(run_dir)
     print(f"\n    Dashboard  →  {_CYAN(DASHBOARD_URL)}")
     print(_DIM("    Training continues while you watch. Ctrl+C to stop.\n"))
-    execute_training_run(
-        [sys.executable, "-m", "code.neuro.trainer", "--game", game,
-         "--resume", str(run_dir)])
+    run_with_loading([sys.executable, "-m", "code.neuro.trainer", "--game", game, "--resume", str(run_dir)],
+                     label="Loading the run")
 
 
 def watch_random_agent():
@@ -984,10 +1006,10 @@ def watch_random_agent():
     proc_env = os.environ.copy()
     proc_env.pop("SDL_VIDEODRIVER", None)
     print(_DIM(f"\n    Launching {game} with random actions... (ESC to quit)\n"))
-    subprocess.run(
+    run_with_loading(
         [sys.executable, "-m", "code.games.tools.manual_play",
          "--game", CONFIG_KEY.get(game, game), "--fps", "60", "--random"],
-        env=proc_env
+        env=proc_env, label="Loading the game"
     )
 
 
@@ -1022,9 +1044,9 @@ def run_level_editor():
 
     print("  >>>", " ".join(cmd), "\n")
     try:
-        subprocess.run(cmd, check=True, env=env_vars)
-    except subprocess.CalledProcessError as e:
-        print(f"\n  Editor exited with error code {e.returncode}")
+        code = run_with_loading(cmd, env=env_vars, label="Loading the editor")
+        if code:
+            print(f"\n  Editor exited with error code {code}")
     except KeyboardInterrupt:
         print("\n  Editor closed.")
 
@@ -1345,7 +1367,7 @@ def play_mutant():
     cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
            "--fps", "60", "--level", level, "--record", str(record), "--player", player]
     print(_DIM(f"    Launching {game} · {variant}... (ESC to quit)\n"))
-    subprocess.run(cmd, env=env)
+    run_with_loading(cmd, env=env, label="Loading the game")
 
 
 def retrain_mutants():

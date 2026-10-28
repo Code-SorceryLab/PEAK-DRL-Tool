@@ -851,3 +851,8 @@ while running:
 if input_log:
     input_log.close()
 pygame.quit()
+# Started by hand, quitting goes back to SELECT GAME; the game select, the study, a recording, a demo, random
+# play and the level editor's play-test each wait for this process and take over again themselves.
+if not (os.environ.get("PEAK_READY_FILE") or args.record or args.demo or args.random or args.quit_after or level_file):
+    os.execv(sys.executable, [sys.executable, "-m", "code.games.tools.game_select"]
+             + (["-ApplePersistenceIgnoreState", "YES"] if sys.platform == "darwin" else []))

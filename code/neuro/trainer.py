@@ -615,6 +615,8 @@ def main() -> None:
         state = SharedState(Controls(turbo=args.turbo))
         start_server(state, http_port=args.port)
         print(f"dashboard: http://127.0.0.1:{args.port}/{args.game}/index.html", flush=True)
+        if os.environ.get("PEAK_READY_FILE"):   # the menu's loading bar stops; it opens the browser now
+            open(os.environ["PEAK_READY_FILE"], "a").close()
 
     if args.replay:
         replay(args.replay, args.game, args.level, state, loop=args.loop)
