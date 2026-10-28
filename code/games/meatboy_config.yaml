@@ -1,37 +1,27 @@
-# Super Meat Boy character — monolithic loadout (the "old way").
-# Physics tuned to the SkarnKain Super-Meat-Boy-JS-Remake reference
-# (50 fps, 30 px blocks, forces applied twice per frame), converted to
-# px/s at 32 px tiles: floaty-but-fast classic SMB feel, ~3.4-tile max jump,
-# very fast sprint, damped wall-slide fall.
+# Super Meat Boy (Team Meat, 2010) as PEAK plays it. Every value, its source and what it was before:
+# docs/MEATBOY_SMB_RESEARCH.md. Scale: one Meat Boy height (u) = 0.7 tile = 22.4 px; fixed 60 Hz step.
 tile_size: 32
 player:
-  width: 18
-  height: 26
+  width: 22                # a cube about 0.7 tile tall
+  height: 22
 physics:
-  gravity: 1060.0          # JS: 0.2*2 px/f^2 @50fps -> ~1067 px/s^2
-  fast_fall_grav: 1060.0   # JS has no fast-fall distinction
-  max_fall_speed: 450.0    # Super Meat Boy falls ~20 body-lengths/s (walkthrough, 1-13); was 1400
+  gravity: 918.0           # 41 u/s^2 (DiGRA 2016)
+  max_fall_speed: 500.0    # none seen within a full jump (DiGRA); about 20 u/s in 1-13 (Kevin)
 movement:
-  walk_accel: 810.0        # same 0.54 ratio to run_accel as before; was 2600
-  run_accel: 1500.0        # 0 -> 600 px/s in 0.4 s, as Super Meat Boy (walkthrough 1-13, 206.98-207.38 s); was 4800
-  max_walk_speed: 300.0
-  max_run_speed: 600.0     # JS sustained ~10.2 px/f (~544); cap 13 (~693)
-  air_control: 1.0         # JS air accel == ground accel
-  ground_friction: 3600.0
-  air_friction: 300.0
-  skid_decel: 7000.0
+  walk_accel: 784.0        # 35 u/s^2, top speed in 0.52 s (DiGRA)
+  max_walk_speed: 403.0    # 18 u/s (DiGRA)
+  run_accel: 1500.0        # 0 -> 600 px/s in 0.4 s (Kevin, 1-13 walkthrough)
+  max_run_speed: 600.0     # about 27 u/s, what the 1-3 record of 1.37 s needs (estimate)
+  turn_factor: 2.0         # acceleration doubles against the motion: 70 vs 35 u/s^2 (DiGRA)
 jump:
-  jump_vel: 480.0          # JS max impulse 0.9*2*5 = 9 px/f -> ~480 px/s
-  cut_vel: 150.0
-  coyote_frames: 6
-  buffer_frames: 6
-  max_jumps: 1
+  jump_vel: 470.0          # 21 u/s at any speed (DiGRA)
+  min_hold_frames: 8       # a tap rises 2.2 u as DiGRA measured (their "0.1 s hold"); let go after that, the climb stops
 wall:
-  slide_max_speed: 280.0   # JS slide terminal ~5.3 px/f -> ~283 px/s
-  wall_jump_vy: 500.0      # ~22 body-lengths/s up off a wall in Super Meat Boy (1-13); was 580
-  wall_jump_push: 500.0    # ~18-23 body-lengths/s away from the wall in Super Meat Boy; was 620
-  wall_jump_push_away: 645.0  # holding away: the same 1.3x the plain push as before; was 800
-  control_lockout_frames: 6
+  slide_max_speed: 180.0   # 8 u/s (estimate: no source gives it)
+  stick_frames: 12         # 200 ms on the wall after pulling away (Refenes)
+  wall_jump_vy: 500.0      # about 22 u/s up (Kevin, 1-13)
+  wall_jump_push: 500.0    # about 22 u/s away (Kevin, 1-13)
+crumble_seconds: 0.75      # "slightly longer" than the Flash game's half second (wiki; estimate)
 levels:
   - meatboy/world1_01_hello_world.txt
   - meatboy/world1_02_upward.txt
@@ -43,5 +33,5 @@ levels:
   - meatboy/world1_08_the_bit.txt
   - meatboy/world1_09_safety_third.txt
   - meatboy/world1_10_the_levee.txt
-  - meatboy/world1_11_salt_factory.txt
+  - meatboy/world1_11_fired.txt
 max_steps: 4000

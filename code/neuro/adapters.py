@@ -48,7 +48,7 @@ class GameAdapter(Protocol):
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
 TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
 N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6}   # megaman: left, right, jump, up, down, fire
-N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
+N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "meatboy": 21}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
 OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels kept in the game's own, editor-owned file
 # Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,
 # but kept out of the menus and off the default sweep roster so they do not cost probe budget.
@@ -472,16 +472,35 @@ class MeatboyAdapter(_EventWeights):
 
     _MOVE_MD = {-1: 1, 0: 0, 1: 2}
     _FIT_SCALE = 1000.0
+    _SOLID_CODES = {1, 2, 5, 7}   # Map_parameters: ground, platform, question block, crumble
+    SENSOR_LABELS = [  # dashboard telemetry layout for the 21-slot vector built in sense()
+        {"g": "Proximity rays", "color": "bg-zinc-300", "rows": [
+            {"i": i, "l": n, "d": f"Ray {d}: distance to the nearest solid tile", "inv": True}
+            for i, (n, d) in enumerate((("FWD", "straight ahead"), ("U30", "30 degrees up"), ("U60", "60 degrees up"),
+                                        ("D30", "30 degrees down"), ("D60", "60 degrees down"), ("BCK", "straight back")))]},
+        {"g": "Threats", "color": "bg-red-500", "rows": [
+            {"i": 6, "l": "NMY", "d": "Saw straight ahead: distance", "inv": True},
+            {"i": 7, "l": "PIT", "d": "No floor below a point 1.5 tiles ahead", "inv": False},
+            {"i": 17, "l": "SX", "d": "Nearest saw, horizontal bearing (left negative, right positive)", "center": True, "inv": False},
+            {"i": 18, "l": "SY", "d": "Nearest saw, vertical bearing (up negative, down positive)", "center": True, "inv": False},
+            {"i": 19, "l": "SAW", "d": "Nearest saw: distance to its blade", "inv": True}]},
+        {"g": "Body", "color": "bg-sky-400", "rows": [
+            {"i": 8, "l": "GND", "d": "On the ground", "inv": False},
+            {"i": 9, "l": "VX", "d": "Horizontal velocity", "center": True, "inv": False},
+            {"i": 10, "l": "VY", "d": "Vertical velocity", "center": True, "inv": False},
+            {"i": 11, "l": "JMP", "d": "Jump possible (on the ground or on a wall)", "inv": False},
+            {"i": 20, "l": "RISE", "d": "In a jump that letting go of jump still cuts short", "inv": False}]},
+        {"g": "Walls", "color": "bg-amber-400", "rows": [
+            {"i": 14, "l": "WL", "d": "In the air against a wall on the left", "inv": False},
+            {"i": 15, "l": "WR", "d": "In the air against a wall on the right", "inv": False},
+            {"i": 16, "l": "CEIL", "d": "Head against the ceiling", "inv": False}]},
+    ]
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
                  sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         pygame.init()  # MeatboyCore does not init pygame itself
         from code.games.meatboy_core import MeatboyCore
-        from code.games.modules.Parameters.Map_parameters import (
-            TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE,
-        )
-        self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
         self.win_bonus = win_bonus
         self.sprint = sprint        # persona capability: run/sprint action variants
         self.time_rate = time_rate  # persona objective: fitness per second left on a win
@@ -523,7 +542,7 @@ class MeatboyAdapter(_EventWeights):
     @property
     def can_jump(self) -> bool:
         p = self.core.player
-        return bool(p.on_ground or p.coyote > 0 or (not p.on_ground and (p.contact_left or p.contact_right)))
+        return bool(p.on_ground or p.wall_dir)
 
     @property
     def camera(self) -> tuple[float, float]:
@@ -565,10 +584,31 @@ class MeatboyAdapter(_EventWeights):
             return True
         if tx >= ld.cols or ty < 0 or ty >= ld.rows:
             return False
-        return ld.grid[ty][tx] in self._solid_codes
+        return ld.grid[ty][tx] in self._SOLID_CODES
 
     def enemy_positions(self) -> list[tuple[float, float]]:
         return [(float(s.cx), float(s.cy)) for s in self.core.level_data.saws]
+
+    def sense(self, march, ray_max, hit_solid, hit_enemy, hit_none, tile_hit, tile_probe):
+        """21-slot vector (see SENSOR_LABELS): the 14 shared rays plus what Super Meat Boy is played with,
+        the walls to jump off, the ceiling, the nearest saw (moving ones too) and a jump still rising."""
+        import math
+        import numpy as np
+        from .sensors import shared_rays
+        vec, rays, tiles = shared_rays(self)
+        p, ox, oy = self.core.player, self.x, self.y
+        saw = min(self.core.level_data.saws, key=lambda s: math.hypot(s.cx - ox, s.cy - oy) - s.radius, default=None)
+        sx = sy = 0.0
+        sd = ray_max
+        if saw is not None:
+            sx = float(np.clip((saw.cx - ox) / ray_max, -1.0, 1.0))
+            sy = float(np.clip((saw.cy - oy) / ray_max, -1.0, 1.0))
+            sd = min(max(math.hypot(saw.cx - ox, saw.cy - oy) - saw.radius, 0.0), ray_max)
+            if sd < ray_max:
+                rays.append((ox, oy, saw.cx, saw.cy, hit_enemy))
+        extra = [float(p.wall_dir < 0), float(p.wall_dir > 0), float(p.contact_ceiling), sx, sy, sd / ray_max,
+                 float(p.jumping)]
+        return np.concatenate([vec, np.asarray(extra, dtype=np.float32)]), rays, tiles
 
     def _count_enemies(self) -> int:
         return 0  # saws are hazards, not enemies: no kill events in Meat Boy

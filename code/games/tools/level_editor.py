@@ -55,12 +55,16 @@ GAME_LABELS = {
     "platformer": "Mario / Platformer",
     "sonic": "Sonic",
     "megaman": "Mega Man (NES)",
+    "meatboy": "Super Meat Boy",
 }
 
 # Games that keep their level list in their own file, next to game_config.yaml, in the same
 # levels / disabled_levels shape; the rest of that game's configuration is never rewritten here.
+# A plain list of files (meatboy: the level id is the list index) is read only: that file also
+# holds the game's settings and comments, which a rewrite would lose.
 GAME_LEVELS_CONFIG = {
     "megaman": "megaman_levels.yaml",
+    "meatboy": "meatboy_config.yaml",
 }
 # Games built from fixed-size screens (cols, rows): the viewport outlines them, and the level is
 # saved untrimmed so the screens stay on their grid. A screen block left blank does not exist.
@@ -68,12 +72,15 @@ GAME_SCREEN_GRID = {
     "megaman": (16, 15),
 }
 # Games whose physics is not tuned per level: no sliders, nothing baked into the sidecar YAML.
-NO_PHYSICS_GAMES = {"megaman"}
+NO_PHYSICS_GAMES = {"megaman", "meatboy"}
+# Games whose sidecar holds saws (dynamics: saws), placed with the saw tool.
+SAW_GAMES = {"meatboy"}
 
 GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
     "sonic": ["green_hill*.txt", "sonic*.txt", "gh*.txt"],
     "megaman": ["*.txt"],
+    "meatboy": ["*.txt"],
 }
 
 TILE_LIBRARY = [
@@ -120,6 +127,9 @@ TILE_LIBRARY = [
     ('w', 'Screw (floor)',  (200, 160, 60),  (30, 20, 0)),
     ('W', 'Screw (ceil)',   (200, 160, 60),  (30, 20, 0)),
     ('+', 'Life Energy',    (250, 230, 150), (40, 30, 0)),
+    # Super Meat Boy
+    ('%', 'Crumble',        (150, 110, 80),  (40, 20, 10)),
+    ('*', 'Saw',            (110, 110, 120), (230, 230, 240)),
 ]
 TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
 TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
@@ -128,6 +138,7 @@ GAME_TILE_ORDER = {
     "sonic": [' ', '#', '=', '^', 'O', 'S', '/', '\\', '(', ')', '[', ']', 'U', 'n', 'C', 'E', 'G', 'P'],
     "megaman": [' ', '#', 'H', '^', 'D', 'G', 'X', 'P',
                  'b', 'k', 'j', 'K', 'J', 'c', 'f', 'v', 'h', 's', 'e', 'w', 'W', '+'],
+    "meatboy": [' ', '#', '%', '*', '^', 'G', 'P'],
 }
 SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
 
@@ -154,6 +165,10 @@ class PlatformDef:
     def from_dict(cls, d):
         return cls(d['start'],d['end'],d.get('speed',PLAT_DEFAULT_SPD),
                    d.get('width',PLAT_DEFAULT_W),d.get('height',PLAT_DEFAULT_H))
+
+# ─── Saw (sidecar dynamics: saws, kept as the dicts found there) ──
+SAW_BRUSH = "__saw__"; SAW_DEFAULT_D = TILE_SIZE * 2   # the loader's default diameter
+SAW_COL = (110,110,120); SAW_EDGE = (160,160,170)        # as Objects/Saw.py draws them
 
 # ─── UI Colors ───────────────────────────────────────────────────
 UI_BG=(18,8,12); UI_PANEL=(26,12,18); UI_PANEL2=(36,18,26)
@@ -457,6 +472,9 @@ class GameConfig:
     def _write_yaml(self, data):
         if not self.config_path or yaml is None:
             return False
+        if isinstance(self._root_cfg(self.yaml_data).get('levels'), list):
+            print(f"[GameConfig] {self.config_path.name} is not rewritten here: edit its levels: list by hand, one '  - {self.game}/<file>.txt' per level")
+            return False
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
@@ -585,6 +603,8 @@ class GameConfig:
 
         root_cfg = self._root_cfg(self.yaml_data)
         raw = root_cfg.get('levels', {}) or {}
+        if isinstance(raw, list):   # a plain list of files: the level id is the index
+            raw = {str(i): {'file': f} for i, f in enumerate(raw)}
         for lid, lcfg in raw.items():
             if isinstance(lcfg, dict):
                 self.levels[str(lid)] = lcfg
@@ -1050,6 +1070,7 @@ class Level:
         self.rows=rows; self.cols=cols; self.grid=[[' ']*cols for _ in range(rows)]
         self.platforms=[]; self.filename=None; self.level_id=None
         self.physics_overrides={}; self.enemy_physics={}
+        self.saws=[]; self.sidecar={}; self.eol=''   # sidecar: as loaded; eol: the file's last newline, kept
     def get(self,r,c): return self.grid[r][c] if 0<=r<self.rows and 0<=c<self.cols else None
     def set(self,r,c,ch):
         if r<0 or c<0: return
@@ -1085,15 +1106,20 @@ class Level:
             lines.append(''.join(rc))
         return '\n'.join(lines)
     def save(self, path, trim=None):
-        with open(path,'w') as f: f.write(self.to_ascii(trim=self.TRIM if trim is None else trim))
+        with open(path,'w') as f: f.write(self.to_ascii(trim=self.TRIM if trim is None else trim)+self.eol)
         self.filename=str(path); self._save_yaml(path)
     def _save_yaml(self, tp):
         if yaml is None: return
         if not self.SAVE_PHYSICS:
-            if not self.platforms: return
+            if not (self.platforms or self.saws or self.sidecar): return
             self.physics_overrides={}; self.enemy_physics={}
         yp=str(tp).rsplit('.',1)[0]+'.yaml'
-        d={'dynamics':{'moving_platforms':[p.to_dict() for p in self.platforms]} if self.platforms else {}}
+        d=copy.deepcopy(self.sidecar)   # keys the editor does not own go back as they were
+        dyn=d['dynamics']=dict(d.get('dynamics') or {})
+        for key,items in (('moving_platforms',[p.to_dict() for p in self.platforms]),('saws',self.saws)):
+            if items: dyn[key]=items
+            else: dyn.pop(key,None)
+        if self.SAVE_PHYSICS: d.pop('physics',None)
         if self.physics_overrides:
             d['physics']=self.physics_overrides
         if self.enemy_physics:
@@ -1105,8 +1131,11 @@ class Level:
         if not Path(yp).exists(): return
         try:
             with open(yp,'r') as f: data=yaml.safe_load(f) or {}
+            self.sidecar=data
             for pd in (data.get('dynamics',{}) or {}).get('moving_platforms',[]):
                 self.platforms.append(PlatformDef.from_dict(pd))
+            # keys a saw leaves out get the loader's defaults, so every saw can be drawn and dragged
+            self.saws=[{'x':0,'y':0,'diameter':SAW_DEFAULT_D,**s} for s in (data.get('dynamics') or {}).get('saws') or []]
             ph=data.get('physics',{}) or {}
             if ph:
                 self.physics_overrides={k:v for k,v in ph.items() if k!='enemies'}
@@ -1117,11 +1146,13 @@ class Level:
         n.filename=self.filename; n.level_id=self.level_id
         n.platforms=[PlatformDef(p.start[:],p.end[:],p.speed,p.width,p.height) for p in self.platforms]
         n.physics_overrides=dict(self.physics_overrides); n.enemy_physics=dict(self.enemy_physics)
+        n.saws=copy.deepcopy(self.saws); n.sidecar=self.sidecar; n.eol=self.eol
         return n
     @classmethod
     def from_ascii(cls, text):
-        lines=text.split('\n'); rows=len(lines); cols=max((len(l) for l in lines),default=DEFAULT_COLS)
-        lv=cls(rows,cols)
+        # a final newline ends the last row; it is not one more, empty row
+        lines=text.removesuffix('\n').split('\n'); rows=len(lines); cols=max((len(l) for l in lines),default=DEFAULT_COLS)
+        lv=cls(rows,cols); lv.eol='\n' if text.endswith('\n') else ''
         for r,line in enumerate(lines):
             for c,ch in enumerate(line): lv.grid[r][c]=ch
         return lv
@@ -1164,11 +1195,13 @@ class Editor:
         self.last_cell=None; self.hover_cell=None; self.dirty=False
         self.plat_placing=False; self.plat_start_world=None; self.plat_ghost_end=None
         self.plat_default_spd=PLAT_DEFAULT_SPD; self.sel_plat_idx=None
+        self.saw_default_d=SAW_DEFAULT_D; self.sel_saw_idx=None   # a saw is placed like a platform: plat_placing
         self.drag_handle=None; self.drag_offset=(0.0,0.0)
         self.right_scroll=0; self.right_max_scroll=0; self.browser_level_id=None
         self._sb_thumb=pygame.Rect(0,0,0,0); self._sb_drag=False; self._sb_dy=0; self._sb_ds=0
         self._hs_thumb=pygame.Rect(0,0,0,0); self._hs_drag=False; self._hs_dx=0; self._hs_dc=0.0
         self._spd_m=pygame.Rect(0,0,0,0); self._spd_p=pygame.Rect(0,0,0,0)
+        self._dia_m=pygame.Rect(0,0,0,0); self._dia_p=pygame.Rect(0,0,0,0)
         self._tile_rects={}; self._tool_rects={}
         self._lv_btn={}; self._ul_btn={}; self._ul_del={}
         self._tog_btn={}; self._ren_btn={}; self._del_btn={}; self._dh_rects={}
@@ -1229,7 +1262,7 @@ class Editor:
         if self.undo_stack: self.redo_stack.append(self.level.clone()); self.level=self.undo_stack.pop(); self.dirty=True
     def redo(self):
         if self.redo_stack: self.undo_stack.append(self.level.clone()); self.level=self.redo_stack.pop(); self.dirty=True
-    def clear_all(self): self.push_undo(); self.level.clear_all(); self.level.platforms.clear(); self.dirty=True
+    def clear_all(self): self.push_undo(); self.level.clear_all(); self.level.platforms.clear(); self.level.saws.clear(); self.dirty=True
     def resize_grid(self,nr,nc): self.push_undo(); self.level.resize(nr,nc); self.dirty=True
     def w2s(self,wx,wy):
         ts=TILE_SIZE*self.zoom; return (int(wx*ts-self.cam_x+LEFT_PANEL_W),int(wy*ts-self.cam_y+TOOLBAR_H))
@@ -1262,6 +1295,22 @@ class Editor:
                 hsx,hsy=self.wp2s(wp[0]+p.width/2,wp[1]+p.height/2)
                 if math.hypot(sx-hsx,sy-hsy)<=HANDLE_HIT_R: return i,h
         return None,None
+    def s2saw(self,sx,sy):
+        # a saw centre snaps to half tiles: a cell's centre or its corner
+        h=TILE_SIZE//2; wx,wy=self.s2wp(sx,sy,snap=False); return int(round(wx/h)*h),int(round(wy/h)*h)
+    def ht_saw(self,sx,sy):
+        for i,s in enumerate(self.level.saws):
+            for h,wp in (('start',(s['x'],s['y'])),('end',s.get('end'))):
+                if wp:
+                    hsx,hsy=self.wp2s(*wp)
+                    if math.hypot(sx-hsx,sy-hsy)<=HANDLE_HIT_R: return i,h
+        return None,None
+    def sel_saw(self):
+        i=self.sel_saw_idx; return self.level.saws[i] if i is not None and 0<=i<len(self.level.saws) else None
+    def resize_saw(self,step):
+        s=self.sel_saw()
+        if s is None: self.saw_default_d=max(8,min(512,self.saw_default_d+step)); return
+        self.push_undo(); s['diameter']=max(8,min(512,s['diameter']+step)); self.dirty=True
     def load_by_id(self,lid):
         path=self.gc.get_level_file_path(lid)
         if not path: return False
@@ -1270,7 +1319,7 @@ class Editor:
             self.undo_stack.clear(); self.redo_stack.clear()
             self.dirty=False; self._center(); self.browser_level_id=lid; return True
         except: return False
-    def brush(self): return ' ' if self.eraser_mode or self.selected_tile==MOVING_PLATFORM_BRUSH else self.selected_tile
+    def brush(self): return ' ' if self.eraser_mode or self.selected_tile in (MOVING_PLATFORM_BRUSH,SAW_BRUSH) else self.selected_tile
     def start_lv_drag(self,lid,si,my): self._drag_lid=lid;self._drag_si=si;self._drag_y=my;self._drag_di=si
     def finish_lv_drag(self):
         if not self._drag_lid: return
@@ -1342,6 +1391,27 @@ def draw_platforms(surf,ed,vp):
         pygame.draw.circle(surf,HANDLE_START,(sx0+sw//2,sy0+sh//2),HANDLE_R)
         pygame.draw.circle(surf,HANDLE_END,(ex0+sw//2,ey0+sh//2),HANDLE_R)
 
+def draw_saws(surf,ed):
+    def blade(c,d,edge=SAW_EDGE):
+        r=max(2,int(d*ed.zoom/2)); pygame.draw.circle(surf,SAW_COL,c,r); pygame.draw.circle(surf,edge,c,r,2)
+    h=TILE_SIZE//2
+    for r,row in enumerate(ed.level.grid):   # the '*' glyph: a static saw two tiles across, centred on its cell
+        for c,ch in enumerate(row):
+            if ch=='*': blade(ed.wp2s(c*TILE_SIZE+h,r*TILE_SIZE+h),SAW_DEFAULT_D)
+    handles=[]
+    for i,s in enumerate(ed.level.saws):
+        c=ed.wp2s(s['x'],s['y']); handles.append((c,HANDLE_START))
+        if s.get('end'):
+            e=ed.wp2s(*s['end']); handles.append((e,HANDLE_END))
+            pygame.draw.line(surf,PLAT_PATH_COL,c,e,2); pygame.draw.circle(surf,SAW_EDGE,e,max(2,int(s['diameter']*ed.zoom/2)),1)
+        blade(c,s['diameter'],PLAT_SEL_COL if i==ed.sel_saw_idx else SAW_EDGE)
+    if ed.selected_tile==SAW_BRUSH and ed.plat_placing and ed.plat_ghost_end:
+        c=ed.wp2s(*ed.plat_start_world); e=ed.wp2s(*ed.plat_ghost_end); r=max(2,int(ed.saw_default_d*ed.zoom/2))
+        pygame.draw.line(surf,PLAT_PATH_COL,c,e,2); pygame.draw.circle(surf,SAW_EDGE,c,r,1); pygame.draw.circle(surf,SAW_EDGE,e,r,1)
+        handles+=[(c,HANDLE_START),(e,HANDLE_END)]
+    for p,cl in handles:   # on top of every blade
+        pygame.draw.circle(surf,cl,p,HANDLE_R); pygame.draw.circle(surf,(255,255,255),p,HANDLE_R,2)
+
 def draw_viewport(surf,ed,font,sfont):
     vx=LEFT_PANEL_W;vy=TOOLBAR_H;vw=WINDOW_W-LEFT_PANEL_W-RIGHT_PANEL_W;vh=WINDOW_H-TOOLBAR_H-STATUS_H-HSB_H
     vp=pygame.Rect(vx,vy,vw,vh); surf.set_clip(vp); pygame.draw.rect(surf,UI_BG,vp)
@@ -1355,6 +1425,7 @@ def draw_viewport(surf,ed,font,sfont):
             if tr.colliderect(vp): render_tile_object(surf,ch,sx,sy,int(ts))
     bx,by=ed.w2s(0,0); pygame.draw.rect(surf,(70,88,140),(bx,by,int(lv.cols*ts),int(lv.rows*ts)),2)
     draw_platforms(surf,ed,vp)
+    if ed.game in SAW_GAMES: draw_saws(surf,ed)
     if ed.show_grid and ts>=6:
         for c in range(cs,ce+1):
             sx=int(c*ts-ed.cam_x+vx);bold=c%10==0
@@ -1395,6 +1466,20 @@ def draw_viewport(surf,ed,font,sfont):
 
 # (Left panel, right panel, toolbar, status — using same logic as v3
 #  but with the critical toolbar click fix applied in main loop)
+
+def draw_step_row(surf,sfont,y,text):
+    """A value with - and + buttons, under a tool button; returns the two button rects."""
+    px=LEFT_PANEL_W;pad=8;sr=pygame.Rect(pad,y,px-pad*2,24)
+    pygame.draw.rect(surf,UI_PANEL2,sr,border_radius=3);pygame.draw.rect(surf,UI_BORDER,sr,1,border_radius=3)
+    try:sfont.render_to(surf,(pad+6,y+6),text,fgcolor=UI_TEXT,size=10)
+    except:pass
+    bw=18;mr=pygame.Rect(px-pad-bw*2-4,y+3,bw,18);pr2=pygame.Rect(px-pad-bw,y+3,bw,18)
+    for btn,sym in [(mr,'-'),(pr2,'+')]:
+        pygame.draw.rect(surf,UI_BORDER,btn,border_radius=3)
+        try:
+            b=sfont.get_rect(sym,size=12);sfont.render_to(surf,(btn.x+(btn.w-b.width)//2,btn.y+(btn.h-b.height)//2),sym,fgcolor=UI_TEXT,size=12)
+        except:pass
+    return mr,pr2
 
 def draw_left_panel(surf,ed,font,sfont):
     px=LEFT_PANEL_W;pad=8
@@ -1438,22 +1523,29 @@ def draw_left_panel(surf,ed,font,sfont):
     try:sfont.render_to(surf,(pad+28,y+7),"V  Platform",fgcolor=UI_TEXT if pa else UI_SUBTEXT,size=11)
     except:pass
     if pa:pygame.draw.rect(surf,UI_ACCENT,pr,1,border_radius=4)
-    y+=30;sr=pygame.Rect(pad,y,px-pad*2,24)
-    pygame.draw.rect(surf,UI_PANEL2,sr,border_radius=3);pygame.draw.rect(surf,UI_BORDER,sr,1,border_radius=3)
-    try:sfont.render_to(surf,(pad+6,y+6),f"Spd: {ed.plat_default_spd:.0f}",fgcolor=UI_TEXT,size=10)
-    except:pass
-    bw=18;mr=pygame.Rect(px-pad-bw*2-4,y+3,bw,18);pr2=pygame.Rect(px-pad-bw,y+3,bw,18)
-    for btn,sym in [(mr,'-'),(pr2,'+')]:
-        pygame.draw.rect(surf,UI_BORDER,btn,border_radius=3)
-        try:
-            b=sfont.get_rect(sym,size=12);sfont.render_to(surf,(btn.x+(btn.w-b.width)//2,btn.y+(btn.h-b.height)//2),sym,fgcolor=UI_TEXT,size=12)
-        except:pass
-    ed._spd_m=mr;ed._spd_p=pr2;y+=28
+    y+=30;ed._spd_m,ed._spd_p=draw_step_row(surf,sfont,y,f"Spd: {ed.plat_default_spd:.0f}");y+=28
     if pa:
         hint="Click END" if ed.plat_placing else "Click START";hcol=UI_WARN if ed.plat_placing else UI_ACCENT2
         try:sfont.render_to(surf,(pad+4,y),hint,fgcolor=hcol,size=10)
         except:pass
         y+=16
+    if ed.game in SAW_GAMES:
+        y+=8;pygame.draw.line(surf,UI_BORDER,(pad,y),(px-pad,y),1);y+=8
+        try:sfont.render_to(surf,(pad+2,y),"SAW",fgcolor=UI_SUBTEXT,size=11)
+        except:pass
+        y+=14;sa=ed.selected_tile==SAW_BRUSH;sr=pygame.Rect(pad,y,px-pad*2,26);ed._tool_rects['saw']=sr
+        pygame.draw.rect(surf,UI_BTN_ACT if sa else UI_BTN,sr,border_radius=4)
+        pygame.draw.circle(surf,SAW_COL,(pad+15,y+13),8);pygame.draw.circle(surf,SAW_EDGE,(pad+15,y+13),8,2)
+        try:sfont.render_to(surf,(pad+28,y+7),"B  Saw",fgcolor=UI_TEXT if sa else UI_SUBTEXT,size=11)
+        except:pass
+        if sa:pygame.draw.rect(surf,UI_ACCENT,sr,1,border_radius=4)
+        s=ed.sel_saw();y+=30   # the -/+ resize the selected saw, or set the size of the next one
+        ed._dia_m,ed._dia_p=draw_step_row(surf,sfont,y,f"Dia: {(s['diameter'] if s else ed.saw_default_d):.0f}  {'selected' if s else 'new'}");y+=28
+        if sa:
+            hint="Click END (same spot: static)" if ed.plat_placing else "Click CENTRE, drag dots, Del"
+            try:sfont.render_to(surf,(pad+4,y),hint,fgcolor=UI_WARN if ed.plat_placing else UI_ACCENT2,size=10)
+            except:pass
+            y+=16
     y+=8;pygame.draw.line(surf,UI_BORDER,(pad,y),(px-pad,y),1);y+=8
     try:sfont.render_to(surf,(pad+2,y),"CONTROLS",fgcolor=UI_SUBTEXT,size=10)
     except:pass
@@ -1462,7 +1554,7 @@ def draw_left_panel(surf,ed,font,sfont):
                    ("Ctrl+S","Save"),("Ctrl+O","Open"),("Ctrl+N","New"),("Ctrl+R","Resize"),
                    ("Ctrl+P","Play"),("Ctrl+Z","Undo"),("Ctrl+Y","Redo"),("Ctrl+X","Clear"),
                    ("G","Grid"),("F","Fill"),("X","Eraser"),("V","Platform"),("Del","Del plat"),
-                   ("Home","Reset"),("1-0","Tiles"),("Esc","Cancel")]:
+                   ("Home","Reset"),("1-0","Tiles"),("Esc","Cancel")]+([("B","Saw")] if ed.game in SAW_GAMES else []):
         if y+12>WINDOW_H-STATUS_H-4:break
         try:
             sfont.render_to(surf,(pad+2,y),kt,fgcolor=UI_ACCENT2,size=9)
@@ -1702,7 +1794,7 @@ def draw_status(surf,ed,sfont):
     y=WINDOW_H-STATUS_H;pygame.draw.rect(surf,UI_STATUS,(0,y,WINDOW_W,STATUS_H))
     pygame.draw.line(surf,UI_BORDER,(0,y),(WINDOW_W,y),1)
     lv=ed.level
-    tl="Eraser" if ed.eraser_mode else ("Platform" if ed.selected_tile==MOVING_PLATFORM_BRUSH else TILE_BY_CHAR.get(ed.selected_tile,TILE_BY_CHAR[' '])[1])
+    tl="Eraser" if ed.eraser_mode else ({MOVING_PLATFORM_BRUSH:"Platform",SAW_BRUSH:"Saw"}.get(ed.selected_tile) or TILE_BY_CHAR.get(ed.selected_tile,TILE_BY_CHAR[' '])[1])
     info=f"  {ed.game_label}  |  {lv.rows}r x {lv.cols}c  |  Zoom {ed.zoom:.2f}x  |  Brush: {tl}  |  Plats: {len(lv.platforms)}"
     if ed.hover_cell and ed.selected_tile!=MOVING_PLATFORM_BRUSH:
         hr,hc=ed.hover_cell;ch=lv.get(hr,hc)
@@ -1801,7 +1893,7 @@ def main(argv=None):
     font=pygame.freetype.SysFont("monospace",14);sfont=pygame.freetype.SysFont("monospace",14)
     clock=pygame.time.Clock()
     gc=GameConfig(args.game)
-    Level.TRIM=args.game not in GAME_SCREEN_GRID
+    Level.TRIM=args.game not in GAME_SCREEN_GRID and args.game not in SAW_GAMES   # saws sit at world pixels: a trim would move the grid under them
     Level.SAVE_PHYSICS=args.game not in NO_PHYSICS_GAMES
     if not args.level and args.game in GAME_SCREEN_GRID and gc.level_ids:
         args.level=gc.get_level_file_path(gc.level_ids[0])   # a blank canvas is off the screen grid
@@ -1920,7 +2012,10 @@ def main(argv=None):
                                 elif key=="fill":ed.fill_mode=not ed.fill_mode
                                 elif key=="grid":ed.show_grid=not ed.show_grid
                                 elif key=="platform":ed.selected_tile=MOVING_PLATFORM_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
+                                elif key=="saw":ed.selected_tile=SAW_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
                                 break
+                        if ed._dia_m.collidepoint(ex,ey):ed.resize_saw(-8)
+                        elif ed._dia_p.collidepoint(ex,ey):ed.resize_saw(8)
                         for ch,rect in ed._tile_rects.items():
                             if rect.collidepoint(ex,ey):ed.selected_tile=ch;ed.plat_placing=False;ed.eraser_mode=False;break
                     elif ev_in_vp:
@@ -1937,6 +2032,18 @@ def main(argv=None):
                                 wx,wy=ed.s2wp(ex,ey,snap=True);ed.push_undo()
                                 ed.level.platforms.append(PlatformDef(list(ed.plat_start_world),[wx,wy],speed=ed.plat_default_spd))
                                 ed.sel_plat_idx=len(ed.level.platforms)-1;ed.plat_placing=False;ed.dirty=True
+                        elif ed.selected_tile==SAW_BRUSH and not ed.eraser_mode:
+                            hi,hh=ed.ht_saw(ex,ey)
+                            if hi is not None:
+                                ed.push_undo();ed.sel_saw_idx=hi;ed.drag_handle=hh;s=ed.level.saws[hi]
+                                hsx,hsy=ed.wp2s(*((s['x'],s['y']) if hh=='start' else s['end']));ed.drag_offset=(hsx-ex,hsy-ey)
+                            elif not ed.plat_placing:
+                                ed.plat_start_world=ed.plat_ghost_end=ed.s2saw(ex,ey);ed.plat_placing=True;ed.sel_saw_idx=None
+                            else:
+                                (cx,cy),end=ed.plat_start_world,ed.s2saw(ex,ey);ed.push_undo()
+                                s={'x':cx,'y':cy,'diameter':ed.saw_default_d}
+                                if end!=(cx,cy):s['end']=list(end)
+                                ed.level.saws.append(s);ed.sel_saw_idx=len(ed.level.saws)-1;ed.plat_placing=False;ed.dirty=True
                         elif target_cell:
                             r,c=target_cell;brush=ed.brush()
                             if ed.fill_mode:ed.flood_fill(r,c,brush)
@@ -1944,7 +2051,7 @@ def main(argv=None):
                                 if not pstarted:ed.push_undo();pstarted=True
                                 ed.paint_char=brush;ed.painting=True;ed.last_cell=None;ed.paint_cell(r,c,ed.paint_char)
                 elif ev.button==3 and ev_in_vp:
-                    if ed.selected_tile==MOVING_PLATFORM_BRUSH:ed.plat_placing=False;ed.sel_plat_idx=None
+                    if ed.selected_tile in (MOVING_PLATFORM_BRUSH,SAW_BRUSH):ed.plat_placing=False;ed.sel_plat_idx=None;ed.sel_saw_idx=None
                     elif target_cell:
                         if not pstarted:ed.push_undo();pstarted=True
                         ed.paint_char=' ';ed.painting=True;ed.last_cell=None;ed.paint_cell(target_cell[0],target_cell[1],' ')
@@ -1990,6 +2097,15 @@ def main(argv=None):
                         else:p.end=wp
                         ed.dirty=True
                     elif ed.plat_placing and motion_in_vp:ed.plat_ghost_end=ed.s2wp(ev.pos[0],ev.pos[1],snap=True)
+                elif ed.selected_tile==SAW_BRUSH:
+                    s=ed.sel_saw()
+                    if ed.drag_handle is not None and s is not None:
+                        wx,wy=ed.s2saw(ev.pos[0]+ed.drag_offset[0],ev.pos[1]+ed.drag_offset[1])
+                        if ed.drag_handle=='start':s['x'],s['y']=wx,wy
+                        elif (wx,wy)!=(s['x'],s['y']):s['end']=[wx,wy]
+                        else:s.pop('end',None)   # end dropped on the centre: a static saw
+                        ed.dirty=True
+                    elif ed.plat_placing and motion_in_vp:ed.plat_ghost_end=ed.s2saw(*ev.pos)
                 if ed.painting and motion_in_vp and ed.hover_cell:ed.paint_cell(ed.hover_cell[0],ed.hover_cell[1],ed.paint_char)
                 if ed.panning:ed.cam_x=ed.pan_cam[0]-(ev.pos[0]-ed.pan_start[0]);ed.cam_y=ed.pan_cam[1]-(ev.pos[1]-ed.pan_start[1])
             elif ev.type==pygame.KEYDOWN:
@@ -2010,13 +2126,16 @@ def main(argv=None):
                 elif ev.key==pygame.K_f:ed.fill_mode=not ed.fill_mode
                 elif ev.key==pygame.K_x and not ctrl:ed.eraser_mode=not ed.eraser_mode
                 elif ev.key==pygame.K_v:ed.selected_tile=MOVING_PLATFORM_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
+                elif ev.key==pygame.K_b and ed.game in SAW_GAMES:ed.selected_tile=SAW_BRUSH;ed.plat_placing=False;ed.eraser_mode=False
                 elif ev.key==pygame.K_ESCAPE:
                     if ed._drag_lid:ed.cancel_lv_drag()
                     elif ed.plat_placing:ed.plat_placing=False
                     elif ed.eraser_mode:ed.eraser_mode=False
-                elif ev.key==pygame.K_DELETE:
+                elif ev.key in (pygame.K_DELETE,pygame.K_BACKSPACE):   # a Mac's Delete key sends Backspace
                     if ed.selected_tile==MOVING_PLATFORM_BRUSH and ed.sel_plat_idx is not None and 0<=ed.sel_plat_idx<len(ed.level.platforms):
                         ed.push_undo();ed.level.platforms.pop(ed.sel_plat_idx);ed.sel_plat_idx=None;ed.dirty=True
+                    elif ed.selected_tile==SAW_BRUSH and ed.sel_saw() is not None:
+                        ed.push_undo();ed.level.saws.pop(ed.sel_saw_idx);ed.sel_saw_idx=None;ed.dirty=True
                 else:
                     for i,k in enumerate([pygame.K_1,pygame.K_2,pygame.K_3,pygame.K_4,pygame.K_5,
                                           pygame.K_6,pygame.K_7,pygame.K_8,pygame.K_9,pygame.K_0]):

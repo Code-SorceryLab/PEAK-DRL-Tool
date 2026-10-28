@@ -161,7 +161,12 @@ class HitboxOverlay(DebugOverlay):
                 pygame.draw.line(gs, col, (bx, by), (bx + dx*blen, by), 2)
                 pygame.draw.line(gs, col, (bx, by), (bx, by + dy*blen), 2)
 
-        pm = core.physics_manager
+        pm = getattr(core, "physics_manager", None)
+        if pm is None:          # Meat Boy: the hazards are saws, circles off the tile grid
+            for saw in core.level_data.saws:
+                pygame.draw.circle(gs, (255, 55, 55), (int(saw.cx - core.camera_x), int(saw.cy - core.camera_y)),
+                                   int(saw.radius), 1)
+            return
         cx, cy, cw, ch = core.camera_x, core.camera_y, core.WIDTH, core.HEIGHT
         for entity in (pm.hazard_hash.query_rect(cx, cy, cw, ch) +
                        pm.collectible_hash.query_rect(cx, cy, cw, ch)):
@@ -658,8 +663,8 @@ class InfoPanelOverlay(DebugOverlay):
         rows = [
             ("Pos",    f"{px_val}, {py_val}"),
             ("Vel",    f"{p.vx:.1f}, {p.vy:.1f}"),
-            ("Stall",  f"{core.stall_timer:.2f}s ×{core.stall_windows_count}"),
-            ("Best X", f"{int(core.progress_x_best)}"),
+            ("Stall",  f"{getattr(core, 'stall_timer', 0.0):.2f}s ×{getattr(core, 'stall_windows_count', 0)}"),
+            ("Best X", f"{int(getattr(core, 'progress_x_best', p.gObj.x))}"),   # Meat Boy has no stall rule
             ("Frame",  f"{core.frame}"),
         ]
         rx = px + half_w - 5
