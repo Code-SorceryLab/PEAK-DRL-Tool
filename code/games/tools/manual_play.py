@@ -207,6 +207,10 @@ if level_file and args.game == "meatboy":       # the level editor's play-test: 
     core_game.levels, core_game._level_idx = [level_file], 0
     core_game.reset()
     print(f"[Play] Loaded editor file: {Path(level_file).name}")
+elif level_file and args.game == "bomberman":   # shortcut: the default rules, not a listed level's overrides
+    core_game.cfg["levels"], core_game._level_idx = [level_file], 0
+    core_game.reset()
+    print(f"[Play] Loaded editor file: {Path(level_file).name}")
 elif level_file and args.game != "megaman":
     fp = Path(level_file)
     cm = core_game.config_manager
@@ -405,7 +409,7 @@ class _DemoRecorder:
               f"{len(self.sensors)} frames -> {path}")
 
 
-if args.game == "bomberman" and not level_id and core_game.cfg.get("campaign"):
+if args.game == "bomberman" and not (level_id or level_file) and core_game.cfg.get("campaign"):
     core_game._level_idx = int(core_game.cfg["campaign"][0])   # free play is Bomberman II from area 1-1
 core_game.reset()
 demo = recorder = None

@@ -1031,7 +1031,7 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
-    game_choices = ["platformer", "megaman"]
+    game_choices = ["platformer", "meatboy", "bomberman", "megaman"]
     game = pick_one("GAME  ·  which game to edit", game_choices, default=game_choices[0])
     if not game:
         return

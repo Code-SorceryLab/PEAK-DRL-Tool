@@ -55,6 +55,7 @@ GAME_LABELS = {
     "platformer": "Mario / Platformer",
     "megaman": "Mega Man (NES)",
     "meatboy": "Super Meat Boy",
+    "bomberman": "Bomberman II",
 }
 
 # Games that keep their level list in their own file, next to game_config.yaml, in the same
@@ -64,14 +65,16 @@ GAME_LABELS = {
 GAME_LEVELS_CONFIG = {
     "megaman": "megaman_levels.yaml",
     "meatboy": "meatboy_config.yaml",
+    "bomberman": "bomberman_config.yaml",
 }
 # Games built from fixed-size screens (cols, rows): the viewport outlines them, and the level is
 # saved untrimmed so the screens stay on their grid. A screen block left blank does not exist.
 GAME_SCREEN_GRID = {
     "megaman": (16, 15),
+    "bomberman": (15, 13),
 }
 # Games whose physics is not tuned per level: no sliders, nothing baked into the sidecar YAML.
-NO_PHYSICS_GAMES = {"megaman", "meatboy"}
+NO_PHYSICS_GAMES = {"megaman", "meatboy", "bomberman"}
 # Games whose sidecar holds saws (dynamics: saws), placed with the saw tool.
 SAW_GAMES = {"meatboy"}
 
@@ -79,6 +82,7 @@ GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
     "megaman": ["*.txt"],
     "meatboy": ["*.txt"],
+    "bomberman": ["*.txt"],
 }
 
 TILE_LIBRARY = [
@@ -130,7 +134,27 @@ GAME_TILE_ORDER = {
 }
 SOLID_CHARS  = {'#', '=', '?', '>', '<', 'F', 'L'}
 
+BADGE_CHARS = set()   # glyphs drawn as lettered badges whatever the platformers draw for them (use_game)
+
+def use_game(game):
+    """Bomberman's glyphs mean other things in the platformers (C, F, E, M, B, K...): its palette, built from
+    the game's own enemy and item tables, replaces theirs, and draws as badges. main() calls this once."""
+    if game != "bomberman" or "bomberman" in GAME_TILE_ORDER:
+        return
+    from code.games import bomberman_core as bm
+    with open(bm.CONFIG_PATH, encoding="utf-8") as f:
+        enemies = yaml.safe_load(f)["enemies"]
+    tiles = [(' ', 'Floor', (30, 35, 50), (80, 90, 120)), ('#', 'Wall / pillar', (80, 60, 40), (220, 200, 160)),
+             ('?', 'Brick', (150, 80, 50), (255, 220, 190)), ('G', 'Exit', (60, 200, 100), (0, 60, 20)),
+             ('@', 'Exit under brick', (150, 80, 50), (120, 255, 160)), ('P', 'Player Start', (60, 160, 255), (0, 30, 120))]
+    tiles += [(k, e["name"], (150, 60, 170), (255, 230, 255)) for k, e in enemies.items()]
+    tiles += [(k, f"{v.capitalize()} (brick)", (200, 150, 40), (40, 20, 0)) for k, v in bm.POWERUPS.items()]
+    TILE_BY_CHAR.update({t[0]: t for t in tiles})
+    GAME_TILE_ORDER["bomberman"] = [t[0] for t in tiles]
+    BADGE_CHARS.update(t[0] for t in tiles if t[0] not in ' #P')
+
 def tile_entries_for(game):
+    use_game(game)
     return [TILE_BY_CHAR[ch] for ch in GAME_TILE_ORDER.get(game, GAME_TILE_ORDER[DEFAULT_GAME])]
 
 # ─── Moving Platform ─────────────────────────────────────────────
@@ -585,8 +609,8 @@ class GameConfig:
 
         root_cfg = self._root_cfg(self.yaml_data)
         raw = root_cfg.get('levels', {}) or {}
-        if isinstance(raw, list):   # a plain list of files: the level id is the index
-            raw = {str(i): {'file': f} for i, f in enumerate(raw)}
+        if isinstance(raw, list):   # a plain list of files (or {file: ..., overrides}): the level id is the index
+            raw = {str(i): f if isinstance(f, dict) else {'file': f} for i, f in enumerate(raw)}
         for lid, lcfg in raw.items():
             if isinstance(lcfg, dict):
                 self.levels[str(lid)] = lcfg
@@ -796,6 +820,8 @@ class GameConfig:
 # ═══════════════════════════════════════════════════════════════════
 def render_tile_object(surf, char, sx, sy, ts):
     ti=int(ts)
+    if char in BADGE_CHARS:
+        pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); draw_badge(surf,char,pygame.Rect(sx,sy,ti,ti)); return
     if USE_REAL_OBJECTS:
         if char=='#':
             t=create_tile(TILE_GROUND,0,0,True,COLOR_GROUND); t.gObj.width=t.gObj.height=ti; t.gObj.x=sx; t.gObj.y=sy; t.render(surf,0,0); return
@@ -814,9 +840,6 @@ def render_tile_object(surf, char, sx, sy, ts):
         elif char in ('?','>','<','F','L'):
             cn={'?':'coin','>':'star','<':'mushroom','F':'flower','L':'life'}[char]
             QuestionBlock(gObj=GameObject(float(sx),float(sy),ti,ti),contains=cn).render(surf,sx,sy); return
-    if char == 'S' or char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
-        draw_tile_rect(surf, char, sx, sy, ti, ti)
-        return
     # Fallback rendering
     if char in (' ', '.'): pygame.draw.rect(surf,UI_BG,(sx,sy,ti,ti)); return
     if char in ('#','='):
@@ -914,30 +937,6 @@ def draw_tile_rect(surf, char, x, y, w, h, alpha=255):
                 if (ix//cell+iy//cell)%2==0:
                     s2=pygame.Surface((min(cell,w-ix),min(cell,h-iy)),pygame.SRCALPHA); s2.fill((180,30,50,120)); s.blit(s2,(ix,iy))
         surf.blit(s,(x,y)); return
-    if char == 'S':
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        base_h = max(4, h // 3)
-        pygame.draw.rect(s, (170, 170, 178, alpha), (w * 0.18, h * 0.52, w * 0.64, base_h), border_radius=2)
-        for i in range(3):
-            yy = int(h * 0.48 - i * max(2, h // 8))
-            pygame.draw.line(s, (130, 130, 138, alpha), (int(w * 0.22), yy), (int(w * 0.78), yy), 2)
-        pygame.draw.rect(s, (255, 90, 90, alpha), (w * 0.12, h * 0.2, w * 0.76, max(4, h // 5)), border_radius=2)
-        surf.blit(s, (x, y)); return
-    if char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        pts = {
-            '/':  [(0, h), (w, h * 0.55), (w, h), (0, h)],
-            '\\': [(0, h * 0.55), (w, h), (w, h), (0, h)],
-            '(':  [(0, h), (w, 0), (w, h), (0, h)],
-            ')':  [(0, 0), (w, h), (w, h), (0, h)],
-            '[':  [(w * 0.15, h), (w, h * 0.45), (w, h), (0, h)],
-            ']':  [(0, h * 0.45), (w * 0.85, h), (w, h), (0, h)],
-            'U':  [(0, h * 0.45), (w * 0.2, h * 0.75), (w * 0.5, h * 0.9), (w * 0.8, h * 0.75), (w, h * 0.45), (w, h), (0, h)],
-            'n':  [(0, h * 0.8), (w * 0.25, h * 0.35), (w * 0.5, h * 0.15), (w * 0.75, h * 0.35), (w, h * 0.8), (w, h), (0, h)],
-        }[char]
-        pygame.draw.polygon(s, (*color, alpha), pts)
-        pygame.draw.lines(s, (120, 230, 120, alpha), False, pts[:-2] if char in ('U', 'n') else pts[:2], 2)
-        surf.blit(s, (x, y)); return
     s=pygame.Surface((w,h),pygame.SRCALPHA); s.fill((*color,alpha))
     if char in SOLID_CHARS and w>4:
         hi=tuple(min(255,c+40) for c in color)
@@ -946,6 +945,7 @@ def draw_tile_rect(surf, char, x, y, w, h, alpha=255):
 
 # ─── Palette icons (same as v3) ──────────────────────────────────
 def draw_palette_icon(surf, char, rect):
+    if char in BADGE_CHARS: draw_badge(surf,char,rect); return
     x,y,w,h=rect.x,rect.y,rect.width,rect.height; cx,cy=x+w//2,y+h//2
     col=TILE_BY_CHAR.get(char,TILE_BY_CHAR[' '])[2]
     hi=tuple(min(255,c+70) for c in col); dk=tuple(max(0,c-40) for c in col)
@@ -965,36 +965,8 @@ def draw_palette_icon(surf, char, rect):
     elif char=='=':
         bh2=max(5,h//3); by2=cy-bh2//2
         pygame.draw.rect(surf,col,(x+1,by2,w-2,bh2),border_radius=3); pygame.draw.rect(surf,hi,(x+1,by2,w-2,bh2),1,border_radius=3)
-    elif char=='S':
-        base_h=max(4,h//3); base_y=y+h-base_h-1
-        pygame.draw.rect(surf,(180,180,186),(x+3,base_y,w-6,base_h),border_radius=2)
-        for i in range(3):
-            yy=base_y-2-i*max(2,h//8)
-            pygame.draw.line(surf,(140,140,146),(x+4,yy),(x+w-4,yy),2)
-        pygame.draw.rect(surf,(255,90,90),(x+2,y+3,w-4,max(4,h//5)),border_radius=2)
     elif char=='^':
         pts=[(cx,y+2),(x+2,y+h-2),(x+w-2,y+h-2)]; pygame.draw.polygon(surf,col,pts); pygame.draw.polygon(surf,(255,100,100),pts,1)
-    elif char in ('/', '\\', '(', ')', '[', ']', 'U', 'n'):
-        if char == '/':
-            pts=[(x+2,y+h-2),(x+w-2,y+h//2),(x+w-2,y+h-2)]
-        elif char == '\\':
-            pts=[(x+2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
-        elif char == '(':
-            pts=[(x+2,y+h-2),(x+w-2,y+2),(x+w-2,y+h-2)]
-        elif char == ')':
-            pts=[(x+2,y+2),(x+w-2,y+h-2),(x+2,y+h-2)]
-        elif char == '[':
-            pts=[(x+w//6,y+h-2),(x+w-2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
-        elif char == ']':
-            pts=[(x+2,y+h//2),(x+w*5//6,y+h-2),(x+w-2,y+h-2),(x+2,y+h-2)]
-        elif char == 'U':
-            pts=[(x+2,y+h//2),(x+w//4,y+h*3//4),(cx,y+h-3),(x+w*3//4,y+h*3//4),(x+w-2,y+h//2),(x+w-2,y+h-2),(x+2,y+h-2)]
-        else:
-            pts=[(x+2,y+h*4//5),(x+w//4,y+h//3),(cx,y+3),(x+w*3//4,y+h//3),(x+w-2,y+h*4//5),(x+w-2,y+h-2),(x+2,y+h-2)]
-        pygame.draw.polygon(surf,col,pts)
-        top_line = pts[:-2] if char in ('U', 'n') else pts[:2]
-        if len(top_line) >= 2:
-            pygame.draw.lines(surf,(140,255,160),False,top_line,2)
     elif char in ('?','>','<','F','L'):
         qc={'?':(210,170,30),'>':(240,200,50),'<':(195,80,70),'F':(240,110,20),'L':(90,220,120)}[char]
         pygame.draw.rect(surf,qc,(x+2,y+2,w-4,h-4),border_radius=3)
@@ -1088,7 +1060,7 @@ class Level:
             lines.append(''.join(rc))
         return '\n'.join(lines)
     def save(self, path, trim=None):
-        with open(path,'w') as f: f.write(self.to_ascii(trim=self.TRIM if trim is None else trim)+self.eol)
+        with open(path,'w',newline='') as f: f.write(self.to_ascii(trim=self.TRIM if trim is None else trim)+self.eol)
         self.filename=str(path); self._save_yaml(path)
     def _save_yaml(self, tp):
         if yaml is None: return
@@ -1106,7 +1078,7 @@ class Level:
             d['physics']=self.physics_overrides
         if self.enemy_physics:
             d.setdefault('physics',{})['enemies']=self.enemy_physics
-        with open(yp,'w') as f: yaml.dump(d,f,default_flow_style=False,sort_keys=False)
+        with open(yp,'w',newline='') as f: yaml.dump(d,f,default_flow_style=False,sort_keys=False)
     def _load_yaml(self, tp):
         if yaml is None: return
         yp=str(tp).rsplit('.',1)[0]+'.yaml'
@@ -1878,6 +1850,7 @@ def main(argv=None):
     gc=GameConfig(args.game)
     Level.TRIM=args.game not in GAME_SCREEN_GRID and args.game not in SAW_GAMES   # saws sit at world pixels: a trim would move the grid under them
     Level.SAVE_PHYSICS=args.game not in NO_PHYSICS_GAMES
+    use_game(args.game)
     if not args.level and args.game in GAME_SCREEN_GRID and gc.level_ids:
         args.level=gc.get_level_file_path(gc.level_ids[0])   # a blank canvas is off the screen grid
     if args.level:
