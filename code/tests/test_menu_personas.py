@@ -84,7 +84,7 @@ def test_manual_play_records_like_an_agent_when_asked(monkeypatch):
     monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
     monkeypatch.setattr(menu, "pick_one", lambda *a, **k: next(picks))
     monkeypatch.setattr("builtins.input", lambda *a: next(answers))
-    monkeypatch.setattr(menu.subprocess, "run", lambda cmd, **k: cmds.append(cmd))
+    monkeypatch.setattr(menu, "run_with_loading", lambda cmd, **k: cmds.append(cmd))
     menu.run_manual_play()
     (cmd,) = cmds
     assert cmd[cmd.index("--record") + 1:cmd.index("--record") + 3] == ["--player", "Kevin_C_"]  # safe folder name
@@ -96,7 +96,7 @@ def test_manual_play_records_nothing_by_default(monkeypatch):
     monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
     monkeypatch.setattr(menu, "pick_one", lambda *a, **k: next(picks))
     monkeypatch.setattr("builtins.input", lambda *a: "")
-    monkeypatch.setattr(menu.subprocess, "run", lambda cmd, **k: cmds.append(cmd))
+    monkeypatch.setattr(menu, "run_with_loading", lambda cmd, **k: cmds.append(cmd))
     menu.run_manual_play()
     assert "--record" not in cmds[0]
 

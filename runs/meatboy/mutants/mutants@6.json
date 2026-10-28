@@ -11,7 +11,7 @@
       "operator": "seal_route",
       "class": "breaking",
       "direction": "harder",
-      "description": "A wall along column 27, 4 tiles: the goal can no longer be reached",
+      "description": "A wall along column 34, 7 tiles: the goal can no longer be reached",
       "retrain": true,
       "base_file": "meatboy/world1_07_diverge.txt",
       "family": "level",
@@ -19,40 +19,159 @@
       "config": null,
       "cells": [
         [
-          27,
+          34,
           0,
           ".",
           "#"
         ],
         [
-          27,
+          34,
           1,
           ".",
           "#"
         ],
         [
-          27,
+          34,
           2,
           ".",
           "#"
         ],
         [
-          27,
+          34,
           3,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          5,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          6,
           ".",
           "#"
         ]
       ],
       "location": {
-        "col": 27,
-        "row": 2
+        "col": 34,
+        "row": 3
       },
       "parameter": {
-        "tiles": 4
+        "tiles": 7
       },
       "note": "placed by rule (eval_mutants.place)",
       "checks": {
         "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "widen_gap@6",
+      "game": "meatboy",
+      "stage": "6",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The gap at row 7, columns 27-33, widened by 2 to the right: 7 tiles -> 9",
+      "retrain": true,
+      "base_file": "meatboy/world1_07_diverge.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          34,
+          7,
+          "#",
+          "."
+        ],
+        [
+          34,
+          8,
+          "#",
+          "."
+        ],
+        [
+          34,
+          9,
+          "#",
+          "."
+        ],
+        [
+          34,
+          10,
+          "#",
+          "."
+        ],
+        [
+          34,
+          11,
+          "#",
+          "."
+        ],
+        [
+          34,
+          12,
+          "#",
+          "."
+        ],
+        [
+          35,
+          7,
+          "#",
+          "."
+        ],
+        [
+          35,
+          8,
+          "#",
+          "."
+        ],
+        [
+          35,
+          9,
+          "#",
+          "."
+        ],
+        [
+          35,
+          10,
+          "#",
+          "."
+        ],
+        [
+          35,
+          11,
+          "#",
+          "."
+        ],
+        [
+          35,
+          12,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 35,
+        "row": 7
+      },
+      "parameter": {
+        "tiles": 12
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
         "same_level": false
       }
     },
@@ -94,7 +213,7 @@
       "operator": "off_route",
       "class": "neutral",
       "direction": "none",
-      "description": "The tile at row 21, column 3 hollowed out, closed on all four sides",
+      "description": "The tile at row 28, column 5 hollowed out, closed on all four sides",
       "retrain": true,
       "base_file": "meatboy/world1_07_diverge.txt",
       "family": "level",
@@ -102,15 +221,15 @@
       "config": null,
       "cells": [
         [
-          3,
-          21,
+          5,
+          28,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 3,
-        "row": 21
+        "col": 5,
+        "row": 28
       },
       "parameter": {
         "tiles": 1
@@ -130,7 +249,7 @@
       "operator": "cosmetic_tile",
       "class": "neutral",
       "direction": "none",
-      "description": "The cell at row 0, column 1 written as ' ' instead of '.': the same tile",
+      "description": "The cell at row 0, column 0 written as ' ' instead of '.': the same tile",
       "retrain": false,
       "base_file": "meatboy/world1_07_diverge.txt",
       "family": "level",
@@ -138,14 +257,14 @@
       "config": null,
       "cells": [
         [
-          1,
+          0,
           0,
           ".",
           " "
         ]
       ],
       "location": {
-        "col": 1,
+        "col": 0,
         "row": 0
       },
       "parameter": {
@@ -158,10 +277,5 @@
       }
     }
   ],
-  "skipped": [
-    {
-      "operator": "widen_gap",
-      "reason": "no gap with a ledge on each side and a drop under it"
-    }
-  ]
+  "skipped": []
 }

@@ -1889,6 +1889,7 @@ def main(argv=None):
     args=parse_args(argv)
     pygame.init();pygame.freetype.init()
     screen=pygame.display.set_mode((WINDOW_W,WINDOW_H),pygame.RESIZABLE)
+    if os.environ.get("PEAK_READY_FILE"):open(os.environ["PEAK_READY_FILE"],"a").close()   # the menu's loading bar stops
     pygame.display.set_caption(f"PEAK Level Editor v3.1 - {GAME_LABELS.get(args.game, args.game)}")
     font=pygame.freetype.SysFont("monospace",14);sfont=pygame.freetype.SysFont("monospace",14)
     clock=pygame.time.Clock()

@@ -11,7 +11,7 @@
       "operator": "seal_route",
       "class": "breaking",
       "direction": "harder",
-      "description": "A wall along row 3, 11 tiles: the goal can no longer be reached",
+      "description": "A wall along column 18, 16 tiles: the goal can no longer be reached",
       "retrain": true,
       "base_file": "meatboy/world1_09_safety_third.txt",
       "family": "level",
@@ -19,56 +19,20 @@
       "config": null,
       "cells": [
         [
-          4,
-          3,
+          18,
+          0,
           ".",
           "#"
         ],
         [
-          5,
-          3,
+          18,
+          1,
           ".",
           "#"
         ],
         [
-          6,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          7,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          13,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          14,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          15,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          16,
-          3,
-          ".",
-          "#"
-        ],
-        [
-          17,
-          3,
+          18,
+          2,
           ".",
           "#"
         ],
@@ -79,69 +43,88 @@
           "#"
         ],
         [
-          19,
-          3,
+          18,
+          12,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          13,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          14,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          15,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          16,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          23,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          24,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          25,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          26,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          27,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          28,
+          ".",
+          "#"
+        ],
+        [
+          18,
+          29,
           ".",
           "#"
         ]
       ],
       "location": {
-        "col": 14,
-        "row": 3
+        "col": 18,
+        "row": 16
       },
       "parameter": {
-        "tiles": 11
+        "tiles": 16
       },
       "note": "placed by rule (eval_mutants.place)",
       "checks": {
         "exit_reachable": false,
-        "same_level": false
-      }
-    },
-    {
-      "id": "widen_gap@8",
-      "game": "meatboy",
-      "stage": "8",
-      "section": null,
-      "operator": "widen_gap",
-      "class": "degrading",
-      "direction": "harder",
-      "description": "The gap at row 3, columns 4-7, widened by 2 to the right: 4 tiles -> 6",
-      "retrain": true,
-      "base_file": "meatboy/world1_09_safety_third.txt",
-      "family": "level",
-      "level_file": "level.txt",
-      "config": null,
-      "cells": [
-        [
-          8,
-          3,
-          "#",
-          "."
-        ],
-        [
-          9,
-          3,
-          "#",
-          "."
-        ],
-        [
-          9,
-          4,
-          "#",
-          "."
-        ]
-      ],
-      "location": {
-        "col": 9,
-        "row": 3
-      },
-      "parameter": {
-        "tiles": 3
-      },
-      "note": "placed by rule (eval_mutants.place)",
-      "checks": {
-        "exit_reachable": true,
         "same_level": false
       }
     },
@@ -183,7 +166,7 @@
       "operator": "off_route",
       "class": "neutral",
       "direction": "none",
-      "description": "The tile at row 24, column 1 hollowed out, closed on all four sides",
+      "description": "The tile at row 31, column 7 hollowed out, closed on all four sides",
       "retrain": true,
       "base_file": "meatboy/world1_09_safety_third.txt",
       "family": "level",
@@ -191,15 +174,15 @@
       "config": null,
       "cells": [
         [
-          1,
-          24,
+          7,
+          31,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 1,
-        "row": 24
+        "col": 7,
+        "row": 31
       },
       "parameter": {
         "tiles": 1
@@ -219,7 +202,7 @@
       "operator": "cosmetic_tile",
       "class": "neutral",
       "direction": "none",
-      "description": "The cell at row 1, column 2 written as ' ' instead of '.': the same tile",
+      "description": "The cell at row 0, column 7 written as ' ' instead of '.': the same tile",
       "retrain": false,
       "base_file": "meatboy/world1_09_safety_third.txt",
       "family": "level",
@@ -227,15 +210,15 @@
       "config": null,
       "cells": [
         [
-          2,
-          1,
+          7,
+          0,
           ".",
           " "
         ]
       ],
       "location": {
-        "col": 2,
-        "row": 1
+        "col": 7,
+        "row": 0
       },
       "parameter": {
         "tiles": 1
@@ -247,5 +230,10 @@
       }
     }
   ],
-  "skipped": []
+  "skipped": [
+    {
+      "operator": "widen_gap",
+      "reason": "no gap with a ledge on each side and a drop under it"
+    }
+  ]
 }

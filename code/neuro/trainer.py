@@ -250,16 +250,17 @@ class Trainer:
                 surf = self._surface_for(i)
                 slot.adapter.render(surf)
                 cam_x, cam_y = slot.adapter.camera
+                z = getattr(slot.adapter.core, "zoom", 1.0)   # Meat Boy draws each level zoomed in
                 entry["jpg"] = _encode(surf, 1.0 if i == watch else THUMB_SCALE)
                 entry["scale"] = 1.0 if i == watch else THUMB_SCALE
                 if self.state.controls.sensors_on:
                     entry["rays"] = [
-                        [round(x1 - cam_x, 1), round(y1 - cam_y, 1),
-                         round(x2 - cam_x, 1), round(y2 - cam_y, 1), hit]
+                        [round((x1 - cam_x) * z, 1), round((y1 - cam_y) * z, 1),
+                         round((x2 - cam_x) * z, 1), round((y2 - cam_y) * z, 1), hit]
                         for x1, y1, x2, y2, hit in slot.last_rays
                     ]
                     entry["tiles"] = [
-                        [round(tx - cam_x, 1), round(ty - cam_y, 1), ts, kind]
+                        [round((tx - cam_x) * z, 1), round((ty - cam_y) * z, 1), ts * z, kind]
                         for tx, ty, ts, kind in slot.last_tiles
                     ]
                     if i == watch:  # grid mode: the 363 cells are drawn as tiles, bars show body only
@@ -276,7 +277,8 @@ class Trainer:
         for slot, rec in zip(self.slots, env_rows):
             cause = "Success" if rec["status"] == "WON" else (rec.get("cause") or rec["status"].title())
             level_len = rec.get("level_len") or 1.0
-            progress = min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)
+            progress = rec["progress"] if "progress" in rec else \
+                min(max((rec.get("end_x") or 0.0) / level_len, 0.0), 1.0)   # Meat Boy: its own path share
             rows.append([self.persona.name, self.game, self.level or "auto", cause,
                          slot.jump_count, rec.get("coins", 0),
                          round(slot.vx_sum / max(slot.frames, 1), 2), round(progress, 3),
@@ -613,6 +615,8 @@ def main() -> None:
         state = SharedState(Controls(turbo=args.turbo))
         start_server(state, http_port=args.port)
         print(f"dashboard: http://127.0.0.1:{args.port}/{args.game}/index.html", flush=True)
+        if os.environ.get("PEAK_READY_FILE"):   # the menu's loading bar stops; it opens the browser now
+            open(os.environ["PEAK_READY_FILE"], "a").close()
 
     if args.replay:
         replay(args.replay, args.game, args.level, state, loop=args.loop)

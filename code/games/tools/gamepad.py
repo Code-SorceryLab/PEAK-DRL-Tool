@@ -34,10 +34,25 @@ def _nes_held(report=None) -> set:
 def _read_nes(dev) -> None:
     global _nes, _nes_dev
     try:
-        while True:
-            _nes = dev.read(64, 500) or _nes
+        while not _release.is_set():
+            _nes = dev.read(64, 100) or _nes
+        dev.close()              # released: another process may open it now
     except OSError:              # unplugged: the next open_pad looks for it again
-        _nes = _nes_dev = None
+        pass
+    _nes = _nes_dev = None
+
+
+_release = threading.Event()
+
+
+def release_pad() -> None:
+    """Let go of the USB NES pad: macOS gives it to one process at a time, so a game launched from here
+    could not read it. open_pad() takes it back."""
+    reader = next((t for t in threading.enumerate() if t.name == "nes-pad"), None)
+    if reader:
+        _release.set()
+        reader.join(1.0)
+        _release.clear()
 
 
 def _open_nes() -> bool:
@@ -51,7 +66,7 @@ def _open_nes() -> bool:
         except (ImportError, OSError):
             return False
         _nes_dev = dev
-        threading.Thread(target=_read_nes, args=(dev,), daemon=True).start()
+        threading.Thread(target=_read_nes, args=(dev,), daemon=True, name="nes-pad").start()
     return _nes_dev is not None
 
 

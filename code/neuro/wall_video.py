@@ -76,6 +76,7 @@ def frames(cam, max_frames: int = 5400, track: dict | None = None, width: int = 
 def _sample(cam, scale: float) -> list:
     """[rays as [x1, y1, x2, y2, hit] in video pixels relative to the view, sensor values]."""
     cx, cy = cam.adapter.camera
+    scale *= getattr(cam.adapter.core, "zoom", 1.0)    # Meat Boy draws each level zoomed in
     rays = [[round((x1 - cx) * scale), round((y1 - cy) * scale), round((x2 - cx) * scale), round((y2 - cy) * scale), int(hit)]
             for x1, y1, x2, y2, hit in (cam.rays or [])]
     return [rays, [round(float(v), 2) for v in (cam.vec if cam.vec is not None else [])]]

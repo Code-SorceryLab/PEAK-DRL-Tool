@@ -16,7 +16,7 @@ ROCK, ROCK_HI, ROCK_LO = (44, 36, 28), (76, 58, 48), (30, 24, 18)
 MOSS, MOSS_HI, MOSS_LO = (50, 62, 26), (70, 88, 36), (34, 44, 16)
 CRUMBLE, CRUMBLE_LO = (176, 150, 112), (120, 98, 70)
 SPIKE, SPIKE_HI = (120, 124, 130), (200, 204, 210)
-FIRE, FIRE_HI = (232, 92, 24), (252, 210, 70)
+FIRE_LO, FIRE, FIRE_HI = (196, 36, 14), (240, 112, 24), (255, 214, 80)
 MEAT, MEAT_HI, MEAT_LO = (190, 32, 26), (226, 70, 56), (120, 14, 12)
 BLOOD = (150, 20, 18)
 GIRL, GIRL_LO, BANDAGE = (232, 160, 168), (190, 116, 126), (246, 236, 214)
@@ -95,16 +95,26 @@ def spikes(ts: int) -> pygame.Surface:
     return s
 
 
-@lru_cache(maxsize=16)
-def fire(ts: int, phase: int) -> pygame.Surface:
-    """Fire (1-11 Fired): three tongues of flame; phase 0-2 flickers it."""
-    s = pygame.Surface((ts, ts), pygame.SRCALPHA)
-    n = 3
-    for i in range(n):
-        x0, w = i * ts // n, ts // n
-        tip = ts // 6 + ((i + phase) % 3) * ts // 10
-        pygame.draw.polygon(s, FIRE, [(x0, ts), (x0 + w // 2, tip), (x0 + w, ts)])
-        pygame.draw.polygon(s, FIRE_HI, [(x0 + w // 4, ts), (x0 + w // 2, tip + ts // 3), (x0 + 3 * w // 4, ts)])
+@lru_cache(maxsize=32)
+def fire(ts: int, phase: int, top: bool) -> pygame.Surface:
+    """Fire (1-11 Fired): a wall of flame. A tile under more fire is solid flame; the top tile throws
+    tongues half a tile up, which kill too. phase 0-3 flickers it."""
+    h = ts + (ts // 2 if top else 0)
+    s = pygame.Surface((ts, h), pygame.SRCALPHA)
+    s.fill(FIRE_LO, (0, h - ts, ts, ts))
+    if not top:
+        pygame.draw.rect(s, FIRE, (0, 0, ts, ts), 0)
+        for k in range(3):                                         # embers rising through the flame
+            pygame.draw.circle(s, FIRE_HI, ((k * 11 + phase * 7) % ts, (k * 13 + phase * 9) % ts), 3)
+        return s
+    rng = random.Random(phase)
+    for layer, col, scale in ((0, FIRE_LO, 1.0), (1, FIRE, 0.8), (2, FIRE_HI, 0.5)):
+        for i in range(3):                                         # three tongues per tile, swaying with the phase
+            w = ts / 3
+            x0 = i * w - w * 0.25
+            tip = (1 - scale) * h + rng.randint(0, ts // 4)
+            sway = rng.randint(-ts // 8, ts // 8)
+            pygame.draw.polygon(s, col, [(x0, h), (x0 + w * 0.75 + sway, tip), (x0 + w * 1.5, h)])
     return s
 
 
@@ -166,3 +176,13 @@ def timer_sign(surface: pygame.Surface, seconds: float) -> None:
     pygame.draw.rect(surface, (244, 242, 236), board, border_radius=3)
     text = nes_text(f"{seconds:.2f}", 2, (190, 24, 24))
     surface.blit(text, text.get_rect(center=board.center))
+
+
+def lives(surface: pygame.Surface, n: int) -> None:
+    """The study's lives under the timer sign: Meat Boy and the count (the game itself has none)."""
+    from .modules.System.nes_font import nes_text
+    plate = pygame.Surface((96, 38), pygame.SRCALPHA)
+    pygame.draw.rect(plate, (16, 10, 8, 170), plate.get_rect(), border_radius=6)
+    surface.blit(plate, (52, 56))
+    surface.blit(meat_boy(24, 24, True, 0), (56, 60))
+    surface.blit(nes_text(f"*{n}", 3, (244, 242, 236), shadow=INK), (92, 66))   # "*" is the font's times sign

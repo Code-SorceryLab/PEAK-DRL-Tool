@@ -229,9 +229,10 @@ def frame_message(cam, full: bool) -> dict:
            "jpg": base64.b64encode(_encode(surf, 1.0 if full else THUMB_SCALE)).decode("ascii")}
     if full:
         cx, cy = cam.adapter.camera
-        msg["rays"] = [[round(x1 - cx, 1), round(y1 - cy, 1), round(x2 - cx, 1), round(y2 - cy, 1), hit]
+        z = getattr(cam.adapter.core, "zoom", 1.0)     # Meat Boy draws each level zoomed in
+        msg["rays"] = [[round((x1 - cx) * z, 1), round((y1 - cy) * z, 1), round((x2 - cx) * z, 1), round((y2 - cy) * z, 1), hit]
                        for x1, y1, x2, y2, hit in cam.rays]
-        msg["tiles"] = [[round(tx - cx, 1), round(ty - cy, 1), ts, kind] for tx, ty, ts, kind in cam.tiles]
+        msg["tiles"] = [[round((tx - cx) * z, 1), round((ty - cy) * z, 1), ts * z, kind] for tx, ty, ts, kind in cam.tiles]
         msg["sensors"] = [round(float(v), 2) for v in (cam.vec if cam.vec is not None else [])]
         msg["sensor_labels"] = getattr(cam.adapter, "SENSOR_LABELS", None)
     return msg

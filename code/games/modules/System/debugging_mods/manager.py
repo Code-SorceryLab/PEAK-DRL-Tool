@@ -182,10 +182,13 @@ class DebugManager:
         self.last_action_name = action_name
 
     # ─────────────────────────────────────────────────────────
-    def render_overlays(self, surface: pygame.Surface, core):
+    def render_overlays(self, surface: pygame.Surface, core, game_overlays=True):
+        """game_overlays=False: the core drew F1/F4/F6 itself (Meat Boy draws them before its zoom)."""
         if core.render_mode != "human" or not self.show_panel:
             # Headless or panel closed: only the game-area overlays (panel overlays
             # would draw at DEBUG_PANEL_X, outside or over the game frame).
+            if not game_overlays:
+                return
             if self.show_grid:
                 self._safe_overlay("grid", self.grid_overlay.render, surface, core)
             if self.show_hitboxes:
@@ -243,13 +246,13 @@ class DebugManager:
         self._render_hud_strip(surface, core, debug_x, panel_w)
 
         # ── Game-area overlays ────────────────────────────────
-        if self.show_grid:
+        if game_overlays and self.show_grid:
             self._safe_overlay("grid", self.grid_overlay.render, surface, core)
-        if self.show_hitboxes:
+        if game_overlays and self.show_hitboxes:
             self._safe_overlay("hitboxes", self.hitbox_overlay.render, surface, core)
 
         # ── Jump arc — toggled with F1 (shot+arc) ──────────────
-        if self.show_sensors:
+        if game_overlays and self.show_sensors:
             self._safe_overlay("jump_arc", self.jump_arc_overlay.render, surface, core)
 
         # ── Panel overlays ────────────────────────────────────
