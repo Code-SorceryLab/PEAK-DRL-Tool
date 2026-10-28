@@ -344,7 +344,7 @@ class Player():
             # Scale sprite to match current gObj dimensions (handles power-up size changes)
             current_size = (int(self.gObj.width), int(self.gObj.height))
             if (sprite.get_width(), sprite.get_height()) != current_size:
-                sprite = pygame.transform.scale(sprite, current_size)
+                sprite = pygame.transform.smoothscale(sprite, current_size)
             if self.palette:
                 sprite = _recolour(sprite, self.palette)
             y_offset = sprite.get_height() - self.gObj.height

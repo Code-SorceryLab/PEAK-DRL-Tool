@@ -148,27 +148,30 @@ SPRITES["brick"] = [
     "vvvvvvvKvvvvvvvK",
     "KKKKKKKKKKKKKKKK",
 ]
-SPRITES["rune_block_0"] = [
+_BLOCK = [                     # gold, riveted, bevelled: the ? block before its mark
     "KKKKKKKKKKKKKKKK",
     "KYYYYYYYYYYYYYyK",
     "KYKYYYYYYYYYYKyK",
-    "KYYYYYYCYYYYYYyK",
-    "KYYYYYKCKYYYYYyK",
-    "KYYYYYKCKYYYYYyK",
-    "KYYCCCCCCCCCYYyK",
-    "KYYYKCCWCCKYYYyK",
-    "KYYYYKCCCKYYYYyK",
-    "KYYYKCCKCCKYYYyK",
-    "KYYYKCKYKCKYYYyK",
-    "KYYYKKYYYKKYYYyK",
-    "KYYYYYYYYYYYYYyK",
+] + ["KYYYYYYYYYYYYYyK"] * 10 + [
     "KYKYYYYYYYYYYKyK",
     "KyyyyyyyyyyyyyyK",
     "KKKKKKKKKKKKKKKK",
 ]
-SPRITES["rune_block_1"] = [r.replace("C", "c").replace("W", "C") for r in SPRITES["rune_block_0"]]   # the rune pulses
-SPRITES["rune_block_used"] = [r.replace("Y", "l").replace("y", "K").replace("C", "L").replace("W", "L")
-                              for r in SPRITES["rune_block_0"]]
+_QUESTION = [                  # the mark, outlined, 6 x 10
+    ".KKKKK",
+    "KWWWWWK",
+    "KWKKKWWK",
+    "KKKYYKWWK",
+    "....KWWK",
+    "...KWWK",
+    "...KWWK",
+    "...KKK",
+    "...KWWK",
+    "...KKKK",
+]
+SPRITES["question_block_0"] = _put(_BLOCK, _QUESTION, 4, 3)
+SPRITES["question_block_1"] = [r.replace("W", "C") for r in SPRITES["question_block_0"]]   # the mark glows
+SPRITES["question_block_used"] = [r.replace("Y", "l").replace("y", "K") for r in _BLOCK]
 SPRITES["crystal_spikes"] = [
     "................",
     "...K.......K....",
@@ -236,41 +239,42 @@ SPRITES["mana_gem_0"] = [
     "...KK...",
 ]
 SPRITES["mana_gem_1"] = [r.replace("W", "C") for r in SPRITES["mana_gem_0"][:3]] + SPRITES["mana_gem_0"][3:]
-SPRITES["mushroom"] = [
+# The power-ups stay what they are, in the world's darker, gothic colours.
+SPRITES["mushroom"] = [        # crimson cap, glinting spots, a bone-pale stem
     "...KKKK...",
-    ".KKRRWWKK.",
-    "KRRRRWWRRK",
-    "KWWRRRRWWK",
-    "KWWRRRRRWK",
-    "KRRRWWRRRK",
+    ".KKrRRrKK.",
+    "KrRRWRRRrK",
+    "KRWCRRRWRK",
+    "KRRRRrRCWK",
+    "KrRWRRRRrK",
     "KKKKKKKKKK",
-    ".KSKSSKSK.",
-    ".KSSSSSSK.",
+    ".KGKGGKGK.",
+    ".KgGGGGgK.",
     "..KKKKKK..",
 ]
-SPRITES["one_up"] = [r.replace("R", "E") for r in SPRITES["mushroom"]]
-SPRITES["fire_flower"] = [
-    "..KKKKKK..",
-    ".KROOOORK.",
-    "KROYYYYORK",
-    "KROYWWYORK",
-    ".KROOOORK.",
-    "..KKEEKK..",
-    "KEEKKEKKEK",
-    "KEEEKEKEEK",
-    ".KKEEEEKK.",
-    "...KKKK...",
+SPRITES["one_up"] = [r.replace("R", "E").replace("r", "e") for r in SPRITES["mushroom"]]
+SPRITES["fire_flower"] = [     # flame petals round a white-hot core, a thorny stem
+    "..KK..KK..",
+    ".KOOKKOOK.",
+    "KORYYYYROK",
+    ".KYWWWWYK.",
+    "KOYWCCWYOK",
+    ".KYWWWWYK.",
+    "KORYYYYROK",
+    ".KOOKKOOK.",
+    ".KeeKeKeeK",
+    "..KKKeKKK.",
 ]
-SPRITES["star"] = [
+SPRITES["star"] = [            # gold, its right half in shadow, a mana glint at its heart
     "....KK....",
-    "...KYYK...",
-    "KKKKYYKKKK",
-    "KYYYWYYYYK",
-    ".KYYKYKYK.",
-    "..KYYYYK..",
-    ".KYYYYYYK.",
-    ".KYYKKYYK.",
-    "KYYK..KYYK",
+    "...KWYK...",
+    "KKKKYyKKKK",
+    "KWYYYYYyyK",
+    ".KYYKYKyK.",
+    "..KYYYyK..",
+    ".KYYCYyyK.",
+    ".KYYKKyyK.",
+    "KYYK..KyyK",
     "KKK....KKK",
 ]
 SPRITES["magic_bolt_0"] = [

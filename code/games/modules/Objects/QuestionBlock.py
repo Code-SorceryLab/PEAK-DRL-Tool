@@ -33,9 +33,9 @@ class QuestionBlock:
             return
         from ... import mario_art
         if self.hit:
-            name = "rune_block_used"
+            name = "question_block_used"
         elif self.contains in ("brick", "coins", "starbrick"):   # looks like any brick
             name = "brick"
         else:
-            name = f"rune_block_{mario_art.tick(2, 400)}"        # the rune pulses
+            name = f"question_block_{mario_art.tick(2, 400)}"    # the ? glows
         mario_art.draw(surface, name, sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE)

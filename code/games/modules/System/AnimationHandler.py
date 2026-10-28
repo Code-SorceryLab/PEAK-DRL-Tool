@@ -78,7 +78,7 @@ class AnimationHandler:
                 try:
                     img = pygame.image.load(path).convert_alpha()
                     if base_size:
-                        img = pygame.transform.scale(img, base_size)
+                        img = pygame.transform.smoothscale(img, base_size)   # keeps a painted sprite's detail
                     frames.append(img)
                 except Exception as e:
                     print(f"Failed to load {path} for animation ID {anim_id}: {e}")
