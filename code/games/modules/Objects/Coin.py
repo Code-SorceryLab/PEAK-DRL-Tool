@@ -42,7 +42,6 @@ class Coin():
 
     def render(self, surface:pygame.Surface, sx:float, sy:float, debug:bool = False):
         # Draw circle centred on the hitbox (gObj x/y is top-left of the 16×16 rect)
-        cx = int(sx) + self.radius
-        cy = int(sy) + self.radius
-        pygame.draw.circle(surface, self.color, (cx, cy), self.radius)
-        pygame.draw.circle(surface, MapP.COLOR_BLACK, (cx, cy), self.radius, 2)
+        from ... import mario_art                   # a mana gem
+        d = 2 * self.radius
+        mario_art.draw(surface, f"mana_gem_{mario_art.tick(2, 300)}", sx, sy, d, d)

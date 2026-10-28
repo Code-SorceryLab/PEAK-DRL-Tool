@@ -31,15 +31,11 @@ class QuestionBlock:
     def render(self, surface: pygame.Surface, sx: float, sy: float):
         if self.hidden:
             return
-        if not self.hit and self.contains in ("brick", "coins", "starbrick"):   # looks like any brick
-            pygame.draw.rect(surface, MapP.COLOR_PLATFORM, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE))
-            pygame.draw.rect(surface, MapP.COLOR_BLACK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE), 1)
-            return
-        pygame.draw.rect(surface, MapP.COLOR_QBLOCK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE))
-        pygame.draw.rect(surface, MapP.COLOR_BLACK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE), 1)
-
-        if not self.hit:
-            font = pygame.font.Font(None, 26)
-            q = font.render("?", True, MapP.COLOR_WHITE)
-            surface.blit(q, q.get_rect(center=(sx + MapP.TILE_SIZE // 2, sy + MapP.TILE_SIZE // 2)))
-        return
+        from ... import mario_art
+        if self.hit:
+            name = "rune_block_used"
+        elif self.contains in ("brick", "coins", "starbrick"):   # looks like any brick
+            name = "brick"
+        else:
+            name = f"rune_block_{mario_art.tick(2, 400)}"        # the rune pulses
+        mario_art.draw(surface, name, sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE)

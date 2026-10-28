@@ -42,25 +42,7 @@ class LifeUp:
 
     def render(self, surface: pygame.Surface, sx: float, sy: float,
                debug: bool = False) -> None:
-        w = self.gObj.width
-        h = self.gObj.height
-        # Green mushroom cap
-        pygame.draw.ellipse(surface, _COL_BODY,
-                            (int(sx), int(sy), w, h * 2 // 3))
-        # Stem
-        pygame.draw.rect(surface, _COL_STEM,
-                         (int(sx + w // 4), int(sy + h // 2), w // 2, h // 2))
-        # "1" text on cap
-        try:
-            font = pygame.font.SysFont(None, max(10, w // 2))
-            txt  = font.render("1", True, (0, 80, 20))
-            surface.blit(txt, (int(sx + w // 2 - txt.get_width() // 2),
-                               int(sy + h // 6 - txt.get_height() // 2)))
-        except Exception:
-            # Fallback: white dot
-            pygame.draw.circle(surface, _COL_SPOT,
-                               (int(sx + w // 2), int(sy + h // 4)),
-                               max(2, w // 6))
+        from ... import mario_art                   # the 1-UP
+        mario_art.draw(surface, "one_up", sx, sy, self.gObj.width, self.gObj.height)
         if debug:
-            pygame.draw.rect(surface, (0, 255, 0),
-                             (int(sx), int(sy), w, h), 1)
+            pygame.draw.rect(surface, (0, 255, 0), (int(sx), int(sy), self.gObj.width, self.gObj.height), 1)

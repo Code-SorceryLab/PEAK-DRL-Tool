@@ -37,20 +37,7 @@ class Mushroom:
 
     def render(self, surface: pygame.Surface, sx: float, sy: float,
                debug: bool = False) -> None:
-        w = self.gObj.width
-        h = self.gObj.height
-        # Cap (top half) — red
-        pygame.draw.ellipse(surface, COLOR_POWERUP_MUSH,
-                            (int(sx), int(sy), w, h * 2 // 3))
-        # Stem (bottom third) — cream
-        pygame.draw.rect(surface, (255, 230, 180),
-                         (int(sx + w // 4), int(sy + h // 2), w // 2, h // 2))
-        # White spots on cap
-        spot_r = max(2, w // 8)
-        pygame.draw.circle(surface, (255, 255, 255),
-                           (int(sx + w // 3), int(sy + h // 5)), spot_r)
-        pygame.draw.circle(surface, (255, 255, 255),
-                           (int(sx + w * 2 // 3), int(sy + h // 5)), spot_r)
+        from ... import mario_art                   # the mushroom
+        mario_art.draw(surface, "mushroom", sx, sy, self.gObj.width, self.gObj.height)
         if debug:
-            pygame.draw.rect(surface, (255, 0, 0),
-                             (int(sx), int(sy), w, h), 1)
+            pygame.draw.rect(surface, (255, 0, 0), (int(sx), int(sy), self.gObj.width, self.gObj.height), 1)

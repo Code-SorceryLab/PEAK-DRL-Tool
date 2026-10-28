@@ -67,31 +67,7 @@ class StarPowerUp:
 
     def render(self, surface: pygame.Surface, sx: float, sy: float,
                debug: bool = False) -> None:
-        w  = self.gObj.width
-        h  = self.gObj.height
-        cx = int(sx + w // 2)
-        cy = int(sy + h // 2)
-        r  = min(w, h) // 2
-
-        # Outer glow
-        glow = pygame.Surface((w + 8, h + 8), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (*COLOR_POWERUP_STAR, 60),
-                           (w // 2 + 4, h // 2 + 4), r + 4)
-        surface.blit(glow, (int(sx) - 4, int(sy) - 4))
-
-        # 5-pointed star
-        import math
-        points = []
-        for i in range(10):
-            angle  = math.pi / 5 * i - math.pi / 2
-            radius = r if i % 2 == 0 else r * 0.45
-            points.append((
-                cx + int(radius * math.cos(angle)),
-                cy + int(radius * math.sin(angle))
-            ))
-        pygame.draw.polygon(surface, COLOR_POWERUP_STAR, points)
-        pygame.draw.polygon(surface, (255, 255, 200), points, 1)
-
+        from ... import mario_art                   # the star
+        mario_art.draw(surface, "star", sx, sy, self.gObj.width, self.gObj.height)
         if debug:
-            pygame.draw.rect(surface, (255, 255, 0),
-                             (int(sx), int(sy), w, h), 1)
+            pygame.draw.rect(surface, (255, 255, 0), (int(sx), int(sy), self.gObj.width, self.gObj.height), 1)

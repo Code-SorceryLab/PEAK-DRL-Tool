@@ -49,44 +49,8 @@ class FireFlower:
 
     def render(self, surface: pygame.Surface, sx: float, sy: float,
                debug: bool = False) -> None:
-        w  = self.gObj.width
-        h  = self.gObj.height
-
-        # Gentle vertical bob
+        from ... import mario_art                   # the fire flower, bobbing gently
         bob = math.sin(self._t * 3.0) * 2.0
-        sx_i = int(sx)
-        sy_i = int(sy + bob)
-
-        cx = sx_i + w // 2
-
-        # ── Stem ──────────────────────────────────────────────────────────────
-        stem_x  = cx - 1
-        stem_y0 = sy_i + h * 2 // 3
-        stem_y1 = sy_i + h
-        pygame.draw.line(surface, _COL_STEM,
-                         (stem_x, stem_y0), (stem_x, stem_y1), 3)
-
-        # ── Leaf ──────────────────────────────────────────────────────────────
-        leaf_y = sy_i + h * 3 // 4
-        pygame.draw.ellipse(surface, _COL_LEAF,
-                            (stem_x - 6, leaf_y - 3, 8, 5))
-
-        # ── Petals (4 around centre) ───────────────────────────────────────────
-        petal_r  = max(3, w // 4)
-        orbit_r  = petal_r + 1
-        head_cy  = sy_i + h // 3
-        pulse    = 1.0 + 0.08 * math.sin(self._t * 5.0)
-        pr       = int(petal_r * pulse)
-        for i in range(4):
-            angle = math.pi / 2 * i
-            px    = cx      + int(orbit_r * math.cos(angle))
-            py    = head_cy + int(orbit_r * math.sin(angle))
-            pygame.draw.circle(surface, _COL_PETALS, (px, py), pr)
-
-        # ── Centre ────────────────────────────────────────────────────────────
-        centre_r = max(2, w // 5)
-        pygame.draw.circle(surface, _COL_CENTRE, (cx, head_cy), centre_r)
-
+        mario_art.draw(surface, "fire_flower", sx, sy + bob, self.gObj.width, self.gObj.height)
         if debug:
-            pygame.draw.rect(surface, (255, 100, 0),
-                             (int(sx), int(sy), w, h), 1)
+            pygame.draw.rect(surface, (255, 100, 0), (int(sx), int(sy), self.gObj.width, self.gObj.height), 1)

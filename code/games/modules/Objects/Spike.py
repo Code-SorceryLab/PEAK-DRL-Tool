@@ -116,19 +116,14 @@ class Spike:
 
         Layers
         ------
-        1. Dark base rectangle (fills the tile).
-        2. Lighter isoceles triangle pointing upward — the actual spike.
-        3. Optional debug: red bounding box overlay.
+        1. The crystal-shard sprite (mario_art.py), stretched to the tile.
+        2. Optional debug: red bounding box overlay.
         """
         w = self.gObj.width
         h = self.gObj.height
 
-        #    Apex at horizontal centre, top edge.
-        #    Base corners at bottom-left and bottom-right.
-        apex  = (int(sx + w / 2), int(sy + 1))
-        bl    = (int(sx + 1),     int(sy + h - 1))
-        br    = (int(sx + w - 1), int(sy + h - 1))
-        pygame.draw.polygon(surface, _COL_BASE, [apex, bl, br])
+        from ... import mario_art                   # crystal shards
+        mario_art.draw(surface, "crystal_spikes", sx, sy, w, h)
 
         # 3. Debug: red hitbox
         if debug:

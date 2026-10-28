@@ -225,25 +225,18 @@ class MovingPlatform:
 
         Visual layers
         -------------
-        1. Main body rectangle.
-        2. Light highlight strip along the top edge (same style as static platforms).
-        3. Dark accent on the left and right edges.
+        1. The rune-lift sprite (mario_art.py), one 32 px piece at a time.
         4. Optional debug: velocity arrow and bounding box.
         """
         w = self.gObj.width
         h = self.gObj.height
         isx, isy = int(sx), int(sy)
 
-        # 1. Body
-        pygame.draw.rect(surface, _COL_BODY, (isx, isy, w, h))
-
-        # 2. Top highlight strip
-        hi_h = max(2, h // 4)
-        pygame.draw.rect(surface, _COL_TOP, (isx, isy, w, hi_h))
-
-        # 3. Edge accents (1 px wide on left/right)
-        pygame.draw.line(surface, _COL_EDGE, (isx, isy), (isx, isy + h - 1), 2)
-        pygame.draw.line(surface, _COL_EDGE, (isx + w - 1, isy), (isx + w - 1, isy + h - 1), 2)
+        # 1. A floating rune lift, one 32 px piece at a time (mario_art.py)
+        from ... import mario_art
+        for x in range(0, w, 32):
+            piece = min(32, w - x)
+            mario_art.draw(surface, "rune_platform", isx + x, isy, piece, h)
 
         # 4. Debug overlays
         if debug:

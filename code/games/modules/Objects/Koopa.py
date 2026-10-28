@@ -453,78 +453,18 @@ class Koopa:
         w, h   = self.gObj.width, self.gObj.height
         s      = self.sm.state
 
+        from ... import mario_art                   # the rune tortoise and its crystal shell
         if s in (KoopaState.SHELL, KoopaState.MOVING):
-            self._draw_shell(surface, ix, iy, w, h, moving=(s == KoopaState.MOVING))
-        elif s == KoopaState.ALIVE:
-            self._draw_koopa(surface, ix, iy, w, h, winged=False)
+            name = f"shell_{mario_art.tick(2, 80)}" if s == KoopaState.MOVING else "shell_0"
         elif s == KoopaState.FLYING:
-            self._draw_koopa(surface, ix, iy, w, h, winged=True)
+            name = f"tortoise_fly_{mario_art.tick(2, 150)}"
+        else:
+            name = f"tortoise_{int(self.gObj.x // 8) % 2}"
+        mario_art.draw(surface, name, ix, iy, w, h, flip=self.vx > 0)
 
         if debug:
             lbl = f"{s.name}  {self.sm}"
             pygame.draw.rect(surface, (255, 0, 0), (ix, iy, w, h), 1)
-
-    # ── Private draw helpers ──────────────────────────────────────────────────
-
-    def _draw_shell(self, surface: pygame.Surface,
-                    x: int, y: int, w: int, h: int, moving: bool) -> None:
-        """Draw shell — ellipse with cross pattern and optional motion blur."""
-        # Shell body
-        pygame.draw.ellipse(surface, C_SHELL, (x, y, w, h))
-        # Inner highlight
-        pygame.draw.ellipse(surface, C_SHELL_HI,
-                            (x + 4, y + 4, w - 8, h - 8))
-        # Cross dividers
-        pygame.draw.line(surface, C_SHELL,
-                         (x + w // 2, y + 3), (x + w // 2, y + h - 3), 2)
-        pygame.draw.line(surface, C_SHELL,
-                         (x + 3, y + h // 2), (x + w - 3, y + h // 2), 2)
-
-        if moving:
-            # Motion streak lines trailing behind the shell
-            trail_dir = -1 if self.vx > 0 else 1
-            for i in range(1, 4):
-                lx = x + trail_dir * i * 5
-                alpha = max(1, 3 - i)
-                pygame.draw.line(surface, C_MOTION,
-                                 (lx, y + h // 4), (lx, y + 3 * h // 4), alpha)
-
-    def _draw_koopa(self, surface: pygame.Surface,
-                    x: int, y: int, w: int, h: int, winged: bool) -> None:
-        """Draw the full koopa body (ALIVE / FLYING)."""
-        head_h = h // 3
-        body_h = h - head_h
-
-        # ── Wings (drawn behind body) ─────────────────────────────────────────
-        if winged:
-            # Flap animation: offset by phase
-            flap = int(4 * math.sin(self._fly_phase * 2))
-            left_wing  = [(x - 12, y + head_h - flap),
-                          (x - 3,  y + head_h + 6),
-                          (x - 3,  y + head_h + body_h // 2)]
-            right_wing = [(x + w + 12, y + head_h - flap),
-                          (x + w + 3,  y + head_h + 6),
-                          (x + w + 3,  y + head_h + body_h // 2)]
-            pygame.draw.polygon(surface, C_WING, left_wing)
-            pygame.draw.polygon(surface, C_WING, right_wing)
-            pygame.draw.polygon(surface, C_WING_EDGE, left_wing, 1)
-            pygame.draw.polygon(surface, C_WING_EDGE, right_wing, 1)
-
-        # ── Body / shell on back ──────────────────────────────────────────────
-        body_rect = (x, y + head_h, w, body_h)
-        pygame.draw.rect(surface, C_SHELL, body_rect)
-        # Shell highlight panel
-        pygame.draw.rect(surface, C_SHELL_HI,
-                         (x + 3, y + head_h + 3, w - 6, body_h - 6))
-
-        # ── Head ─────────────────────────────────────────────────────────────
-        pygame.draw.ellipse(surface, C_HEAD,
-                            (x + 2, y, w - 4, head_h + 5))
-
-        # ── Eye — faces direction of travel ───────────────────────────────────
-        eye_x = (x + w - 8) if self.vx < 0 else (x + 3)
-        pygame.draw.rect(surface, C_EYE,          (eye_x,     y + 3, 5, 5))
-        pygame.draw.rect(surface, (255, 255, 255), (eye_x + 1, y + 3, 2, 2))
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-from code.games import art_png, bomberman_art, megaman_art
+from code.games import art_png, bomberman_art, mario_art, megaman_art
 
 
 def test_export_writes_each_sprite_as_drawn_and_keeps_edits(tmp_path, monkeypatch):
@@ -28,7 +28,8 @@ def test_the_games_draw_an_edited_png(tmp_path, monkeypatch):
     monkeypatch.setattr(art_png, "ROOT", str(tmp_path))
     art_png.export("bomberman", bomberman_art.all_sprites(), bomberman_art.PAL)
     art_png.export("megaman", megaman_art.all_sprites(), megaman_art.PAL)
-    for game, name in (("bomberman", "brick"), ("megaman", "mm_idle")):
+    art_png.export("mario", mario_art.all_sprites(), mario_art.PAL)
+    for game, name in (("bomberman", "brick"), ("megaman", "mm_idle"), ("mario", "brick")):
         img = pygame.image.load(art_png.path(game, name))
         img.set_at((1, 1), (1, 2, 3, 255))
         pygame.image.save(img, art_png.path(game, name))
@@ -36,5 +37,8 @@ def test_the_games_draw_an_edited_png(tmp_path, monkeypatch):
     bomberman_art.sprite.cache_clear()
     assert bomberman_art.get(bomberman_art.BRICK).get_at((2, 2))[:3] == (1, 2, 3)     # drawn 2x
     assert megaman_art.DrawnAssets(1.0).sprite("mm_idle").get_at((1, 1))[:3] == (1, 2, 3)
+    mario_art._scaled.clear()
+    assert mario_art.image("brick", 32, 32).get_at((2, 2))[:3] == (1, 2, 3)               # drawn 2x
+    mario_art._scaled.clear()
     art_png.load.cache_clear()
     bomberman_art.sprite.cache_clear()

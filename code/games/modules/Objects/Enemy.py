@@ -44,6 +44,6 @@ class Enemy():
         self.gObj.x += self.vx * dt
 
     def render(self, surface: pygame.Surface, sx: float, sy: float, debug: bool = False):
-        pygame.draw.rect(surface, self.color, (sx, sy, self.gObj.width, self.gObj.height))
-        eye_offset = 4 if self.vx > 0 else 14
-        pygame.draw.rect(surface, (255, 255, 255), (sx + eye_offset, sy + 4, 4, 8))
+        from ... import mario_art                   # the imp, its feet stepping as it walks
+        mario_art.draw(surface, f"imp_{int(self.gObj.x // 8) % 2}", sx, sy, self.gObj.width, self.gObj.height,
+                       flip=self.vx > 0)

@@ -10,15 +10,15 @@ from ..System.EntityType import EntityType
 PROJECTILE_SPEED    = 480.0   # SMB: 4 px/frame
 
 # Upward velocity applied on every ground bounce (negative = up in screen coords).
-# Increase magnitude for higher bounces, decrease for flatter arcs.
 PROJ_JUMP_VEL       = -360.0  # SMB: 3 px/frame up off the floor
 
-# Gravity acceleration applied each frame (px/s²).
-# Matches world gravity for a natural arc; lower values produce floatier fireballs.
-PROJ_GRAVITY        = 900.0
+# Thrown downward: SMB's FireballObjCore sets Fireball_Y_Speed = $04 (4 px/frame down).
+PROJ_LAUNCH_VEL     = 480.0
 
-# Maximum downward fall speed (px/s).
-PROJ_MAX_FALL_SPEED = 480.0
+# The fireball's own gravity and fall cap, not Mario's: ImposeGravity with force $50 (/256 px per
+# frame²) and maximum 3 px/frame. So it skips along in low hops, about half a tile high.
+PROJ_GRAVITY        = 2250.0
+PROJ_MAX_FALL_SPEED = 360.0
 
 # Seconds before the projectile auto-expires regardless of bounces.
 PROJECTILE_LIFETIME = 3.0
@@ -68,25 +68,24 @@ class FireFlowerProjectile(Projectile):
         cls,
         player,
         speed: float    = PROJECTILE_SPEED,
-        jump_vel: float = PROJ_JUMP_VEL,
+        launch_vel: float = PROJ_LAUNCH_VEL,
     ) -> "FireFlowerProjectile":
         """
-        Spawn a projectile centred on the player, travelling in the direction
-        they are currently facing.
+        Spawn a projectile at the player's head height (SMB: Fireball_Y = Player_Y), travelling
+        down and forward in the direction they are facing.
 
         Parameters
         ----------
-        speed    : horizontal speed in px/s (sign is applied automatically).
-        jump_vel : initial upward vy in px/s (negative = up).
-                   Pass a less-negative value for a flatter arc.
+        speed      : horizontal speed in px/s (sign is applied automatically).
+        launch_vel : initial downward vy in px/s (positive = down).
         """
         cx = player.gObj.x + player.gObj.width  / 2 - PROJECTILE_WIDTH  / 2
-        cy = player.gObj.y + player.gObj.height / 2 - PROJECTILE_HEIGHT / 2
+        cy = player.gObj.y
         vx = speed if player.facing_right else -speed
         return cls(
             gObj=GameObject(cx, cy, PROJECTILE_WIDTH, PROJECTILE_HEIGHT, True),
             vx=vx,
-            vy=jump_vel,    # launch immediately upward on spawn
+            vy=launch_vel,  # thrown toward the ground
             owner="player",
             damage=1,
             lifetime=PROJECTILE_LIFETIME,
@@ -111,10 +110,8 @@ class FireFlowerProjectile(Projectile):
             self.gObj.active = False
             return
 
-        # Gravity — use ctx values when available so level physics config applies.
-        gravity        = ctx.GRAVITY        if ctx else PROJ_GRAVITY
-        max_fall_speed = ctx.MAX_FALL_SPEED if ctx else PROJ_MAX_FALL_SPEED
-        self.vy = min(self.vy + gravity * dt, max_fall_speed)
+        # The fireball's own gravity (SMB gives it its own, not Mario's).
+        self.vy = min(self.vy + PROJ_GRAVITY * dt, PROJ_MAX_FALL_SPEED)
 
         # Bounce — PhysicsManager sets on_ground=True after snapping to floor.
         # We read it here (same pattern as StarPowerUp) and immediately re-launch.
@@ -132,17 +129,6 @@ class FireFlowerProjectile(Projectile):
     def render(self, surface: pygame.Surface, screen_x: float, screen_y: float):
         if not self.gObj.active:
             return
-        # Outer glow (orange)
-        pygame.draw.circle(
-            surface,
-            (255, 140, 0),
-            (int(screen_x + PROJECTILE_WIDTH // 2), int(screen_y + PROJECTILE_HEIGHT // 2)),
-            PROJECTILE_WIDTH // 2,
-        )
-        # Inner core (bright yellow/white)
-        pygame.draw.circle(
-            surface,
-            (255, 255, 180),
-            (int(screen_x + PROJECTILE_WIDTH // 2), int(screen_y + PROJECTILE_HEIGHT // 2)),
-            PROJECTILE_WIDTH // 4,
-        )
+        from ... import mario_art                   # a magic bolt
+        mario_art.draw(surface, f"magic_bolt_{mario_art.tick(2, 60)}", screen_x, screen_y,
+                       PROJECTILE_WIDTH, PROJECTILE_HEIGHT)

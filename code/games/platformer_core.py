@@ -30,6 +30,8 @@ from .modules.System.LevelLoader import LevelLoader, LevelData
 from .modules.System.PhysicsManager import PhysicsManager
 from .modules.System.config_manager import ConfigManager
 from . import mutants
+from . import mario_art
+from .modules.Objects.Goal import Goal
 from .modules.System.debugging_mods.manager import DebugManager
 from .modules.System.nes_font import nes_text
 from .modules.Objects.Spike import Spike
@@ -1952,7 +1954,7 @@ class PlatformerCore(gymnasium.Env):
         else:
             game_surf = surface
 
-        game_surf.fill(COLOR_SKY)
+        game_surf.fill(mario_art.SKY)
         self._draw_world(game_surf)
         self._draw_entities(game_surf)
         self._draw_player(game_surf)
@@ -1989,7 +1991,7 @@ class PlatformerCore(gymnasium.Env):
                 tile.render(surface, tile.gObj.x - self.camera_x, tile.gObj.y - self.camera_y)
             elif isinstance(tile, Tile):
                 if tile.color == COLOR_QBLOCK: continue
-                tile.render(surface, self.camera_x, self.camera_y)
+                self._draw_tile(surface, tile)
             elif isinstance(tile, QuestionBlock):
                 tile.render(surface, tile.x - self.camera_x, tile.y - self.camera_y)
             elif hasattr(tile, 'render'):
@@ -2004,6 +2006,23 @@ class PlatformerCore(gymnasium.Env):
         for plat in visible_platforms:
             if plat.gObj.active:
                 plat.render(surface, plat.gObj.x - self.camera_x, plat.gObj.y - self.camera_y)
+
+    _TILE_ART = {COLOR_GROUND: "ground", COLOR_PLATFORM: "brick"}
+
+    def _open_above(self, obj) -> bool:
+        """Is the grid cell above this one empty? (a surface tile gets its top face)"""
+        row, col = int(obj.y // TILE_SIZE), int(obj.x // TILE_SIZE)
+        grid = self.level_data.grid
+        return row > 0 and 0 <= col < len(grid[row - 1]) and grid[row - 1][col] == TILE_AIR   # the map's top edge is a ceiling
+
+    def _draw_tile(self, surface: pygame.Surface, tile) -> None:
+        """Terrain in the magic look (mario_art.py); a tile with no sprite keeps its flat colour."""
+        name = self._TILE_ART.get(tile.color)
+        if name is None:
+            return tile.render(surface, self.camera_x, self.camera_y)
+        if name == "ground" and self._open_above(tile):
+            name = "ground_top"
+        mario_art.draw(surface, name, tile.x - self.camera_x, tile.y - self.camera_y, tile.width, tile.height)
 
     def _update_firebars(self):
         """Spin the fire bars; touching a fireball is a hit (star and i-frames absorb it)."""
@@ -2032,7 +2051,10 @@ class PlatformerCore(gymnasium.Env):
 
         visible_collectibles = self.physics_manager.collectible_hash.query_rect(cx, cy, cw, ch)
         for entity in visible_collectibles:
-            if hasattr(entity, 'render'):
+            if isinstance(entity, Goal):                # the crystal staff: its orb on the top cell
+                mario_art.draw(surface, "staff_top" if self._open_above(entity) else "staff_pole",
+                               entity.x - cx, entity.y - cy, entity.width, entity.height)
+            elif hasattr(entity, 'render'):
                 entity.render(surface, entity.x - cx, entity.y - cy)
 
         for proj in self.level_data.projectiles:

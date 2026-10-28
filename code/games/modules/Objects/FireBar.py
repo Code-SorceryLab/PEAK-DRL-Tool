@@ -65,7 +65,7 @@ class FireBar:
         return False
 
     def render(self, surface: pygame.Surface, camera_x: float, camera_y: float) -> None:
+        from ... import mario_art                   # violet flame orbs
+        d = 2 * int(self.ball_radius) + 2
         for bx, by in self.balls():
-            pos = (int(bx - camera_x), int(by - camera_y))
-            pygame.draw.circle(surface, _COL_OUTER, pos, int(self.ball_radius) + 2)
-            pygame.draw.circle(surface, _COL_INNER, pos, max(2, int(self.ball_radius) - 2))
+            mario_art.draw(surface, "flame_orb", bx - camera_x - d / 2, by - camera_y - d / 2, d, d)
