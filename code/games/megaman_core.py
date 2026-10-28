@@ -844,6 +844,10 @@ class MegamanCore:
             self.score += en.PEARL_SCORE
             self.coins_total += 1
             self.sfx("pearl")
+        elif it.kind == "oneup":
+            self.extra_lives = getattr(self, "extra_lives", 0) + 1   # manual play adds it to the run's lives
+        elif it.kind.startswith("weapon"):
+            pass                                        # no weapons to refill: only the buster
         elif p.hp < p.hp_max:
             self.refill = en.ITEM_HEAL[it.kind]         # step() pays it out, the game frozen
 

@@ -1,6 +1,6 @@
 """Our own sprites as PNG files, one per sprite, to edit in any pixel editor (Aseprite, Piskel, ...).
 
-The art modules (bomberman_art.py) draw each sprite as text, rows of palette
+The art modules (bomberman_art.py, megaman_art.py) draw each sprite as text, rows of palette
 letters. This writes them out at one pixel per art pixel, and the games draw a sprite's PNG in place
 of its text whenever the file is there: edit the PNG and the game shows the edit.
 
@@ -78,8 +78,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--force", action="store_true", help="rewrite every PNG from the text, losing edits")
     args = ap.parse_args()
-    from . import bomberman_art
-    for game, mod in (("bomberman", bomberman_art)):
+    from . import bomberman_art, megaman_art
+    for game, mod in (("bomberman", bomberman_art), ("megaman", megaman_art)):
         n = export(game, mod.all_sprites(), mod.PAL, args.force)
         print(f"{game}: {n} written to {os.path.join(ROOT, game)}")
 

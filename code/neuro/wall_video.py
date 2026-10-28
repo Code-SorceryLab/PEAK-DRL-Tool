@@ -105,7 +105,7 @@ def write_webm(surfaces: Iterable[pygame.Surface], path: str, fps: int = cameras
 
 def no_ripped_art() -> None:
     """Refuse while the ripped Mega Man art is around, then point the game's art folder at nowhere,
-    so even a config naming another folder (megaman_config.yaml assets.dir) draws flat shapes."""
+    so even a config naming another folder (megaman_config.yaml assets.dir) draws our own art (megaman_art.py)."""
     if os.environ.get("PEAK_MM1_ASSETS") not in (None, "", NO_ART) or os.path.isdir(RIPPED):
         raise SystemExit("refusing to record: the ripped Mega Man art (megaman-data/ or PEAK_MM1_ASSETS) would end up "
                          "on the public site; unset PEAK_MM1_ASSETS and move megaman-data/ away first")

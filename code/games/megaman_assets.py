@@ -88,7 +88,11 @@ class Assets:
         root = root if os.path.isabs(root) else os.path.join(_REPO, root)
         key = (root, scale)
         if key not in _cache:
-            _cache[key] = cls(root, cfg, scale) if os.path.isdir(os.path.join(root, "sprites")) else None
+            if os.path.isdir(os.path.join(root, "sprites")):
+                _cache[key] = cls(root, cfg, scale)
+            else:                               # no ripped art here: our own drawings (megaman_art.py)
+                from .megaman_art import DrawnAssets
+                _cache[key] = DrawnAssets(scale)
         return _cache[key]
 
     def __init__(self, root: str, cfg: dict, scale: float) -> None:
@@ -108,6 +112,8 @@ class Assets:
 
     def sprite(self, name: str, flip_x: bool = False, flip_y: bool = False):
         """A frame at game scale with a transparent background, or None if its sheet is missing."""
+        if name not in FRAMES:
+            return None
         key = (name, flip_x, flip_y)
         if key not in self._sprites:
             sheet, x, y, w, h = FRAMES[name]

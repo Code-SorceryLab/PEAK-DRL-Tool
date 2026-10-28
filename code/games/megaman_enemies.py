@@ -47,7 +47,8 @@ BOSS_BLINK = 63             # frames he cannot be hurt again after a hit
 BOSS_RECOIL_UNTIL = 31      # ...and he is thrown back while the blink counter is at least this
 ROLLING_CUTTER_HALF = 6
 ROLLING_CUTTER_SPEED = 2.375                      # $02.60
-ITEM_HALF = {"life_large": (4, 8), "life_small": (6, 6), "pearl": (4, 4), "clear": (8, 8)}
+ITEM_HALF = {"life_large": (4, 8), "life_small": (6, 6), "pearl": (4, 4), "clear": (8, 8),
+             "weapon_large": (4, 8), "weapon_small": (6, 6), "oneup": (8, 8)}
 ITEM_HEAL = {"life_large": 10, "life_small": 2}
 ITEM_TTL = 240              # a dropped item lasts four seconds
 PEARL_SCORE = 1000
@@ -281,7 +282,7 @@ def octopus(e: Enemy, core) -> bool:
         e.fd -= 1
         if e.fd == 0:
             e.facing, e.vy = -e.facing, -e.vy
-        return True
+        return _on_screen(e, core)                 # the ROM drops it off-screen even while it waits
     vy = e.vy
     alive = move(e, core)
     e.vy = vy                                      # never picks up the resting fall speed
@@ -374,8 +375,9 @@ def kill(e: Enemy, core) -> bool:
     core.score += STATS[e.kind][5]
     core.kills_total += 1
     r = core.rng.randrange(128) % 100              # the console's seed is 7 bits wide, hence the skew
-    drop = "pearl" if 12 <= r < 65 else "life_small" if 80 <= r < 95 else "life_large" if 97 <= r < 99 else None
-    if drop:                                       # weapon energy and extra lives have no use here
+    drop = ("pearl" if 12 <= r < 65 else "weapon_small" if r < 80 else "life_small" if r < 95
+            else "weapon_large" if r < 97 else "life_large" if r < 99 else "oneup" if r == 99 else None)
+    if drop:                                       # BonusProbabilityTable; weapon energy only looks the part here
         core.items.append(Item(drop, e.x, e.y, vy=-4.0, ttl=ITEM_TTL))
     if e.kind == "s":                              # the shell's slot re-arms after 72 frames
         e.state, e.fd = "dead", 72
@@ -533,16 +535,16 @@ def cut_man(e: Enemy, core) -> bool:
     elif s == 24:
         step()
         e.timer -= 1
-        if (e.timer <= 0 or same_y) and not cutter_out:
+        if (e.timer <= 0 or (same_y and not airborne)) and not cutter_out:   # a jumping Mega Man doesn't cut the wait
             e.vx, e.anim, e.state = 0.0, 0, 15
     return True
 
 
 def hit_boss(e: Enemy, core) -> None:
-    """A buster shot landed: he is knocked back, away from Mega Man, and blinks."""
+    """A buster shot landed: he is knocked back against the way he was walking, and blinks."""
     e.hp -= STATS[e.kind][3]
     e.blink = BOSS_BLINK
-    e.facing = -1 if core.nes_player()[0] >= e.x else 1
+    e.facing = -e.facing                           # BossVariable43 eor #$40
     e.vy, e.vx, e.state = -1.25, 1.125, 14
 
 

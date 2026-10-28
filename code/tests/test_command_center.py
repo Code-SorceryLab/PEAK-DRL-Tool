@@ -275,7 +275,8 @@ def test_recording_hides_any_mega_man_art(tmp_path, monkeypatch):
     monkeypatch.delenv("PEAK_MM1_ASSETS")                       # restored (unset) after the test
     (tmp_path / "art" / "sprites").mkdir(parents=True)          # a config pointing at ripped art elsewhere
     wall_video.no_ripped_art()
-    assert megaman_assets.Assets.get({"dir": str(tmp_path / "art")}, 1.0) is None
+    from code.games.megaman_art import DrawnAssets                # our own drawings: fine to publish
+    assert isinstance(megaman_assets.Assets.get({"dir": str(tmp_path / "art")}, 1.0), DrawnAssets)
 
 
 def test_the_experienced_mega_man_video_uses_the_paper_seed_agents(monkeypatch):
