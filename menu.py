@@ -271,6 +271,22 @@ def guess_game_for_run(run_dir: Path) -> str:
     return GAMES[0]
 
 
+def tty_sane() -> None:
+    """Enter ends a line again. A game or a decoder it starts can leave the terminal in raw input
+    (Enter shows ^M and input() never returns): newlines, line editing and echo back on."""
+    try:
+        import termios
+    except ImportError:                          # Windows has no termios
+        return
+    try:
+        attrs = termios.tcgetattr(sys.stdin)
+        attrs[0] |= termios.ICRNL
+        attrs[3] |= termios.ICANON | termios.ECHO
+        termios.tcsetattr(sys.stdin, termios.TCSANOW, attrs)
+    except (termios.error, OSError, ValueError):   # stdin is a pipe or closed, not a terminal
+        pass
+
+
 def setup_project():
     RUNS_DIR.mkdir(exist_ok=True)
 
@@ -1544,6 +1560,7 @@ def main():
     )
 
     while True:
+        tty_sane()
         setup_project()
         header = []
         for step, fn in enumerate((get_available_games, get_enabled_level_count, get_trained_games,
@@ -1626,6 +1643,7 @@ def main():
             # Pause so the user can read output before the screen is cleared,
             # unless the action was "clear screen" itself.
             if fn is not clear_cli:
+                tty_sane()                    # the action may have run a game that left the terminal raw
                 try:
                     input(_DIM("\n    Press Enter to return to menu..."))
                 except (EOFError, KeyboardInterrupt):

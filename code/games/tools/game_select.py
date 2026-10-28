@@ -98,12 +98,13 @@ def _decode_clip(game: str) -> None:
         length = min(CLIP_S, (tries[i + 1][0] / meta["fps"] - start) if i + 1 < len(tries) else CLIP_S)
         w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                                         "stream=width,height", "-of", "csv=p=0", str(video)],
-                                       capture_output=True, text=True, check=True).stdout.split(","))
+                                       stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True).stdout.split(","))
         scale = min(CLIP_BOX[0] / w, CLIP_BOX[1] / h)
         size = (int(w * scale) // 2 * 2, int(h * scale) // 2 * 2)
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{length:.2f}", "-i", str(video),
+        raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{length:.2f}", "-i", str(video),
                               "-vf", f"fps={CLIP_FPS},scale={size[0]}:{size[1]}:flags=neighbor",
-                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdin=subprocess.DEVNULL,   # keep off the terminal
+                             capture_output=True, check=True).stdout
     except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError):
         return
     n = size[0] * size[1] * 3
