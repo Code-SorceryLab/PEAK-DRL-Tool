@@ -175,3 +175,12 @@ def test_falling_onto_a_grounded_enemy_kills_it(tmp_path, drop_px):
             break
     assert core.alive
     assert not enemy.gObj.active
+
+
+def test_a_reset_after_big_mario_starts_where_a_fresh_one_does(tmp_path):
+    core = _core(tmp_path, FLAT)
+    core.reset()
+    fresh = (core.player.gObj.y, core.player.gObj.height)
+    core.player.gObj.height = 42                   # the last episode ended big (mushroom)
+    core.reset()
+    assert (core.player.gObj.y, core.player.gObj.height) == fresh

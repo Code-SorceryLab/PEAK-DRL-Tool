@@ -983,6 +983,7 @@ class PlatformerCore(gymnasium.Env):
                 self.player.power_machine._iframes_timer = 0.0
             else:
                 self.player.power_machine.reset()
+                self.player.gObj.height      = PLATFORMER_HEIGHT   # small again: a big box would spawn in the floor
                 self.player.powered_up       = False
                 self.player.invincible_timer = 0
 

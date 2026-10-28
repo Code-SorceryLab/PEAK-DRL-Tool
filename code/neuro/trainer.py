@@ -127,6 +127,7 @@ class Trainer:
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
+        self.pop.locked_level = level         # persisted so --resume keeps a --level run on its level
         self.pop.game = game  # tags embedded in best.npz
 
         # Level curriculum: an explicit --level locks that one level; otherwise the
@@ -614,9 +615,15 @@ def main() -> None:
         return
 
     run_dir = args.run_dir or args.resume or os.path.join("runs", args.game)
+    # a flag the user actually typed beats a saved or swept value; an argparse default does not
+    typed = {a.lstrip("-").split("=")[0].replace("-", "_") for a in sys.argv if a.startswith("--")}
     if args.resume:
         pop = Population.load(args.resume)
         cfg = pop.cfg
+        if "persona" not in typed and pop.persona in PERSONAS:
+            args.persona = pop.persona        # the run's own player type, not the default
+        if args.level is None:
+            args.level = pop.locked_level
         print(f"resumed {args.resume} at gen {pop.generation}", flush=True)
     else:
         pop = None
@@ -627,8 +634,6 @@ def main() -> None:
             from .gasweep import load_best
             fields = load_best(args.game)
             print(f"--best: {args.game} -> {fields or 'baseline (this game has no sweep yet)'}", flush=True)
-        # a flag the user actually typed beats the sweep; an argparse default does not
-        typed = {a.lstrip("-").split("=")[0].replace("-", "_") for a in sys.argv if a.startswith("--")}
         for k, v in given.items():
             if k not in fields or k in typed:
                 fields[k] = v

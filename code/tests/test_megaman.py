@@ -232,3 +232,11 @@ def test_practice_section_is_playable_but_not_a_stage_leg(name, start):
     core.won = True
     core.reset()                                     # a won practice section does not advance into the campaign
     assert core.level_entry()["id"] == name
+
+
+def test_a_section_with_no_route_to_its_exit_gives_no_progress():
+    from code.neuro.adapters import MegamanAdapter
+    a = object.__new__(MegamanAdapter)             # a sealed mutant: no route from the start, every cost inf
+    a._start_cost = a._best_cost = float("inf")
+    a._end_cost, a._has_boss = 0.0, False
+    assert a._attempt_progress() == 0.0            # inf - inf is NaN, and min(1.0, nan) read as 100 %

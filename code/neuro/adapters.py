@@ -1177,7 +1177,9 @@ class MegamanAdapter(_EventWeights):
 
     def _attempt_progress(self) -> float:
         """0..1 along the route; with a boss at the end, half is the route and half his energy."""
-        route = max(0.0, min(1.0, (self._start_cost - self._best_cost) / (self._start_cost - self._end_cost)))
+        span = self._start_cost - self._end_cost
+        # No route from the start (a breaking mutant): no progress, as the telemetry's progress() says.
+        route = max(0.0, min(1.0, (self._start_cost - self._best_cost) / span)) if span < float("inf") else 0.0
         if not self._has_boss:
             return route
         from code.games import megaman_enemies as en

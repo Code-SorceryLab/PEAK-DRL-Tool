@@ -57,10 +57,29 @@ def _header(rows: list[dict]) -> list[str]:
 def read(path: str) -> list[dict]:
     try:
         with open(path, encoding="utf-8", newline="") as f:
-            return [{k: _parse(k, v) for k, v in row.items() if k is not None}
+            return [_from_legacy(row) if "status" not in row and "cause_of_death" in row
+                    else {k: _parse(k, v) for k, v in row.items() if k is not None}
                     for row in csv.DictReader(f)]
     except FileNotFoundError:
         return []
+
+
+def _from_legacy(old: dict) -> dict:
+    """A row of the older agent CSV (code/neuro/episodes.py), which 2D manual play still writes, in this schema."""
+    import ast
+    won = old.get("cause_of_death") == "Success"
+    route = [list(p) for p in ast.literal_eval(old.get("route") or "[]")]
+    secs = float(old.get("elapsed_time") or 0)
+    row = {"game": old.get("game") or None, "level": str(old.get("world")), "persona": old.get("persona") or None,
+           "status": "WON" if won else "DEAD", "cause": "" if won else old.get("cause_of_death", ""),
+           "frames": round(secs * 60), "time_s": secs, "progress": float(old.get("progress_ratio") or 0),
+           "jumps": int(old.get("jump_count") or 0), "coins": int(old.get("coins_collected") or 0),
+           "kills": int(old.get("enemies_killed") or 0), "avg_speed": float(old.get("avg_vx") or 0),
+           "end_x": route[-1][0] if route else None, "end_y": route[-1][1] if route else None,
+           "tile": 32, "route": route}
+    if old.get("bricks_destroyed"):
+        row["bricks"] = int(old["bricks_destroyed"])
+    return row
 
 
 def append(path: str, rows: list[dict]) -> None:

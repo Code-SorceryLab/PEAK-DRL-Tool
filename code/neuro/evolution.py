@@ -124,6 +124,7 @@ class Population:
             "best_level": self.best_level,
             "annealed": self.annealed,
             "persona": getattr(self, "persona", None),
+            "locked_level": getattr(self, "locked_level", None),   # a --level run; None = the curriculum
             "config": asdict(self.cfg),
             "rng_state": self.rng.bit_generator.state,
             "history": self.history,
@@ -162,5 +163,6 @@ class Population:
         pop.best_level = state.get("best_level")
         pop.annealed = state.get("annealed", False)
         pop.history = state.get("history", [])
+        pop.persona, pop.locked_level = state.get("persona"), state.get("locked_level")
         pop.rng.bit_generator.state = state["rng_state"]
         return pop

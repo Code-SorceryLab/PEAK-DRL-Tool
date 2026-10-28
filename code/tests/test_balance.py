@@ -155,3 +155,11 @@ def test_gaconfig_for_game_lets_explicit_args_win(tmp_path):
         assert GAConfig.for_game("sonic").memory == GAConfig().memory
     finally:
         gs.BEST_PATH = old
+
+
+def test_win_rate_counts_only_the_generations_from_the_first_win():
+    # first win at gen 22 of a 25-gen budget: the 10-gen window would reach back into gens 16-21 (no wins)
+    hist = [_row(g, ["DEAD"] * 10, 100.0) for g in range(1, 22)] + \
+           [_row(g, ["WON"] * 5 + ["DEAD"] * 5, 900.0) for g in range(22, 26)]
+    cell = summarize(hist, pop_size=10, level="L", seed=7, best_fitness=900.0, best_gen=22)
+    assert cell["first_win_gen"] == 22 and cell["win_rate"] == 0.5        # 20 wins in 40 episodes, not 20 in 100

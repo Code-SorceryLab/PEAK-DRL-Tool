@@ -79,6 +79,14 @@ def tally(rows: list[dict], mode: str) -> dict:
 
 
 # ── the analyses ─────────────────────────────────────────────────────────────────────────────
+def persona_flags(per: list[dict], mode: str, plist: list[str]) -> dict:
+    """persona -> (flags, comparisons) over the non-neutral mutants. An unsolved original ("not counted")
+    is left out of both, as ast_rule.md says it is left out of every tally."""
+    return {p: (sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) in ("broken", "changed")),
+                sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) not in (None, "not counted")))
+            for p in plist}
+
+
 def judgments(results: dict) -> list[dict]:
     """One row per mutant on every level: whether each method got it right, and the words the page
     shows; `main` marks the evaluation level's."""
@@ -372,11 +380,10 @@ def write(results: dict, out: str = OUT) -> list[str]:
             md.append(f"| {GAME[r['game']]} | `{r['id']}` | {r['class']} | "
                       + " | ".join(short.get(r.get((mode, p)), " ") for p in plist) + " |")
         md.append("")
-        counts = {p: sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
+        flags = persona_flags(per, mode, plist)
         alarms = {p: sum(1 for r in per if r["class"] == "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
-        n_play = {p: sum(1 for r in per if r["class"] != "neutral" and (mode, p) in r) for p in plist}  # the mutants it played
         fa_text = ", ".join(f"{p} {alarms[p]}" for p in plist if alarms[p]) or "none"
-        md.append(f"Flags per persona ({mode}): " + ", ".join(f"{p} {counts[p]}/{n_play[p]}" for p in plist)
+        md.append(f"Flags per persona ({mode}): " + ", ".join(f"{p} {flags[p][0]}/{flags[p][1]}" for p in plist)
                   + f"; false alarms on off-route: {fa_text}.")
         md.append("")
 
@@ -435,10 +442,9 @@ def _every_level(results: dict, every: list[dict]) -> list[str]:
     plist = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
     per = [r for r in personas(results, every=True) if r["game"] != "megaman"]
     for mode in ("retrain", "replay"):
-        counts = {p: sum(1 for r in per if r["class"] != "neutral" and r.get((mode, p)) in ("broken", "changed")) for p in plist}
-        n_play = {p: sum(1 for r in per if r["class"] != "neutral" and (mode, p) in r) for p in plist}
+        flags = persona_flags(per, mode, plist)
         md.append("")
-        md.append(f"Flags per persona, every level ({mode}): " + ", ".join(f"{p} {counts[p]}/{n_play[p]}" for p in plist) + ".")
+        md.append(f"Flags per persona, every level ({mode}): " + ", ".join(f"{p} {flags[p][0]}/{flags[p][1]}" for p in plist) + ".")
     md += ["", "| Level | Mutant | Class | " + " | ".join(HEAD[m] for m in (*MODES, "solvable")) + " |",
            "|---|---|---|" + "---|" * (len(MODES) + 1)]
     md += [f"| {where(r['game'], r['level'])} | `{r['id']}` | {r['class']} | " + " | ".join(_mark(r[m]) for m in (*MODES, "solvable")) + " |"
