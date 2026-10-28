@@ -5,9 +5,12 @@ not ripped sprites. Every sprite is a list of strings, one character per pixel (
 """
 from __future__ import annotations
 
+import itertools
 from functools import lru_cache
 
 import pygame
+
+from . import art_png
 
 # Colours as the console shows them (2C02 palette entries in brackets)
 PAL = {
@@ -330,7 +333,12 @@ def frame_tile(left: bool, right: bool, up: bool, down: bool, vent: bool) -> tup
 
 @lru_cache(maxsize=512)
 def sprite(rows: tuple, flip: bool = False, scale: int = SCALE) -> pygame.Surface:
-    """One bitmap as a surface, transparent where '.', each pixel scale x scale."""
+    """One bitmap as a surface, transparent where '.', each pixel scale x scale: its PNG (art_png.py)
+    when there is one, else drawn from the text."""
+    png = art_png.load("bomberman", _index().get(rows))
+    if png is not None:
+        s = pygame.transform.scale(png, (png.get_width() * scale, png.get_height() * scale))
+        return pygame.transform.flip(s, True, False) if flip else s
     h, w = len(rows), max(len(r) for r in rows)
     s = pygame.Surface((w * scale, h * scale), pygame.SRCALPHA)
     for y, row in enumerate(rows):
@@ -564,3 +572,24 @@ ITEM_ICONS.update({
     "q": _icon(["............", "...WWWWWW...", "..WW....WW..", "........WW..", ".....WWWW...", ".....WW.....",
                 ".....WW.....", "............", ".....WW.....", "............"], "U"),    # mystery
 })
+
+
+def all_sprites() -> dict:
+    """name -> rows for every picture the game draws, the built ones (frame pieces, flames) too:
+    what art_png.py exports."""
+    out = {}
+    for k, v in list(globals().items()):
+        if k.isupper() and not k.startswith("_") and k != "PAL" and isinstance(v, (list, dict)):
+            art_png.named(k.lower(), v, out)
+    for sides in itertools.product((0, 1), repeat=5):
+        out["frame_" + "".join(map(str, sides))] = list(frame_tile(*map(bool, sides)))
+    for shape in "chvudlr":
+        for level in range(3):
+            out[f"flame_{shape}{level}"] = list(_flame(shape, level))
+    return out
+
+
+
+@lru_cache(maxsize=1)
+def _index() -> dict:
+    return art_png.index(all_sprites())
