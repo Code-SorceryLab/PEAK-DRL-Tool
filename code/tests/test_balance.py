@@ -163,3 +163,80 @@ def test_win_rate_counts_only_the_generations_from_the_first_win():
            [_row(g, ["WON"] * 5 + ["DEAD"] * 5, 900.0) for g in range(22, 26)]
     cell = summarize(hist, pop_size=10, level="L", seed=7, best_fitness=900.0, best_gen=22)
     assert cell["first_win_gen"] == 22 and cell["win_rate"] == 0.5        # 20 wins in 40 episodes, not 20 in 100
+
+
+# ── unfinished probes, deaths per win, the 95 % CI ───────────────────────────
+
+def _probe(root, tag, name, hist):
+    import json
+    d = root / "mario" / "novice" / tag / name
+    d.mkdir(parents=True)
+    (d / "state.json").write_text(json.dumps({"config": {"seed": int(name.split("_")[1]), "pop_size": 3},
+                                              "best_fitness": 900.0, "best_gen": 1,
+                                              "history": [dict(r, level="L") for r in hist]}))
+    return d
+
+
+def _lost(n):
+    return [_row(g, ["DEAD"] * 3, 100.0) for g in range(1, n + 1)]
+
+
+def _won_at_3():  # first win at gen 3, then the WIN_WINDOW gens probe() runs before it stops
+    from code.neuro.balance import WIN_WINDOW
+    return _lost(2) + [_row(g, ["WON"] * 3, 900.0) for g in range(3, 4 + WIN_WINDOW)]
+
+
+def test_only_finished_probes_reach_a_report(tmp_path, capsys):
+    from code.neuro.balance import done, load_probe_cells
+    _probe(tmp_path, "p3g20", "L_1", _lost(20))          # ran its whole budget, never won
+    _probe(tmp_path, "p3g20", "L_2", _won_at_3())        # stopped WIN_WINDOW gens after its first win
+    _probe(tmp_path, "p3g20", "L_3", _lost(12))          # killed at gen 12
+    (_probe(tmp_path, "p3g20", "L_4", _lost(20)) / "state.json").write_text('{"history": [')   # cut mid-write
+    cells = load_probe_cells("mario", "novice", "p3g20", str(tmp_path))
+    assert [c["seed"] for c in cells["L"]] == [1, 2]
+    out = capsys.readouterr().out
+    assert "L_3" in out and "unfinished" in out and "L_4" in out
+    assert not done(_won_at_3()[:-1], 20) and not done([], 20)
+
+
+def test_deaths_per_win_counts_failed_attempts_per_win():
+    # 5 wins and 5 deaths in each of 10 generations: 1 death per win, though 5 per generation
+    hist = [_row(g, ["WON"] * 5 + ["DEAD"] * 5, 900.0) for g in range(1, 11)]
+    cell = summarize(hist, pop_size=10, level="L", seed=1, best_fitness=900.0, best_gen=1)
+    assert cell["deaths_per_run"] == 5.0 and cell["deaths_per_win"] == 1.0
+    assert aggregate([cell, dict(cell, deaths_per_win=3.0)])["deaths_per_win_mean"] == 2.0
+
+
+def test_mean_ci_uses_the_t_quantile_at_every_n():
+    import math
+    import statistics
+    from code.neuro.balance import mean_ci
+
+    def t(n):
+        vals = [float(i) for i in range(n)]
+        return mean_ci(vals)[1] * math.sqrt(n) / statistics.stdev(vals)
+    assert abs(t(8) - 2.365) < 1e-9 and abs(t(9) - 2.306) < 0.01 and abs(t(30) - 2.045) < 0.002
+    assert mean_ci([4.0]) == (4.0, None) and mean_ci([])[1] is None    # one value: no interval, not +-0
+
+
+def test_one_seed_prints_no_interval():
+    from code.neuro.balance import format_compare, format_report
+    row = aggregate([summarize(_won_at_3(), pop_size=3, level="L", seed=1, best_fitness=900.0, best_gen=3)])
+    assert row["win_rate_ci"] is None and row["first_win_ci"] is None and row["best_gen_ci"] is None
+    assert "±" not in format_report([row], "mario").splitlines()[-1]
+    assert "±" not in format_compare({"rays": [row]}, "mario").splitlines()[-1]
+
+
+def test_a_sweep_job_reports_only_its_own_configs(tmp_path, monkeypatch):
+    import sys
+    import pytest
+    from code.neuro import gasweep
+    written = []
+    monkeypatch.setattr(gasweep, "run_jobs", lambda *a, **k: None)
+    monkeypatch.setattr(gasweep, "write_report", lambda game, persona, tag, *a, **k: written.append((game, persona, tag)))
+    monkeypatch.setattr(gasweep, "rebuild", lambda *a, **k: pytest.fail("rebuilt every game's results"))
+    monkeypatch.setattr(gasweep, "BEST_PATH", str(tmp_path / "ga_best.yaml"))
+    monkeypatch.setattr(sys, "argv", ["gasweep", "--game", "mario", "--persona", "novice", "--levels", "Mario1-1",
+                                      "--seeds", "1234", "--gens", "1", "--axes", "memory", "--out", str(tmp_path)])
+    gasweep.main()
+    assert written == [("mario", "novice", gasweep.sweep_tag(10, 1, "rays", s)) for s in ("base", "memory-2", "memory-3")]

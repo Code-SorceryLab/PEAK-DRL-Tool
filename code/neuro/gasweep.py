@@ -26,6 +26,8 @@ from collections import Counter
 
 import yaml
 
+from code.stats.episode_log import atomic_open
+
 from .balance import (BALANCE_DIR, config_tag, fmt_hms, probe_dir, run_jobs, write_report)
 from .evolution import GAConfig
 from .personas import PERSONAS, get_persona
@@ -154,10 +156,10 @@ def sweep_point(report: dict) -> tuple[float, float]:
     return wr, fw
 
 
-def paired_delta(variant: dict, base: dict) -> tuple[float, float, int, int, int]:
-    """Variant vs baseline on the same (level, seed) cells: (mean Δ win rate, 95 % CI, cells up,
-    cells down, n). Paired because every config shares seeds, so the per-cell difference
-    cancels level/seed luck."""
+def paired_delta(variant: dict, base: dict) -> tuple[float, float | None, int, int, int]:
+    """Variant vs baseline on the same (level, seed) cells: (mean Δ win rate, 95 % CI or None below
+    two cells, cells up, cells down, n). Paired because every config shares seeds, so the per-cell
+    difference cancels level/seed luck."""
     from .balance import mean_ci
     b = {(lvl, c["seed"]): c for lvl, lst in (base.get("cells") or {}).items() for c in lst}
     d = [float(c.get("win_rate") or 0) - float(b[(lvl, c["seed"])].get("win_rate") or 0)
@@ -260,7 +262,7 @@ def write_best_yaml(reports: list[dict], path: str | None = None) -> dict:
         "# OFAT composites ignore interactions between knobs — `confirmed_win_rate` is the composite\n"
         "# actually probed by `--confirm`, next to the `baseline_win_rate` it has to beat.\n"
     )
-    with open(path, "w", encoding="utf-8") as f:
+    with atomic_open(path, "w", encoding="utf-8") as f:
         f.write(header)
         yaml.safe_dump(doc, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
     return games
@@ -381,10 +383,11 @@ def main() -> None:
         validate_level(args.game, lvl)
 
     def run_configs(configs: list[tuple[str, dict]], what: str) -> None:
-        jobs = []
+        jobs, tags = [], []
         for suffix, ov in configs:
             cfg = GAConfig(sensors=args.sensors, **ov)
             tag = sweep_tag(cfg.pop_size, args.gens, args.sensors, suffix)   # sig = current GAConfig()
+            tags.append(tag)
             jobs += [(args.game, lvl, seed, args.gens, persona, args.sensors, ov,
                       probe_dir(args.game, persona.name, tag, lvl, seed, root=GASWEEP_ROOT))
                      for lvl in levels for seed in args.seeds]
@@ -395,7 +398,9 @@ def main() -> None:
               f"balance sweep, {workers} worker(s)  [{args.game} · {persona.name} · {args.sensors}]\n", flush=True)
         t0 = time.time()
         run_jobs(jobs, workers, label=lambda j: f"{os.path.basename(os.path.dirname(j[7]))} · {j[1]} seed {j[2]}")
-        rebuild(args.out)
+        # only this job's configs: other games' jobs may be mid-run on the same cluster
+        for tag in tags:
+            write_report(args.game, persona.name, tag, args.out, root=GASWEEP_ROOT, prefix="gasweep")
         _publish_best(args.out)
         print(f"\n{fmt_hms(time.time() - t0)} wall", flush=True)
 

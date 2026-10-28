@@ -76,7 +76,7 @@ def fig_difficulty(reports: list[dict], out: str) -> bool:
             rows = {r["level"]: r for d in ds if (d.get("persona") or "experienced") == persona for r in d["levels"]}
             xs = [i + (j - (len(personas) - 1) / 2) * w for i in range(len(levels))]
             ys = [rows[lv]["win_rate_mean"] * 100 if lv in rows else 0 for lv in levels]
-            es = [rows[lv]["win_rate_ci"] * 100 if lv in rows else 0 for lv in levels]
+            es = [(rows[lv]["win_rate_ci"] or 0) * 100 if lv in rows else 0 for lv in levels]
             ax.bar(xs, ys, w, color=PCOL.get(persona, DIM), label=persona, yerr=es,
                    error_kw={"ecolor": DIM, "elinewidth": 1, "capsize": 0})
         ax.set_xticks(range(len(levels)), [_level_label(game, lv) for lv in levels])
@@ -118,7 +118,7 @@ def fig_capacity(groups: dict, out: str) -> bool:
         xs = [p["n_params"] for p in pts]
         for p in pts:
             ticks[p["n_params"]] = p["ga"]["hidden"]
-        ys, cis = [p["fw"] for p in pts], [p["fw_ci"] for p in pts]
+        ys, cis = [p["fw"] for p in pts], [p["fw_ci"] or 0 for p in pts]
         col = PCOL.get(persona, DIM)
         ax.plot(range(len(xs)), ys, styles[games.index(game) % 4], color=col, marker="o", lw=2,
                 label=f"{GNAME.get(game, game)} · {persona}")
@@ -152,7 +152,7 @@ def fig_sensors(ablations: list[dict], out: str) -> bool:
     rows = []
     for (game, persona, _base), by_mode in paired:
         m, ci, _up, _dn, _n = paired_delta(by_mode["grid"], by_mode["rays"])
-        rows.append((f"{GNAME.get(game, game)} · {persona}", m * 100, ci * 100, PCOL.get(persona, DIM)))
+        rows.append((f"{GNAME.get(game, game)} · {persona}", m * 100, (ci or 0) * 100, PCOL.get(persona, DIM)))
     rows.sort(key=lambda r: (r[0].split(" · ")[0], PORDER.index(r[0].split(" · ")[1]) if r[0].split(" · ")[1] in PORDER else 9))
     fig, ax = plt.subplots(figsize=(9.5, 1.1 + 0.62 * len(rows)))
     ys = range(len(rows))[::-1]
@@ -206,7 +206,7 @@ def fig_knobs(groups: dict, out: str) -> bool:
                 ax.text(j, i, "—", ha="center", va="center", color=FAINT)
                 continue
             m, ci = v
-            sig = abs(m) > ci > 0
+            sig = abs(m) > (ci or 0) > 0     # one seed: no interval, so no star
             ax.text(j, i, f"{m:+.0%}" + ("★" if sig else ""), ha="center", va="center", fontsize=10.5,
                     color=TXT, fontweight="bold" if sig else "normal")
     ax.set_xticks(range(len(cols)), [f"{GNAME.get(g, g)}\n{p}" for g, p, *_ in cols], fontsize=10)

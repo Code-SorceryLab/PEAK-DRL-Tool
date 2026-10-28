@@ -114,3 +114,60 @@ def test_mutations_is_a_balance_command_page():
     html = ast_page.render({})                       # no playtests yet: the page still renders
     assert report._nav([], False, None, "mutations") in html
     assert 'href="mutations.html" aria-current="page"' in html
+
+
+# ── verdicts, CIs and the ablation / GA-sweep summaries ──────────────────────────────
+
+def test_b2_reads_deaths_per_win_and_an_old_report_gets_no_b2_verdict():
+    from code.neuro.report import _verdicts
+    row = {"completion_rate_mean": 0.7, "mean_completion_time": 20, "death_cluster_entropy_mean": 0.4,
+           "deaths_per_run_mean": 5.0, "deaths_per_win_mean": 1.0}      # 5 deaths a generation, 1 per win
+    assert "B2 punishment: in band" in _verdicts(row, None, {})
+    old = {k: v for k, v in row.items() if k != "deaths_per_win_mean"}
+    assert "B2" not in _verdicts(old, None, {})
+
+
+def test_luck_dependent_sentence_quotes_the_winners_own_rate():
+    from code.neuro.report import _verdict_sentence
+    row = {"win_rate_mean": 0.2, "solved_by": 1, "seeds": 3, "death_hist": [0] * 10,   # seed rates 0.6, 0, 0
+           "dominant_cause": "Pit", "dominant_cause_frac": 1.0}
+    word, _, sent = _verdict_sentence(row, None)
+    assert word == "luck-dependent" and "winners then win 60%" in sent
+
+
+def test_one_seed_shows_no_interval_rather_than_zero():
+    from code.neuro import report
+    from code.neuro.balance import aggregate, summarize
+    hist = [{"gen": g, "best": 900.0, "avg": 450.0, "best_x": 900.0, "duration": 1.0, "wins": 3, "stuck": 0,
+             "envs": [{"status": "WON", "end_x": 900.0, "level_len": 1000.0, "coins": 0, "level_coins": 0,
+                       "frames": 600}] * 3} for g in range(1, 12)]
+    html = report._metric_table([aggregate([summarize(hist, 3, "L", 1, 900.0, 1)])])
+    assert "None" not in html and "<td>1.0</td><td>1.0</td>" in html and "100% ±" not in html   # first win, best gen
+    datas = [_rep("base", {}, 0.5, 10, seeds=(1,)), _rep("hidden-8", {"hidden": 8}, 0.6, 8, seeds=(1,))]
+    key, group = next(iter(_gasweep_groups(datas).items()))
+    html = report._gasweep_section(key, group, 0) + report._gasweep_overview({key: group})
+    assert "None" not in html and "± 0" not in html
+
+
+def test_ablation_first_win_means_count_unsolved_seeds_at_the_budget():
+    from code.neuro import report
+
+    def rep(fws, tag):   # one level, three seeds; None = never won in the 40-gen budget
+        solved = [fw for fw in fws if fw]
+        return {"tag": tag, "gens_budget": 40, "seeds": [1, 2, 3], "pop_size": 10,
+                "levels": [{"level": "L", "seeds": 3, "solved_by": len(solved), "first_win_mean": sum(solved) / len(solved),
+                            "first_win_ci": 0.0, "win_rate_mean": 0.5, "win_rate_ci": 0.1,
+                            "dominant_cause": "Pit", "dominant_cause_frac": 1.0}],
+                "cells": {"L": [{"seed": s, "win_rate": 0.5, "first_win_gen": fw} for s, fw in zip((1, 2, 3), fws)]}}
+    by_mode = {"rays": rep([5, None, None], "p10g40"), "grid": rep([5, 20, 20], "p10g40_grid")}
+    face = report._abl_face(by_mode["rays"], by_mode["grid"])
+    assert "gen 28.3" in face and "gen 15.0" in face           # (5 + 40 + 40) / 3 vs (5 + 20 + 20) / 3
+    html = report._ablation_section("mario", "novice", "p10g40", by_mode, 0)
+    assert "gen 28.3" in html and "+10.0 gens" not in html      # 5.0 vs 15.0 would compare different seeds
+
+
+def test_the_sweep_overview_caption_claims_no_seed_count_or_budget():
+    datas = [_rep("base", {}, 0.5, 10, seeds=(1, 2, 3, 4, 5)), _rep("hidden-8", {"hidden": 8}, 0.6, 8, seeds=(1, 2, 3, 4, 5))]
+    from code.neuro.report import _gasweep_overview
+    html = _gasweep_overview(_gasweep_groups(datas))
+    assert "3 seeds" not in html and "gens/probe" not in html

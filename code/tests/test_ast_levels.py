@@ -61,6 +61,7 @@ def test_a_level_variant_is_played_on_its_level_and_replayed_by_that_levels_base
     monkeypatch.setattr(ast_eval, "play_agent", fake)
     monkeypatch.setattr(ast_eval, "ROOT", str(tmp_path))
     monkeypatch.setattr(ast_eval.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(ast_eval.balance, "probe_done", lambda run: True)
     monkeypatch.setattr(ast_eval.episode_log, "reset", lambda p: None)
     monkeypatch.setattr(ast_eval.episode_log, "append", lambda p, rows: None)
     ast_eval.play("meatboy", "base@5", ["experienced"])
@@ -76,3 +77,19 @@ def test_the_level_tasks_retrain_every_persona_on_each_retrained_level_variant(p
     assert "base-reseeded@5" in variants and "seal_route@5" in variants
     assert not {"base@5", "cosmetic_tile@5", "seal_route", "base-reseeded"} & variants
     assert len(tasks) == len(variants) * len(ast_eval.PERSONA_ORDER)
+
+
+def test_play_skips_an_agent_whose_training_never_finished(monkeypatch, tmp_path, capsys):
+    import json
+    runs = [tmp_path / "p10g20" / f"2_{s}" for s in (1, 2)]
+    for d, gens in zip(runs, (20, 12)):                  # the second was killed at gen 12 of 20, without a win
+        d.mkdir(parents=True)
+        (d / "best.npz").write_bytes(b"")                 # best.npz exists from gen 1 on
+        (d / "state.json").write_text(json.dumps({"history": [{"gen": g, "wins": 0} for g in range(1, gens + 1)]}))
+    played = []
+    monkeypatch.setattr(ast_eval, "agent_dirs", lambda game, variant, persona: [str(d) for d in runs])
+    monkeypatch.setattr(ast_eval, "play_agent", lambda game, run, level, seed=0: played.append(run) or
+                        {"status": "DEAD", "cause": "Saw", "progress": 0.5, "time_s": 1.0, "persona": "experienced"})
+    monkeypatch.setattr(ast_eval, "ROOT", str(tmp_path / "ast"))
+    ast_eval.play("meatboy", "base", ["experienced"])
+    assert played == [str(runs[0])] and "unfinished" in capsys.readouterr().out

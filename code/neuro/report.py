@@ -25,8 +25,8 @@ GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "game
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES, list_levels
-from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_hms, mean_ci
-from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, tag_base_sig
+from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_ci, fmt_hms, mean_ci
+from .gasweep import AXES, AXIS_DOC, best_config, paired_delta, parse_sweep_tag, sweep_point, tag_base_sig
 # Level glyphs -> canvas categories (see code/games/levels/common/ASCII_TILEMAP.md)
 GLYPHS = {"#": "#%([/\\])Un", "=": "=", "?": "?<>FL", "^": "^*O", "E": "EkKMBX",
           "C": "C", "G": "G", "S": "S", "H": "H", "P": "P", "D": "D"}
@@ -56,6 +56,7 @@ TIPS = {
     "Train time": "Wall-clock time spent evolving on this level, summed over all seeds.",
     "Progress at death": "How far through the level failing agents get on average (0% = start, 100% = goal).",
     "Deaths per gen": "Average deaths per generation (one attempt per population member).",
+    "Deaths per win": "Failed attempts (deaths and stalls) per win over the whole probe; with no wins, every one counts.",
     "Death spread": "Entropy of death locations: 0 = everyone dies at one learnable chokepoint, "
                     "1 = deaths scattered everywhere (feels random).",
     "Dominant cause": "The single failure mode that kills most agents: Enemy, Pit, Saw, Spike, Stall, OOB.",
@@ -66,7 +67,7 @@ TIPS = {
     "Dominant path": "Share of winning runs that follow the most common route. Near 100% = one true path.",
     "B1": "Challenge calibration: completion rate and win time vs the target band in "
           "code/stats/MarioThresholds.yaml. Bands are designer-set, not human-calibrated yet.",
-    "B2": "Punishment severity: deaths per run and death spread vs their target bands.",
+    "B2": "Punishment severity: deaths per win and death spread vs their target bands.",
     "B3": "Strategy diversity: route-cluster count and dominant-path share vs their target bands.",
 }
 
@@ -523,12 +524,13 @@ def _verdicts(row: dict, strat: tuple[int, float] | None, th: dict) -> str:
     t_ok = _in_band(row.get("mean_completion_time"), b1.get("target_mean_completion_time", 20),
                     b1.get("warning_mean_completion_time_difference", 4))
     out.append(("B1 challenge", cr_ok and t_ok, cr_ok or t_ok, "B1"))
-    b2 = (th.get("B2_punishment_severity") or {}).get("thresholds", {})
-    d_ok = _in_band(row.get("deaths_per_run_mean"), b2.get("target_deaths_per_run", 2),
-                    b2.get("warning_deaths_per_run", 1))
-    e_ok = _in_band(row.get("death_cluster_entropy_mean"), b2.get("target_death_cluster_entropy", 0.4),
-                    b2.get("warning_death_cluster_entropy", 0.1))
-    out.append(("B2 punishment", d_ok and e_ok, d_ok or e_ok, "B2"))
+    if row.get("deaths_per_win_mean") is not None:   # older reports hold only deaths per generation: no verdict
+        b2 = (th.get("B2_punishment_severity") or {}).get("thresholds", {})
+        d_ok = _in_band(row["deaths_per_win_mean"], b2.get("target_deaths_per_run", 2),
+                        b2.get("warning_deaths_per_run", 1))
+        e_ok = _in_band(row.get("death_cluster_entropy_mean"), b2.get("target_death_cluster_entropy", 0.4),
+                        b2.get("warning_death_cluster_entropy", 0.1))
+        out.append(("B2 punishment", d_ok and e_ok, d_ok or e_ok, "B2"))
     if strat is not None:
         b3 = (th.get("B3_strategy_diversity") or {}).get("thresholds", {})
         s_ok = _in_band(strat[0], b3.get("target_strategy_count", 2), b3.get("warning_strategy_count", 1))
@@ -560,6 +562,7 @@ def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, 
                f"No seed ever reached the goal; <b>{cause}</b> accounts for {frac:.0%} of deaths {where}."
     elif solved < seeds:
         word, color = "luck-dependent", "var(--yellow)"
+        wr = wr * seeds / solved   # the winners' own mean: a seed that never won has win rate 0
         sent = (f"Only {solved} of {seeds} seeds cracked it and winners then win {wr:.0%} of the time — "
                 f"<b>{cause}</b> kills {frac:.0%} {where}. A level some playtesters never beat is a spike, not a curve.")
     elif wr >= 0.5:
@@ -1072,8 +1075,9 @@ def _cause_name(name: str) -> str:
     return "unknown" if name in ("?", "", "-") else name
 
 
-def _ci(row: dict) -> float:
-    return min(row.get("win_rate_ci") or 0.0, 1.0)
+def _ci(row: dict, sep: str = " ± ") -> str:
+    ci = row.get("win_rate_ci")
+    return fmt_ci(None if ci is None else min(ci, 1.0), ".0%", sep)
 
 
 def _heat(hist: list[int]) -> str:
@@ -1122,9 +1126,9 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     mct = (f"{row['mean_completion_time']}s" if row.get("mean_completion_time") is not None else "—")
     pad = (f"{row['progress_at_death_mean']:.0%}" if row.get("progress_at_death_mean") is not None else "—")
     gap = row.get("novice_expert_gap_mean", 0.0)
-    fw_full = (f"gen {row['first_win_mean']} ± {row['first_win_ci']}"
+    fw_full = (f"gen {row['first_win_mean']}{fmt_ci(row['first_win_ci'], sep=' ± ')}"
                if row["first_win_mean"] is not None else "never")
-    bg_full = (f"gen {row['best_gen_mean']} ± {row['best_gen_ci']}"
+    bg_full = (f"gen {row['best_gen_mean']}{fmt_ci(row['best_gen_ci'], sep=' ± ')}"
                if row.get("best_gen_mean") is not None else "—")
     sd = row.get("completion_time_stddev")
     if sd is None and cells:  # legacy rows: derive from the per-seed cells
@@ -1133,7 +1137,6 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     if mct != "—" and sd is not None:
         mct += f" ± {sd}s"
     rate = row.get("improvement_rate_mean")
-    pop = row.get("pop_size") or (cells[0].get("pop_size") if cells else None)  # legacy: unknown
     ttime = row.get("train_time_s")
     if ttime is None:
         ttime = sum(c.get("train_time_s") or 0 for c in cells)
@@ -1146,7 +1149,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     cfg_slot = _slot(tid, _TPL.get(tid) or _config_html(_level_config(game, row["level"], grid)))
 
     headline = [  # the four a designer reads first; the rest sit behind "all metrics"
-        _stat("Win rate", f"{wr:.0%} ± {_ci(row):.0%}", "measured 10 gens after first win", icon="coin"),
+        _stat("Win rate", f"{wr:.0%}{_ci(row)}", "measured 10 gens after first win", icon="coin"),
         _stat("First win", fw_full, f"{row['solved_by']}/{row['seeds']} seeds solved", icon="up"),
         _stat("Dominant cause", _cause_name(row["dominant_cause"]), icon="heartbreak", sub=
               f"{row['dominant_cause_frac']:.0%} of deaths"),
@@ -1159,7 +1162,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
         _stat("Completion", f"{row.get('completion_rate_mean', 0):.0%}", "wins / all episodes"),
         _stat("Mean win time", mct, "mean ± std of winning runs"),
         _stat("Progress at death", pad, "how far failers get"),
-        _stat("Deaths per gen", f"{row.get('deaths_per_run_mean', 0)}", f"of {pop} attempts" if pop else "per generation"),
+        _stat("Deaths per win", f"{row.get('deaths_per_win_mean', 'N/A')}", "failed attempts per win"),
         _stat("Coin rate", f"{row.get('coin_collection_rate_mean', 1):.0%}", "collected / available"),
         _stat("Skill gap", f"{gap:+.0%}", "late-gen wins − early-gen wins"),
         _stat("Stuck rate", f"{row['stuck_frac_mean']:.0%}", "episodes ending in a stall"),
@@ -1251,14 +1254,14 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
 def _metric_table(rows: list[dict]) -> str:
     trs = []
     for r in rows:
-        wr = f"{r['win_rate_mean']:.0%} ±{_ci(r):.0%}"
-        fw = (f"{r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None else "—")
+        wr = f"{r['win_rate_mean']:.0%}{_ci(r, ' ±')}"
+        fw = (f"{r['first_win_mean']}{fmt_ci(r['first_win_ci'])}" if r["first_win_mean"] is not None else "-")
         solved_cls = ("wr-good" if r["solved_by"] == r["seeds"] else
                       ("wr-mid" if r["solved_by"] else "wr-bad"))
         mct = f"{r['mean_completion_time']}s" if r.get("mean_completion_time") is not None else "—"
         if mct != "—" and r.get("completion_time_stddev") is not None:
             mct += f" ±{r['completion_time_stddev']}"
-        bg = (f"{r['best_gen_mean']}±{r['best_gen_ci']}" if r.get("best_gen_mean") is not None else "—")
+        bg = (f"{r['best_gen_mean']}{fmt_ci(r['best_gen_ci'])}" if r.get("best_gen_mean") is not None else "-")
         rate = (f"{r['improvement_rate_mean']:+.1%}" if r.get("improvement_rate_mean") is not None else "—")
         pad = f"{r['progress_at_death_mean']:.0%}" if r.get("progress_at_death_mean") is not None else "—"
         trs.append(
@@ -2277,7 +2280,7 @@ def _instructions_page(games: list[str], logo: str | None, nav: bool = True, aft
         ("numbers", "gear", "How the numbers are computed", """
   <ul>
     <li><b>First win</b> — the generation of the first WON episode, mean ± 95% CI over the seeds that
-    solved the level (t-distribution for n &lt; 9).</li>
+    solved the level (t-distribution; no interval from a single seed).</li>
     <li><b>Best gen</b> — the generation whose best genome set the all-time fitness record, mean ± CI.</li>
     <li><b>Win rate</b> — WON episodes ÷ all episodes in the 10 generations after the first win
     (a probe stops 10 generations after its first win, or at the budget). Levels that were never won
@@ -2288,6 +2291,8 @@ def _instructions_page(games: list[str], logo: str | None, nav: bool = True, aft
     <li><b>Improvement</b> — least-squares slope of the per-generation best x, from gen 1 to the
     generation the peak was first reached, divided by the level length (share of level per gen).</li>
     <li><b>Progress at death</b> — mean of end x ÷ level length over DEAD + STUCK episodes.</li>
+    <li><b>Deaths per win</b>: (DEAD + STUCK episodes) ÷ WON episodes over the whole probe; every death
+    when nothing won. The B2 band reads this one.</li>
     <li><b>Deaths per gen</b> — (DEAD + STUCK episodes) ÷ generations; one attempt per population member.</li>
     <li><b>Death spread</b> — entropy of the death-position histogram (10 bins), normalized to 0..1.</li>
     <li><b>Dominant cause</b> — most frequent failure cause over DEAD + STUCK episodes, with its share.</li>
@@ -2381,7 +2386,7 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
     n = len(order)
 
     def fw(r):
-        return f"gen {r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None else "never"
+        return f"gen {r['first_win_mean']}{fmt_ci(r['first_win_ci'])}" if r["first_win_mean"] is not None else "never"
 
     def mean(vals):
         vals = [v for v in vals if v is not None]
@@ -2389,9 +2394,9 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
 
     def agg(m):
         rs = list(rows[m].values())
-        mfw = mean([r["first_win_mean"] for r in rs])
-        return {"solved": f'{sum(1 for r in rs if r["solved_by"])}<span class="faint">/{n}</span>',
-                "fw": f"gen {mfw:.1f}" if mfw is not None else "never",
+        solved = sum(1 for r in rs if r["solved_by"])
+        return {"solved": f'{solved}<span class="faint">/{n}</span>',
+                "fw": f"gen {sweep_point(by_mode[m])[1]:.1f}" if solved else "never",   # unsolved seeds at the budget
                 "wr": f'{mean([r["win_rate_mean"] for r in rs]) or 0:.0%}',
                 "time": fmt_hms(_train_time(by_mode[m]))}
     A = {m: agg(m) for m in modes}
@@ -2426,7 +2431,7 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
                 tds.append(f"<td class='{cls} wr-na' colspan='4'>not probed</td>")
                 continue
             tds.append(f"<td class='{cls}'>{r['solved_by']}/{r['seeds']}</td><td>{fw(r)}</td>"
-                       f"<td><span class='{_wr_cls(r)}'>{r['win_rate_mean']:.0%}</span> ±{r['win_rate_ci']:.0%}</td>"
+                       f"<td><span class='{_wr_cls(r)}'>{r['win_rate_mean']:.0%}</span>{fmt_ci(r['win_rate_ci'], '.0%', ' ±')}</td>"
                        f"<td>{_cause_name(r['dominant_cause'])} {r['dominant_cause_frac']:.0%}</td>")
         if len(modes) == 2:
             a, b = rows["rays"].get(lvl), rows["grid"].get(lvl)
@@ -2435,7 +2440,8 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
                 cls = "delta-g" if d > 0.005 else "delta-r" if d < -0.005 else "delta-0"
                 fa, fb = a["first_win_mean"], b["first_win_mean"]
                 dg = ("—" if fa is None and fb is None else "grid only" if fa is None else "rays only" if fb is None
-                      else f"{fb - fa:+.1f} gens")
+                      else f"{fb - fa:+.1f} gens" if a["solved_by"] == a["seeds"] and b["solved_by"] == b["seeds"]
+                      else "partial")   # means over the solved seeds compare like with like only when every seed solved
                 tds.append(f"<td class='{cls}'>{d:+.0%}</td><td>{dg}</td>")
             else:
                 tds.append("<td class='wr-na'>—</td><td class='wr-na'>—</td>")
@@ -2512,17 +2518,18 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
 
 
 def _abl_face(r: dict, g: dict) -> str:
-    """The face of one rays-vs-grid card, side by side: each mode's mean win rate, first win and levels
-    solved, the paired Δ between them (identical level × seed cells, ★ = clears its 95 % CI) and the winner."""
+    """The face of one rays-vs-grid card, side by side: each mode's mean win rate, first win (unsolved seeds
+    at the budget, as in the GA sweep) and levels solved, the paired Δ between them (identical level × seed
+    cells, ★ = clears its 95 % CI) and the winner."""
     m, ci, up, dn, n = paired_delta(g, r)   # grid − rays
-    sig = abs(m) > ci > 0
+    sig = abs(m) > (ci or 0) > 0
     winner = ("tie" if abs(m) < 0.005 else "grid" if m > 0 else "rays")
 
     def agg(d):
         rs = d["levels"]
-        fw = [x["first_win_mean"] for x in rs if x["first_win_mean"] is not None]
+        solved = sum(1 for x in rs if x["solved_by"])
         return (sum(x["win_rate_mean"] for x in rs) / len(rs) if rs else 0.0,
-                sum(fw) / len(fw) if fw else None, sum(1 for x in rs if x["solved_by"]), len(rs))
+                sweep_point(d)[1] if solved else None, solved, len(rs))
 
     def side(mode, wr, fw, solved, nl):
         return (f'<div class="vsside{" win" if winner == mode else ""}" style="--c:{MODE_COLOR[mode]}">'
@@ -2534,7 +2541,7 @@ def _abl_face(r: dict, g: dict) -> str:
     dcls = "delta-g" if m > 0.005 else "delta-r" if m < -0.005 else "delta-0"
     return (f'<div class="vs">{side("rays", rw, rf, rsv, nl)}'
             f'<div class="vsmid"><b class="num {dcls}" title="{up} cells grid better · {dn} rays better · {n} paired">{m:+.0%}</b>'
-            f'<small>± {ci:.0%}{" ★" if sig else ""}</small><small>grid − rays</small>'
+            f'<small>{fmt_ci(ci, ".0%", "± ")}{" ★" if sig else ""}</small><small>grid − rays</small>'
             f'<span class="verdict" style="--c:{MODE_COLOR.get(winner, "var(--faint)")}">{winner.capitalize()}</span></div>'
             f'{side("grid", gw, gf, gsv, nl)}</div>')
 
@@ -2674,14 +2681,14 @@ def _gasweep_overview(groups: dict[tuple, list[dict]]) -> str:
                 tds.append('<td class="k k-base">base</td>')
                 continue
             m, ci, up, dn, n = paired_delta(best["data"], c["base"]["data"]) if c["base"] else (0.0, 0.0, 0, 0, 0)
-            sig = abs(m) > ci > 0
-            tds.append(f'<td class="k{" k-sig" if sig else ""}" style="{_effect(m)}" title="{GA_DOC[axis][0]}: Δ win rate {m:+.0%} ± {ci:.0%} · {up} cells up, {dn} down of {n}">'
+            sig = abs(m) > (ci or 0) > 0
+            tds.append(f'<td class="k{" k-sig" if sig else ""}" style="{_effect(m)}" title="{GA_DOC[axis][0]}: Δ win rate {m:+.0%}{fmt_ci(ci, ".0%", " ± ")} · {up} cells up, {dn} down of {n}">'
                        f'<b>{GA_DOC[axis][2](best["val"])}</b>{f"<small>{m:+.0%} {star}</small>" if sig else ""}</td>')
         if c["best"] and c["base"]:
             m, ci, up, dn, n = paired_delta(c["best"]["data"], c["base"]["data"])
-            sig = abs(m) > ci > 0
+            sig = abs(m) > (ci or 0) > 0
             tds.append(f'<td class="k{" k-sig" if sig else ""}" style="{_effect(m)}" title="{up} cells up, {dn} down of {n} · first win gen {c["best"]["fw"]:.1f}">'
-                       f'<b>{c["best"]["wr"]:.0%}</b><small>{m:+.0%} ± {ci:.0%}{f" {star}" if sig else ""}</small></td>')
+                       f'<b>{c["best"]["wr"]:.0%}</b><small>{m:+.0%}{fmt_ci(ci, ".0%", " ± ")}{f" {star}" if sig else ""}</small></td>')
         else:
             tds.append('<td class="k k-none">not run</td>')
         tds.append(f'<td><span class="verdict" style="--c:{_VERDICT[c["verdict"]["word"]][0]}">{_VERDICT[c["verdict"]["word"]][1]}</span></td>')
@@ -2692,7 +2699,7 @@ def _gasweep_overview(groups: dict[tuple, list[dict]]) -> str:
     return f"""
   <div class="viz gsov"><div class="vt">Best value per knob <span class="faint">— per sweep, the bound that beat the baseline on
     win rate ("base" = none did), shaded by its paired Δ; the Δ is printed only when it clears its 95 % CI. Click a sweep to open it.</span></div>
-    <div class="caption" style="margin:-2px 0 8px">{note}{cols[0]["budget"]} gens/probe · 3 seeds · paired on identical level × seed cells</div>
+    <div class="caption" style="margin:-2px 0 8px">{note}paired on identical level × seed cells</div>
     <div class="ovwrap"><table class="knobmap"><thead><tr><th scope="col">Sweep</th><th scope="col">Baseline win rate</th>{ths}
       <th scope="col">Composite (confirmed)</th><th scope="col">Capacity</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>
     <div class="kmlegend"><span><i style="{_effect(-0.3)}"></i>worse than the baseline</span><span><i></i>about the same</span>
@@ -2744,7 +2751,7 @@ def _hidden_verdict(points: list[dict]) -> dict:
         return {"word": "insufficient", "change": 0.0, "ci": 0.0, "m": 0.0, "b": 0.0, "n": len(pts)}
     m, b = statistics.linear_regression(xs, ys)
     change = m * (max(xs) - min(xs))
-    ci = statistics.fmean(p["fw_ci"] for p in pts)
+    ci = statistics.fmean([p["fw_ci"] for p in pts if p["fw_ci"] is not None] or [0.0])
     word = "flat" if abs(change) < max(ci, 1.0) else ("improves" if change < 0 else "degrades")
     return {"word": word, "change": change, "ci": ci, "m": m, "b": b, "n": len(pts)}
 
@@ -2779,7 +2786,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
             color = "#e0442e" if p["axis"] == "base" else ("#cfcfcf" if kind == "hidden" else
                                                            "#f8b800" if p["axis"] != "best" else "#58d854")
             scatter_pts.append({"label": p["label"], "x": p["n_params"], "y": round(p["fw"], 2),
-                                "ci": round(p["fw_ci"], 2), "kind": kind, "color": color, "star": p["axis"] == "base"})
+                                "ci": None if p["fw_ci"] is None else round(p["fw_ci"], 2), "kind": kind, "color": color, "star": p["axis"] == "base"})
     fit = ({"m": verdict["m"], "b": verdict["b"], "color": vcol.replace("var(--green)", "#58d85499")
             .replace("var(--blue)", "#cfcfcf99").replace("var(--red)", "#e4005899")}
            if verdict["word"] not in ("insufficient",) else None)
@@ -2881,10 +2888,10 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
             trs.append(f"<tr><td class='{'base' if is_base else ''}'>{fmt(base_ga[axis]) if is_base else fmt(p['val'])}"
                        f"{' (base)' if is_base else ''}{' ★' if p is best else ''}</td>"
                        f"<td>{p['n_params']:,}</td><td>{p['solved']}/{p['n_levels']}</td>"
-                       f"<td>{p['fw']:.1f} ± {p['fw_ci']:.1f}</td><td>{p['wr']:.0%} ± {p['wr_ci']:.0%}</td>"
+                       f"<td>{p['fw']:.1f}{fmt_ci(p['fw_ci'], '.1f', ' ± ')}</td><td>{p['wr']:.0%}{fmt_ci(p['wr_ci'], '.0%', ' ± ')}</td>"
                        f"<td>{p['best_gen']:.1f}</td><td>{(p['rate'] or 0) * 100:.1f}%</td><td>{fmt_hms(p['time'])}</td>"
-                       f"<td class='{cls_wr if not is_base else ''}'>{'—' if is_base else f'{d_wr:+.0%} ± {d_ci:.0%}'}"
-                       f"{' ★' if not is_base and abs(d_wr) > d_ci > 0 else ''}</td>"
+                       f"<td class='{cls_wr if not is_base else ''}'>{'-' if is_base else f'{d_wr:+.0%}' + fmt_ci(d_ci, '.0%', ' ± ')}"
+                       f"{' ★' if not is_base and abs(d_wr) > (d_ci or 0) > 0 else ''}</td>"
                        f"<td>{'—' if is_base else f'{up}/{dn}'}</td>"
                        f"<td class='{cls_fw if not is_base else ''}'>{'—' if is_base else f'{d_fw:+.1f}'}</td></tr>")
         tables.append(f"""
@@ -2924,7 +2931,7 @@ def _gasweep_section(key: tuple, datas: list[dict], idx: int) -> str:
     if best_pt and base:
         cm, cci, *_ = paired_delta(best_pt["data"], base["data"])
         face_best = (f'<b class="num">{best_pt["wr"]:.0%}</b>'
-                     f'<small>{cm:+.0%} ± {cci:.0%}{" ★" if abs(cm) > cci > 0 else ""} vs baseline</small>')
+                     f'<small>{cm:+.0%}{fmt_ci(cci, ".0%", " ± ")}{" ★" if abs(cm) > (cci or 0) > 0 else ""} vs baseline</small>')
     else:
         face_best = '<b class="num">—</b><small>not confirmed yet</small>'
     face = (f'<div class="gsface"><div class="gsnum"><small>Baseline win rate</small>{face_base}</div>'

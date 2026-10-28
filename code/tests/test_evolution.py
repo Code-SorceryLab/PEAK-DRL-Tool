@@ -95,3 +95,30 @@ def test_save_load_keeps_net_fields(tmp_path):
     assert loaded.cfg.hidden == 8 and loaded.cfg.memory == 2 and loaded.cfg.action_feedback is False
     meta = json.loads(str(np.load(tmp_path / "best.npz")["meta"]))
     assert meta["hidden"] == 8 and meta["memory"] == 2 and meta["action_feedback"] is False
+
+
+def test_a_write_killed_midway_leaves_the_old_file(tmp_path):
+    import os
+    import pytest
+    from code.stats.episode_log import atomic_open
+    p = tmp_path / "report.json"
+    p.write_text("old")
+    with pytest.raises(RuntimeError):
+        with atomic_open(str(p)) as f:
+            f.write("half")
+            raise RuntimeError("killed mid-write")
+    assert p.read_text() == "old" and os.listdir(tmp_path) == ["report.json"]
+
+
+def test_state_json_is_saved_last(tmp_path, monkeypatch):
+    import pytest
+    real = np.savez_compressed
+
+    def dies_on_best(f, **arrays):
+        if "best.npz" in getattr(f, "name", f):
+            raise RuntimeError("killed")
+        real(f, **arrays)
+    monkeypatch.setattr(np, "savez_compressed", dies_on_best)
+    with pytest.raises(RuntimeError):
+        Population(GAConfig(), 10).save(str(tmp_path))
+    assert not (tmp_path / "state.json").exists()      # a state.json always has its genomes beside it

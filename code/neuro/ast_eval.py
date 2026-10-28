@@ -220,7 +220,10 @@ def _best_retrained(variant: str, section: str, persona: str = "experienced") ->
     from .relay import evaluate
     root = os.path.join(variant_dir("megaman", variant), "probes")
     runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, "*", f"{section}_*", "best.npz"))]
-    scored = [(evaluate(r, section, 12), r) for r in sorted(runs)]
+    finished = [r for r in sorted(runs) if balance.probe_done(r)]
+    for r in sorted(set(runs) - set(finished)):
+        print(f"  skip {r}: unfinished", flush=True)
+    scored = [(evaluate(r, section, 12), r) for r in finished]
     return max(scored)[1] if scored else None
 
 
@@ -306,8 +309,10 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
         with eval_mutants._named(m["dir"] if m else None):
             for persona in personas:
                 for run in agent_dirs(game, base if replay else variant, persona):
-                    if not os.path.exists(os.path.join(run, "best.npz")):
-                        print(f"  {variant:<20}{persona:<13}missing {run}", flush=True)
+                    why = ("missing" if not os.path.exists(os.path.join(run, "best.npz"))   # it exists from gen 1
+                           else None if balance.probe_done(run) else "unfinished")
+                    if why:
+                        print(f"  {variant:<20}{persona:<13}{why} {run}", flush=True)
                         continue
                     row = dict(play_agent(game, run, level), variant=variant)
                     rows.append(row)

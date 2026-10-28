@@ -47,3 +47,13 @@ def test_resume_keeps_the_runs_own_persona_and_locked_level(tmp_path, monkeypatc
     monkeypatch.setattr(sys, "argv", ["trainer", "--game", "mario", "--resume", str(tmp_path), "--no-serve"])
     tr.main()                                                   # what menu "Watch All Models" runs
     assert seen == {"level": "Mario1-3", "persona": "novice"}
+
+
+def test_a_fresh_run_starts_a_fresh_episode_log(tmp_path):
+    import csv
+    pygame.init()
+    for _ in range(2):
+        Trainer("mario", "Mario1-1", GAConfig(pop_size=2, max_frames=60, seed=1), run_dir=str(tmp_path)).run(
+            max_gens=1, verbose=False)
+    with open(tmp_path / "episodes.csv", newline="", encoding="utf-8") as f:
+        assert len(list(csv.DictReader(f))) == 2          # the second run's two episodes, not both runs' four

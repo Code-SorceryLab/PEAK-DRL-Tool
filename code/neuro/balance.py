@@ -30,6 +30,8 @@ import re
 import statistics
 import time
 
+from code.stats.episode_log import atomic_open
+
 from .evolution import GAConfig
 from .personas import PERSONAS, Persona, get_persona
 from .sensors import SENSOR_MODES
@@ -45,14 +47,20 @@ T_CRIT = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447, 8: 2.365}
 WIN_WINDOW = 10  # generations after the first win used to measure a stable win rate
 
 
-def mean_ci(vals: list[float]) -> tuple[float, float]:
-    if not vals:
-        return 0.0, 0.0
-    m = statistics.fmean(vals)
-    if len(vals) < 2:
-        return m, 0.0
-    sd = statistics.stdev(vals)
-    return m, T_CRIT.get(len(vals), 1.96) * sd / math.sqrt(len(vals))
+def mean_ci(vals: list[float]) -> tuple[float, float | None]:
+    """(mean, 95% CI half-width); the half-width is None below two values: there is no interval."""
+    n = len(vals)
+    if n < 2:
+        return (statistics.fmean(vals) if vals else 0.0), None
+    z, df = 1.959964, n - 1
+    # past the table, the Cornish-Fisher expansion of the t quantile (2.300 at n = 9, exact 2.306)
+    t = T_CRIT.get(n) or z + (z**3 + z) / (4 * df) + (5 * z**5 + 16 * z**3 + 3 * z) / (96 * df**2)
+    return statistics.fmean(vals), t * statistics.stdev(vals) / math.sqrt(n)
+
+
+def fmt_ci(ci: float | None, spec: str = "", sep: str = "±") -> str:
+    """'<sep><ci>' for printing after a mean, or nothing when there is no interval."""
+    return "" if ci is None else f"{sep}{ci:{spec}}"
 
 
 def config_tag(pop_size: int, gens: int, sensors: str = "rays") -> str:
@@ -62,6 +70,35 @@ def config_tag(pop_size: int, gens: int, sensors: str = "rays") -> str:
 def probe_dir(game: str, persona: str, tag: str, level: str, seed: int,
               root: str = PROBES_ROOT) -> str:
     return os.path.join(root, game, persona, tag, f"{level}_{seed}".replace(" ", "_"))
+
+
+def done(hist: list[dict], budget: int) -> bool:
+    """A probe finished: it reached its gen budget, or WIN_WINDOW gens after its first win (probe()'s stop)."""
+    if not hist:
+        return False
+    first_win = next((r["gen"] for r in hist if r["wins"] > 0), None)
+    last = hist[-1]["gen"]
+    return last >= budget or (first_win is not None and last >= first_win + WIN_WINDOW)
+
+
+def probe_state(run_dir: str) -> dict | None:
+    """The run's state.json, or None when it has none; one that fails to parse is printed, not hidden."""
+    path = os.path.join(run_dir, "state.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"skip {path}: unreadable ({e})", flush=True)
+        return None
+
+
+def probe_done(run_dir: str) -> bool:
+    """A probe dir (.../<tag>/<level>_<seed>) whose training finished, against the budget its tag names."""
+    st = probe_state(run_dir)
+    budget = (_parse_tag(os.path.basename(os.path.dirname(run_dir))) or (0, 0))[1]
+    return st is not None and done(st.get("history") or [], budget)
 
 
 def probe(game: str, level: str, seed: int, gens: int, persona: Persona | None = None,
@@ -174,7 +211,8 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
         "mean_completion_time": round(statistics.fmean(win_times), 1) if win_times else None,
         "completion_time_stddev": round(statistics.stdev(win_times), 1) if len(win_times) > 1 else 0.0,
         "progress_at_death": round(statistics.fmean(progress_at_death), 3) if progress_at_death else None,
-        "deaths_per_run": round(len(dead_eps) / max(len(hist), 1), 2),
+        "deaths_per_run": round(len(dead_eps) / max(len(hist), 1), 2),   # per generation
+        "deaths_per_win": round(len(dead_eps) / max(len(won_eps), 1), 2),  # the B2 band's unit; no wins: every death
         "death_hist": death_hist,
         "death_cluster_entropy": round(entropy, 3),
         "coin_collection_rate": round(coin_rate, 3),
@@ -239,11 +277,11 @@ def aggregate(cells: list[dict]) -> dict:
         "pop_size": cells[0].get("pop_size"),
         "solved_by": len(solved),
         "first_win_mean": round(fw_m, 1) if solved else None,
-        "first_win_ci": round(fw_ci, 1) if solved else None,
+        "first_win_ci": None if fw_ci is None else round(fw_ci, 1),
         "best_gen_mean": round(bg_m, 1) if bg else None,
-        "best_gen_ci": round(bg_ci, 1) if bg else None,
+        "best_gen_ci": None if bg_ci is None else round(bg_ci, 1),
         "win_rate_mean": round(wr_m, 3),
-        "win_rate_ci": round(wr_ci, 3),
+        "win_rate_ci": None if wr_ci is None else round(wr_ci, 3),
         "dominant_cause": dom[0],
         "dominant_cause_frac": round(dom[1] / total_deaths, 2),
         "causes": causes,
@@ -258,6 +296,7 @@ def aggregate(cells: list[dict]) -> dict:
         "completion_time_stddev": round(statistics.fmean(comp_sd), 1) if comp_sd else None,
         "progress_at_death_mean": round(statistics.fmean(pad), 3) if pad else None,
         "deaths_per_run_mean": round(statistics.fmean(c["deaths_per_run"] for c in cells), 2),
+        "deaths_per_win_mean": round(statistics.fmean(c["deaths_per_win"] for c in cells), 2),
         "death_hist": death_hist,
         "death_cluster_entropy_mean": round(statistics.fmean(c["death_cluster_entropy"] for c in cells), 3),
         "coin_collection_rate_mean": round(statistics.fmean(c["coin_collection_rate"] for c in cells), 3),
@@ -278,11 +317,11 @@ def format_report(rows: list[dict], game: str) -> str:
     out.append(hdr)
     out.append("-" * len(hdr))
     for r in difficulty_rank(rows):
-        fw = (f"gen {r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None
+        fw = (f"gen {r['first_win_mean']}{fmt_ci(r['first_win_ci'])}" if r["first_win_mean"] is not None
               else "never")
-        bg = (f"gen {r['best_gen_mean']}±{r['best_gen_ci']}" if r.get("best_gen_mean") is not None
+        bg = (f"gen {r['best_gen_mean']}{fmt_ci(r['best_gen_ci'])}" if r.get("best_gen_mean") is not None
               else "-")
-        wr = f"{r['win_rate_mean']:.0%} ±{r['win_rate_ci']:.0%}"
+        wr = f"{r['win_rate_mean']:.0%}{fmt_ci(r['win_rate_ci'], '.0%', ' ±')}"
         cause = f"{r['dominant_cause']} ({r['dominant_cause_frac']:.0%})"
         rate = (f"{r['improvement_rate_mean']:+.1%}/g" if r.get("improvement_rate_mean") is not None
                 else "-")
@@ -326,9 +365,9 @@ def format_compare(by_mode: dict[str, list[dict]], game: str) -> str:
             if r is None:
                 line += f"{'-':>20}{'-':>18}"
                 continue
-            fw = (f"gen {r['first_win_mean']}±{r['first_win_ci']}" if r["first_win_mean"] is not None
+            fw = (f"gen {r['first_win_mean']}{fmt_ci(r['first_win_ci'])}" if r["first_win_mean"] is not None
                   else "never")
-            line += f"{fw:>20}{r['win_rate_mean']:>10.0%} ±{r['win_rate_ci']:<6.0%}"
+            line += f"{fw:>20}{r['win_rate_mean']:>10.0%}{fmt_ci(r['win_rate_ci'], '.0%', ' ±'):<8}"
         out.append(line)
     return "\n".join(out)
 
@@ -349,20 +388,20 @@ def compare(game: str, persona: str, gens: int, out_dir: str = BALANCE_DIR, pref
 
 def load_probe_cells(game: str, persona: str, tag: str, root: str = PROBES_ROOT,
                      seeds=None) -> dict[str, list[dict]]:
-    """Re-summarize every probe dir under one (game, persona, tag) from its state.json; with
-    `seeds`, only the dirs trained with one of them."""
+    """Re-summarize every finished probe dir under one (game, persona, tag) from its state.json; with
+    `seeds`, only the dirs trained with one of them. Unfinished and unreadable dirs are printed and skipped."""
     cells: dict[str, list[dict]] = {}
+    budget = (_parse_tag(tag) or (0, 0))[1]
     for sp in sorted(glob.glob(os.path.join(root, game, persona, tag, "*", "state.json"))):
-        try:
-            with open(sp, encoding="utf-8") as f:
-                st = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-        hist = st.get("history") or []
+        st = probe_state(os.path.dirname(sp))
+        hist = (st or {}).get("history") or []
         if not hist:
             continue
         cfg = st.get("config", {})
         if seeds is not None and int(cfg.get("seed", 0)) not in {int(s) for s in seeds}:
+            continue
+        if not done(hist, budget):
+            print(f"skip {os.path.dirname(sp)}: unfinished (gen {hist[-1]['gen']} of {budget})", flush=True)
             continue
         cell = summarize(hist, int(cfg.get("pop_size", 10)), str(hist[-1].get("level")),
                          int(cfg.get("seed", 0)), float(st.get("best_fitness", 0.0)),
@@ -397,7 +436,7 @@ def write_report(game: str, persona: str, tag: str, out_dir: str = BALANCE_DIR,
     rows = [aggregate(c) for c in cells.values()]
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{prefix}_{game}_{persona}_{tag}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
+    with atomic_open(out_path, "w", encoding="utf-8") as f:
         json.dump({"game": game, "persona": persona, "tag": tag, "pop_size": parsed[0],
                    "gens_budget": parsed[1], "seeds": seeds,
                    "train_time_s": round(sum(r["train_time_s"] for r in rows), 1),

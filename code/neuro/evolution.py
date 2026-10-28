@@ -7,6 +7,8 @@ from dataclasses import dataclass, asdict
 
 import numpy as np
 
+from code.stats.episode_log import atomic_open
+
 
 @dataclass
 class GAConfig:
@@ -112,11 +114,8 @@ class Population:
 
     def save(self, run_dir: str) -> None:
         os.makedirs(run_dir, exist_ok=True)
-        np.savez_compressed(
-            os.path.join(run_dir, "gen_state.npz"),
-            weights=self.weights,
-            best_weights=self.best_weights,
-        )
+        with atomic_open(os.path.join(run_dir, "gen_state.npz"), "wb") as f:
+            np.savez_compressed(f, weights=self.weights, best_weights=self.best_weights)
         state = {
             "generation": self.generation,
             "best_fitness": self.best_fitness,
@@ -129,8 +128,6 @@ class Population:
             "rng_state": self.rng.bit_generator.state,
             "history": self.history,
         }
-        with open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
         # The tags travel inside the model file too, so a copied best.npz stays identifiable.
         meta = {
             "game": getattr(self, "game", None),
@@ -145,8 +142,11 @@ class Population:
             "memory": self.cfg.memory,
             "n_params": self.n_params,
         }
-        np.savez_compressed(os.path.join(run_dir, "best.npz"),
-                            weights=self.best_weights, meta=np.array(json.dumps(meta)))
+        with atomic_open(os.path.join(run_dir, "best.npz"), "wb") as f:
+            np.savez_compressed(f, weights=self.best_weights, meta=np.array(json.dumps(meta)))
+        # last: a state.json at generation N means both genome files are at N too
+        with atomic_open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
 
     @classmethod
     def load(cls, run_dir: str) -> "Population":

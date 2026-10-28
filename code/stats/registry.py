@@ -1,9 +1,9 @@
 """The balance metrics: every metric defined once, used by every consumer.
 
-balance.py (probe reports), the trainer and manual play (metrics.json per run / session), the
-Command Center report and the Streamlit dashboard all call compute_level() on the same
-episode rows (code/stats/episode_stats.py), so a metric can't mean one thing in the report and
-another on the dashboard.
+code/stats/summarize.py (metrics.json for an episode log) and the telemetry page
+(code/stats/telemetry.py) call compute_level() on the episode rows (code/stats/episode_stats.py).
+The balance probe reports do not: code/neuro/balance.py summarize() folds each probe's generations
+itself, and its deaths_per_win is the deaths_per_run below.
 
 Metrics follow the team's concrete-metrics table: eight balance dimensions, shared metrics plus
 game-specific ones. A metric that doesn't apply to a game is not computed for it; one that

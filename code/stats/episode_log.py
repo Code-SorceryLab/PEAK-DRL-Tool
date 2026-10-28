@@ -6,6 +6,7 @@ gains a column (a new metric) is rewritten with the wider header instead of drop
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import json
 import os
@@ -13,6 +14,21 @@ import os
 LEAD = ["persona", "game", "level", "source", "session", "gen", "agent", "status", "cause",
         "frames", "time_s", "progress"]
 TEXT = {"persona", "game", "level", "source", "session", "status", "cause", "agent"}
+
+
+@contextlib.contextmanager
+def atomic_open(path: str, mode: str = "w", **kw):
+    """open() for writing that fills a temp file beside `path` and swaps it in on success, so a job
+    killed mid-write leaves the old file whole instead of a truncated one."""
+    tmp = f"{path}.{os.urandom(4).hex()}.tmp"     # unique per writer, even across cluster nodes
+    try:
+        with open(tmp, mode, **kw) as f:
+            yield f
+        # shortcut: on Windows this fails while another process has `path` open; retry there if it ever bites
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def _cell(v):
@@ -97,7 +113,7 @@ def append(path: str, rows: list[dict]) -> None:
         existing_header = None
     header = existing_header or _header(rows)
     mode = "a" if existing_header is not None else "w"
-    with open(path, mode, newline="", encoding="utf-8") as f:
+    with (open if mode == "a" else atomic_open)(path, mode, newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=header, restval="", extrasaction="ignore")
         if mode == "w":
             w.writeheader()

@@ -71,7 +71,7 @@ ast_megaman() {  # one Slurm array task (--array=0-$((19 * personas - 1))): a pe
 smoke() {  # a few minutes: proves the install, the personas and Mega Man work on this machine
   $PY -m pytest code/tests -q -p no:debugging || exit 1
   GENS=5; SEEDS=(1234)
-  probe mario clumsy --sensors rays --out runs/_test
+  probe mario clumsy --sensors rays --out runs/_test --root runs/_test/probes
   mkdir -p runs/_test/logs
   $PY -m code.neuro.trainer --game megaman --level CutMan-7-Corridor --seed 1 --gens 5 --no-serve --run-dir runs/_test/megaman
   stamp "TEST DONE"

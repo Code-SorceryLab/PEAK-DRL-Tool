@@ -21,6 +21,8 @@ import time
 import numpy as np
 import pygame
 
+from code.stats import episode_log
+
 from .episodes import append_rows
 from .adapters import N_INPUTS_BY_GAME, N_OUTPUTS_BY_GAME, GameAdapter, list_levels, make_adapter
 from .evolution import GAConfig, Population
@@ -126,6 +128,8 @@ class Trainer:
             cfg.n_inputs = N_INPUTS_BY_GAME.get(game, 0)  # a game owning sense() owns its vector length
         self.net_proto = make_net(cfg)
         self.pop = population or Population(cfg, self.net_proto.n_params)
+        if population is None:   # a fresh population: the old log's rows were not played by it
+            episode_log.reset(os.path.join(run_dir, "episodes.csv"))
         self.pop.persona = self.persona.name  # persisted so replay matches capabilities
         self.pop.locked_level = level         # persisted so --resume keeps a --level run on its level
         self.pop.game = game  # tags embedded in best.npz
