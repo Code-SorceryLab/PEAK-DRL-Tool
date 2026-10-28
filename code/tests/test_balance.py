@@ -240,3 +240,29 @@ def test_a_sweep_job_reports_only_its_own_configs(tmp_path, monkeypatch):
                                       "--seeds", "1234", "--gens", "1", "--axes", "memory", "--out", str(tmp_path)])
     gasweep.main()
     assert written == [("mario", "novice", gasweep.sweep_tag(10, 1, "rays", s)) for s in ("base", "memory-2", "memory-3")]
+
+
+def test_the_ga_best_guard_blocks_only_a_sibling_trained_with_other_settings(tmp_path):
+    from code.neuro.balance import trained_with_another_ga
+    from code.neuro.evolution import GAConfig, Population
+    from code.neuro.gasweep import AXES
+    want = {k: getattr(GAConfig(anneal_factor=0.3), k) for k in AXES}   # what --best means now
+
+    def saved(name, factor, annealed):
+        cfg, d = GAConfig(anneal_factor=factor), tmp_path / name
+        pop = Population(cfg, 10)
+        if annealed:                       # what trainer.py does after the level's first win
+            cfg.mutation_rate *= factor
+            cfg.mutation_sigma *= factor
+            pop.annealed = True
+        pop.save(str(d))
+        return str(d)
+
+    (tmp_path / "starting").mkdir()        # a sibling task that has not saved anything yet
+    (tmp_path / "no_config").mkdir()
+    (tmp_path / "no_config" / "state.json").write_text("{}")
+    assert not trained_with_another_ga(str(tmp_path / "starting"), want)
+    assert not trained_with_another_ga(str(tmp_path / "no_config"), want)
+    assert not trained_with_another_ga(saved("same_won", 0.3, annealed=True), want)   # Mario1-1 after its first win
+    assert trained_with_another_ga(saved("other", 0.5, annealed=False), want)
+    assert trained_with_another_ga(saved("other_won", 0.5, annealed=True), want)

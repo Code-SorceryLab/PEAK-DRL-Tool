@@ -94,6 +94,21 @@ def probe_state(run_dir: str) -> dict | None:
         return None
 
 
+def trained_with_another_ga(run_dir: str, want: dict) -> bool:
+    """Whether a probe dir recorded GA settings other than `want` (gasweep.AXES fields). A dir that has not
+    saved its config yet (a sibling task still starting) does not count. The trainer anneals mutation in
+    place after a level's first win and saves it so, so an annealed run is compared before annealing."""
+    st = probe_state(run_dir) or {}
+    got = dict(st.get("config") or {})
+    f = got.get("anneal_factor")
+    if st.get("annealed") and f not in (None, 0.0, 1.0):
+        for k in ("mutation_rate", "mutation_sigma"):
+            if k in got:
+                got[k] /= f
+    same = lambda a, b: math.isclose(a, b, rel_tol=1e-9) if isinstance(b, float) else a == b
+    return any(k in got and not same(got[k], v) for k, v in want.items())
+
+
 def probe_done(run_dir: str) -> bool:
     """A probe dir (.../<tag>/<level>_<seed>) whose training finished, against the budget its tag names."""
     st = probe_state(run_dir)
@@ -532,8 +547,7 @@ def main() -> None:
         from .gasweep import AXES
         want = {k: getattr(GAConfig(**best_ov), k) for k in AXES}
         for d in sorted(glob.glob(os.path.join(root, args.game, persona.name, tag, "*"))):
-            got = (probe_state(d) or {}).get("config") or {}
-            if any(k in got and got[k] != v for k, v in want.items()):
+            if trained_with_another_ga(d, want):
                 raise SystemExit(f"{d} was trained with another ga_best.yaml than {tag} means now: move "
                                  f"{os.path.dirname(d)} aside first")
     if root == PROBES_ROOT and not set(args.seeds) <= set(PAPER_SEEDS):
