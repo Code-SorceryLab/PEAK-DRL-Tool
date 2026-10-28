@@ -114,3 +114,7 @@ class MeatboyPhysicsManager:
         player.contact_ceiling = self._overlaps_solid(gObj, grid, 0, -1)
         if not player.on_ground:
             player.on_ground = self._overlaps_solid(gObj, grid, 0, 1)
+            if player.on_ground and player.vy > 0:
+                # resting on the floor: get_rect() truncates y, so a sub-pixel sink never collides and gravity
+                # kept building (vy 0/15/31, y +0.8 px) until it did, shaking the camera; int(y) is the floor line
+                player.vy, gObj.y = 0.0, float(int(gObj.y))

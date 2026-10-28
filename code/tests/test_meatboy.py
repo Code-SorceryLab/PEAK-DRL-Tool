@@ -59,6 +59,15 @@ def test_walk_and_run_reach_their_top_speeds_in_the_measured_time(tmp_path):
     assert core.player.vx == 600.0
 
 
+def test_standing_still_he_rests_on_the_floor_without_sinking_or_shaking(tmp_path):
+    core = _flat(tmp_path)
+    seen = set()
+    for _ in range(60):
+        core.step([0, 0, 0])
+        seen.add((core.player.y, core.player.vy, core.player.on_ground))
+    assert len(seen) == 1 and seen.pop()[1:] == (0.0, True)
+
+
 def test_no_direction_stops_him_dead_on_the_ground_but_not_in_the_air(tmp_path):
     core = _flat(tmp_path)
     for _ in range(30):
