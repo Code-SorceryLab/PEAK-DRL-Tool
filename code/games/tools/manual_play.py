@@ -163,6 +163,8 @@ ACTION_MAPPING = {
 }
 
 _IDLE = {"megaman": [0, 0, 0, 0]}
+# Keys besides SPACE that jump: the pad overlay and inputs.csv show them as A, not as up
+JUMP_KEYS = {"platformer": (pygame.K_w,), "meatboy": (pygame.K_w, pygame.K_UP), "sonic": (pygame.K_w, pygame.K_UP)}
 
 
 def _random_action() -> list:
@@ -215,6 +217,8 @@ gamepad.open_pad()
 core_game = GameCls(render_mode="human", **env_kwargs)
 if args.game == "meatboy" and level_id:
     core_game._level_idx = int(level_id)   # meatboy levels are indexed, not named
+if args.record and hasattr(core_game, "debug_manager"):
+    core_game.debug_manager.update_input = lambda: None   # F3 slow motion and F2 free cam would leave no trace in a row
 substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixed-dt cores keep real-time pace
 # Meatboy draws onto whatever surface it is given; the other cores own a window.
 screen = core_game._surf if hasattr(core_game, "_surf") else \
@@ -305,7 +309,8 @@ class _Recorder:
         if won is None:
             won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
         cause = "Success" if won else str(getattr(core_game, "death_cause", "")
-                                          or getattr(core_game, "last_cause", "") or "Dead")
+                                          or getattr(core_game, "last_cause", "")
+                                          or ("Timeout" if core_game.alive else "Dead"))   # Meat Boy names no time-out
         if args.game == "bomberman":
             progress = 1.0 - self.best_cost / self.start_cost
         else:
@@ -732,7 +737,7 @@ while running:
         if done:
             break
 
-    held = None if args.random else gamepad.held()
+    held = None if args.random else gamepad.held(JUMP_KEYS.get(args.game, ()))
     if input_log and not getattr(core_game, "intro", 0):
         input_log.log(runs_done + 1, recorder.recorded + 1, held)
     if hasattr(core_game, "debug_manager"):

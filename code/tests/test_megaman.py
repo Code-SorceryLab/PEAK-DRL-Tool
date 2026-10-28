@@ -240,3 +240,52 @@ def test_a_section_with_no_route_to_its_exit_gives_no_progress():
     a._start_cost = a._best_cost = float("inf")
     a._end_cost, a._has_boss = 0.0, False
     assert a._attempt_progress() == 0.0            # inf - inf is NaN, and min(1.0, nan) read as 100 %
+
+
+def test_every_episode_opens_on_the_section_as_defined():
+    """Later attempts borrow other seeds; the first of each episode keeps the section's own, so the
+    same inputs score the same there episode after episode."""
+    a = make_adapter("megaman", "CutMan-4-Shaft", 900, 5000.0)
+    a.attempts = 2
+    firsts = []
+    for _ in range(3):
+        a.reset()
+        rng = np.random.default_rng(5)
+        while not a._done:                              # the first attempt (the second starts on another seed)
+            gx, gy = a._compass()
+            p = a.core.player
+            up = -1 if gy < 0 and (p.climbing or a.core.tile_at(a.x, a.y) == "H") else int(gy > 0)
+            a.step(int(np.sign(gx)) if rng.random() > 0.2 else int(rng.integers(-1, 2)), bool(rng.integers(2)), up, True)
+        firsts.append(a._done[0])
+    assert firsts[0] == firsts[1] == firsts[2], firsts
+
+
+def test_the_game_freezes_are_not_stalls():
+    """A shutter, an energy refill and the halt before the boss explodes stop the game with the pad
+    away: busy, so the stall rule does not count those frames as idle."""
+    a = make_adapter("megaman", "CutMan-7-Corridor", 600, 5000.0)
+    core = a.core
+    assert not a.busy
+    core.gate = {"phase": "open"}
+    assert a.busy
+    core.gate, core.refill = None, 6
+    assert a.busy
+    core.refill, core.halt = 0, 32
+    assert a.busy
+
+
+def test_the_physics_stay_put():
+    """A fixed script up the Ledges ladder and along the ledges: climbing, shooting from the ladder,
+    running, jumping, getting hit and a refill. A rule that changes moves where a stretch ends."""
+    a = make_adapter("megaman", "CutMan-3-Ledges", 3600, 5000.0)
+    p = a.core.player
+    assert p.climbing
+    script = [(60, 0, False, -1, True), (60, 0, False, -1, False), (240, 1, True, 0, True),
+              (120, 1, False, 0, True), (120, -1, True, 0, False)]   # (frames, move_x, jump, move_y, fire)
+    ends = []
+    for frames, move_x, jump, move_y, fire in script:
+        for _ in range(frames):
+            a.step(move_x, jump, move_y, fire)
+        ends.append((round(a.x, 2), round(a.y, 2), p.hp, round(a.progress(), 4)))
+    assert ends == [(1648.0, 2377.5, 28, 0.0116), (1648.0, 2314.0, 28, 0.0494), (2127.12, 2255.0, 27, 0.3311),
+                    (2162.0, 2282.0, 28, 0.3311), (1955.12, 2282.0, 24, 0.3457)], ends

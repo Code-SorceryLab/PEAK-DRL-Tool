@@ -351,6 +351,14 @@ def watch_command(q: dict, dash_port: int = 8000) -> tuple[list[str], str] | Non
     return cmd, f"{section or stage}, seed {seed}"
 
 
+def local_request(headers, port: int, changes_state: bool) -> bool:
+    """Whether a request to the server on 127.0.0.1:port comes from a page on this machine: it names
+    this server as its Host (a rebound DNS name does not), and one that starts something was not sent
+    by another site."""
+    return (headers.get("Host") in (f"127.0.0.1:{port}", f"localhost:{port}")
+            and not (changes_state and headers.get("Sec-Fetch-Site") == "cross-site"))
+
+
 def port_busy(port: int) -> bool:
     import socket
     with socket.socket() as sock:
@@ -406,6 +414,8 @@ def serve(paths: list[str], port: int, open_browser: bool, dash_port: int = 8000
 
         def do_GET(self) -> None:
             u = urllib.parse.urlparse(self.path)
+            if not local_request(self.headers, port, u.path == "/watch"):
+                return self._send(403, "forbidden")
             if u.path in ("/", "/telemetry.html"):
                 return self._send(200, render(build(paths)))
             if u.path != "/watch":

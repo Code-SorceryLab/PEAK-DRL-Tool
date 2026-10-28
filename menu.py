@@ -778,7 +778,9 @@ def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant
     rows = [_study_row(r, game, participant, phase, run) for r in rows]
     result = ("cleared" if any(r["status"] == "WON" for r in rows)
               else "game_over" if len(rows) >= STUDY_LIVES else "quit")   # quit: the window closed with lives left
-    rows = [{**r, "run_result": result, "lives_used": len(rows)} for r in rows]
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")      # a session played again with ADD TO lands in the same folders
+    rows = [{**r, "run_result": result, "lives_used": len(rows), "life": i, "recorded_at": stamp}
+            for i, r in enumerate(rows, 1)]
     if mutant:
         rows = [{**r, "mutant": mutant["id"], "mutant_class": mutant["class"]} for r in rows]
     out = STUDY_DIR / participant / game / phase / f"run{run}" / "episodes.csv"

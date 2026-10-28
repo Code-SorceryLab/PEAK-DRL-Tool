@@ -935,9 +935,11 @@ class MegamanAdapter(_EventWeights):
         self.core.won = False  # reset() advances to the next level when won is left True
         section = self.core.level_entry().get("section") or {}
         self._n_attempts = self.attempts if section else 1
+        seed = self.core._seed
         if k:                                                 # later attempts: another seed ...
             self.core._seed = 1000 * self._episode + k
         self.core.reset()
+        self.core._seed = seed                                # only lent: each episode opens on the section as defined
         first = list(section.get("start") or []) == list(self.core.level_data.start)
         if k and not first:                                   # ... and whatever energy was left
             rng = random.Random(7919 * self._episode + k)
@@ -1168,8 +1170,11 @@ class MegamanAdapter(_EventWeights):
 
     @property
     def busy(self) -> bool:
-        """The boss-room intro and a screen flip take the pad away: not a stall."""
-        return self.core.boss_intro > 0 or self.core.camera_y != self.core._camera_target()[1]
+        """The boss-room intro, a screen flip, a shutter, an energy refill and the halt before the
+        boss explodes take the pad away: not a stall."""
+        core = self.core
+        return (core.boss_intro > 0 or core.gate is not None or core.refill > 0 or core.halt > 0
+                or core.camera_y != core._camera_target()[1])
 
     @property
     def reach(self) -> float:

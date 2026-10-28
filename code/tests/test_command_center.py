@@ -179,6 +179,7 @@ def tmp_repo(tmp_path):
     git(repo, "commit", "-q", "-m", "landing page")
     git(repo, "switch", "-q", "main")
     git(repo, "remote", "add", "origin", str(origin))
+    git(repo, "push", "-q", "origin", "main")     # publish refuses a source commit no remote has
     (repo / "site" / "videos").mkdir(parents=True)
     (repo / "site" / "index.html").write_text("new")
     (repo / "site" / "._index.html").write_text("macOS metadata")

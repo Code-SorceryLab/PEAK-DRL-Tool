@@ -174,6 +174,7 @@ def test_a_run_quit_before_its_last_life_is_kept_as_quit_and_offered_again(monke
     assert asked.count("NOT FINISHED") == 1                # only the quit run is offered again (TRY AGAIN)
     run1 = list(csv.DictReader(open(tmp_path / "P1" / "mario" / "baseline" / "run1" / "episodes.csv")))
     assert [(r["run_result"], r["lives_used"]) for r in run1] == [("quit", "1")] + [("game_over", "3")] * 3
+    assert [r["life"] for r in run1] == ["1", "1", "2", "3"] and all(r["recorded_at"] for r in run1)   # tell runs apart
     assert len(played) == 9                                # 8 attempts and the retry
 
 
