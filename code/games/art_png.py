@@ -1,7 +1,7 @@
 """Our own sprites as PNG files, one per sprite, to edit in any pixel editor (Aseprite, Piskel, ...).
 
-The art modules (bomberman_art.py, megaman_art.py) draw each sprite as text, rows of palette
-letters. This writes them out at one pixel per art pixel, and the games draw a sprite's PNG in place
+The art modules draw each sprite as text, rows of palette letters (bomberman_art.py, megaman_art.py,
+mario_art.py), or as shapes in code (meatboy_art.py). This writes them out at one pixel per art pixel, and the games draw a sprite's PNG in place
 of its text whenever the file is there: edit the PNG and the game shows the edit.
 
     python -m code.games.art_png                    # write the PNGs that are not there yet
@@ -74,6 +74,17 @@ def export(game: str, sprites: dict, pal: dict, force: bool = False) -> int:
     return n
 
 
+def export_surfaces(game: str, surfaces: dict, force: bool = False) -> int:
+    """The same, for art drawn as images rather than text (meatboy_art.py)."""
+    os.makedirs(os.path.join(ROOT, game), exist_ok=True)
+    n = 0
+    for name, img in surfaces.items():
+        if force or not os.path.isfile(path(game, name)):
+            pygame.image.save(img, path(game, name))
+            n += 1
+    return n
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--force", action="store_true", help="rewrite every PNG from the text, losing edits")
@@ -82,6 +93,9 @@ def main() -> None:
     for game, mod in (("bomberman", bomberman_art), ("megaman", megaman_art), ("mario", mario_art)):
         n = export(game, mod.all_sprites(), mod.PAL, args.force)
         print(f"{game}: {n} written to {os.path.join(ROOT, game)}")
+    from . import meatboy_art
+    n = export_surfaces("meatboy", meatboy_art.all_surfaces(), args.force)
+    print(f"meatboy: {n} written to {os.path.join(ROOT, 'meatboy')}")
 
 
 if __name__ == "__main__":

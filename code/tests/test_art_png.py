@@ -42,3 +42,18 @@ def test_the_games_draw_an_edited_png(tmp_path, monkeypatch):
     mario_art._scaled.clear()
     art_png.load.cache_clear()
     bomberman_art.sprite.cache_clear()
+
+
+def test_meat_boy_draws_its_pngs(tmp_path, monkeypatch):
+    from code.games import meatboy_art
+    pygame.init()
+    monkeypatch.setattr(art_png, "ROOT", str(tmp_path))
+    assert art_png.export_surfaces("meatboy", meatboy_art.all_surfaces()) == 5 + 1 + 64 + 2 + 8   # Meat Boy, Bandage Girl, rock, crumble + spikes, fire
+    img = pygame.image.load(art_png.path("meatboy", "crumble"))
+    img.set_at((5, 5), (1, 2, 3, 255))
+    pygame.image.save(img, art_png.path("meatboy", "crumble"))
+    art_png.load.cache_clear()
+    meatboy_art.crumble.cache_clear()
+    assert meatboy_art.crumble(32).get_at((5, 5))[:3] == (1, 2, 3)
+    art_png.load.cache_clear()
+    meatboy_art.crumble.cache_clear()

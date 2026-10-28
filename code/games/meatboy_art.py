@@ -1,6 +1,10 @@
 """Super Meat Boy's World 1 (The Forest) look for meatboy_core, drawn in the colours the game shows
 (sampled from a walkthrough of 1-1 Hello World): a misty sky with rock and pine silhouettes, dark
 rock under a moss cap, Meat Boy's red cube and Bandage Girl in pink. Original drawings, no assets.
+
+Every sprite is drawn here once and exported as a PNG to code/games/assets/art/meatboy/ (art_png.py);
+the game draws the PNG whenever it is there, so the art can be edited in a pixel editor. The misty
+backdrop (drawn to the window's size) and the saws (Saw.py; every saw has its own size) stay code.
 """
 from __future__ import annotations
 
@@ -9,6 +13,8 @@ import random
 from functools import lru_cache
 
 import pygame
+
+from . import art_png
 
 SKY_TOP, SKY_LOW = (196, 210, 214), (178, 196, 200)
 MIST = [(168, 186, 188), (150, 170, 172), (128, 150, 150)]     # far to near silhouettes
@@ -49,12 +55,31 @@ def backdrop(w: int, h: int) -> pygame.Surface:
     return s
 
 
+GROUND_VARIANTS = 4             # boulder patterns; a tile's position picks one
+
+
+def _png(name: str, size=None, flip: bool = False):
+    """The sprite's PNG, scaled to size and mirrored if asked; None when there is no file."""
+    img = art_png.load("meatboy", name)
+    if img is None:
+        return None
+    if size and img.get_size() != tuple(size):
+        img = pygame.transform.scale(img, size)
+    return pygame.transform.flip(img, True, False) if flip else img
+
+
 @lru_cache(maxsize=4096)
 def ground(ts: int, top: bool, left: bool, right: bool, bottom: bool, seed: int) -> pygame.Surface:
     """A rock tile; top/left/right/bottom: that side faces open air (moss on top, a dark rim elsewhere)."""
+    v = seed % GROUND_VARIANTS
+    return (_png(f"ground_{int(top)}{int(left)}{int(right)}{int(bottom)}_{v}", (ts, ts))
+            or _draw_ground(ts, top, left, right, bottom, v))
+
+
+def _draw_ground(ts: int, top: bool, left: bool, right: bool, bottom: bool, variant: int) -> pygame.Surface:
     s = pygame.Surface((ts, ts))
     s.fill(ROCK)
-    rng = random.Random(seed)
+    rng = random.Random(variant)
     for _ in range(2):                                              # brown boulders in the rock
         r = rng.randint(ts // 5, ts // 3)
         cx, cy = rng.randint(0, ts), rng.randint(0, ts)
@@ -76,6 +101,10 @@ def ground(ts: int, top: bool, left: bool, right: bool, bottom: bool, seed: int)
 
 @lru_cache(maxsize=8)
 def crumble(ts: int) -> pygame.Surface:
+    return _png("crumble", (ts, ts)) or _draw_crumble(ts)
+
+
+def _draw_crumble(ts: int) -> pygame.Surface:
     s = pygame.Surface((ts, ts))
     s.fill(CRUMBLE)
     pygame.draw.rect(s, CRUMBLE_LO, (0, 0, ts, ts), 2)
@@ -86,6 +115,10 @@ def crumble(ts: int) -> pygame.Surface:
 
 @lru_cache(maxsize=8)
 def spikes(ts: int) -> pygame.Surface:
+    return _png("spikes", (ts, ts)) or _draw_spikes(ts)
+
+
+def _draw_spikes(ts: int) -> pygame.Surface:
     s = pygame.Surface((ts, ts), pygame.SRCALPHA)
     n = 3
     for i in range(n):
@@ -99,6 +132,11 @@ def spikes(ts: int) -> pygame.Surface:
 def fire(ts: int, phase: int, top: bool) -> pygame.Surface:
     """Fire (1-11 Fired): a wall of flame. A tile under more fire is solid flame; the top tile throws
     tongues half a tile up, which kill too. phase 0-3 flickers it."""
+    h = ts + (ts // 2 if top else 0)
+    return _png(f"fire_{phase}_{int(top)}", (ts, h)) or _draw_fire(ts, phase, top)
+
+
+def _draw_fire(ts: int, phase: int, top: bool) -> pygame.Surface:
     h = ts + (ts // 2 if top else 0)
     s = pygame.Surface((ts, h), pygame.SRCALPHA)
     s.fill(FIRE_LO, (0, h - ts, ts, ts))
@@ -128,7 +166,11 @@ def _cube(s: pygame.Surface, rect: pygame.Rect, body, lo, hi) -> None:
 @lru_cache(maxsize=64)
 def meat_boy(w: int, h: int, right: bool, pose: int) -> pygame.Surface:
     """Meat Boy: a red cube with black eyes, a toothy grin and stubby legs. pose 0 stand, 1/2 run,
-    3 in the air, 4 on a wall."""
+    3 in the air, 4 on a wall. His PNG faces right and is mirrored for left."""
+    return _png(f"meat_boy_{pose}", (w + 8, h + 8), flip=not right) or _draw_meat_boy(w, h, right, pose)
+
+
+def _draw_meat_boy(w: int, h: int, right: bool, pose: int) -> pygame.Surface:
     s = pygame.Surface((w + 8, h + 8), pygame.SRCALPHA)
     legs = 5
     body = pygame.Rect(4, 4, w, h - legs)
@@ -150,6 +192,11 @@ def meat_boy(w: int, h: int, right: bool, pose: int) -> pygame.Surface:
 @lru_cache(maxsize=8)
 def bandage_girl(ts: int) -> pygame.Surface:
     """Bandage Girl: pink cube, a bandage across her head, a white flower, pigtail bumps."""
+    size = int(ts * 0.8)
+    return _png("bandage_girl", (size + 8, size + 8)) or _draw_bandage_girl(ts)
+
+
+def _draw_bandage_girl(ts: int) -> pygame.Surface:
     size = int(ts * 0.8)
     s = pygame.Surface((size + 8, size + 8), pygame.SRCALPHA)
     body = pygame.Rect(4, 6, size, size - 4)
@@ -186,3 +233,18 @@ def lives(surface: pygame.Surface, n: int) -> None:
     surface.blit(plate, (52, 56))
     surface.blit(meat_boy(24, 24, True, 0), (56, 60))
     surface.blit(nes_text(f"*{n}", 3, (244, 242, 236), shadow=INK), (92, 66))   # "*" is the font's times sign
+
+
+def all_surfaces(ts: int = 32, size: tuple = (22, 22)) -> dict:
+    """name -> surface for every sprite, drawn from code at the game's sizes: what art_png.py exports."""
+    out = {f"meat_boy_{pose}": _draw_meat_boy(*size, True, pose) for pose in range(5)}
+    out["bandage_girl"] = _draw_bandage_girl(ts)
+    for sides in range(16):
+        t, l, r, b = (bool(sides >> k & 1) for k in (3, 2, 1, 0))
+        for v in range(GROUND_VARIANTS):
+            out[f"ground_{int(t)}{int(l)}{int(r)}{int(b)}_{v}"] = _draw_ground(ts, t, l, r, b, v)
+    out["crumble"], out["spikes"] = _draw_crumble(ts), _draw_spikes(ts)
+    for phase in range(4):
+        for top in (False, True):
+            out[f"fire_{phase}_{int(top)}"] = _draw_fire(ts, phase, top)
+    return out

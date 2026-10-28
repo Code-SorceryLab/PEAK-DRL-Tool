@@ -606,7 +606,8 @@ def _draw_controls(state) -> None:
     w, h = PAD_W + 128, 54
     x, y = _view_w() - w - 10, screen.get_height() - h - 10
     card = pygame.Surface((w, h), pygame.SRCALPHA)
-    pygame.draw.rect(card, (14, 15, 22, 205), card.get_rect(), border_radius=8)
+    pygame.draw.rect(card, (14, 15, 22, 240), card.get_rect(), border_radius=8)   # near solid: readable on busy ground
+    pygame.draw.rect(card, (96, 104, 140), card.get_rect(), 1, border_radius=8)
     screen.blit(card, (x, y))
     draw_nes_pad(screen, x + 7, y + 7, h - 14, state, _font(11, True))
     ty = y + 6
@@ -854,5 +855,11 @@ pygame.quit()
 # Started by hand, quitting goes back to SELECT GAME; the game select, the study, a recording, a demo, random
 # play and the level editor's play-test each wait for this process and take over again themselves.
 if not (os.environ.get("PEAK_READY_FILE") or args.record or args.demo or args.random or args.quit_after or level_file):
-    os.execv(sys.executable, [sys.executable, "-m", "code.games.tools.game_select"]
-             + (["-ApplePersistenceIgnoreState", "YES"] if sys.platform == "darwin" else []))
+    select = [sys.executable, "-m", "code.games.tools.game_select"] \
+        + (["-ApplePersistenceIgnoreState", "YES"] if sys.platform == "darwin" else [])
+    if os.name == "nt":
+        # Windows has no real exec: os.execv ends this process and starts the menu apart from the terminal,
+        # which gets its prompt back at once (it looks closed) while the menu opens behind other windows.
+        import subprocess
+        sys.exit(subprocess.call(select))
+    os.execv(sys.executable, select)
