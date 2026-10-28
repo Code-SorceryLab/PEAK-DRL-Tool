@@ -39,6 +39,7 @@ import yaml
 from . import megaman_enemies as en
 from .megaman_core import AIR, CONFIG_PATH, DOOR, DOOR_SHUT, GOAL, LADDER, LEVELS_PATH, SOLID, SPIKE, START, VOID, parse_level
 from .megaman_route import DRIFT_CELLS, JUMP_CELLS, route_field
+from .mutants import source_hash
 
 GAME = "megaman"
 OUT = os.path.join("runs", GAME, "mutants")
@@ -347,7 +348,8 @@ def generate(stage: str = "CutMan", out: str = OUT) -> dict:
                       "class": cls, "direction": direction, "description": description, "parameter": parameter,
                       "location": {"col": changed[len(changed) // 2][0], "row": changed[len(changed) // 2][1]},
                       "cells": [[c, r, st.char(c, r), cells[(c, r)]] for c, r in changed],     # col, row, before, after
-                      "base_file": st.file, "level_file": "level.txt", "config": None, "checks": checks}
+                      "base_file": st.file, "base_sha1": source_hash(st.file), "level_file": "level.txt", "config": None,
+                      "checks": checks}
             mutants.append((record, text))
     base_jump = jump_reach(st.cfg["player"])
     for mid, key, change, direction in MECHANICS:

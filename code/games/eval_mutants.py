@@ -416,6 +416,8 @@ def build(game: str, out: str | None = None, level: str | None = None) -> dict:
     skipped = []
     if not hand:
         specs, skipped = place(game, level, text, base)
+        for s in skipped:                                   # a mutant once placed here must not outlive its operator
+            shutil.rmtree(os.path.join(out, f"{s['operator']}@{level}"), ignore_errors=True)
     records = []
     for op, cls, change, description, note in specs:
         mid = op if hand else f"{op}@{level}"
@@ -424,7 +426,7 @@ def build(game: str, out: str | None = None, level: str | None = None) -> dict:
         os.makedirs(folder)
         record = {"id": mid, "game": game, "stage": level, "section": None, "operator": op, "class": cls,
                   "direction": "none" if cls == "neutral" else "harder", "description": description,
-                  "retrain": op != "cosmetic_tile", "base_file": file}
+                  "retrain": op != "cosmetic_tile", "base_file": file, "base_sha1": mutants.source_hash(file)}
         if isinstance(change[0][0], str):                   # mechanics: config values
             olds = {k: _effective(k)(base.core) for k, _, _ in change}
             wrong = [f"{k} is {olds[k]}, the spec expects {b}" for k, b, _ in change if olds[k] != b]

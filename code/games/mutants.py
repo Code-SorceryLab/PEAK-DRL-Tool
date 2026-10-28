@@ -9,11 +9,24 @@ config and its level, so level names and every command stay the same:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 
 ENV = "PEAK_MUTANT"
 OLD_ENV = "PEAK_MM1_MUTANT"   # Mega Man's first name for it; its notes and commands still use it
+LEVELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels")
+
+
+def source_hash(base_file: str) -> str:
+    """sha1 of a level file and its .yaml sidecar: a mutant copied from them is stale once it changes."""
+    h = hashlib.sha1()
+    path = os.path.join(LEVELS_DIR, base_file)
+    for p in (path, os.path.splitext(path)[0] + ".yaml"):
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                h.update(f.read().replace(b"\r\n", b"\n"))   # a Windows checkout is the same level
+    return h.hexdigest()
 
 
 def active(game: str) -> dict | None:
@@ -35,6 +48,11 @@ def active(game: str) -> dict | None:
 def level_path(record: dict | None, file: str) -> str | None:
     """The mutant's own copy of this level file, or None when the mutant leaves it alone."""
     if record and record.get("level_file") and record.get("base_file") == file:
+        if record.get("base_sha1") and not record.get("_fresh"):
+            if record["base_sha1"] != source_hash(file):
+                raise SystemExit(f"mutant {record['dir']} was made from an older {file}: regenerate it "
+                                 "(python -m code.games.eval_mutants --all-levels, or code.games.megaman_mutants)")
+            record["_fresh"] = True
         return os.path.join(record["dir"], record["level_file"])
     return None
 
