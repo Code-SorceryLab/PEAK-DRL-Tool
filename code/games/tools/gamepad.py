@@ -1,6 +1,5 @@
 # code/games/tools/gamepad.py — the game controller for manual play and its game selection screen.
 import sys
-import threading
 
 import pygame
 from pygame._sdl2 import controller as sdl_controller
@@ -15,6 +14,7 @@ PAD_DEADZONE = 0.5
 # The USB NES pad (0810:e501). On macOS SDL reads it through Apple's controller framework, which loses its
 # A, B and d-pad, so it is read straight from USB (hidapi): its last raw report, while it is plugged in.
 NES_PAD = (0x0810, 0xE501)
+NES_GUID = "03007e411008000001e5000000000000"   # its SDL GUID, the same on macOS and Windows
 _nes = _nes_dev = None
 _NES_BITS = {(5, 0x20): pygame.CONTROLLER_BUTTON_A, (5, 0x10): pygame.CONTROLLER_BUTTON_B,   # HID buttons 1, 0
              (6, 0x10): pygame.CONTROLLER_BUTTON_BACK, (6, 0x20): pygame.CONTROLLER_BUTTON_START}   # 8, 9
@@ -23,50 +23,48 @@ _NES_DPAD = ((3, pygame.CONTROLLER_BUTTON_DPAD_LEFT, pygame.CONTROLLER_BUTTON_DP
 
 
 def _nes_held(report=None) -> set:
-    """The SDL controller buttons held in a raw report of the NES pad (the last one read by default)."""
-    r = report or _nes
+    """The SDL controller buttons held in a raw report of the NES pad (the newest one by default)."""
+    r = report or _read_nes()
     if not r:
         return set()
     held = {b for (i, bit), b in _NES_BITS.items() if r[i] & bit}
     return held | {low if r[i] < 0x40 else high for i, low, high in _NES_DPAD if not 0x40 <= r[i] <= 0xbf}
 
 
-def _read_nes(dev) -> None:
+def _read_nes():
+    """The newest report of the NES pad, read on the caller's thread without a wait (a reader thread made
+    Python crash on macOS: a segfault in the main thread's memory allocator within 3 s of launch)."""
     global _nes, _nes_dev
-    try:
-        while not _release.is_set():
-            _nes = dev.read(64, 100) or _nes
-        dev.close()              # released: another process may open it now
-    except OSError:              # unplugged: the next open_pad looks for it again
-        pass
-    _nes = _nes_dev = None
-
-
-_release = threading.Event()
+    if _nes_dev:
+        try:
+            while r := _nes_dev.read(64):
+                _nes = r
+        except (OSError, ValueError):    # unplugged: the next open_pad looks for it again
+            _nes = _nes_dev = None
+    return _nes
 
 
 def release_pad() -> None:
     """Let go of the USB NES pad: macOS gives it to one process at a time, so a game launched from here
     could not read it. open_pad() takes it back."""
-    reader = next((t for t in threading.enumerate() if t.name == "nes-pad"), None)
-    if reader:
-        _release.set()
-        reader.join(1.0)
-        _release.clear()
+    global _nes, _nes_dev
+    if _nes_dev:
+        _nes_dev.close()
+    _nes = _nes_dev = None
 
 
 def _open_nes() -> bool:
-    """macOS: start reading the NES pad from USB if it is plugged in and hidapi is installed."""
+    """macOS: open the NES pad on USB if it is plugged in and hidapi is installed."""
     global _nes_dev
     if sys.platform == "darwin" and _nes_dev is None:
         try:
             import hid
             dev = hid.device()
             dev.open(*NES_PAD)
+            dev.set_nonblocking(1)
         except (ImportError, OSError):
             return False
         _nes_dev = dev
-        threading.Thread(target=_read_nes, args=(dev,), daemon=True, name="nes-pad").start()
     return _nes_dev is not None
 
 
@@ -75,11 +73,16 @@ def open_pad(quiet: bool = False) -> None:
     global pad
     sdl_controller.init()
     nes = _open_nes()            # then SDL's copy of it (Apple's framework, name "usb gamepad") is left out
-    idx = next((i for i in range(sdl_controller.get_count()) if sdl_controller.is_controller(i)
-                and not (nes and sdl_controller.name_forindex(i).strip() == "usb gamepad")), None)
-    # shortcut: a pad missing from SDL's mapping database is ignored, add a raw-joystick fallback if one turns up
-    pad = sdl_controller.Controller(idx) if idx is not None else None
-    if pad and pad.as_joystick().get_guid() == "03007e411008000001e5000000000000":
+    ids = [i for i in range(sdl_controller.get_count()) if sdl_controller.is_controller(i)
+           and not (nes and sdl_controller.name_forindex(i).strip() == "usb gamepad")]
+    try:
+        # the USB NES pad first: a paired DualSense or Xbox pad listed before it would otherwise take its place
+        idx = min(ids, key=lambda i: pygame.joystick.Joystick(i).get_guid() != NES_GUID, default=None)
+        # shortcut: a pad missing from SDL's mapping database is ignored, add a raw-joystick fallback if one turns up
+        pad = sdl_controller.Controller(idx) if idx is not None else None
+    except pygame.error:         # a pad left while counted (unplugged, or a wireless one fell asleep):
+        pad = None               # its JOYDEVICEREMOVED event calls open_pad again
+    if pad and pad.as_joystick().get_guid() == NES_GUID:
         # USB NES pad (0810:e501): SDL's SNES-clone mapping wants A on b2, which this pad lacks.
         # Swap a/b here if A and B feel reversed.
         pad.set_mapping({"a": "b1", "b": "b0", "back": "b8", "start": "b9", "leftx": "a0", "lefty": "a1",
@@ -95,7 +98,7 @@ def button(btn) -> bool:
 
 def pad_state() -> tuple[int, int, bool, bool, bool]:
     """(dx, dy, jump, fire, run) from the controller: left stick or d-pad, plus the face buttons."""
-    if pad is None and not _nes:
+    if pad is None and not _read_nes():
         return 0, 0, False, False, False
     held = lambda ids: any(button(b) for b in ids)
     x = pad.get_axis(pygame.CONTROLLER_AXIS_LEFTX) / 32767 if pad else 0.0
