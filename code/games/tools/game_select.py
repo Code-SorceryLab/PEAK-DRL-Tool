@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
@@ -14,6 +15,7 @@ os.environ["SDL_VIDEO_CENTERED"] = "1"
 os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
 import pygame
+from pygame._sdl2.video import Window
 
 import menu
 from code.games.modules.System import music
@@ -36,12 +38,36 @@ _clips, _frames = {}, {}         # game -> (size, raw RGB frames) from the decod
 
 
 def run_game(cmd: list, env: dict) -> None:
-    """Run one game in its own window until it is quit, then come back to this one."""
-    pygame.display.quit()          # one window at a time
+    """Run one game in its own window until it is quit, then come back to this one. A loading bar shows
+    until the game's window is up (manual_play touches PEAK_READY_FILE then)."""
     music.stop()
-    subprocess.run(cmd + menu.NO_RESTORE, env=env)
+    gamepad.release_pad()          # macOS gives the USB NES pad to one process at a time: the game's turn
+    ready = os.path.join(tempfile.gettempdir(), f"peak_ready_{os.getpid()}")
+    if os.path.exists(ready):
+        os.remove(ready)
+    proc = subprocess.Popen(cmd + menu.NO_RESTORE, env={**env, "PEAK_READY_FILE": ready})
+    clock, start = pygame.time.Clock(), pygame.time.get_ticks()
+    while proc.poll() is None and not os.path.exists(ready):
+        pygame.event.pump()
+        _loading(min(0.95, (pygame.time.get_ticks() - start) / 3000))   # about 3 s to the first frame
+        clock.tick(30)
+    pygame.display.quit()          # one window at a time
+    proc.wait()
+    if os.path.exists(ready):
+        os.remove(ready)
     pygame.display.init()
+    gamepad.open_pad(quiet=True)
     music.play("menu")
+
+
+def _loading(done: float) -> None:
+    """LOADING and a bar while a game starts."""
+    _draw("LOADING", [" "], None, "THE GAME OPENS IN ITS OWN WINDOW")
+    screen = pygame.display.get_surface()
+    w, h = SIZE
+    pygame.draw.rect(screen, GREY, (w // 2 - 200, h // 2, 400, 28), 3)
+    pygame.draw.rect(screen, GOLD, (w // 2 - 194, h // 2 + 6, int(388 * done), 16))
+    pygame.display.flip()
 
 
 def _play(game: str, level: str | None) -> None:
@@ -91,6 +117,7 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4,
     if screen is None:                 # the first screen, or the first after a game closed the window
         screen = pygame.display.set_mode(SIZE)
         pygame.display.set_caption("PEAK  User Study" if args.study else "PEAK  Manual Play")
+        Window.from_display_module().focus()   # macOS leaves a reopened window without the keyboard
     screen.fill((0, 0, 0))
     w, h = SIZE
     pygame.draw.rect(screen, (252, 252, 252), (16, 16, w - 32, h - 32), 4)

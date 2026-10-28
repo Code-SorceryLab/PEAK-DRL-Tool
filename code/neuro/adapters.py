@@ -514,7 +514,6 @@ class MeatboyAdapter(_EventWeights):
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
         self._level_enemies = self._count_enemies()
-        self._best_bfs = 1.0
         self.reset()
 
     @property
@@ -546,7 +545,7 @@ class MeatboyAdapter(_EventWeights):
 
     @property
     def camera(self) -> tuple[float, float]:
-        cx, cy = self.core._camera(self.core.WIDTH, self.core.HEIGHT)
+        cx, cy = self.core._camera(*self.core.view_size())
         return float(cx), float(cy)
 
     def reset(self) -> None:
@@ -558,7 +557,18 @@ class MeatboyAdapter(_EventWeights):
         self._end_xy: tuple[float, float] | None = None
         self._level_coins = _count_coins(self.core)
         self._level_enemies = self._count_enemies()
-        self._best_bfs = 1.0
+        self._start_bfs = max(self.core._bfs_norm_dist(), 1e-6)   # the start's path distance to the goal
+        self._best_bfs = self._start_bfs
+
+    @property
+    def reach(self) -> float:
+        """What the progress bar measures: the same 0..1000 scale as episode_stats."""
+        return self.progress() * self._FIT_SCALE
+
+    def progress(self) -> float:
+        """The share of the start's shortest path to Bandage Girl covered (0 standing still, 1 at her):
+        the levels are climbs and mazes, so x across the level says little."""
+        return 1.0 if self.won else max(0.0, min(1.0, 1.0 - self._best_bfs / self._start_bfs))
 
     def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
         if not self.alive:
@@ -619,10 +629,10 @@ class MeatboyAdapter(_EventWeights):
     def _progress_fitness(self) -> float:
         if self.won:
             return self._FIT_SCALE + self.win_bonus + _win_time_bonus(self)
-        return (1.0 - self._best_bfs) * self._FIT_SCALE
+        return self.reach
 
     def episode_stats(self) -> dict:
-        return _episode_stats(self,(1.0 - self._best_bfs) * self._FIT_SCALE)
+        return {**_episode_stats(self, self.reach), "progress": round(self.progress(), 3)}
 
     def set_level(self, level: str) -> None:
         self.core._level_idx = int(level)

@@ -287,6 +287,9 @@ class _Recorder:
         if args.game == "bomberman":
             self.start_cost = max(core_game.start_cost(), 1.0)
             self.best_cost = self.start_cost
+        if args.game == "meatboy":            # the agents' measure: the share of the start's path to the goal
+            self.start_cost = max(core_game._bfs_norm_dist(), 1e-6)
+            self.best_cost = self.start_cost
 
     def step(self, action) -> None:
         lives = getattr(core_game, "lives", None)
@@ -310,6 +313,8 @@ class _Recorder:
             self.route.append(tuple(round(v, 1) for v in self._xy()))
         if args.game == "bomberman":
             self.best_cost = min(self.best_cost, core_game.goal_cost())
+        if args.game == "meatboy" and core_game._bfs_norm_dist() >= 0:
+            self.best_cost = min(self.best_cost, core_game._bfs_norm_dist())
         self.last_xy = self._xy()
 
     def end(self, xy=None, won=None) -> None:
@@ -319,8 +324,8 @@ class _Recorder:
         cause = "Success" if won else str(getattr(core_game, "death_cause", "")
                                           or getattr(core_game, "last_cause", "")
                                           or ("Timeout" if core_game.alive else "Dead"))   # Meat Boy names no time-out
-        if args.game == "bomberman":
-            progress = 1.0 - self.best_cost / self.start_cost
+        if args.game in ("bomberman", "meatboy"):
+            progress = 1.0 if won else 1.0 - self.best_cost / self.start_cost
         else:
             progress = xy[0] / (core_game.level_data.width or 1.0)
         progress = min(max(progress, 0.0), 1.0)
@@ -780,6 +785,8 @@ while running:
     dm = getattr(core_game, "debug_manager", None)
     if not (dm and dm.show_panel and getattr(core_game, "render_mode", None) == "human"):
         _draw_controls(held)   # the open debug panel already shows the pad in its Input card
+    if frame == 1 and os.environ.get("PEAK_READY_FILE"):   # the window is up: the game select stops its loading bar
+        Path(os.environ["PEAK_READY_FILE"]).touch()
     if warm_until:
         left = max(0, warm_until - pygame.time.get_ticks()) // 1000
         _banner(f"Warm-up, not recorded: {left // 60}:{left % 60:02d} left", (255, 210, 90))

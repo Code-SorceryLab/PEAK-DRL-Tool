@@ -234,10 +234,13 @@ def get_run_dirs():
     including balance probes (runs/probes/<game>/<persona>/<tag>/<level>_<seed>)."""
     if not RUNS_DIR.exists():
         return []
-    gasweep = RUNS_DIR / "gasweep"  # hundreds of ablation cells — watch those from the command center
-    return sorted(p.parent for p in RUNS_DIR.rglob("state.json")
-                  if (p.parent / "best.npz").exists() and p.parent.name != "_replay"
-                  and gasweep not in p.parents)
+    found = []
+    for root, dirs, files in os.walk(RUNS_DIR):
+        if Path(root) == RUNS_DIR:    # hundreds of ablation cells: watch those from the command center, and
+            dirs[:] = [d for d in dirs if d != "gasweep"]   # not walking their 200,000 files saves the menu 15 s
+        if "state.json" in files and "best.npz" in files and os.path.basename(root) != "_replay":
+            found.append(Path(root))
+    return sorted(found)
 
 
 def run_meta(run_dir: Path) -> dict:
@@ -1542,10 +1545,15 @@ def main():
 
     while True:
         setup_project()
+        header = []
+        for step, fn in enumerate((get_available_games, get_enabled_level_count, get_trained_games,
+                                   get_trained_models_count)):
+            bar = "█" * (6 * step) + "·" * (6 * (4 - step))   # the run scan below reads every run folder
+            print(f"\r    {_DIM('Loading PEAK ENGINE')}  {_CYAN(bar)}", end="", flush=True)
+            header.append(fn())
         clear_cli()
 
-        _print_header(get_available_games(), get_enabled_level_count(),
-                      get_trained_games(), get_trained_models_count())
+        _print_header(*header)
 
         _section("TRAIN")
         print(_menu_item("1",  "Project Status"))

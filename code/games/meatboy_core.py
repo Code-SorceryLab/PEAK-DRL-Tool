@@ -36,6 +36,7 @@ class MeatboyCore:
     WIDTH = 1280      # the game's own window: 40 x 22.5 tiles, so most World 1 levels fit whole
     HEIGHT = 720
     DEBUG_PANEL_X = WIDTH
+    hud_lives = None  # manual play sets the lives after this one (the study's --lives); None draws none
 
     @property
     def TOTAL_WIDTH(self):
@@ -117,11 +118,14 @@ class MeatboyCore:
                              gy * self.tile_size + self.tile_size / 2)
         else:
             self._goal_xy = (self.level_data.width, self.level_data.height / 2)
+        fit = min(self.WIDTH / self.level_data.width, self.HEIGHT / self.level_data.height)
+        self.zoom = fit if fit >= 1.0 else 4 / 3    # fills the window, as the game frames a level; a bigger one scrolls at 30 x 17 tiles (1-4)
         self._prepare_dist()
 
     def _spawn_player(self):
-        sx, sy = self.level_data.player_start
-        gObj = GameObject(float(sx), float(sy), self._pw, self._ph)
+        sx, sy = self.level_data.player_start                       # the P tile's top-left
+        ts = self.tile_size                                         # stand on its floor, in its middle
+        gObj = GameObject(float(sx) + (ts - self._pw) / 2, float(sy) + ts - self._ph, self._pw, self._ph)
         self.player = MeatboyPlayer(gObj, self._movement, self._jump, self._wall,
                                     human_mode=self._human)
 
@@ -211,9 +215,11 @@ class MeatboyCore:
                     grid[row][col] = TILE_AIR
                 del self._crumble_timers[(row, col)]
 
-    def _player_cells(self):
+    def _player_cells(self, reach=0):
+        """The cells the player overlaps, and `reach` px under his feet."""
         ts = self.tile_size
         r = self.player.get_rect()
+        r.height += reach
         cells = []
         for col in range(r.left // ts, r.right // ts + 1):
             for row in range(r.top // ts, r.bottom // ts + 1):
@@ -226,12 +232,12 @@ class MeatboyCore:
         for saw in self.level_data.saws:
             if saw.hits_rect(prect):
                 return "Saw"
-        for (row, col) in self._player_cells():
-            t = self.level_data.grid[row][col]
+        ts, grid = self.tile_size, self.level_data.grid
+        for (row, col) in self._player_cells(reach=ts // 2):
+            t = grid[row][col]
             if t in (TILE_SPIKE, TILE_PIT):
-                tr = pygame.Rect(col * self.tile_size, row * self.tile_size,
-                                 self.tile_size, self.tile_size)
-                if prect.colliderect(tr):
+                tip = ts // 2 if t == TILE_SPIKE and (row == 0 or grid[row - 1][col] != TILE_SPIKE) else 0
+                if prect.colliderect(pygame.Rect(col * ts, row * ts - tip, ts, ts + tip)):   # the flames' tips
                     return "Fire" if t == TILE_SPIKE else "Pit"
         return None
 
@@ -395,15 +401,35 @@ class MeatboyCore:
         cy = (lh - view_h) / 2 if lh <= view_h else max(0.0, min(cy, lh - view_h))
         return cx, cy
 
+    def view_size(self, game_w=None, game_h=None):
+        """The part of the level the camera shows, in world pixels: the window divided by the zoom."""
+        return (math.ceil((game_w or self.WIDTH) / self.zoom), math.ceil((game_h or self.HEIGHT) / self.zoom))
+
     def render(self, surface=None, blit_only=False):
         """Super Meat Boy's World 1 look (meatboy_art): misty forest, moss-capped rock, the red cube
-        leaving blood on every surface he touches, Bandage Girl at the goal."""
+        leaving blood on every surface he touches, Bandage Girl at the goal. The world is drawn at 1:1 and
+        scaled up by the level's zoom, as the game frames each level."""
         from . import meatboy_art as A
         if surface is None:
             return
         window = surface
         if surface.get_width() > self.WIDTH:                        # the window with the debug panel
             surface = surface.subsurface((0, 0, self.WIDTH, min(self.HEIGHT, surface.get_height())))
+        vw, vh = self.view_size(*surface.get_size())
+        view = surface if self.zoom == 1.0 else pygame.Surface((vw, vh))
+        self._draw_world(view, A)
+        dm = getattr(self, "debug_manager", None)
+        if dm:
+            self._debug_on_view(view, dm)
+        if view is not surface:
+            pygame.transform.scale(view, surface.get_size(), surface)
+        A.timer_sign(surface, self._steps / 60.0)                   # the hanging sign at the top left
+        if self.hud_lives is not None:                              # the study's lives (the game has none)
+            A.lives(surface, self.hud_lives + 1)
+        if dm:
+            dm.render_overlays(window, self, game_overlays=False)
+
+    def _draw_world(self, surface, A):
         ts, ld, p = self.tile_size, self.level_data, self.player
         vw, vh = surface.get_width(), surface.get_height()
         camx, camy = self._camera(vw, vh)
@@ -417,9 +443,11 @@ class MeatboyCore:
                 blood.add((int(cx // ts), int((feet + 1) // ts), 0))
             if getattr(p, "wall_dir", 0):
                 blood.add((int((cx + p.wall_dir * (p.width / 2 + 1)) // ts), int((p.y + p.height / 2) // ts), p.wall_dir))
-        solid = lambda c, r: 0 <= r < ld.rows and 0 <= c < ld.cols and ld.grid[r][c] in _SOLID
+        tile = lambda c, r: ld.grid[r][c] if 0 <= r < ld.rows and 0 <= c < ld.cols else None
+        solid = lambda c, r: tile(c, r) in _SOLID
         c0 = max(0, int(camx // ts)); c1 = min(ld.cols, int((camx + vw) // ts) + 1)
-        r0 = max(0, int(camy // ts)); r1 = min(ld.rows, int((camy + vh) // ts) + 1)
+        r0 = max(0, int(camy // ts)); r1 = min(ld.rows, int((camy + vh) // ts) + 2)
+        fires = []
         for r in range(r0, r1):
             for c in range(c0, c1):
                 t, x, y = ld.grid[r][c], c * ts - camx, r * ts - camy
@@ -436,10 +464,13 @@ class MeatboyCore:
                 elif t == TILE_CRUMBLE:
                     surface.blit(A.crumble(ts), (x, y))
                 elif t == TILE_SPIKE:                               # World 1 has no spikes: fire (1-11)
-                    surface.blit(A.fire(ts, (self._steps // 6 + c) % 3), (x, y))
+                    fires.append((x, y, tile(c, r - 1) != TILE_SPIKE, c))
                 elif t == TILE_GOAL:
                     girl = A.bandage_girl(ts)
                     surface.blit(girl, (x + (ts - girl.get_width()) // 2, y + ts - girl.get_height() + 4))
+        for x, y, top, c in fires:                                  # last, so the flames lick over the rock
+            img = A.fire(ts, (self._steps // 4 + c) % 4, top)
+            surface.blit(img, (x, y + ts - img.get_height()))
         for saw in ld.saws:
             saw.render(surface, saw.cx - camx, saw.cy - camy)
         if self.alive or self.won:
@@ -451,12 +482,20 @@ class MeatboyCore:
                 a = k * 0.63
                 pygame.draw.circle(surface, A.MEAT, (int(p.x - camx + p.width / 2 + 14 * math.cos(a)),
                                                      int(p.y - camy + p.height / 2 + 14 * math.sin(a))), 4)
-        A.timer_sign(surface, self._steps / 60.0)                   # the hanging sign at the top left
-        dm = getattr(self, "debug_manager", None)
-        if dm:
-            dm.render_overlays(window, self)
+
+    def _debug_on_view(self, view, dm):
+        """F1, F4 and F6 drawn on the unscaled view, so they line up with the world after the zoom."""
+        self.WIDTH, self.HEIGHT = view.get_size()                  # the overlays size the game area from these
+        try:
+            if dm.show_grid:
+                dm._safe_overlay("grid", dm.grid_overlay.render, view, self)
+            if dm.show_hitboxes:
+                dm._safe_overlay("hitboxes", dm.hitbox_overlay.render, view, self)
             if dm.show_sensors:                                     # F1: what a PEAK agent senses here
-                self._draw_agent_rays(surface)
+                dm._safe_overlay("jump_arc", dm.jump_arc_overlay.render, view, self)
+                self._draw_agent_rays(view)
+        finally:
+            del self.WIDTH, self.HEIGHT                             # back to the class's window size
 
     # ---- debug panel hooks (DebugManager / overlays.py read these, as they read Mario's core) ----
     @property

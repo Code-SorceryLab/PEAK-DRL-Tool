@@ -14,7 +14,9 @@ PEAK keeps 32 px tiles. In the real game a metal block (one tile) is 48 px wide 
 0.7 tile = **22.4 px** in PEAK, and every value in u below is multiplied by 22.4 to get px.
 
 The PEAK view is **1280 x 720** (40 x 22.5 tiles), the size of the game's own window, so 1-3 fits on one
-screen as it does in the game. Larger levels scroll.
+screen as it does in the game. The game zooms each level (about 40 x 22 tiles in 1-3, 30 x 17 in 1-4,
+estimate [SHOT]); PEAK does the same: a level that fits the window is zoomed to fill it, a bigger one scrolls
+at 30 x 17 tiles.
 
 ## Physics
 
@@ -83,10 +85,11 @@ beyond the 11 levels PEAK plays and are not built.
 
 PEAK plays World 1 levels 1-1 to 1-11, in the game's order (level ids 0 to 10). The study's evaluation level
 is id 2, **1-3 The Gap**. Every layout is our own ASCII drawing; no level data from the game is copied.
-Redrawn on 27 Oct at the game's scale: 1-1, 1-2 and 1-3 from screenshots of AL's installed copy; 1-8,
-1-10 and 1-11 from the playthrough video [VID] and the wiki. 1-4 to 1-7 and 1-9 are still Kevin's 13 Oct
-drawings (the right names, not traced). The old 1-11 "Salt Factory" is not a World 1 level; it is now
-1-11 Fired.
+Redrawn on 27 Oct at the game's scale: 1-1, 1-2, 1-3, 1-4, 1-6, 1-7 and 1-9 from the start screens of
+AL's installed copy (1-4, 1-7 and 1-9 scroll, so their parts off the start screen follow the wiki); 1-8,
+1-10 and 1-11 from the playthrough video [VID] and the wiki. 1-5 keeps Kevin's 13 Oct climb with the
+start shed from AL's copy (only its bottom room is on the start screen). The old 1-11 "Salt Factory" is
+not a World 1 level; it is now 1-11 Fired.
 
 | Level | A+ par (s) | Record (s) | What it teaches (stated [WIKI]) |
 |---|---|---|---|
