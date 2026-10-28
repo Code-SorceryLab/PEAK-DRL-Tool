@@ -87,28 +87,34 @@ def show_game(game: str) -> None:
 
 def _decode_clip(game: str) -> None:
     """CLIP_S seconds of a trained agent's replay (runs/videos/<game>, menu 22), from a level other than the
-    study's own where there is one, so the clip shows the game without the route. None without the video or ffmpeg."""
+    study's own where there is one, so the clip shows the game without the route. None without the video or PyAV.
+    PyAV, not the ffmpeg command: Windows Smart App Control blocks a downloaded ffmpeg.exe."""
     from code.games.eval_mutants import EVAL_LEVELS
     video = menu.RUNS_DIR / "videos" / game / "experienced.webm"
     try:
+        import av
         meta = json.loads(video.with_suffix(".json").read_text())
         tries = meta["attempts"]          # [start frame, level, outcome] per attempt
         i = next((k for k, a in enumerate(tries) if a[1] != EVAL_LEVELS.get(game, ("",))[0]), 0)
         start = tries[i][0] / meta["fps"]
         length = min(CLIP_S, (tries[i + 1][0] / meta["fps"] - start) if i + 1 < len(tries) else CLIP_S)
-        w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                                        "stream=width,height", "-of", "csv=p=0", str(video)],
-                                       stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True).stdout.split(","))
-        scale = min(CLIP_BOX[0] / w, CLIP_BOX[1] / h)
-        size = (int(w * scale) // 2 * 2, int(h * scale) // 2 * 2)
-        raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{length:.2f}", "-i", str(video),
-                              "-vf", f"fps={CLIP_FPS},scale={size[0]}:{size[1]}:flags=neighbor",
-                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdin=subprocess.DEVNULL,   # keep off the terminal
-                             capture_output=True, check=True).stdout
-    except (OSError, ValueError, KeyError, IndexError, subprocess.CalledProcessError):
+        frames, due = [], start
+        with av.open(str(video)) as box:
+            s = box.streams.video[0]
+            scale = min(CLIP_BOX[0] / s.width, CLIP_BOX[1] / s.height)
+            size = (int(s.width * scale) // 2 * 2, int(s.height * scale) // 2 * 2)
+            box.seek(int(start / s.time_base), stream=s)           # the keyframe before start
+            for f in box.decode(s):
+                if f.time is None or f.time < due:
+                    continue
+                if f.time >= start + length:
+                    break
+                frames.append(f.to_ndarray(width=size[0], height=size[1], format="rgb24",
+                                           interpolation="POINT").tobytes())
+                due += 1 / CLIP_FPS
+    except Exception:                     # no PyAV, no video or a bad one: the screen just has no clip
         return
-    n = size[0] * size[1] * 3
-    _clips[game] = (size, [raw[k:k + n] for k in range(0, len(raw) - n + 1, n)])
+    _clips[game] = (size, frames)
 
 
 def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4, game: str | None = None) -> None:

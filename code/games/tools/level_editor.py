@@ -1078,7 +1078,9 @@ class Level:
             d['physics']=self.physics_overrides
         if self.enemy_physics:
             d.setdefault('physics',{})['enemies']=self.enemy_physics
+        if d==self.sidecar and Path(yp).exists(): return   # unchanged: keep the file and its comments
         with open(yp,'w',newline='') as f: yaml.dump(d,f,default_flow_style=False,sort_keys=False)
+        self.sidecar=d
     def _load_yaml(self, tp):
         if yaml is None: return
         yp=str(tp).rsplit('.',1)[0]+'.yaml'

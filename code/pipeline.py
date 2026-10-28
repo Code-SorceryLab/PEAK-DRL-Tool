@@ -124,7 +124,7 @@ def pick_section(section: str, stage: str, attempts: int = 12, shortlist: int = 
     except FileNotFoundError:                  # only then: a broken file holds the other sections' picks
         data = {"stage": stage, "legs": {}}
     data.setdefault("legs", {})[section] = best
-    with open(MANIFEST, "w", encoding="utf-8") as f:
+    with episode_log.atomic_open(MANIFEST, encoding="utf-8") as f:   # a kill mid-write must not leave half a file
         json.dump(data, f, indent=2)
     print(f"picked {best['run']} -> {MANIFEST}", flush=True)
 

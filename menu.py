@@ -980,7 +980,7 @@ def watch_all_models():
     run_dir = _pick_run()
     if not run_dir:
         return
-    if any(d in run_dir.parents for d in (RUNS_DIR / "probes", RUNS_DIR / "ast")):
+    if any(d in run_dir.parents for d in (RUNS_DIR / "probes", RUNS_DIR / "ast", RUNS_DIR / "ablation")):
         print(_RED("\n    That is a finished probe: training it on would overwrite a published agent. "
                    "Watch it with Watch Trained Agent (6)."))
         return
