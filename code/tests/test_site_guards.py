@@ -31,8 +31,16 @@ def repo(tmp_path, monkeypatch):
 
 
 def test_the_reproduce_tab_checks_out_the_commit_it_was_built_from():
+    sha = command_center._git(".", "rev-parse", "HEAD", check=False)
+    if not sha:
+        pytest.skip("not a git checkout (a cluster copy unpacked from a tar)")
     html = command_center.reproduce_page("mario", [])
-    assert f"cd PEAK-DRL-Tool\ngit checkout {git('.', 'rev-parse', 'HEAD')}\n" in html     # a clone alone is main
+    assert f"cd PEAK-DRL-Tool\ngit checkout {sha}\n" in html     # a clone alone is main
+
+
+def test_a_copy_outside_git_still_builds_the_reproduce_tab(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)                                  # no .git: there is no commit to name
+    assert "git checkout" not in command_center.reproduce_page("mario", [])
 
 
 def test_publish_names_its_source_commit_and_refuses_one_no_remote_has(repo, tmp_path):
@@ -66,7 +74,10 @@ def test_a_build_that_failed_part_way_does_not_block_the_next(tmp_path, monkeypa
 def test_only_pages_on_this_machine_reach_the_local_servers():
     page = {"Host": "127.0.0.1:8003", "Sec-Fetch-Site": "same-origin"}
     assert telemetry.local_request(page, 8003, changes_state=True)
-    assert telemetry.local_request({"Host": "localhost:8003"}, 8003, changes_state=True)      # typed in the address bar
+    assert telemetry.local_request({"Host": "localhost:8003", "Sec-Fetch-Site": "none"}, 8003, changes_state=True)  # typed
+    other_port = {"Host": "127.0.0.1:8003", "Sec-Fetch-Site": "same-site"}   # a page on another local port
+    assert not telemetry.local_request(other_port, 8003, changes_state=True)
+    assert not telemetry.local_request({"Host": "127.0.0.1:8003"}, 8003, changes_state=True)   # no header: fail closed
     assert not telemetry.local_request({"Host": "evil.example:8003"}, 8003, changes_state=False)   # DNS rebinding
     cross = {"Host": "127.0.0.1:8003", "Sec-Fetch-Site": "cross-site"}
     assert not telemetry.local_request(cross, 8003, changes_state=True)   # another site's link to /watch

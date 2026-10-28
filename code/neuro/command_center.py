@@ -353,6 +353,8 @@ def reproduce_page(game: str, agents: list[dict]) -> str:
             ("python -m code.neuro.command_center --open", "this Command Center, on your machine")]
     width = max(len(c) for c, _ in cmds) + 2
     rebuild = "\n".join(esc(f"{c.ljust(width)}# {why}") for c, why in cmds)
+    sha = _git(".", "rev-parse", "HEAD", check=False)       # a copy outside git (a cluster tar) has none to name
+    checkout = f"\ngit checkout {sha}" if sha else ""
     steps = f"""
 <h2><i class="ico sprout"></i>Reproduce: {esc(NAMES[game])}</h2>
 <p class="lede">Every agent below was trained with one of the seeds {", ".join(map(str, PAPER_SEEDS))}, the seeds
@@ -360,8 +362,7 @@ behind the published numbers. Each one is a folder with its network (best.npz) a
 (state.json). Levels are named as the game's files and the commands name them (0 is the first level of an indexed game).</p>
 <h3>1. Set up</h3>
 <pre><code>git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
-cd PEAK-DRL-Tool
-git checkout {_git(".", "rev-parse", "HEAD")}
+cd PEAK-DRL-Tool{checkout}
 pip install -r requirements.txt</code></pre>
 <h3>2. Get the agents</h3>
 <p>All {len(rows)} agents of this game: <a href="agents/{game}.zip" download>agents/{game}.zip</a>.

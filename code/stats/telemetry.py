@@ -353,10 +353,11 @@ def watch_command(q: dict, dash_port: int = 8000) -> tuple[list[str], str] | Non
 
 def local_request(headers, port: int, changes_state: bool) -> bool:
     """Whether a request to the server on 127.0.0.1:port comes from a page on this machine: it names
-    this server as its Host (a rebound DNS name does not), and one that starts something was not sent
-    by another site."""
+    this server as its Host (a rebound DNS name does not), and one that starts something came from this
+    server's own page or the address bar. Fail closed: a page on another local port is "same-site", and
+    a request with no Sec-Fetch-Site header cannot show where it came from."""
     return (headers.get("Host") in (f"127.0.0.1:{port}", f"localhost:{port}")
-            and not (changes_state and headers.get("Sec-Fetch-Site") == "cross-site"))
+            and (not changes_state or headers.get("Sec-Fetch-Site") in ("same-origin", "none")))
 
 
 def port_busy(port: int) -> bool:
