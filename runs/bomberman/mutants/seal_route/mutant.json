@@ -1,38 +1,39 @@
 {
   "id": "seal_route",
   "game": "bomberman",
-  "stage": "8",
+  "stage": "12",
   "section": null,
   "operator": "seal_route",
   "class": "breaking",
   "direction": "harder",
-  "description": "Walls at row 9, column 12 and row 8, column 13 close the exit into its corner",
+  "description": "Hard walls at row 5, columns 9 and 11 (a brick and a floor tile) close the exit into its pocket",
   "retrain": true,
-  "base_file": "bomberman/09_two_balloms.txt",
+  "base_file": "bomberman/bm2_1_1.txt",
   "family": "level",
   "level_file": "level.txt",
   "config": null,
   "cells": [
     [
-      12,
       9,
-      ".",
+      5,
+      "?",
       "#"
     ],
     [
-      13,
-      8,
+      11,
+      5,
       ".",
       "#"
     ]
   ],
   "location": {
-    "col": 13,
-    "row": 8
+    "col": 11,
+    "row": 5
   },
   "parameter": {
     "tiles": 2
   },
+  "note": "The exit is under the brick at row 5, column 10; pillars stand above and below it.",
   "checks": {
     "exit_reachable": false,
     "same_level": false

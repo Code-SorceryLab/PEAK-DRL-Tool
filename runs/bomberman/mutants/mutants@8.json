@@ -1,0 +1,185 @@
+{
+  "game": "bomberman",
+  "stage": "8",
+  "base_file": "bomberman/09_two_balloms.txt",
+  "mutants": [
+    {
+      "id": "seal_route@8",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "Hard walls on the 2 tiles next to the exit close it in",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          12,
+          9,
+          ".",
+          "#"
+        ],
+        [
+          13,
+          8,
+          ".",
+          "#"
+        ]
+      ],
+      "location": {
+        "col": 13,
+        "row": 8
+      },
+      "parameter": {
+        "tiles": 2
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": false,
+        "same_level": false
+      }
+    },
+    {
+      "id": "add_enemy@8",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "add_enemy",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "A Ballom at row 6, column 7",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          7,
+          6,
+          ".",
+          "E"
+        ]
+      ],
+      "location": {
+        "col": 7,
+        "row": 6
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false
+      }
+    },
+    {
+      "id": "fuse_down@8",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "fuse_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Bomb fuse 150 -> 94 frames on this level",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "levels.8.fuse": 94
+      },
+      "parameter": {
+        "key": "levels.8.fuse",
+        "from": 150,
+        "to": 94
+      },
+      "checks": {
+        "exit_reachable": true,
+        "values": {
+          "levels.8.fuse": 94
+        }
+      }
+    },
+    {
+      "id": "off_route@8",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The tile at row 2, column 0 hollowed out, closed on all four sides",
+      "retrain": true,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          0,
+          2,
+          "#",
+          "."
+        ]
+      ],
+      "location": {
+        "col": 0,
+        "row": 2
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": false,
+        "walled_in": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@8",
+      "game": "bomberman",
+      "stage": "8",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "The cell at row 2, column 3 written as ' ' instead of '.': the same tile",
+      "retrain": false,
+      "base_file": "bomberman/09_two_balloms.txt",
+      "family": "level",
+      "level_file": "level.txt",
+      "config": null,
+      "cells": [
+        [
+          3,
+          2,
+          ".",
+          " "
+        ]
+      ],
+      "location": {
+        "col": 3,
+        "row": 2
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "note": "placed by rule (eval_mutants.place)",
+      "checks": {
+        "exit_reachable": true,
+        "same_level": true
+      }
+    }
+  ],
+  "skipped": []
+}

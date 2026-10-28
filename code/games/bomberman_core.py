@@ -25,11 +25,13 @@ CONFIG_PATH = os.path.join(_HERE, "bomberman_config.yaml")
 
 WALL, FLOOR, BRICK = "#", ".", "?"
 EXIT, EXIT_HIDDEN = "G", "@"
-POWERUPS = {"C": "bombs", "F": "range", "S": "speed"}       # under a brick until bombed
-REVEALED = {"C": "c", "F": "f", "S": "s", "@": "G"}          # what a bombed brick leaves behind
-DESTRUCTIBLE = (BRICK, "C", "F", "S", EXIT_HIDDEN)          # every tile a blast opens
-ITEM_OF = {"c": "bombs", "f": "range", "s": "speed"}
-ENEMY_GLYPHS = "EkKMB"
+# Bomberman II's items, each under a brick until bombed (upper case), then lying on the floor (lower)
+POWERUPS = {"C": "bombs", "F": "range", "S": "speed", "R": "remote", "W": "wallpass", "X": "bombpass",
+            "V": "vest", "D": "dollar", "Q": "mystery"}
+REVEALED = {**{k: k.lower() for k in POWERUPS}, "@": "G"}    # what a bombed brick leaves behind
+DESTRUCTIBLE = (BRICK, *POWERUPS, EXIT_HIDDEN)               # every tile a blast opens
+ITEM_OF = {k.lower(): v for k, v in POWERUPS.items()}
+ENEMY_GLYPHS = "EkKMBbtnpo"
 DIRS = {0: (0, 0), 1: (0, -1), 2: (1, 0), 3: (0, 1), 4: (-1, 0)}  # idle, up, right, down, left
 
 
@@ -67,6 +69,10 @@ class Player:
     facing: int = 2              # DIRS key, never 0
     on_ground: bool = True       # platformer adapters read this; always grounded top-down
     items: int = 0
+    remote: bool = False         # bombs wait for the detonate button (B)
+    wallpass: bool = False       # walks through bricks
+    bombpass: bool = False       # walks through bombs
+    vest: int = 0                # frames of immunity to blasts left
 
 
 @dataclass
@@ -76,6 +82,7 @@ class Bomb:
     fuse: int
     blast_range: int
     passable: bool = True        # the player walks off the bomb they just dropped
+    remote: bool = False         # waits for the detonate button instead of its fuse
 
 
 @dataclass
@@ -90,16 +97,25 @@ class Enemy:
     alive: bool = True
     width: int = 24
     height: int = 24
+    turn: float = 0.15           # chance of a new direction at a crossing (0: only when blocked)
+    reverse: float = 0.0         # chance of turning back at a crossing (an erratic walker)
+    chase_range: float = 99.0    # tiles: chases only when the player is this close
+    teleport: int = 0            # frames between jumps to a random open tile (0: never)
+    guard: int = 0               # frames it cannot be hurt (just spawned out of a door or an item)
+    clock: int = 0
 
 
 @dataclass
 class Blast:
     cells: set
     frames: int
+    pieces: dict = field(default_factory=dict)   # (x, y) -> flame piece to draw: c, h, v, or an end u/d/l/r
+    opened: set = field(default_factory=set)     # bricks it set burning (drawn until the flames die)
+    kills: int = 0                               # enemies it has killed: each further one is worth double
 
 
 class BombermanCore:
-    WIDTH, HEIGHT = 15 * 32, 13 * 32  # manual_play window (every authored level is 15 × 13)
+    WIDTH, HEIGHT = 15 * 32, 13 * 32 + 32   # manual_play window: a 15 x 13 arena under the 32 px score band
 
     def __init__(self, render_mode: str = "none", max_steps=None, level_idx: int = 0, seed: int = 0) -> None:
         with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -157,9 +173,24 @@ class BombermanCore:
             raise ValueError(f"{self.level_file()}: needs one P and one G/@")
         return LevelData(grid, len(grid), cols, self.tile_size, start, exit_, hidden, spawns)
 
+    def _make_enemy(self, k: str, x: int, y: int, guard: int = 0) -> Enemy:
+        c, ts = self.cfg["enemies"][k], self.tile_size
+        return Enemy(k, x * ts + 4, y * ts + 4, float(c["speed"]) * self._enemy_speed, bool(c["passes_bricks"]),
+                     float(c["chase"]), direction=self.rng.choice([1, 2, 3, 4]), turn=float(c.get("turn", 0.15)),
+                     reverse=float(c.get("reverse", 0.0)), chase_range=float(c.get("chase_range", 99)),
+                     teleport=int(c.get("teleport", 0)), guard=guard)
+
+    def next_level(self) -> int:
+        """Where beating this level leads: the next area of the campaign it belongs to (Bomberman II's
+        world 1), or the next level of the training ladder; both wrap."""
+        camp = [int(i) for i in self.cfg.get("campaign") or []]
+        if self._level_idx in camp:
+            return camp[(camp.index(self._level_idx) + 1) % len(camp)]
+        return (self._level_idx + 1) % len(self.cfg["levels"])
+
     def reset(self, *, seed=None, options=None):
         if self.won:  # beating a level advances to the next (wrapping); dying/timeout replays
-            self._level_idx = (self._level_idx + 1) % len(self.cfg["levels"])
+            self._level_idx = self.next_level()
         if seed is not None:
             self._seed = seed
         self.rng = random.Random(self._seed)
@@ -172,20 +203,20 @@ class BombermanCore:
         self.player = Player(sx * ts + (ts - size) / 2, sy * ts + (ts - size) / 2, size, size,
                              speed=float(pc.get("walk_speed", 112)), bombs_max=int(pc.get("bombs", 1)),
                              blast_range=int(opts.get("range", pc.get("range", 1))))
-        ec = self.cfg["enemies"]
-        espeed = float(opts.get("enemy_speed", 1.0))
-        self.enemies = [Enemy(k, x * ts + 4, y * ts + 4, float(ec[k]["speed"]) * espeed,
-                              bool(ec[k]["passes_bricks"]),
-                              float(ec[k]["chase"]), direction=self.rng.choice([1, 2, 3, 4]))
-                        for k, x, y in self.level_data.spawns]
+        self._enemy_speed = float(opts.get("enemy_speed", 1.0))
+        self.enemies = [self._make_enemy(k, x, y) for k, x, y in self.level_data.spawns]
         # Some levels gate the exit on a cleared arena (killing is the lesson); others only ask
         # the player to reach it (the lesson is the maze and staying alive).
         self.requires_clear = bool(opts.get("requires_clear", True))
         # A bigger blast needs a longer walk to clear it: levels that raise `range` can buy the
         # retreat time back with `fuse`, or every bomb the agent drops is a suicide.
         self.fuse_frames = int(opts.get("fuse", self.cfg["bomb"]["fuse_frames"]))
+        for k, v in ((options or {}).get("carry") or {}).items():   # what the player brings in (manual play)
+            setattr(self.player, k, v)
         self.bombs: list[Bomb] = []
         self.blasts: list[Blast] = []
+        self.intro = 0             # manual play: frames of the AREA card still to show (start_intro)
+        self._detonator = False    # the caller has a detonate button (a 4th action value)
         self.score = 0
         self.coins_total = 0       # power-ups collected (the adapter's "coins")
         self.kills_total = 0
@@ -198,6 +229,11 @@ class BombermanCore:
         self.alive = True
         self.death_cause = ""
         self._steps = 0
+        self.dying: list[list] = []   # [x, y, kind, frames since, points] of enemies just killed (drawing only)
+        self.extra_lives = 0          # lives won from items this attempt (manual play adds them)
+        self._prev_detonate = False
+        self.walked = 0.0             # px walked (picks the walk frame)
+        self.death_t = 0              # frames of the death animation shown (manual play's death_tick)
         self._dist = self._distance_field()
         return self._obs(), self._info()
 
@@ -228,15 +264,16 @@ class BombermanCore:
 
     def _blocked(self, x: float, y: float, w: int, h: int, enemy: Enemy | None = None) -> bool:
         """Any solid tile (or bomb) under the hitbox at (x, y)?"""
-        ts = self.tile_size
+        ts, p = self.tile_size, self.player
         x0, y0 = int(x // ts), int(y // ts)
         x1, y1 = int((x + w - 1) // ts), int((y + h - 1) // ts)
         for ty in range(y0, y1 + 1):
             for tx in range(x0, x1 + 1):
-                if self.solid(tx, ty, for_enemy=enemy):
+                if self.solid(tx, ty, for_enemy=enemy) and not (
+                        enemy is None and p.wallpass and self.tile(tx, ty) in DESTRUCTIBLE):
                     return True
                 b = self.bomb_at(tx, ty)
-                if b is not None and not (enemy is None and b.passable):
+                if b is not None and not (enemy is None and (b.passable or p.bombpass)):
                     return True
         return False
 
@@ -288,7 +325,7 @@ class BombermanCore:
         tx, ty = self._center_tile(p.x, p.y, p.width, p.height)
         if self.bomb_at(tx, ty) is not None or len(self.bombs) >= p.bombs_max:
             return False
-        self.bombs.append(Bomb(tx, ty, self.fuse_frames, p.blast_range))
+        self.bombs.append(Bomb(tx, ty, self.fuse_frames, p.blast_range, remote=p.remote and self._detonator))
         return True
 
     # ── bombs & blasts ───────────────────────────────────────────────────────
@@ -306,10 +343,31 @@ class BombermanCore:
                     break
         return cells
 
+    def _flame_pieces(self, bomb: Bomb, pieces: dict, opened: set) -> None:
+        """How the console draws one bomb's flames: a centre, arms, a cap where an arm ends, and a
+        burning brick (no flame) where one stops it."""
+        def put(cell, piece):
+            have = pieces.get(cell)
+            pieces[cell] = piece if have is None or have == piece else "c"
+        put((bomb.tx, bomb.ty), "c")
+        for (dx, dy), mid, cap in (((0, -1), "v", "u"), ((1, 0), "h", "r"), ((0, 1), "v", "d"), ((-1, 0), "h", "l")):
+            arm = []
+            for r in range(1, bomb.blast_range + 1):
+                x, y = bomb.tx + dx * r, bomb.ty + dy * r
+                t = self.tile(x, y)
+                if t == WALL:
+                    break
+                if t in DESTRUCTIBLE:
+                    opened.add((x, y))
+                    break
+                arm.append((x, y))
+            for i, cell in enumerate(arm):
+                put(cell, cap if i == len(arm) - 1 else mid)
+
     def _explode(self, first: Bomb) -> bool:
         """Detonate a bomb (chaining neighbours). True if the blast opened a brick or
         landed next to an enemy — an empty blast is just litter and earns nothing."""
-        queue, done, cells = [first], set(), set()
+        queue, done, cells, pieces, burnt = [first], set(), set(), {}, set()
         while queue:
             b = queue.pop()
             if id(b) in done:
@@ -319,11 +377,19 @@ class BombermanCore:
                 self.bombs.remove(b)
             bc = self.blast_cells(b)
             cells |= bc
+            self._flame_pieces(b, pieces, burnt)
             for other in list(self.bombs):  # chain reaction
                 if (other.tx, other.ty) in bc:
                     queue.append(other)
         ld = self.level_data
         opened = 0
+        for x, y in cells:                    # a blast over a lying item or the open door calls up enemies
+            t = self.tile(x, y)
+            if t in ITEM_OF:
+                ld.grid[y][x] = FLOOR         # the item is lost, and a Pass comes out of it
+                self._spawn("K", x, y, 1)
+            elif t == EXIT and (x, y) == ld.exit:
+                self._spawn("o", x, y, 4)     # four Pontans out of the door
         for x, y in cells:
             t = self.tile(x, y)
             if t in DESTRUCTIBLE:
@@ -336,11 +402,18 @@ class BombermanCore:
         if alive:  # how near the blast came: a smooth gradient from "bombed nowhere" to "killed it"
             gap = min(abs(ex - cx) + abs(ey - cy) for cx, cy in cells for ex, ey in alive)
             self.best_aim = max(self.best_aim, 1.0 - min(gap, self.AIM_REACH) / self.AIM_REACH)
-        self.blasts.append(Blast(cells, int(self.cfg["bomb"]["blast_frames"])))
+        self.blasts.append(Blast(cells, int(self.cfg["bomb"]["blast_frames"]), pieces, burnt))
         self._dist = self._distance_field()
         return opened > 0 or (gap is not None and gap <= 1)
 
     AIM_REACH = 4    # tiles: how far from an enemy a blast still counts as "aimed at it"
+
+    def _spawn(self, kind: str, x: int, y: int, n: int) -> None:
+        """Enemies called up by bombing the door or an item, unhurt by the flames that called them."""
+        if kind not in self.cfg["enemies"]:
+            return
+        guard = int(self.cfg["bomb"]["blast_frames"]) + 30
+        self.enemies += [self._make_enemy(kind, x, y, guard) for _ in range(n)]
 
     def danger_cells(self, lookahead: int | None = None) -> set:
         """Cells that are burning now or will be within `lookahead` frames (for sensing)."""
@@ -368,6 +441,18 @@ class BombermanCore:
     def _enemy_step(self, e: Enemy) -> None:
         ts = self.tile_size
         step = e.speed * self.dt
+        e.clock += 1
+        if e.guard > 0:
+            e.guard -= 1
+        if e.teleport and e.clock % e.teleport == 0:      # Nagacham: vanishes and turns up elsewhere
+            p = self.player
+            ptx, pty = self._center_tile(p.x, p.y, p.width, p.height)
+            spots = [(x, y) for y in range(self.level_data.rows) for x in range(self.level_data.cols)
+                     if self.tile(x, y) == FLOOR and abs(x - ptx) + abs(y - pty) >= 4 and self.bomb_at(x, y) is None]
+            if spots:
+                x, y = self.rng.choice(spots)
+                e.x, e.y = x * ts + (ts - e.width) / 2, y * ts + (ts - e.height) / 2
+                return
         tx, ty = self._center_tile(e.x, e.y, e.width, e.height)
         cx, cy = tx * ts + (ts - e.width) / 2, ty * ts + (ts - e.height) / 2
         at_center = abs(e.x - cx) < step and abs(e.y - cy) < step
@@ -375,15 +460,19 @@ class BombermanCore:
             e.x, e.y = cx, cy
             free = [d for d, (dx, dy) in DIRS.items() if d and not self.solid(tx + dx, ty + dy, for_enemy=e)
                     and self.bomb_at(tx + dx, ty + dy) is None]
+            p = self.player
+            px, py = self._center_tile(p.x, p.y, p.width, p.height)
+            near = abs(px - tx) + abs(py - ty) <= e.chase_range
+            back = {1: 3, 2: 4, 3: 1, 4: 2}.get(e.direction)
             if free:
-                if self.rng.random() < e.chase:
-                    p = self.player
-                    px, py = self._center_tile(p.x, p.y, p.width, p.height)
+                if e.reverse and back in free and self.rng.random() < e.reverse:
+                    e.direction = back                    # Boyon's back-and-forth
+                elif near and self.rng.random() < e.chase:
                     prefer = ([2 if px > tx else 4] if abs(px - tx) >= abs(py - ty) else [3 if py > ty else 1])
                     prefer += [3 if py > ty else 1] if abs(px - tx) >= abs(py - ty) else [2 if px > tx else 4]
                     pick = next((d for d in prefer if d in free), None)
                     e.direction = pick if pick is not None else self.rng.choice(free)
-                elif e.direction not in free or self.rng.random() < 0.15:
+                elif e.direction not in free or self.rng.random() < e.turn:
                     e.direction = self.rng.choice(free)
             else:
                 e.direction = 0
@@ -400,13 +489,23 @@ class BombermanCore:
         """action = (dx, dy, bomb) with dx, dy in {-1, 0, 1}; returns (obs, reward, terminated, truncated, info)."""
         if not self.alive or self.won:
             return self._obs(), 0.0, True, False, self._info()
+        if self.intro > 0:                       # the AREA card: nothing moves yet
+            self.intro -= 1
+            return self._obs(), 0.0, False, False, self._info()
         dx, dy, bomb = int(action[0]), int(action[1]), bool(action[2])
+        self._detonator = len(action) > 3
+        detonate = self._detonator and bool(action[3]) and not self._prev_detonate
+        self._prev_detonate = self._detonator and bool(action[3])
         self._steps += 1
         self.timer = max(0.0, self.timer - self.dt)
         if bomb:
             self._drop_bomb()
         self._move(dx, dy)
         p = self.player
+        self.walked += abs(p.vx or p.vy) * self.dt
+        for d in self.dying:
+            d[3] += 1
+        self.dying = [d for d in self.dying if d[3] < 90]
         ptx, pty = self._center_tile(p.x, p.y, p.width, p.height)
         ts = self.tile_size
         for b in self.bombs:  # a bomb becomes solid once the player's hitbox has fully left its tile
@@ -414,7 +513,16 @@ class BombermanCore:
                                    and p.y < (b.ty + 1) * ts and p.y + p.height > b.ty * ts):
                 b.passable = False
         exploded = useful = 0
+        if detonate:                             # the remote: B sets off the oldest waiting bomb
+            waiting = [b for b in self.bombs if b.remote]
+            if waiting:
+                exploded += 1
+                useful += int(self._explode(waiting[0]))
+        if p.vest > 0:
+            p.vest -= 1
         for b in list(self.bombs):
+            if b.remote:
+                continue
             b.fuse -= 1
             if b.fuse <= 0 and b in self.bombs:
                 exploded += 1
@@ -432,10 +540,14 @@ class BombermanCore:
                 continue
             self._enemy_step(e)
             etx, ety = self._center_tile(e.x, e.y, e.width, e.height)
-            if (etx, ety) in burning:
+            if (etx, ety) in burning and e.guard <= 0:
                 e.alive = False
                 self.kills_total += 1
-                self.score += int(self.cfg["scoring"]["enemy"].get(e.kind, 100))
+                bl = next(b for b in self.blasts if (etx, ety) in b.cells)
+                points = int(self.cfg["scoring"]["enemy"].get(e.kind, 100)) * 2 ** bl.kills   # each further kill
+                bl.kills += 1                                                                    # of one blast: x2
+                self.score += points
+                self.dying.append([e.x, e.y, e.kind, 0, points])   # drawn: shocked, then the points
                 continue
             if (abs((e.x + e.width / 2) - (p.x + p.width / 2)) < (e.width + p.width) / 2 - 6
                     and abs((e.y + e.height / 2) - (p.y + p.height / 2)) < (e.height + p.height) / 2 - 6):
@@ -445,7 +557,7 @@ class BombermanCore:
         if t in ITEM_OF:
             self._pickup(ITEM_OF[t])
             self.level_data.grid[pty][ptx] = FLOOR
-        if (ptx, pty) in burning and self.alive:
+        if (ptx, pty) in burning and self.alive and p.vest <= 0:
             self._die("Bomb")
         elif exploded and self.alive:
             self.safe_detonations += exploded
@@ -455,7 +567,7 @@ class BombermanCore:
         if self.alive and (ptx, pty) == self.level_data.exit and self.tile(ptx, pty) == EXIT \
                 and self.arena_clear:
             self.won = True
-            self.score += 1000
+            self.score += int(self.cfg["scoring"].get("clear", 0))
         if self._steps >= self.max_steps and self.alive and not self.won:
             self._die("Timeout")
         done = (not self.alive) or self.won
@@ -469,13 +581,44 @@ class BombermanCore:
         p = self.player
         self.coins_total += 1
         p.items += 1
-        self.score += 50
+        if item == "mystery":                      # "?": a life, a fire suit, or points
+            item = self.rng.choice(["life", "vest", "dollar"])
         if item == "bombs":
             p.bombs_max += 1
         elif item == "range":
             p.blast_range += 1
         elif item == "speed":
             p.speed = float(self.cfg["player"].get("sprint_speed", 168))
+        elif item in ("remote", "wallpass", "bombpass"):
+            setattr(p, item, True)
+        elif item == "vest":
+            p.vest = int(self.cfg["player"].get("vest_frames", 30 * self.fps))
+        elif item == "dollar":
+            self.score += self.rng.choice([100, 200, 400, 800, 1600, 3200, 6400])
+        elif item == "life":
+            self.extra_lives += 1                  # manual play reads it and adds a life
+
+    # ── the console's area card and death, for manual play (agents never call these) ──
+    def start_intro(self, frames: int = 190) -> None:
+        """The black "AREA x-x / LEFT n" card before play starts (3.15 s on the console)."""
+        self.intro = frames
+
+    def area_name(self) -> str:
+        return str(self.level_entry().get("name", self._level_idx + 1))
+
+    def death_tick(self) -> bool:
+        """One frame of the death animation; False once it is over."""
+        self.death_t += 1
+        return self.death_t < 75
+
+    def carry(self, died: bool) -> dict:
+        """What the player keeps into the next life or area: bombs and fire always, the rest only
+        while alive (Bomberman II's manual)."""
+        p = self.player
+        keep = {"bombs_max": p.bombs_max, "blast_range": p.blast_range}
+        if not died:
+            keep.update(speed=p.speed, remote=p.remote, wallpass=p.wallpass, bombpass=p.bombpass)
+        return keep
 
     # ── progress: Dijkstra to the exit, bricks cost extra ─────────────────────
     BRICK_COST = 6
@@ -543,102 +686,115 @@ class BombermanCore:
         return {"score": self.score, "won": self.won, "alive": self.alive, "steps": self._steps,
                 "bricks": self.bricks_destroyed, "kills": self.kills_total}
 
-    # ── rendering ────────────────────────────────────────────────────────────
-    PAL = {"floor": (64, 140, 64), "floor2": (58, 130, 58), "wall": (120, 124, 128), "wall_hi": (160, 164, 168),
-           "wall_lo": (72, 76, 80), "brick": (190, 110, 50), "brick_lo": (120, 64, 28), "brick_hi": (224, 150, 90),
-           "exit": (30, 30, 40), "exit_hi": (250, 230, 120), "bomb": (24, 24, 28), "fuse": (255, 200, 60),
-           "fire": (255, 120, 30), "fire_core": (255, 240, 160), "player": (245, 245, 250), "player_acc": (60, 120, 255),
-           "E": (245, 245, 255), "k": (80, 180, 255), "K": (255, 90, 90), "M": (255, 150, 220), "B": (170, 120, 255),
-           "eye": (20, 20, 30)}
+    # ── rendering: Bomberman II's look (bomberman_art) ──────────────────────
+    HUD_H = 32           # the black score band above the arena (human mode only)
+    hud_lives = None     # lives left to show as LEFT (manual play sets it; None hides it)
+
+    def _frame_cells(self) -> set:
+        """Wall tiles that belong to the metal frame: on the border, or in a row or column that is
+        wall end to end (the old ladder levels have a double border). Any other wall is a pillar."""
+        ld = self.level_data
+        full_rows = {y for y in range(ld.rows) if all(t == WALL for t in ld.grid[y])}
+        full_cols = {x for x in range(ld.cols) if all(ld.grid[y][x] == WALL for y in range(ld.rows))}
+        return {(x, y) for y in range(ld.rows) for x in range(ld.cols) if ld.grid[y][x] == WALL and
+                (x in (0, ld.cols - 1) or y in (0, ld.rows - 1) or y in full_rows or x in full_cols)}
 
     def render(self, surface=None, blit_only: bool = False):
+        from . import bomberman_art as A
         ld, ts = self.level_data, self.tile_size
+        oy = self.HUD_H if self.render_mode == "human" else 0
         if surface is None:
-            surface = pygame.Surface((int(ld.width), int(ld.height)))
-        vw, vh = surface.get_size()
-        cols, rows = min(ld.cols, vw // ts + 1), min(ld.rows, vh // ts + 1)
-        burning = set()
+            surface = pygame.Surface((int(ld.width), int(ld.height) + oy))
+        surface.fill((0, 0, 0))
+        if self.intro > 0:                                    # the console's card between areas
+            w, h = surface.get_size()
+            lines = [(f"SC {self.score:08d}", 2, (248, 248, 248)) if self.score else None,
+                     ("AREA", 4, (248, 144, 0)), (self.area_name(), 4, (248, 248, 248)),
+                     (f"LEFT {'--' if self.hud_lives is None else max(0, self.hud_lives)}", 2, (248, 248, 248))]
+            y = h // 2 - 110
+            for line in lines:
+                if line:
+                    img = nes_text(*line)
+                    surface.blit(img, ((w - img.get_width()) // 2, y))
+                    y += img.get_height() + 28
+                else:
+                    y += 42
+            return surface
+        if getattr(self, "_frames_of", None) is not ld:          # the frame, worked out once per level
+            self._frames_of, self._frame = ld, self._frame_cells()
+        frame, tick = self._frame, self._steps
+
+        def at(img, x, y):
+            surface.blit(img, (x, y + oy))
+
+        burning_bricks, pieces, life = set(), {}, {}
         for bl in self.blasts:
-            burning |= bl.cells
-        for y in range(rows):
-            for x in range(cols):
-                r = pygame.Rect(x * ts, y * ts, ts, ts)
-                t = ld.grid[y][x]
-                pygame.draw.rect(surface, self.PAL["floor" if (x + y) % 2 else "floor2"], r)
+            burning_bricks |= bl.opened
+            for cell, pc in bl.pieces.items():
+                pieces[cell] = pc
+                life[cell] = bl.frames
+        for y in range(ld.rows):
+            for x in range(ld.cols):
+                t, px, py = ld.grid[y][x], x * ts, y * ts
+                if (x, y) in frame:
+                    open_ = [0 <= x + dx < ld.cols and 0 <= y + dy < ld.rows and (x + dx, y + dy) not in frame
+                             for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))]
+                    at(A.get(A.frame_tile(open_[1], open_[0], open_[3], open_[2], x % 4 == 2)), px, py)
+                    continue
+                pygame.draw.rect(surface, A.FLOOR, (px, py + oy, ts, ts))
                 if t == WALL:
-                    pygame.draw.rect(surface, self.PAL["wall"], r)
-                    pygame.draw.line(surface, self.PAL["wall_hi"], r.topleft, r.topright, 3)
-                    pygame.draw.line(surface, self.PAL["wall_hi"], r.topleft, r.bottomleft, 3)
-                    pygame.draw.line(surface, self.PAL["wall_lo"], r.bottomleft, r.bottomright, 3)
-                    pygame.draw.line(surface, self.PAL["wall_lo"], r.topright, r.bottomright, 3)
+                    at(A.get(A.PILLAR), px, py)
                 elif t in DESTRUCTIBLE:
-                    pygame.draw.rect(surface, self.PAL["brick"], r)
-                    for k in range(4):  # mortar lines, offset every other course
-                        yy = r.top + k * ts // 4
-                        pygame.draw.line(surface, self.PAL["brick_lo"], (r.left, yy), (r.right, yy), 2)
-                        xx = r.left + (ts // 2 if k % 2 else ts // 4)
-                        pygame.draw.line(surface, self.PAL["brick_lo"], (xx, yy), (xx, yy + ts // 4), 2)
-                    pygame.draw.line(surface, self.PAL["brick_hi"], r.topleft, r.topright, 1)
+                    at(A.get(A.BRICK), px, py)
                 elif t == EXIT:
-                    pygame.draw.rect(surface, self.PAL["exit"], r.inflate(-6, -6), border_radius=4)
-                    if self.arena_clear:
-                        glow = 120 + int(60 * math.sin(self._steps / 8))
-                        pygame.draw.rect(surface, (glow, glow - 30, 40), r.inflate(-14, -14), border_radius=3)
-                elif t in ITEM_OF:
-                    col = {"c": (60, 60, 70), "f": (255, 110, 40), "s": (80, 200, 255)}[t]
-                    pygame.draw.rect(surface, (250, 250, 250), r.inflate(-8, -8), border_radius=4)
-                    pygame.draw.rect(surface, col, r.inflate(-14, -14), border_radius=3)
-        for (x, y) in burning:  # flames
-            r = pygame.Rect(x * ts, y * ts, ts, ts)
-            pygame.draw.rect(surface, self.PAL["fire"], r.inflate(-4, -4), border_radius=8)
-            pygame.draw.rect(surface, self.PAL["fire_core"], r.inflate(-16, -16), border_radius=6)
+                    at(A.get(A.DOOR), px, py)
+                elif t in A.ITEM_ICONS:
+                    at(A.get(A.ITEM_ICONS[t]), px, py)
+                if (x, y) in burning_bricks:
+                    at(A.get(A.BURNING_BRICK[(tick // 4) % 2]), px, py)
+        for (x, y), pc in pieces.items():
+            n = life[(x, y)]
+            level = 2 if 6 <= n <= 22 else 1 if 3 <= n <= 25 else 0      # the flames grow, hold, and fade
+            at(A.get(A._flame(pc, level)), x * ts, y * ts)
         for b in self.bombs:
-            cx, cy = b.tx * ts + ts // 2, b.ty * ts + ts // 2
-            pulse = 1 + (0.12 if (b.fuse // 8) % 2 else 0.0)
-            pygame.draw.circle(surface, self.PAL["bomb"], (cx, cy + 2), int(11 * pulse))
-            pygame.draw.circle(surface, (70, 70, 80), (cx - 4, cy - 3), 3)
-            pygame.draw.line(surface, (90, 90, 100), (cx + 6, cy - 8), (cx + 10, cy - 13), 3)
-            if (b.fuse // 4) % 2:
-                pygame.draw.circle(surface, self.PAL["fuse"], (cx + 10, cy - 14), 3)
+            at(A.get(A.BOMB[(b.fuse // 10) % 2]), b.tx * ts, b.ty * ts)
         for e in self.enemies:
-            if not e.alive:
-                continue
-            col = self.PAL.get(e.kind, (220, 220, 220))
-            cx, cy = int(e.x + e.width / 2), int(e.y + e.height / 2)
-            bob = int(2 * math.sin(self._steps / 6 + cx))
-            pygame.draw.circle(surface, col, (cx, cy + bob), 12)
-            pygame.draw.circle(surface, tuple(max(0, c - 60) for c in col), (cx, cy + bob), 12, 2)
-            ex = cx + (3 if e.direction == 2 else -3 if e.direction == 4 else 0)
-            pygame.draw.circle(surface, self.PAL["eye"], (ex - 4, cy + bob - 2), 2)
-            pygame.draw.circle(surface, self.PAL["eye"], (ex + 4, cy + bob - 2), 2)
+            if e.alive:
+                frames = A.ENEMIES.get(e.kind, A.BALLOON)
+                img = A.get(frames[(tick // 12) % len(frames)], e.direction == 4)
+                at(img, int(e.x + e.width / 2 - img.get_width() / 2), int(e.y + e.height - img.get_height() + 2))
+        for x, y, kind, t, points in self.dying:        # shocked, then the points it was worth
+            if t < 40:
+                img = A.get(A.ENEMY_DEATH.get(kind, A.DEATH_FACE))
+                at(img, int(x + 12 - img.get_width() / 2), int(y + 24 - img.get_height() + 2))
+            else:
+                img = nes_text(str(points), 1, (255, 255, 255))
+                at(img, int(x + 12 - img.get_width() / 2), int(y + 6))
         p = self.player
+        cx, feet = p.x + p.width / 2, p.y + p.height
         if self.alive or self.won:
-            cx, cy = int(p.x + p.width / 2), int(p.y + p.height / 2)
-            pygame.draw.ellipse(surface, (20, 20, 30, 90), pygame.Rect(cx - 10, cy + 6, 20, 8))
-            pygame.draw.rect(surface, self.PAL["player_acc"], pygame.Rect(cx - 8, cy - 2, 16, 12), border_radius=4)
-            pygame.draw.circle(surface, self.PAL["player"], (cx, cy - 6), 9)
-            pygame.draw.rect(surface, (250, 200, 190), pygame.Rect(cx - 5, cy - 6, 10, 6), border_radius=2)
-            fx = {1: (0, -1), 2: (1, 0), 3: (0, 1), 4: (-1, 0)}[p.facing]
-            pygame.draw.circle(surface, self.PAL["eye"], (cx - 3 + fx[0] * 2, cy - 5), 1)
-            pygame.draw.circle(surface, self.PAL["eye"], (cx + 3 + fx[0] * 2, cy - 5), 1)
+            moving = bool(p.vx or p.vy)
+            step = (0, 1, 0, 2)[int(self.walked // 12) % 4] if moving else 0
+            img = A.get(A.PLAYER[(p.facing, step)])
+            at(img, int(cx - img.get_width() / 2), int(feet - img.get_height() + 4))
+        elif self.death_t:
+            img = A.get(A.PLAYER_DEATH[min(len(A.PLAYER_DEATH) - 1, self.death_t // 15)])
+            at(img, int(cx - img.get_width() / 2), int(feet - img.get_height() + 4))
         if self.render_mode != "none":
             self._hud(surface)
         return surface
 
     def _hud(self, surface) -> None:
-        """NES Bomberman's grey band across the top: TIME, score, bombs, fire, enemies LEFT."""
-        alive = sum(1 for e in self.enemies if e.alive)
-        cells = [f"TIME {max(0, int(self.timer)):03d}", f"{self.score:06d}",
-                 f"BOMB {self.player.bombs_max - len(self.bombs)}/{self.player.bombs_max}",
-                 f"FIRE {self.player.blast_range}", f"LEFT {alive}"]
-        imgs = [nes_text(c, 2, (255, 255, 255), (0, 0, 0)) for c in cells]
+        """Bomberman II's band above the arena: the 8-digit score, T: the clock, LEFT the lives."""
         w = surface.get_width()
-        pygame.draw.rect(surface, (188, 188, 188), (0, 0, w, 28))
-        pygame.draw.line(surface, (116, 116, 116), (0, 27), (w, 27), 2)
-        gap = (w - 16 - sum(i.get_width() for i in imgs)) // (len(imgs) - 1)
-        x = 8
+        pygame.draw.rect(surface, (0, 0, 0), (0, 0, w, self.HUD_H))
+        left = "--" if self.hud_lives is None else str(max(0, self.hud_lives))
+        cells = [f"{min(self.score, 99_999_999):08d}", f"T:{max(0, math.ceil(self.timer)):03d}", f"LEFT {left}"]
+        imgs = [nes_text(c, 2, (248, 248, 248)) for c in cells]
+        gap = (w - 32 - sum(i.get_width() for i in imgs)) // (len(imgs) - 1)
+        x = 16
         for img in imgs:
-            surface.blit(img, (x, 7))
+            surface.blit(img, (x, (self.HUD_H - img.get_height()) // 2))
             x += img.get_width() + gap
 
 
@@ -666,5 +822,35 @@ if __name__ == "__main__":  # smoke: walk level 0 to the exit with a scripted pa
     assert not core.requires_clear, core.level_entry()
     assert core.enemies and all(e.speed < 48 for e in core.enemies), [e.speed for e in core.enemies]
     assert BombermanCore(level_idx=8).requires_clear                # 09_two_balloms is an arena: gated
-    assert core.fuse_frames == 240, core.fuse_frames
+    assert core.fuse_frames == 150, core.fuse_frames
+
+    # Bomberman II, area 1-1: the item under its brick, an item bombed into a Pass, double points
+    core = BombermanCore(level_idx=12)
+    assert core.area_name() == "1-1" and [e.kind for e in core.enemies] == ["E"] * 3
+    ix, iy = 9, 8                                      # Fire Up under the brick at (9, 8)
+    assert core.tile(ix, iy) == "F"
+    core.level_data.grid[iy][ix] = "f"                 # as if bombed open
+    core.player.x, core.player.y = ix * 32 + 4, iy * 32 + 4
+    core.enemies = []
+    core.step((0, 0, 0))
+    assert core.player.blast_range == 2 and core.tile(ix, iy) == ".", (core.player.blast_range, core.tile(ix, iy))
+    core.level_data.grid[iy][ix] = "f"                 # a lying item caught by a blast becomes a Pass
+    core.player.x, core.player.y = 1 * 32 + 4, 1 * 32 + 4
+    core._explode(Bomb(ix - 1, iy, 0, 2))
+    assert core.tile(ix, iy) == "." and [e.kind for e in core.enemies] == ["K"], [e.kind for e in core.enemies]
+    core = BombermanCore(level_idx=12)                 # two Balloms in one blast: 100, then 200
+    for e, (x, y) in zip(core.enemies, ((5, 1), (6, 1))):
+        e.x, e.y, e.speed = x * 32 + 4, y * 32 + 4, 0.0
+    core.enemies[2].alive = False
+    core._explode(Bomb(4, 1, 0, 3))
+    core.step((0, 0, 0))
+    assert core.score == 300 and core.kills_total == 2, (core.score, core.kills_total)
+    core = BombermanCore(level_idx=15)                 # 1-4's Remote: bombs wait for B
+    core.player.remote = True
+    core.step((0, 0, 1, 0))
+    for _ in range(300):
+        core.step((0, 0, 0, 0))
+    assert len(core.bombs) == 1 and core.bombs[0].remote
+    core.step((0, 0, 0, 1))
+    assert not core.bombs and core.blasts
     print("bomberman core ok")

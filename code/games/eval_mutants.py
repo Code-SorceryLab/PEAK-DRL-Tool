@@ -39,7 +39,7 @@ LEVELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels")
 EVAL_LEVELS = {
     "mario": ("Mario1-1", "Super Mario Bros. 1-1"),
     "meatboy": ("2", "Super Meat Boy 1-3 The Gap"),
-    "bomberman": ("8", "Bomberman 09 Two Balloms"),
+    "bomberman": ("12", "Bomberman II 1-1"),
     "megaman": ("CutMan", "Mega Man, the Cut Man stage"),
 }
 MEGAMAN_SET = ["s3-seal_route", "s3-widen_gap", "m-jump_velocity_down", "s3-off_route", "s3-cosmetic_tile"]
@@ -96,17 +96,18 @@ CHANGES = {
          "The air cell at row 0, column 6 written as ' ' instead of '.': the same tile",
          "Spec: row 0, column 0, a wall tile on this layout. Column 6 is the top row's first air cell."),
     ]),
-    "bomberman": ("bomberman/09_two_balloms.txt", [
-        ("seal_route", "breaking", [(9, 12, ".", "#"), (8, 13, ".", "#")],
-         "Walls at row 9, column 12 and row 8, column 13 close the exit into its corner", None),
-        ("add_enemy", "degrading", [(7, 7, ".", "E")],
-         "A third Ballom at row 7, column 7; every enemy must die before the exit opens", None),
-        ("fuse_down", "degrading", [("levels.8.fuse", 240, 150)],
-         "Bomb fuse 240 -> 150 frames on this level", None),
-        ("off_route", "neutral", [(11, 5, "#", ".")],
-         "The wall tile at row 11, column 5 hollowed out, closed on all four sides", None),
-        ("cosmetic_tile", "neutral", [(5, 5, ".", " ")],
-         "The floor cell at row 5, column 5 written as ' ' instead of '.': the same tile", None),
+    "bomberman": ("bomberman/bm2_1_1.txt", [
+        ("seal_route", "breaking", [(5, 9, "?", "#"), (5, 11, ".", "#")],
+         "Hard walls at row 5, columns 9 and 11 (a brick and a floor tile) close the exit into its pocket",
+         "The exit is under the brick at row 5, column 10; pillars stand above and below it."),
+        ("add_enemy", "degrading", [(6, 7, ".", "E")],
+         "A fourth Ballom at row 6, column 7, the floor tile nearest the centre; every enemy must die before the exit opens", None),
+        ("fuse_down", "degrading", [("levels.12.fuse", 150, 94)],
+         "Bomb fuse 150 -> 94 frames on this level (the same x0.625 as before)", None),
+        ("off_route", "neutral", [(0, 0, "#", ".")],
+         "The frame's top-left corner hollowed out, closed on all four sides", None),
+        ("cosmetic_tile", "neutral", [(1, 2, ".", " ")],
+         "The floor cell at row 1, column 2 written as ' ' instead of '.': the same tile", None),
     ]),
 }
 
@@ -116,12 +117,13 @@ EFFECTIVE = {
     "player.jump.max_velocity": lambda core: core.physics_manager.context.JUMP_VEL_MAX,
     "jump.jump_vel": lambda core: core._jump["jump_vel"],
     "levels.8.fuse": lambda core: core.fuse_frames,
+    "levels.12.fuse": lambda core: core.fuse_frames,
     "bomb.fuse_frames": lambda core: core.fuse_frames,
 }
 EMPTY = (".", " ")                  # air or floor in every game's level text
-BOMBABLE = set("?@CFS")             # Bomberman: a brick, or the exit or a power-up under one; a bomb opens it
+BOMBABLE = set("?@CFSRWXVDQ")      # Bomberman: a brick, or the exit or a power-up under one; a bomb opens it
 GAP_FILL = set(".  O*%^")           # what may fill a gap: air, Mario's pit, Meat Boy's saws and spikes
-FUSE_SCALE = 150 / 240              # Bomberman 09's fuse_down, applied to every level's own fuse
+FUSE_SCALE = 150 / 240              # Bomberman's fuse_down scale (94 of 150), applied to every level's own fuse
 
 
 def _effective(key: str):

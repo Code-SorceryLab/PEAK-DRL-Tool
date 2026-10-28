@@ -15,6 +15,8 @@ from code.games.modules.System import music
 from code.games.modules.System.nes_font import nes_text
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
+# A small arena would lose its bottom rows under the controls card: these games get a band below it
+OVERLAY_BAND = {"bomberman": 72}
 
 # The debug help banner prints box glyphs; legacy consoles default to cp1252.
 for _stream in (sys.stdout, sys.stderr):
@@ -128,12 +130,14 @@ def _sonic_action(keys) -> list:
 
 
 def _bomberman_action(keys) -> list:
-    """[dx, dy, bomb] — arrows / WASD move, SPACE (or Z) drops a bomb."""
+    """[dx, dy, bomb, detonate] — arrows / WASD move, A (SPACE or Z) drops a bomb, B (X or SHIFT)
+    sets off a remote bomb, as on Bomberman II's pad."""
     k = pygame.key.get_pressed()
     px, py, pjump, pfire, _ = gamepad.pad_state()
     dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
     dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
-    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z] or pjump or pfire))]
+    return [dx, dy, int(bool(k[pygame.K_SPACE] or k[pygame.K_z] or pjump)),
+            int(bool(k[pygame.K_x] or k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or pfire))]
 
 
 def _meatboy_action(keys) -> list:
@@ -218,7 +222,7 @@ if args.game == "meatboy" and level_id:
 substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixed-dt cores keep real-time pace
 # Meatboy draws onto whatever surface it is given; the other cores own a window.
 screen = core_game._surf if hasattr(core_game, "_surf") else \
-    pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
+    pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT + OVERLAY_BAND.get(args.game, 0)))
 
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
@@ -415,15 +419,18 @@ class _DemoRecorder:
               f"{len(self.sensors)} frames -> {path}")
 
 
+if args.game == "bomberman" and not level_id and core_game.cfg.get("campaign"):
+    core_game._level_idx = int(core_game.cfg["campaign"][0])   # free play is Bomberman II from area 1-1
 core_game.reset()
 demo = recorder = None
 MEGAMAN_NES = args.game == "megaman" and not args.demo   # READY, the death sequence and restart points
+NES_SHOW = args.game in ("megaman", "bomberman") and not args.demo   # the console's card / READY and death
 UNLIMITED_LIVES = 99                                      # what Mario's HUD shows when lives never run out
 lives_left = args.lives
 runs_done = 0
 if args.game == "platformer":                             # Mario's core counts its own lives
     core_game.max_lives = core_game.lives = args.lives or UNLIMITED_LIVES
-if MEGAMAN_NES:
+if NES_SHOW:
     core_game.start_intro()
 
 
@@ -468,14 +475,15 @@ def _start_recording() -> None:
         input_log = _InputLog(os.path.dirname(recorder.path) if args.game == "megaman" else recorder.run_dir)
 
 
-def _restart_level() -> None:
-    """Back to the start of the level being played (a core's reset() may move on to the next)."""
+def _restart_level(carry: dict | None = None) -> None:
+    """Back to the start of the level being played (a core's reset() may move on to the next).
+    carry: what the player brings along (Bomberman's bombs and fire)."""
     if args.game == "megaman":
         core_game.won = False          # stay on the level being played
     if args.game in INDEXED_GAMES and level_id:
         core_game.won = False          # reset() would otherwise advance to the next level
         core_game._level_idx = int(level_id)
-    core_game.reset()
+    core_game.reset(options={"carry": carry} if carry else None)
     # Keep locked level after reset
     active_id = level_id or (TEMP_ID if level_file else None)
     if active_id and hasattr(core_game, 'world'):
@@ -485,12 +493,25 @@ def _restart_level() -> None:
                 core_game.locked_level = active_id.lower()
             if hasattr(core_game, 'load_level'):
                 core_game.load_level()
-    if MEGAMAN_NES:
+    if NES_SHOW:
         core_game.start_intro()
 
 
-def _megaman_death() -> None:
-    """Play the console's death sequence (halt, puffs, orbs) before anything restarts."""
+def _hold(frames: int) -> None:
+    """The last frame stays up (Bomberman II freezes 3.5 s on a cleared area)."""
+    global running
+    for _ in range(frames):
+        if not running:
+            return
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                running = False
+        pygame.display.flip()
+        clock.tick(args.fps)
+
+
+def _death_sequence() -> None:
+    """Play the console's death (Mega Man's halt, puffs and orbs; Bomberman's collapse) before anything restarts."""
     global running
     while running and core_game.death_tick():
         for event in pygame.event.get():
@@ -510,6 +531,8 @@ def _next_life() -> None:
         core_game.reset(options={"start": start} if start else None)
         core_game.score = score
         core_game.start_intro()
+    elif args.game == "bomberman":
+        _restart_level(core_game.carry(died=True))     # bombs and fire survive a death
     else:
         _restart_level()
 
@@ -560,7 +583,7 @@ def _toggle_panel() -> None:
 
 
 # What A and B do in each game, for the controls overlay
-PAD_LABELS = {"platformer": ("Jump", "Run · Fire"), "megaman": ("Jump", "Fire"), "bomberman": ("Bomb", "Bomb")}
+PAD_LABELS = {"platformer": ("Jump", "Run · Fire"), "megaman": ("Jump", "Fire"), "bomberman": ("Bomb", "Remote")}
 
 
 def _draw_controls(state) -> None:
@@ -579,7 +602,7 @@ def _draw_controls(state) -> None:
         ty += 14
 
 
-TIMER_Y = {"platformer": 74, "bomberman": 40}   # clear of each game's own HUD
+TIMER_Y = {"platformer": 74}   # clear of each game's own HUD
 
 
 def _draw_timer(ms: int, label: str) -> None:
@@ -589,6 +612,8 @@ def _draw_timer(ms: int, label: str) -> None:
     val = _font(18, True).render(f"{s // 60}:{s % 60:02d}", True, (235, 238, 250))
     w, h = lbl.get_width() + val.get_width() + 30, 32
     x, y = _view_w() - w - 10, TIMER_Y.get(args.game, 10)
+    if args.game in OVERLAY_BAND:                       # in the band under the arena, left of the pad
+        x, y = 10, screen.get_height() - OVERLAY_BAND[args.game] // 2 - h // 2
     pill = pygame.Surface((w, h), pygame.SRCALPHA)
     pygame.draw.rect(pill, (14, 15, 22, 205), pill.get_rect(), border_radius=16)
     screen.blit(pill, (x, y))
@@ -732,6 +757,11 @@ while running:
         if done:
             break
 
+    if getattr(core_game, "extra_lives", 0):         # a 1-UP from Bomberman's "?" item
+        lives_left += core_game.extra_lives
+        core_game.extra_lives = 0
+    if hasattr(type(core_game), "hud_lives"):          # LEFT on Bomberman's score band: the lives after this one
+        core_game.hud_lives = None if not args.lives or warm_until else lives_left - 1
     held = None if args.random else gamepad.held()
     if input_log and not getattr(core_game, "intro", 0):
         input_log.log(runs_done + 1, recorder.recorded + 1, held)
@@ -758,8 +788,10 @@ while running:
 
     if info.get("episode_end", False) or done:
         won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
-        if MEGAMAN_NES and not core_game.alive:
-            _megaman_death()
+        if NES_SHOW and not core_game.alive:
+            _death_sequence()
+        if won and args.game == "bomberman":
+            _hold(210)
         if recorder:
             recorder.end()   # this life's row, before reset() clears the outcome
         if demo:
@@ -768,7 +800,8 @@ while running:
                 running = False
         if won and not (level_id or level_file) and not demo:
             print("[Play] Level cleared: on to the next", flush=True)
-            _restart_level()                           # the regular game: next level, lives kept
+            # the regular game: next level, lives kept (Bomberman keeps every item while alive)
+            _restart_level(core_game.carry(died=False) if args.game == "bomberman" else None)
             if recorder:
                 recorder.begin()
             continue

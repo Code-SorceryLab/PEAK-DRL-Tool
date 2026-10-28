@@ -1,43 +1,44 @@
 {
   "game": "bomberman",
-  "stage": "8",
-  "base_file": "bomberman/09_two_balloms.txt",
+  "stage": "12",
+  "base_file": "bomberman/bm2_1_1.txt",
   "mutants": [
     {
       "id": "seal_route",
       "game": "bomberman",
-      "stage": "8",
+      "stage": "12",
       "section": null,
       "operator": "seal_route",
       "class": "breaking",
       "direction": "harder",
-      "description": "Walls at row 9, column 12 and row 8, column 13 close the exit into its corner",
+      "description": "Hard walls at row 5, columns 9 and 11 (a brick and a floor tile) close the exit into its pocket",
       "retrain": true,
-      "base_file": "bomberman/09_two_balloms.txt",
+      "base_file": "bomberman/bm2_1_1.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          12,
           9,
-          ".",
+          5,
+          "?",
           "#"
         ],
         [
-          13,
-          8,
+          11,
+          5,
           ".",
           "#"
         ]
       ],
       "location": {
-        "col": 13,
-        "row": 8
+        "col": 11,
+        "row": 5
       },
       "parameter": {
         "tiles": 2
       },
+      "note": "The exit is under the brick at row 5, column 10; pillars stand above and below it.",
       "checks": {
         "exit_reachable": false,
         "same_level": false
@@ -46,28 +47,28 @@
     {
       "id": "add_enemy",
       "game": "bomberman",
-      "stage": "8",
+      "stage": "12",
       "section": null,
       "operator": "add_enemy",
       "class": "degrading",
       "direction": "harder",
-      "description": "A third Ballom at row 7, column 7; every enemy must die before the exit opens",
+      "description": "A fourth Ballom at row 6, column 7, the floor tile nearest the centre; every enemy must die before the exit opens",
       "retrain": true,
-      "base_file": "bomberman/09_two_balloms.txt",
+      "base_file": "bomberman/bm2_1_1.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
           7,
-          7,
+          6,
           ".",
           "E"
         ]
       ],
       "location": {
         "col": 7,
-        "row": 7
+        "row": 6
       },
       "parameter": {
         "tiles": 1
@@ -80,58 +81,58 @@
     {
       "id": "fuse_down",
       "game": "bomberman",
-      "stage": "8",
+      "stage": "12",
       "section": null,
       "operator": "fuse_down",
       "class": "degrading",
       "direction": "harder",
-      "description": "Bomb fuse 240 -> 150 frames on this level",
+      "description": "Bomb fuse 150 -> 94 frames on this level (the same x0.625 as before)",
       "retrain": true,
-      "base_file": "bomberman/09_two_balloms.txt",
+      "base_file": "bomberman/bm2_1_1.txt",
       "family": "mechanics",
       "level_file": null,
       "cells": [],
       "location": null,
       "config": {
-        "levels.8.fuse": 150
+        "levels.12.fuse": 94
       },
       "parameter": {
-        "key": "levels.8.fuse",
-        "from": 240,
-        "to": 150
+        "key": "levels.12.fuse",
+        "from": 150,
+        "to": 94
       },
       "checks": {
         "exit_reachable": true,
         "values": {
-          "levels.8.fuse": 150
+          "levels.12.fuse": 94
         }
       }
     },
     {
       "id": "off_route",
       "game": "bomberman",
-      "stage": "8",
+      "stage": "12",
       "section": null,
       "operator": "off_route",
       "class": "neutral",
       "direction": "none",
-      "description": "The wall tile at row 11, column 5 hollowed out, closed on all four sides",
+      "description": "The frame's top-left corner hollowed out, closed on all four sides",
       "retrain": true,
-      "base_file": "bomberman/09_two_balloms.txt",
+      "base_file": "bomberman/bm2_1_1.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          5,
-          11,
+          0,
+          0,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 5,
-        "row": 11
+        "col": 0,
+        "row": 0
       },
       "parameter": {
         "tiles": 1
@@ -145,28 +146,28 @@
     {
       "id": "cosmetic_tile",
       "game": "bomberman",
-      "stage": "8",
+      "stage": "12",
       "section": null,
       "operator": "cosmetic_tile",
       "class": "neutral",
       "direction": "none",
-      "description": "The floor cell at row 5, column 5 written as ' ' instead of '.': the same tile",
+      "description": "The floor cell at row 1, column 2 written as ' ' instead of '.': the same tile",
       "retrain": false,
-      "base_file": "bomberman/09_two_balloms.txt",
+      "base_file": "bomberman/bm2_1_1.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          5,
-          5,
+          2,
+          1,
           ".",
           " "
         ]
       ],
       "location": {
-        "col": 5,
-        "row": 5
+        "col": 2,
+        "row": 1
       },
       "parameter": {
         "tiles": 1
