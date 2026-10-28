@@ -18,7 +18,7 @@ from code.stats import ast_metrics as am
 from code.stats import ast_page
 
 OUT = "paper-ast"
-GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman 09", "megaman": "Mega Man Cut Man"}
+GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman II 1-1", "megaman": "Mega Man Cut Man"}
 NAME = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man"}
 NEAR = 3                                   # tiles: the death cluster's own radius
 MODES = ("static", "random", "replay")              # the detectors compared; retraining only answers "still solvable?"
@@ -31,7 +31,10 @@ def where(game: str, level: str | None) -> str:
         return GAME[game]
     if game == "mario":
         return f"Mario {level.replace('Mario', '')}"
-    return f"Meat Boy 1-{int(level) + 1}" if game == "meatboy" else f"Bomberman {int(level) + 1:02d}"
+    if game == "meatboy":
+        return f"Meat Boy 1-{int(level) + 1}"
+    n = os.path.splitext(os.path.basename(eval_mutants.level_file(game, level)))[0].split("_")  # 09_two_balloms, bm2_1_2
+    return f"Bomberman II {n[1]}-{n[2]}" if n[0] == "bm2" else f"Bomberman {n[0]}"
 
 
 # ── small pieces (tested) ────────────────────────────────────────────────────────────────────

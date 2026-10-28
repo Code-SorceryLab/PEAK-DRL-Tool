@@ -256,13 +256,13 @@ def compare(base: dict, mut: dict) -> dict:
     bc, mc = base["death_cluster"], mut["death_cluster"]
     moved = bool(bc and mc and max(abs(bc["col"] - mc["col"]), abs(bc["row"] - mc["row"])) > CLUSTER_TILES)
     new_cluster = bool(mc and not bc)
-    cause = (next(iter(base["causes"]), None), next(iter(mut["causes"]), None))
+    top = [{c for c, s in d.items() if s == max(d.values())} for d in (base["causes"], mut["causes"])]  # ties: all
     signals = {
         "completion_lost": base["completion"] and not mut["completion"],
         "win_rate_p": round(p, 4),
         "win_rate_changed": p < ALPHA,
         "cluster_moved": moved or new_cluster,
-        "cause_changed": bool(cause[1] and cause[0] != cause[1]),
+        "cause_changed": bool(top[1] and not top[0] & top[1]),
     }
     rates = [w / n for w, n in (base.get("seed_win_rates") or {}).values() if n]
     signals["win_rate_beyond_seeds"] = (not min(rates) <= mw / mn <= max(rates)) if len(rates) >= 2 and mn else None
@@ -318,8 +318,9 @@ def evaluate(game: str) -> dict:
     main = EVAL_LEVELS[game][0]
     refs = references(game)
     rand_ref: dict = {}
-    for r in load(game, "base", "random"):
-        rand_ref.setdefault(str(r.get("level")), []).append(r)
+    for ref in ["base"] + [v for v in variants(game) if "@" in v and kind(v) == "base"]:   # each level's own original
+        for r in load(game, ref, "random"):
+            rand_ref.setdefault(str(r.get("level")), []).append(r)
     out = {}
     for v in variants(game):
         by_level: dict = {}
@@ -340,13 +341,15 @@ def evaluate(game: str) -> dict:
                      "humans": dict(summarize(humans), win_rate=win_rate(humans)) if humans else None}
             vs, ref = refs.get(level, (None, None))
             if not is_original(v) and ref and agents and _alike(ref, agents):
-                entry["vs_base"] = compare(summarize(_alike(ref, agents)), entry["agents"])
+                # only the personas both played: either side may lack one (Mega Man trains section by section)
+                entry["vs_base"] = compare(summarize(_alike(ref, agents)), summarize(_alike(agents, ref)))
                 entry["vs"] = vs
-                if v.endswith("cosmetic_tile"):
-                    entry["determinism"] = determinism(_alike(ref, agents), agents)
+                if kind(v).endswith("cosmetic_tile"):            # placed copies too (cosmetic_tile@<level>)
+                    entry["determinism"] = determinism(_alike(ref, agents), _alike(agents, ref))
                 if replayed.get(level) and _alike(ref, replayed[level]):
                     rep = summarize(replayed[level])
-                    entry["replay"] = {"agents": rep, "vs_base": compare(summarize(_alike(ref, replayed[level])), rep)}
+                    entry["replay"] = {"agents": rep, "vs_base": compare(summarize(_alike(ref, replayed[level])),
+                                                                         summarize(_alike(replayed[level], ref)))}
             if not is_original(v) and randoms.get(level) and rand_ref.get(level):
                 rnd = summarize(randoms[level])          # the random baseline against itself on the original
                 entry["random"] = {"agents": rnd, "vs_base": compare(summarize(rand_ref[level]), rnd)}
@@ -412,7 +415,7 @@ def main() -> None:
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             old = json.load(f)
-    with open(path, "w", encoding="utf-8") as f:
+    with episode_log.atomic_open(path, "w", encoding="utf-8") as f:     # the next run reads and merges it
         json.dump({**old, **results}, f, indent=1, default=list)
     for g in games:
         print(table(g, results[g]) if results[g] else f"{g}\n  no playtests yet: python -m code.neuro.ast_eval play --game {g}")

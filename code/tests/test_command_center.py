@@ -1,5 +1,6 @@
 """The PEAK Command Center (code/neuro/command_center.py and the pages it gathers): only the paper
 seeds reach it, every game gets every tab, and the site is static."""
+import glob
 import os
 import re
 import shutil
@@ -11,8 +12,17 @@ from code.neuro import balance, cameras, report
 from code.stats import ast_metrics, ast_page
 
 PAPER = {"1234", "2025", "31337"}
+# the trained runs/ some tests read (probes, reports, Mega Man's relay) are not on every branch: USER-STUDY reset
+# them (30a070eb4), and the Narval pipeline in jobs/README.md writes them again
+TRAINED = os.path.join(balance.PROBES_ROOT, "mario", "novice", "p10g40", "Mario1-1_1234", "state.json")
+needs_runs = pytest.mark.skipif(not os.path.exists(TRAINED), reason="needs the trained runs/ data")
+needs_reports = pytest.mark.skipif(not glob.glob(os.path.join(balance.BALANCE_DIR, "report_bomberman_*.json")),
+                                   reason="needs the trained runs/balance reports")
+needs_relay = pytest.mark.skipif(not os.path.exists(os.path.join("runs", "megaman", "relay.json")),
+                                 reason="needs Mega Man's hand-picked relay")
 
 
+@needs_runs
 def test_reports_keep_only_the_seeds_asked_for(tmp_path):
     for seed in ("1234", "8"):                  # a paper seed and one of the stray seeds committed on 2026-09-21
         src = os.path.join(balance.PROBES_ROOT, "mario", "novice", "p10g40", f"Mario1-1_{seed}", "state.json")
@@ -24,6 +34,7 @@ def test_reports_keep_only_the_seeds_asked_for(tmp_path):
     assert {c["seed"] for c in balance.load_probe_cells("mario", "novice", "p10g40", str(tmp_path))["Mario1-1"]} == {8, 1234}
 
 
+@needs_runs
 def test_the_wall_and_the_route_traces_skip_extra_seeds():
     # on the committed probes: Bomberman experienced level 1, seed 8 wins 57 %, the paper seeds 0 %
     models = dict(cameras.pick_models("bomberman", "experienced"))
@@ -77,6 +88,7 @@ def test_the_mutations_sub_page_keeps_the_totals_for_every_game():
     assert f'{sc["good"]}</span>' in page and 'id="meatboy"' in page and 'id="mario"' not in page and "<nav" not in page
 
 
+@needs_runs
 def test_the_site_has_every_tab_of_every_game(tmp_path):
     from code.neuro import command_center
     vids = tmp_path / "videos" / "mario"
@@ -314,6 +326,7 @@ def test_the_top_bar_and_tabs_are_the_old_pages_pixel_buttons_with_icons():
     assert tabs and all('<i class="ico ' in body for _, body in tabs)
 
 
+@needs_reports
 def test_the_balance_tab_lists_the_levels_no_agent_trained_on():
     data = report.load_data()
     bomberman, megaman = report.balance_page("bomberman", data), report.balance_page("megaman", data)
@@ -332,6 +345,7 @@ def test_a_recording_keeps_a_timeline_and_a_sensor_track():
     assert sensors == [0.5, 0.25] and rays == [[60, 150, 540, 150, 1]]            # view-relative, at 480 px wide
 
 
+@needs_relay
 def test_mega_man_plays_one_attempt_per_section():
     from code.neuro import relay, wall_video
     legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), "CutMan")     # quick to load; any legs do
@@ -384,6 +398,7 @@ def test_the_new_modules_compile_without_warnings():
         assert not [w for w in caught if issubclass(w.category, SyntaxWarning)], path
 
 
+@needs_runs
 def test_hosted_agents_load_from_their_folder_and_skip_stray_seeds(tmp_path):
     import json
     from code.neuro import command_center
@@ -420,6 +435,7 @@ def test_the_tabs_run_in_the_spec_order_with_reproduce_before_how_it_works():
         "wall", "balance", "mutations", "gasweep", "ablation", "reproduce", "howitworks"]
 
 
+@needs_reports
 def test_the_untrained_cards_are_not_a_collapsible_game_section():
     # the report's script wires a collapse button (.chev) on every section.game; these cards have none
     data = report.load_data()

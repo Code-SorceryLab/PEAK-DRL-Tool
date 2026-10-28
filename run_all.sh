@@ -2,11 +2,11 @@
 # PEAK runs: ./run_all.sh sweeps | megaman | ast-megaman | test   (inside a Slurm job, or locally: WORKERS=4 ./run_all.sh ...)
 cd "$(dirname "$0")"
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
-PY=.venv/bin/python; [[ -x $PY ]] || PY=.venv/Scripts/python.exe  # Windows venv layout
+PY=${PY:-.venv/bin/python}; [[ -x $PY ]] || PY=.venv/Scripts/python.exe  # Windows venv layout; PY=... picks another
 W=${WORKERS:-${SLURM_CPUS_PER_TASK:-4}}
 GAMES=(${GAMES:-mario meatboy bomberman})  # GAMES=meatboy ./run_all.sh sweeps: one game per job
 PERSONAS=(${PERSONAS:-novice clumsy experienced speedrunner killer collector})  # PERSONAS=clumsy: one persona per job
-SEEDS=(1234 2025 31337); GENS=40
+SEEDS=(${SEEDS:-1234 2025 31337}); GENS=${GENS:-40}  # GENS=2 SEEDS=1234: a quick derisking sweep
 SECTIONS=(CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss)
 stamp() { echo "[$(date '+%F %T')] $*"; }
 throttle() { while (( $(jobs -rp | wc -l) >= W )); do wait -n; done; }
@@ -34,7 +34,7 @@ sweeps() {
     $PY -m code.neuro.gasweep --game $g --persona $p --gens $GENS --seeds "${SEEDS[@]}" --workers $W --sensors rays --confirm
     stamp "END gasweep $g $p rc=$?"
   done; done
-  $PY -m code.neuro.command_center
+  [[ -z $SLURM_ARRAY_TASK_ID ]] && $PY -m code.neuro.command_center  # an array builds the site once, after its last task
   stamp "ALL DONE"
 }
 

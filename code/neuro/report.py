@@ -15,6 +15,7 @@ import csv
 import glob
 import html as _html
 import io
+import itertools
 import json
 import math
 import os
@@ -22,7 +23,6 @@ import re
 from datetime import datetime
 
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "games")
-LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "img", "PEAK_LOGO.png")
 THRESHOLDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stats", "MarioThresholds.yaml")
 from .adapters import INDEXED_GAMES, OWN_LEVEL_FILES, list_levels
 from .balance import BALANCE_DIR, PAPER_SEEDS, PROBES_ROOT, WIN_WINDOW, fmt_ci, fmt_hms, mean_ci
@@ -314,7 +314,7 @@ def _config_html(sections: list[tuple[str, dict]]) -> str:
 
 
 def _collect_routes(game: str, persona: str, level: str, tag: str | None,
-                    max_routes: int = 22, seeds=PAPER_SEEDS) -> tuple[list[dict], dict | None]:
+                    max_routes: int = 22, seeds=PAPER_SEEDS, dirs=None) -> tuple[list[dict], dict | None]:
     """Route traces for one (game, persona, level), merged over `seeds`, and the fastest win.
 
     A probe dir gives its episodes.csv rows when it has one, else the compact routes.json sampled
@@ -322,12 +322,16 @@ def _collect_routes(game: str, persona: str, level: str, tag: str | None,
     Returns (routes, best): routes = [{"p": [[x, y], ...], "w": 1 | 0}], ≤10 wins then losses;
     best = {"p": route, "t": seconds or None, "seed": str} or None.
     """
-    won_raw, lost_raw, fastest = [], [], []   # fastest: (seconds or None, raw route, seed)
+    won_by, lost_by, fastest = [], [], []   # per seed; fastest: (seconds or None, raw route, seed)
     sub = (game, persona, tag) if tag else (game,)  # legacy reports pre-date the tagged layout
-    for d in sorted(glob.glob(os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_")))):
+    # the report's own probe dirs where it names them (Mega Man's live under runs/ast), else runs/probes
+    for d in sorted(dirs or glob.glob(os.path.join(PROBES_ROOT, *sub, f"{level}_*".replace(" ", "_")))):
         seed = os.path.basename(d).rsplit("_", 1)[-1]
         if seed not in {str(s) for s in seeds}:
             continue
+        won_raw, lost_raw = [], []
+        won_by.append(won_raw)
+        lost_by.append(lost_raw)
         if os.path.exists(os.path.join(d, "episodes.csv")):
             try:
                 with open(os.path.join(d, "episodes.csv"), encoding="utf-8", newline="") as f:
@@ -369,6 +373,9 @@ def _collect_routes(game: str, persona: str, level: str, tag: str | None,
         except (ValueError, SyntaxError, TypeError, OverflowError):
             return None
 
+    # take seeds in turn, so the first wins and the last losses are not all one seed's
+    won_raw = [r for t in itertools.zip_longest(*won_by) for r in t if r is not None]
+    lost_raw = [r for t in itertools.zip_longest(*lost_by) for r in t if r is not None]
     won = [p for p in map(parse, won_raw[:10]) if p]
     lost = [p for p in map(parse, lost_raw[-(max_routes - len(won)):]) if p]
     timed = [f for f in fastest if f[0] is not None and math.isfinite(f[0])]
@@ -430,18 +437,6 @@ def _cluster_strategies(won_routes: list[list[list[float]]]) -> tuple[int, float
             cents.append(profiles[i].copy())
     dominant = max(len(c) for c in clusters) / len(profiles)
     return len(clusters), dominant
-
-
-def _logo_b64() -> str | None:
-    try:
-        from PIL import Image
-        img = Image.open(LOGO_PATH)
-        img.thumbnail((160, 44))
-        buf = io.BytesIO()
-        img.save(buf, "PNG")
-        return base64.b64encode(buf.getvalue()).decode("ascii")
-    except Exception:
-        return None
 
 
 # stylized Meat-Boy-ish cube of our own; nothing copyrighted
@@ -556,7 +551,7 @@ def _verdict_sentence(row: dict, strat: tuple[int, float] | None) -> tuple[str, 
     if solved == 0:
         word, color = "too hard", "var(--red)"
         pad = row.get("progress_at_death_mean")
-        sent = (f"No seed ever reached the goal — the best agents die at {pad:.0%} of the level, "
+        sent = (f"No seed ever reached the goal — failing agents die on average at {pad:.0%} of the level, "
                 f"<b>{cause}</b> accounts for {frac:.0%} of deaths {where}. "
                 "Ease that stretch or give the player a tool for it.") if pad is not None else \
                f"No seed ever reached the goal; <b>{cause}</b> accounts for {frac:.0%} of deaths {where}."
@@ -1110,18 +1105,10 @@ def _stat(label: str, value: str, sub: str = "", icon: str = "") -> str:
             + (f'<div class="sub">{sub}</div>' if sub else "") + "</div>")
 
 
-def _npz_meta(path: str) -> dict:
-    try:
-        import numpy as np
-        return json.loads(str(np.load(path)["meta"]))
-    except Exception:
-        return {}
-
-
 def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: str | None) -> str:
     wr = row["win_rate_mean"]
     fw = (f"first win gen {row['first_win_mean']}" if row["first_win_mean"] is not None
-          else f"best progress {row.get('progress_at_death_mean') or 0:.0%}")
+          else f"mean progress at death {row.get('progress_at_death_mean') or 0:.0%}")
     color = _wr_var(row)
     mct = (f"{row['mean_completion_time']}s" if row.get("mean_completion_time") is not None else "—")
     pad = (f"{row['progress_at_death_mean']:.0%}" if row.get("progress_at_death_mean") is not None else "—")
@@ -1141,7 +1128,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
     if ttime is None:
         ttime = sum(c.get("train_time_s") or 0 for c in cells)
 
-    routes, best = _collect_routes(game, persona, row["level"], tag)
+    routes, best = _collect_routes(game, persona, row["level"], tag, dirs=[c["dir"] for c in cells if c.get("dir")])
     strat = _cluster_strategies([r["p"] for r in routes if r["w"]])
     gkey = f"{game}|{row['level']}"   # one grid and one config per level and page, however many dialogs show them
     grid = _STORE["grids"].get(gkey) or _level_grid(game, row["level"])
@@ -1240,7 +1227,7 @@ def _card(game: str, persona: str, row: dict, cells: list[dict], th: dict, tag: 
             <canvas class="curve" width="1100" height="260" data-curves='{curves}' role="img"
               aria-label="Fitness per generation for each seed on {row['level']}"></canvas>
             <div class="caption">Solid line: the best genome each generation. Faint line: population
-            average. A jump above the dashed line means winning runs (win bonus). Flat = stuck.</div></div>
+            average. Flat = stuck.</div></div>
           <div class="dmore">
             <details class="more"><summary>All {len(stats) + 4} metrics</summary>
               <div class="stats">{''.join(stats)}</div></details>
@@ -1934,13 +1921,6 @@ function drawCurve(cv){
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
     ctx.fillText(Math.round(v).toLocaleString(), 4, y + 4);
   }
-  if (maxY > 5000){
-    const y = py(5000);
-    ctx.setLineDash([5, 4]); ctx.strokeStyle = '#58d85455';
-    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#58d85499'; ctx.fillText('win bonus', W - R - 78, y - 5);
-  }
   ctx.fillStyle = '#a0a0a0';
   ctx.fillText('gen 1', L, H - 9);
   const el = 'gen ' + maxX;
@@ -2367,8 +2347,8 @@ def _ablation_pairs(games: dict) -> dict[tuple[str, str, str], dict[str, dict]]:
     pairs: dict[tuple[str, str, str], dict[str, dict]] = {}
     for (game, tag), personas in games.items():
         base, _, mode = (tag or "").partition("_")
-        if not base:
-            continue  # legacy untagged reports pre-date sensor modes
+        if not base or mode not in ("", "grid"):
+            continue  # legacy untagged reports pre-date sensor modes; a _best tag is no sensor arm
         for persona, data in personas.items():
             pairs.setdefault((game, persona, base), {})[mode or "rays"] = data
     return pairs
@@ -2475,8 +2455,7 @@ def _ablation_section(game: str, persona: str, base: str, by_mode: dict[str, dic
         f'<span style="color:{MODE_COLOR["rays"]}">reds</span> = ray seeds, '
         f'<span style="color:{MODE_COLOR["grid"]}">greys</span> = grid seeds</div>'
         f'<div class="curvegrid">{"".join(curve_boxes)}</div>'
-        f'<div class="caption">Solid = best genome, faint = population average. The dashed green line is the '
-        f'win bonus: a curve crossing it is a seed that solved the level. Steeper = faster learning.</div>')
+        f'<div class="caption">Solid = best genome, faint = population average. Steeper = faster learning.</div>')
     pending = "" if len(modes) == 2 else (
         f'<div class="ovnote">Only <b>{modes[0]}</b> probed so far for this config — run the other mode '
         f'(menu 14, or <code>balance --game {game} --persona {persona} --sensors '
@@ -3025,11 +3004,15 @@ MEGAMAN_REPORTS = os.path.join("runs", "ast", "megaman", "base-retrained")   # M
 def load_data(balance_dir: str = BALANCE_DIR) -> dict:
     """What the Command Center's sub-pages show, read from the committed report JSONs; nothing is
     rebuilt, so the pages carry the published numbers. games: game -> tag -> persona -> report."""
+    from .personas import PERSONAS
+
     def _flat(*patterns: str) -> dict[tuple[str, str | None], dict[str, dict]]:  # (game, tag) -> persona -> data
         out: dict[tuple[str, str | None], dict[str, dict]] = {}
         for pattern in patterns:
             for data in _load_json_glob(pattern):
-                out.setdefault((data["game"], data.get("tag")), {})[data.get("persona") or "experienced"] = data
+                persona = data.get("persona") or "experienced"
+                if persona in PERSONAS:     # a removed persona's reports stay on disk, off the pages (as in figures.py)
+                    out.setdefault((data["game"], data.get("tag")), {})[persona] = data
         return out
     flat = _flat(os.path.join(balance_dir, "report_*.json"), os.path.join(MEGAMAN_REPORTS, "report_megaman_*.json"))
     games: dict[str, dict] = {}  # tagged configs first, legacy last

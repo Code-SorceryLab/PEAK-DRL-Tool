@@ -84,7 +84,10 @@ def _from_legacy(old: dict) -> dict:
     """A row of the older agent CSV (code/neuro/episodes.py), which 2D manual play still writes, in this schema."""
     import ast
     won = old.get("cause_of_death") == "Success"
-    route = [list(p) for p in ast.literal_eval(old.get("route") or "[]")]
+    try:
+        route = [list(p) for p in ast.literal_eval(old.get("route") or "[]")]
+    except (ValueError, SyntaxError, TypeError):   # a row cut off by a killed job: keep the rest of the log readable
+        route = []
     secs = float(old.get("elapsed_time") or 0)
     row = {"game": old.get("game") or None, "level": str(old.get("world")), "persona": old.get("persona") or None,
            "status": "WON" if won else "DEAD", "cause": "" if won else old.get("cause_of_death", ""),
@@ -125,3 +128,15 @@ def reset(path: str) -> None:
     """A fresh population starts a fresh log (a re-probed level must not mix with the old one)."""
     if os.path.exists(path):
         os.remove(path)
+
+
+def rewrite(path: str, rows: list[dict]) -> None:
+    """Replace the log with `rows` in one step: a reader (or a kill) finds the old file or the new,
+    never none; no rows removes it."""
+    if not rows:
+        reset(path)
+        return
+    tmp = path + ".tmp"
+    reset(tmp)
+    append(tmp, rows)
+    os.replace(tmp, path)

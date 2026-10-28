@@ -76,3 +76,12 @@ def test_read_turns_the_older_2d_agent_csv_into_this_schema(tmp_path):
     (row,) = episode_log.read(path)
     assert (row["level"], row["status"], row["end_x"], row["frames"]) == ("Mario1-1", "WON", 30.0, 750)
     assert ast_metrics.win_rate([row])["al"] == [1, 1]        # a human win counts as a win
+
+
+def test_rewrite_replaces_a_log_in_one_step(tmp_path):
+    path = str(tmp_path / "agents.csv")
+    episode_log.append(path, [{"status": "DEAD", "persona": "novice"}])
+    episode_log.rewrite(path, [{"status": "WON", "persona": "killer"}])
+    assert [r["persona"] for r in episode_log.read(path)] == ["killer"] and not os.path.exists(path + ".tmp")
+    episode_log.rewrite(path, [])                              # nothing left to keep: no stale file either
+    assert not os.path.exists(path)

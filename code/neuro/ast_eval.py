@@ -110,9 +110,8 @@ def agent_dirs(game: str, variant: str, persona: str) -> list[str]:
     m, tag = mutant(game, variant), baseline_tag(game, persona, level)
     if m is None or not m["retrain"]:
         return [balance.probe_dir(game, persona, tag, level, s) for s in SEEDS]
+    # the baseline's own tag only: agents of another GA setting would mix it into the comparison (missing until retrained)
     root = os.path.join(variant_dir(game, variant), "probes")
-    tags = sorted(os.path.basename(d) for d in glob.glob(os.path.join(root, game, persona, "*")))
-    tag = tag if tag in tags or not tags else tags[0]       # a shorter test budget leaves its own tag
     return [balance.probe_dir(game, persona, tag, level, s, root) for s in m.get("seeds", SEEDS)]
 
 
@@ -120,14 +119,15 @@ def agent_dirs(game: str, variant: str, persona: str) -> list[str]:
 def retrain_job(game: str, variant: str, persona: str, gens: int = GENS, workers: int | None = None,
                 levels: list[str] | None = None):
     """(command, environment) that trains this persona's three seeds on the mutant, as balance.py
-    trained the baseline. Mega Man retrains only the sections the mutant changes (`levels`)."""
+    trained the baseline. Mega Man retrains only the sections the mutant changes (`levels`), always
+    on its GA-sweep winners (--best)."""
     m = mutant(game, variant)
     if m is None or not m["retrain"]:
         raise SystemExit(f"{game} {variant} is not retrained (the baseline agents replay it)")
     cmd = [sys.executable, "-m", "code.neuro.balance", "--game", game, "--persona", persona,
            "--levels", *(levels or m["retrain_levels"]), "--seeds", *map(str, m.get("seeds", SEEDS)), "--gens", str(gens),
            "--root", os.path.join(variant_dir(game, variant), "probes"), "--out", variant_dir(game, variant)]
-    if game != "megaman" and baseline_tag(game, persona, level_of(game, variant)).endswith("_best"):
+    if game == "megaman" or baseline_tag(game, persona, level_of(game, variant)).endswith("_best"):
         cmd.append("--best")
     if workers:
         cmd += ["--workers", str(workers)]
@@ -170,11 +170,15 @@ def play_random(game: str, level: str, seed: int = 0) -> dict:
     floor a learned agent has to beat."""
     _, cfg, _ = load_agent(agent_dirs(game, "base", "experienced")[0], game)
     rng = np.random.default_rng(10_000 + seed)                   # apart from the hands' own stream
+    n_out = N_OUTPUTS_BY_GAME.get(game, 3)
+
+    def axis(a, b):
+        return 0 if max(a, b) <= 0.5 else -1 if a > b else 1
 
     def act(_vec):
-        # shortcut: Net.act's decoding for 3-output nets only (left, right, jump); Mega Man has no random baseline
-        left, right, jump = rng.random(3)
-        return (0 if max(left, right) <= 0.5 else -1 if left > right else 1), bool(jump > 0.5), 0
+        # shortcut: Net.act's decoding for 3- and 5-output nets (Bomberman adds up/down); Mega Man has no random baseline
+        out = rng.random(n_out)
+        return axis(out[0], out[1]), bool(out[2] > 0.5), axis(out[3], out[4]) if n_out >= 5 else 0
     return _attempt(game, level, cfg, get_persona("experienced"), act, lambda: None, seed,
                     f"random_{seed}", f"random/{seed}", persona_name="random")
 
@@ -216,10 +220,15 @@ def _attempt(game: str, level: str, cfg, persona, act, reset, seed: int, agent: 
 
 
 def _best_retrained(variant: str, section: str, persona: str = "experienced") -> str | None:
-    """The run of this persona trained on this section of the variant that wins most often (relay.py's test)."""
+    """The run of this persona trained on this section of the variant with the GA-sweep winners
+    that wins most often (relay.py's test): only the tag retrain_job's --best writes, so runs of
+    another GA setting or budget never mix in (a sweep the baseline won leaves a plain tag)."""
+    from .gasweep import load_best
     from .relay import evaluate
+    best = load_best("megaman")
+    tag = balance.config_tag(best.get("pop_size", GAConfig().pop_size), GENS) + ("_best" if best else "")
     root = os.path.join(variant_dir("megaman", variant), "probes")
-    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, "*", f"{section}_*", "best.npz"))]
+    runs = [os.path.dirname(p) for p in glob.glob(os.path.join(root, "megaman", persona, tag, f"{section}_*", "best.npz"))]
     finished = [r for r in sorted(runs) if balance.probe_done(r)]
     for r in sorted(set(runs) - set(finished)):
         print(f"  skip {r}: unfinished", flush=True)
@@ -228,10 +237,11 @@ def _best_retrained(variant: str, section: str, persona: str = "experienced") ->
 
 
 def persona_legs(persona: str, variant: str = RETRAINED, levels: list[str] | None = None) -> list | None:
-    """The Cut Man relay with the legs of `levels` (default: every section) replaced by `persona`'s
-    best run of that section trained on `variant`; None when one of them has no such run."""
+    """The Cut Man stage's legs, those of `levels` (default: every section) played by `persona`'s best
+    run of that section trained on `variant`; None when one of them has no such run. The other legs
+    stay empty: no scope a variant plays reaches them (a section mutant plays its section alone)."""
     from . import relay
-    legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
+    legs = relay.stage_legs(MEGAMAN_STAGE)      # not the hand-picked relay.json: a fresh runs/ has none
     for leg in legs:
         if levels is None or leg.level in levels:
             run = _best_retrained(variant, leg.level, persona)
@@ -259,16 +269,21 @@ def play_megaman(variant: str, episodes: int = 20, replay: bool = False, persona
         scopes = [MEGAMAN_STAGE] + sorted({x["section"] for x in eval_mutants.eval_set("megaman") if x["section"]})
     else:
         scopes = [m["section"]] if m["section"] else [MEGAMAN_STAGE] + m["retrain_levels"]
-    with eval_mutants._named(m["dir"] if m else None):
-        if m is None:
-            legs = relay.load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE)
-        else:
-            trained = m["id"] if m["retrain"] and not replay else RETRAINED
+    if m is None:
+        manifest = os.path.join("runs", "megaman", "relay.json")
+        if not os.path.exists(manifest):        # base is the older pipeline's hand-picked relay, kept as context
+            print(f"  {variant:<22}{persona:<13}no hand-picked relay ({manifest}): nothing to play", flush=True)
+            return []
+        legs = relay.load_legs(manifest, MEGAMAN_STAGE)
+    else:
+        trained = m["id"] if m["retrain"] and not replay else RETRAINED
+        with eval_mutants._named(m["dir"] if trained == m["id"] else None):   # legs are picked where they trained
             legs = persona_legs(persona, trained, m["retrain_levels"])
-            if legs is None:
-                print(f"  {variant:<22}{persona:<13}missing: a section with no {persona} agent retrained on {trained}",
-                      flush=True)
-                return []
+        if legs is None:
+            print(f"  {variant:<22}{persona:<13}missing: a section with no {persona} agent retrained on {trained}",
+                  flush=True)
+            return []
+    with eval_mutants._named(m["dir"] if m else None):
         rows = []
         for scope in scopes:
             use = legs if scope == MEGAMAN_STAGE else [leg for leg in legs if leg.level == scope]
@@ -295,8 +310,7 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
             rows = [dict(play_random(game, level, s), variant=variant)
                     for s in range(len(PERSONA_ORDER) * len(SEEDS))]
         path = os.path.join(variant_dir(game, variant), "agents_random.csv")
-        episode_log.reset(path)
-        episode_log.append(path, rows)
+        episode_log.rewrite(path, rows)
         return f"wrote {path} ({sum(r['status'] == 'WON' for r in rows)}/{len(rows)} won)"
     if replay and (m is None or not m["retrain"] or kind in (RETRAINED, RESEEDED)):
         return f"skip {variant}: only a retrained mutant has a replay of its own"
@@ -319,11 +333,8 @@ def play(game: str, variant: str, personas: list[str] | None = None, episodes: i
                     print(f"  {variant:<20}{persona:<13}{row['status']:<6}{row['cause'] or '':<10}"
                           f"{100 * (row['progress'] or 0):>4.0f}%  {row['time_s']:>6.1f} s", flush=True)
     keep = [r for r in (episode_log.read(path) if os.path.exists(path) else []) if r.get("persona") not in personas]
-    if not rows:
-        return f"nothing for {variant}: no agents to play it"
-    episode_log.reset(path)
-    episode_log.append(path, keep + rows)
-    return f"wrote {path}"
+    episode_log.rewrite(path, keep + rows)  # rows of agents that can no longer play go too
+    return f"wrote {path}" if rows else f"nothing for {variant}: no agents to play it"
 
 
 def main() -> None:
@@ -356,10 +367,12 @@ def main() -> None:
         return
     if args.cmd == "retrain":
         if args.game == "megaman":                       # each section with --persona, else the persona its relay leg plays
-            from .relay import load_legs
+            from .relay import load_legs, stage_legs
             m = mutant("megaman", args.mutant)
             jobs: dict = {}
-            for leg in load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE):
+            legs = (stage_legs(MEGAMAN_STAGE) if args.persona       # the relay is only asked whose leg it is
+                    else load_legs(os.path.join("runs", "megaman", "relay.json"), MEGAMAN_STAGE))
+            for leg in legs:
                 if leg.level in (m or {}).get("retrain_levels", []) and (not args.level or leg.level in args.level):
                     for persona in args.persona or [leg.persona.name]:
                         jobs.setdefault(persona, []).append(leg.level)

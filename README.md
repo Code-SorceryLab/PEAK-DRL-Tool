@@ -423,7 +423,7 @@ Optional hooks a non-platformer will want:
 
 | Hook | Why |
 |---|---|
-| `TOPDOWN_GAMES` + `N_OUTPUTS_BY_GAME` | Grow the network's output layer past `left/right/jump` — Bomberman uses 5 (jump = drop a bomb, plus up/down) |
+| `N_OUTPUTS_BY_GAME` | Grow the network's output layer past `left/right/jump` — Bomberman uses 5 (jump = drop a bomb, plus up/down) |
 | `N_INPUTS_BY_GAME` + `sense()` + `SENSOR_LABELS` | Own the ray-mode sensor vector. `sensors.py` hands `sense()` the ray marcher and returns whatever you build; `SENSOR_LABELS` is what the dashboard's telemetry panel renders, so every slot gets a name and a one-line explanation |
 | `reach` | What the progress bar measures, when it isn't pixel-x |
 

@@ -6,7 +6,7 @@ import pandas as pd
 
 from data import parse_route
 
-ENTROPY_BINS = 64
+ENTROPY_BINS = 10   # as registry.py and balance.py: the 0.4 +- 0.1 death-spread band is set for 10 bins
 ROUTE_PROFILE_BINS = 50
 
 

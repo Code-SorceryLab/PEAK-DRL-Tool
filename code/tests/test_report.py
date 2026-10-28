@@ -87,8 +87,8 @@ def test_collect_routes_merges_routes_json_and_csv_and_finds_the_fastest_win(tmp
         (probe / f"Mario1-1_{seed}" / "routes.json").write_text(json.dumps(
             {"level": "Mario1-1", "persona": "novice", "won": won, "lost": lost, "best": best, "best_time_s": t}))
     routes, best = report._collect_routes("mario", "novice", "Mario1-1", "p10g200")
-    assert [r["p"] for r in routes if r["w"]] == won + won           # wins first, merged over seeds in order
-    assert [r["p"] for r in routes if not r["w"]] == lost + lost
+    assert [r["p"] for r in routes if r["w"]] == [won[0], won[0], won[1], won[1]]   # wins first, seeds in turn
+    assert [r["p"] for r in routes if not r["w"]] == [lost[0], lost[0], lost[1], lost[1]]
     assert best == {"p": won[1], "t": 24.5, "seed": "2025"}          # the faster of the two seeds' bests
 
     # a seed with an episode log is read from it; its quicker win becomes the fastest

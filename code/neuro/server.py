@@ -103,8 +103,12 @@ async def _ws_handler(ws, state: SharedState) -> None:
 
 
 def _run_ws(state: SharedState, port: int) -> None:
+    http = port - WS_OFFSET     # the dashboard page's port: it derives this one as http + WS_OFFSET
+    # only our own page (or a client that is no browser: no Origin) may switch levels or take control
+    origins = [f"http://127.0.0.1:{http}", f"http://localhost:{http}", None]
+
     async def serve() -> None:
-        async with websockets.serve(lambda ws: _ws_handler(ws, state), "127.0.0.1", port):
+        async with websockets.serve(lambda ws: _ws_handler(ws, state), "127.0.0.1", port, origins=origins):
             await asyncio.Future()
 
     asyncio.run(serve())

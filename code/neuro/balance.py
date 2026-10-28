@@ -141,8 +141,9 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
               best_fitness: float, best_gen: int) -> dict:
     """Fold one probe's per-generation history into a cell (pure; also used by --rebuild)."""
     first_win = next((r["gen"] for r in hist if r["wins"] > 0), None)
-    # the WIN_WINDOW gens from the first win on; a budget that ends sooner must not reach back before it
-    tail = [r for r in hist if first_win is not None and r["gen"] >= first_win][-WIN_WINDOW:] or hist[-WIN_WINDOW:]
+    # the WIN_WINDOW gens after the first win, however soon the budget ends (a win in the last gen: that gen alone)
+    tail = ([r for r in hist if first_win is not None and r["gen"] > first_win][:WIN_WINDOW]
+            or [r for r in hist if r["gen"] == first_win] or hist[-WIN_WINDOW:])
     episodes = len(tail) * pop_size
     causes: dict[str, int] = {}
     stuck = 0
@@ -157,7 +158,9 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
     death_hist = [0] * 10  # death-location heatmap, 10 bins across the level
     progress_at_death = []
     for e in dead_eps:
-        p = min(max((e.get("end_x") or 0.0) / level_len, 0.0), 1.0)
+        # a game that measures its own progress (Meat Boy climbs: x is not progress) wins over x / width, as in trainer.py
+        p = e["progress"] if e.get("progress") is not None else (e.get("end_x") or 0.0) / level_len
+        p = min(max(p, 0.0), 1.0)
         progress_at_death.append(p)
         death_hist[min(int(p * 10), 9)] += 1
     total_deaths = sum(death_hist)
@@ -521,8 +524,22 @@ def main() -> None:
     tag = config_tag(best_ov.get("pop_size", GAConfig().pop_size), args.gens, args.sensors)
     if best_ov:
         tag += "_best"
+        # the tag names no config, so a newer ga_best.yaml must not train into (or report beside) older probes
+        from .gasweep import AXES
+        want = {k: getattr(GAConfig(**best_ov), k) for k in AXES}
+        for d in sorted(glob.glob(os.path.join(root, args.game, persona.name, tag, "*"))):
+            got = (probe_state(d) or {}).get("config") or {}
+            if any(k in got and got[k] != v for k, v in want.items()):
+                raise SystemExit(f"{d} was trained with another ga_best.yaml than {tag} means now: move "
+                                 f"{os.path.dirname(d)} aside first")
+    if root == PROBES_ROOT and not set(args.seeds) <= set(PAPER_SEEDS):
+        raise SystemExit(f"runs/probes reports only the paper seeds {PAPER_SEEDS}; pass --root for other seeds")
     jobs = [(args.game, lvl, seed, args.gens, persona, args.sensors, best_ov or None,
              probe_dir(args.game, persona.name, tag, lvl, seed, root)) for lvl in levels for seed in args.seeds]
+    todo = [j for j in jobs if not probe_done(j[7])]   # a resubmitted task keeps what finished; delete a dir to redo it
+    if len(todo) < len(jobs):
+        print(f"skip {len(jobs) - len(todo)} finished probe(s)", flush=True)
+    jobs = todo
     workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
     print(f"balance probe: {len(levels)} levels x {len(args.seeds)} seeds = {len(jobs)} jobs, "
           f"budget {args.gens} gens each, {workers} worker(s)  [{persona.name} · {tag} · {root}]\n", flush=True)

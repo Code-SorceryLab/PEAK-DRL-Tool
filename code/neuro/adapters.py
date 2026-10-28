@@ -46,7 +46,6 @@ class GameAdapter(Protocol):
 
 
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
-TOPDOWN_GAMES = {"bomberman"}                 # 2-D movement: the net grows up/down outputs
 N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6}   # megaman: left, right, jump, up, down, fire
 N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "meatboy": 21}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
 OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels kept in the game's own, editor-owned file
@@ -118,7 +117,10 @@ def _win_time_bonus(adapter) -> float:
 
 def _count_coins(core) -> int:
     ld = getattr(core, "level_data", None)  # some cores build level_data on the first reset
-    return len(ld.coins) if ld is not None else 0
+    if ld is None:
+        return 0
+    # loose coins and coin '?' blocks (Mario 1-1 has only the latter); a multi-coin brick counts once
+    return len(ld.coins) + sum(getattr(q, "contains", "") == "coin" for q in getattr(ld, "qblocks", []))
 
 
 def _episode_stats(adapter, x: float) -> dict:
@@ -178,9 +180,6 @@ class _EventWeights:
 
 class MarioAdapter(_EventWeights):
     """Wraps PlatformerCore, pinned to one level, one life, no curriculum, no gym obs."""
-
-    # move_x -1/0/+1 -> MultiDiscrete move component (1=left, 0=idle, 3=right; walk speed only)
-    _MOVE_MD = {-1: 1, 0: 0, 1: 3}
 
     def __init__(self, level: str | None, max_frames: int, win_bonus: float,
                  sprint: bool = False, time_rate: float = 0.0) -> None:
@@ -274,6 +273,7 @@ class MarioAdapter(_EventWeights):
         # the core jumps only on a fresh press (8faff6ef): a held jump re-presses on landing, as a human taps again
         landed_holding = jump and self._sent_jump and self.core.player.on_ground
         self._sent_jump = bool(jump) and not landed_holding
+        self.core.lives = 1     # a 1-UP must not buy a soft reset to the spawn mid-episode (it wipes the fitness)
         _, _, terminated, truncated, _ = self.core.step([_move_md(move_x, self.sprint), int(self._sent_jump), 0])
         self.kills += int(getattr(self.core, "kills_step", 0) or 0)
         if terminated or truncated:

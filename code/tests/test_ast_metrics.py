@@ -173,8 +173,11 @@ def test_replays_sit_beside_the_retrained_attempts(tmp_path, monkeypatch):
     assert e["agents"]["attempts"] == 3 and e["replay"]["agents"]["attempts"] == 3
 
 
-def test_the_reseeded_original_trains_with_new_seeds():
+def test_the_reseeded_original_trains_with_new_seeds(tmp_path, monkeypatch):
     from code.neuro import ast_eval
+    (tmp_path / "report_mario_novice_p10g200.json").write_text(      # the trained runs/ are not on every branch
+        json.dumps({"tag": "p10g200", "levels": [{"level": "Mario1-1", "win_rate_mean": 0.5}]}))
+    monkeypatch.setattr(ast_eval.balance, "BALANCE_DIR", str(tmp_path))
     m = ast_eval.mutant("mario", ast_eval.RESEEDED)
     assert m["retrain"] and m["dir"] is None and m["retrain_levels"] == ["Mario1-1"]
     assert not set(m["seeds"]) & set(ast_eval.SEEDS)
@@ -190,6 +193,7 @@ def test_mega_mans_original_is_retrained_with_the_mutants_command():
     cmd, env = ast_eval.retrain_job("megaman", "base-retrained", "experienced", levels=["CutMan-3-Ledges"])
     arg = {k: cmd[cmd.index(k) + 1] for k in ("--levels", "--gens", "--root")}
     assert env["PEAK_MUTANT"] == "" and cmd[cmd.index("--seeds") + 1:][:3] == list(map(str, ast_eval.SEEDS))
+    assert "--best" in cmd                                                   # Mega Man trains on its GA-sweep winners
     assert arg == {"--levels": "CutMan-3-Ledges", "--gens": "200",
                    "--root": os.path.join("runs", "ast", "megaman", "base-retrained", "probes")}
 

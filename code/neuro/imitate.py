@@ -158,34 +158,6 @@ def to_run(params, out_dir: str, hidden: int, memory: int, report: dict, seed: i
     return out_dir
 
 
-def record_agent(run_dir: str, level: str, attempts: int = 3, max_frames: int = 3600) -> list[dict]:
-    """Demonstrations played by a trained agent instead of a person, in the same shape as
-    manual_play --demo writes. For checking the fit: a clone of a good agent should play like it."""
-    from .adapters import make_adapter
-    from .relay import load_net
-    from .sensors import read_sensors
-    net, sensors, _ = load_net(run_dir)
-    demos = []
-    for k in range(attempts):
-        adapter = make_adapter(GAME, level, max_frames, 5000.0)
-        adapter.attempts = 1
-        adapter.core._seed = k
-        adapter.reset()
-        net.reset()
-        xs, held, where = [], [], []
-        while adapter.alive:
-            vec = read_sensors(adapter, sensors)[0]
-            move_x, jump, move_y, fire = net.act(vec)
-            xs.append(vec)
-            held.append((move_x, int(jump), move_y, int(fire)))
-            where.append((*adapter.core.screen, round(adapter.x), round(adapter.y), adapter.core.player.hp))
-            adapter.step(move_x, jump, move_y, fire)
-        demos.append({"path": f"{run_dir}#{k}", "meta": {"status": adapter.status, "level": level, "compass": "screen"},
-                      "sensors": np.asarray(xs, np.float32), "held": np.asarray(held, np.int8),
-                      "where": np.asarray(where, np.int32)})
-    return demos
-
-
 def main() -> None:
     from .relay import evaluate, stage_legs
     ap = argparse.ArgumentParser(description="Fit agent networks to recorded demonstrations")

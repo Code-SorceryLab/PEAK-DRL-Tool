@@ -400,7 +400,9 @@ async def _serve_ws(wall: Wall, port: int) -> None:
             asyncio.get_running_loop().add_signal_handler(sig, lambda: stop.done() or stop.set_result(None))
         except NotImplementedError:                    # Windows: Ctrl+C reaches asyncio.run as KeyboardInterrupt
             break
-    async with websockets.serve(handler, "127.0.0.1", port, max_size=None):
+    http = port - 765           # web/cameras.html connects to its own port + 765; nothing else may drive the wall
+    origins = [f"http://127.0.0.1:{http}", f"http://localhost:{http}", None]
+    async with websockets.serve(handler, "127.0.0.1", port, max_size=None, origins=origins):
         await stop
 
 

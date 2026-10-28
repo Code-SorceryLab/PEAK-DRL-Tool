@@ -255,7 +255,8 @@ def main() -> None:
                 continue
             print(f"{leg.level:<20}{100 * s['tested_win_rate']:>11.0f}%{100 * s['tested_progress']:>13.0f}%"
                   f"{s['candidates']:>6}  {s['run']}")
-        with open(manifest, "w", encoding="utf-8") as f:
+        from code.stats.episode_log import atomic_open
+        with atomic_open(manifest, "w", encoding="utf-8") as f:    # the pipeline page and AST read it meanwhile
             json.dump({"stage": args.stage, "legs": chosen}, f, indent=2)
         print(f"\nwrote {manifest}")
         return
@@ -301,7 +302,6 @@ def main() -> None:
     from code.stats import episode_log, summarize
     out = args.out or os.path.join(args.runs, "relay", *(("sections", args.section) if args.section else ()))
     csv_path = os.path.join(out, "episodes.csv")
-    episode_log.reset(csv_path)                         # one batch per file: rerunning replaces it
     session = os.path.basename(manifest)
     episodes = []
     for i in range(args.episodes):
@@ -312,7 +312,8 @@ def main() -> None:
               f"kills {e['kills']}", flush=True)
     print()
     print(report(episodes, legs, args.section or "the full stage"))
-    episode_log.append(csv_path, episodes)              # the shared telemetry: one row per episode
+    episode_log.rewrite(csv_path, episodes)             # one batch per file: a finished rerun replaces it,
+                                                        # a killed one leaves the old; one row per episode
     summarize.summarize_file(csv_path, verbose=False)   # -> metrics.json beside it
     with open(os.path.join(out, "legs.json"), "w", encoding="utf-8") as f:
         json.dump({"stage": args.stage, "section": args.section, "manifest": manifest, "legs": {leg.level: leg.run_dir for leg in legs}}, f, indent=2)

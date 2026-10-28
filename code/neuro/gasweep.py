@@ -28,7 +28,7 @@ import yaml
 
 from code.stats.episode_log import atomic_open
 
-from .balance import (BALANCE_DIR, config_tag, fmt_hms, probe_dir, run_jobs, write_report)
+from .balance import (BALANCE_DIR, config_tag, fmt_hms, probe_dir, probe_done, run_jobs, write_report)
 from .evolution import GAConfig
 from .personas import PERSONAS, get_persona
 from .sensors import SENSOR_MODES
@@ -209,8 +209,9 @@ def best_per_game(reports: list[dict]) -> dict:
     recommendation if it wins a strict majority of that game's sweeps, so one lucky persona cannot
     move a default on its own. Ties and minorities fall back to the baseline."""
     out: dict = {}
+    # a sweep around today's baseline comes last, so it replaces an older baseline's under the same key
     for (game, persona, gens, sensors, _sig), rs in sorted(_sweep_groups(reports).items(),
-                                                           key=lambda kv: [str(x) for x in kv[0]]):
+                                                           key=lambda kv: (kv[0][4] == base_sig(), [str(x) for x in kv[0]])):
         if not game:
             continue
         ov = best_config(rs)
@@ -335,6 +336,8 @@ def format_sweep(reports: list[dict]) -> str:
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 def _publish_best(out_dir: str = BALANCE_DIR, path: str | None = None) -> dict:
+    if path is None and os.path.normpath(out_dir) != os.path.normpath(BALANCE_DIR):
+        return {}       # a side sweep (--out elsewhere) holds a few reports: it must not rewrite ga_best.yaml
     games = write_best_yaml(load_reports(out_dir), path)
     if games:
         print(f"\nwrote {path or BEST_PATH}", flush=True)
@@ -391,10 +394,14 @@ def main() -> None:
             jobs += [(args.game, lvl, seed, args.gens, persona, args.sensors, ov,
                       probe_dir(args.game, persona.name, tag, lvl, seed, root=GASWEEP_ROOT))
                      for lvl in levels for seed in args.seeds]
+        todo = [j for j in jobs if not probe_done(j[7])]   # finished probes (base, a resubmit) are kept
+        if len(todo) < len(jobs):
+            print(f"skip {len(jobs) - len(todo)} finished probe(s)", flush=True)
+        jobs = todo
         jobs.sort(key=lambda j: -j[6].get("pop_size", 0))   # heavy configs first: better pool tail
         workers = args.workers or min(len(jobs), max(1, (os.cpu_count() or 2) - 1))
         print(f"GA sweep [{what}]: {len(configs)} configs x {len(levels)} levels x {len(args.seeds)} seeds "
-              f"= {len(jobs)} probes, budget {args.gens} gens each, ≈{cost_multiplier(configs):.0f}x one "
+              f"= {len(jobs)} probes, budget {args.gens} gens each, ~{cost_multiplier(configs):.0f}x one "
               f"balance sweep, {workers} worker(s)  [{args.game} · {persona.name} · {args.sensors}]\n", flush=True)
         t0 = time.time()
         run_jobs(jobs, workers, label=lambda j: f"{os.path.basename(os.path.dirname(j[7]))} · {j[1]} seed {j[2]}")

@@ -1,5 +1,6 @@
 """AST evaluation on every level (code/neuro/ast_eval.py): a variant named <id>@<level> is retrained,
 played and compared on its own level, against the baseline agents of that level."""
+import json
 import os
 
 import pytest
@@ -18,8 +19,15 @@ def on_disk(tmp_path_factory):
 
 
 @pytest.fixture
-def placed(on_disk, monkeypatch):
+def placed(on_disk, monkeypatch, tmp_path):
     monkeypatch.setattr(em, "out_dir", lambda game: on_disk if game == "meatboy" else os.path.join("runs", game, "mutants"))
+    # level 5's 200-generation reports, where --best won (the trained runs/ data is not on every branch)
+    reports = tmp_path / "balance"
+    reports.mkdir()
+    for tag, wr in (("p10g200", 0.2), ("p30g200_best", 0.5)):
+        (reports / f"report_meatboy_experienced_{tag}.json").write_text(
+            json.dumps({"tag": tag, "levels": [{"level": "5", "win_rate_mean": wr}]}))
+    monkeypatch.setattr(balance, "BALANCE_DIR", str(reports))
 
 
 def test_every_level_with_mutants_gets_its_own_base_and_false_alarm_check(placed):
@@ -62,8 +70,7 @@ def test_a_level_variant_is_played_on_its_level_and_replayed_by_that_levels_base
     monkeypatch.setattr(ast_eval, "ROOT", str(tmp_path))
     monkeypatch.setattr(ast_eval.os.path, "exists", lambda p: True)
     monkeypatch.setattr(ast_eval.balance, "probe_done", lambda run: True)
-    monkeypatch.setattr(ast_eval.episode_log, "reset", lambda p: None)
-    monkeypatch.setattr(ast_eval.episode_log, "append", lambda p, rows: None)
+    monkeypatch.setattr(ast_eval.episode_log, "rewrite", lambda p, rows: None)
     ast_eval.play("meatboy", "base@5", ["experienced"])
     ast_eval.play("meatboy", "seal_route@5", ["experienced"], replay=True)
     assert {lv for _, lv, _ in seen} == {"5"}

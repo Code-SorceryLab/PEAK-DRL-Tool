@@ -113,20 +113,17 @@ def fig_capacity(groups: dict, out: str) -> bool:
     ax.text(0.99, budget, f"budget ({budget} gens)", ha="right", va="bottom", color=DIM, fontsize=10, transform=ax.get_yaxis_transform())
     games = list(dict.fromkeys(s[0] for s in series))
     styles = ["-", "--", "-.", ":"]
-    ticks: dict[int, int] = {}
+    hs = sorted({p["ga"]["hidden"] for *_, pts in series for p in pts})   # one axis for every game: weights differ
     for game, persona, _b, pts in series:
-        xs = [p["n_params"] for p in pts]
-        for p in pts:
-            ticks[p["n_params"]] = p["ga"]["hidden"]
+        xs = [hs.index(p["ga"]["hidden"]) for p in pts]
         ys, cis = [p["fw"] for p in pts], [p["fw_ci"] or 0 for p in pts]
         col = PCOL.get(persona, DIM)
-        ax.plot(range(len(xs)), ys, styles[games.index(game) % 4], color=col, marker="o", lw=2,
+        ax.plot(xs, ys, styles[games.index(game) % 4], color=col, marker="o", lw=2,
                 label=f"{GNAME.get(game, game)} · {persona}")
-        ax.fill_between(range(len(xs)), [y - c for y, c in zip(ys, cis)], [y + c for y, c in zip(ys, cis)],
+        ax.fill_between(xs, [y - c for y, c in zip(ys, cis)], [y + c for y, c in zip(ys, cis)],
                         color=col, alpha=0.07, lw=0)
-    xt = sorted(ticks)
-    ax.set_xticks(range(len(xt)), [f"{n}\nh = {ticks[n]}" for n in xt])
-    ax.set_xlabel("network weights (hidden size)")
+    ax.set_xticks(range(len(hs)), [f"h = {h}" for h in hs])
+    ax.set_xlabel("hidden units (the weight count differs by game)")
     ax.set_ylabel("generations to first win (mean over level × seed)")
     ax.set_ylim(0, budget * 1.08)
     ax.set_title("Bigger nets don't win sooner", loc="left", fontsize=16, fontweight="bold", pad=14)

@@ -149,12 +149,15 @@ if df_all.empty:
     st.warning(f"No CSV data found in `{data_path}`. Make sure the path is correct and CSVs exist.")
     st.stop()
 
+games = sorted(df_all["game"].unique().tolist()) if "game" in df_all.columns else []
+if len(games) > 1:      # level ids repeat across games ("3" is a Meat Boy and a Bomberman level): one game at a time
+    df_all = df_all[df_all["game"] == st.selectbox("game", games)]
 worlds = sorted(df_all["world"].unique().tolist())
 
 # ── Session state ───────────────────────────────────────────────────────────
 if "selected_metric" not in st.session_state:
     st.session_state.selected_metric = list(metrics_cfg.keys())[0] if metrics_cfg else "B1_challenge_calibration"
-if "selected_world" not in st.session_state:
+if st.session_state.get("selected_world") not in worlds:
     st.session_state.selected_world = worlds[0] if worlds else None
 
 
