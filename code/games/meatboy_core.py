@@ -12,6 +12,7 @@ from .modules.Objects.GameObject import GameObject
 from .modules.Objects.MeatboyPlayer import MeatboyPlayer
 from .modules.System.LevelLoader import LevelLoader
 from .modules.System.MeatboyPhysicsManager import MeatboyPhysicsManager, MeatboyContext
+from .modules.System.debugging_mods.manager import DebugManager
 from .modules.Parameters.Map_parameters import (
     TILE_SIZE, TILE_GOAL, TILE_SPIKE, TILE_PIT, TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK,
     TILE_AIR, TILE_CRUMBLE,
@@ -21,23 +22,36 @@ from .modules.Parameters.Map_parameters import (
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "meatboy_config.yaml")
 _SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}   # crumble handled separately
 _HAZARD = {TILE_SPIKE, TILE_PIT}
-_CRUMBLE_DELAY = 0.5   # seconds after first touch before a crumble tile dissolves
 _CORE_SCALARS = 11     # see _build_scalars layout
+DEBUG_PANEL_WIDTH = 350   # the side debug panel (human mode only), as Mario's
 
 
 class MeatboyCore:
-    """Super Meat Boy — monolithic character (the "old way", like PlatformerCore).
+    """Super Meat Boy: monolithic character (the "old way", like PlatformerCore).
 
     A single MeatboyPlayer + a per-game MeatboyPhysicsManager, mirroring how
     Sonic is structured. Mirrors the Gym contract GameEnv/train.py
     expect (reset/step/render + get_*_space)."""
 
-    WIDTH = 672
-    HEIGHT = 672
+    WIDTH = 1280      # the game's own window: 40 x 22.5 tiles, so most World 1 levels fit whole
+    HEIGHT = 720
+    DEBUG_PANEL_X = WIDTH
+
+    @property
+    def TOTAL_WIDTH(self):
+        """The window with the debug panel (human mode only)."""
+        return self.WIDTH + DEBUG_PANEL_WIDTH if self.render_mode == "human" else self.WIDTH
 
     def __init__(self, render_mode: str = "none", max_steps=None,
                  persona=None, arch_tag: str = "mlp", **kwargs):
         self.render_mode = render_mode
+        self.camera_x = self.camera_y = 0.0
+        self._cam_offset = [0.0, 0.0]     # F2 free camera
+        if render_mode == "human":        # the core owns the window and its F1-F7 debug panel, as Mario's does
+            pygame.init()
+            pygame.display.set_caption("Super Meat Boy (PEAK)")
+            self._surf = pygame.display.set_mode((self.TOTAL_WIDTH, self.HEIGHT))
+            self.debug_manager = DebugManager(print_help=True)
         with open(_CONFIG_PATH, "r") as f:
             self.cfg = yaml.safe_load(f)
         self.mutant = mutants.active("meatboy")    # PEAK_MUTANT: play that copy of the game
@@ -45,17 +59,17 @@ class MeatboyCore:
         self.tile_size = int(self.cfg.get("tile_size", TILE_SIZE))
         phys = self.cfg.get("physics", {})
         self.ctx = MeatboyContext(
-            gravity=float(phys.get("gravity", 1060.0)),
-            fast_fall_grav=float(phys.get("fast_fall_grav", 1060.0)),
-            max_fall_speed=float(phys.get("max_fall_speed", 1400.0)),
+            gravity=float(phys["gravity"]),
+            max_fall_speed=float(phys["max_fall_speed"]),
             tile_size=self.tile_size,
         )
         self._movement = dict(self.cfg.get("movement", {}))
         self._jump = dict(self.cfg.get("jump", {}))
         self._wall = dict(self.cfg.get("wall", {}))
         pdims = self.cfg.get("player", {})
-        self._pw = int(pdims.get("width", 18))
-        self._ph = int(pdims.get("height", 26))
+        self._pw = int(pdims["width"])
+        self._ph = int(pdims["height"])
+        self._crumble_delay = float(self.cfg["crumble_seconds"])
         self.levels = list(self.cfg.get("levels", []))
         self.max_steps = int(max_steps) if max_steps else int(self.cfg.get("max_steps", 4000))
         self._human = render_mode in ("human", "random")
@@ -122,12 +136,13 @@ class MeatboyCore:
         self.won = False
         self.death_cause = ""
         self._crumble_timers = {}
-        self._blood = set()
+        if getattr(self, "current_level", None) != self.levels[self._level_idx % len(self.levels)]:
+            self._blood = set()        # blood stays on the walls across attempts, as in the game
         # Clear the shaping anchor at the episode boundary. The shared
         # _ScoreTracker only resets on `terminated`, NOT on truncation, so
         # relying on it leaked a stale distance across timed-out episodes and
         # produced a large spurious potential spike on step 1 of the next one.
-        # The core owns the anchor instead — it is the only thing that knows
+        # The core owns the anchor instead: it is the only thing that knows
         # exactly when an episode begins.
         self._bfs_prev = None
         self._load_level()
@@ -139,12 +154,21 @@ class MeatboyCore:
 
     def step(self, action):
         self._steps += 1
+        dt = 1 / 60.0
+        dm = getattr(self, "debug_manager", None)
+        if dm:
+            dm.update_input()
+            dt = dt / 2 if dm.slow_motion else dt                           # F3
+            if dm.free_cam_active:                                          # F2: IJKL
+                self._cam_offset = [o + m * dt for o, m in zip(self._cam_offset, dm.current_cam_move)]
+            else:
+                self._cam_offset = [0.0, 0.0]
         self.player.handle_input(action)
-        self.player.control(1 / 60.0, self.ctx)          # velocity only
-        self.physics.step(self.player, self.level_data.grid, self.ctx, 1 / 60.0)
+        self.player.control(dt, self.ctx)                # velocity only
+        self.physics.step(self.player, self.level_data.grid, self.ctx, dt)
         for saw in self.level_data.saws:
-            saw.update(1 / 60.0)
-        self._update_crumble(1 / 60.0)
+            saw.update(dt)
+        self._update_crumble(dt)
 
         terminated = False
         truncated = False
@@ -171,7 +195,7 @@ class MeatboyCore:
 
     # ---- hazards / crumble ----
     def _update_crumble(self, dt):
-        """Crumble tiles dissolve _CRUMBLE_DELAY seconds after first contact."""
+        """Crumble tiles dissolve crumble_seconds after first contact (back on the next attempt)."""
         ts = self.tile_size
         grid = self.level_data.grid
         touch = self.player.get_rect().inflate(4, 4)
@@ -179,7 +203,7 @@ class MeatboyCore:
             for row in range(max(0, touch.top // ts), touch.bottom // ts + 1):
                 if (0 <= row < self.level_data.rows and 0 <= col < self.level_data.cols
                         and grid[row][col] == TILE_CRUMBLE):
-                    self._crumble_timers.setdefault((row, col), _CRUMBLE_DELAY)
+                    self._crumble_timers.setdefault((row, col), self._crumble_delay)
         for (row, col) in list(self._crumble_timers):
             self._crumble_timers[(row, col)] -= dt
             if self._crumble_timers[(row, col)] <= 0:
@@ -208,7 +232,7 @@ class MeatboyCore:
                 tr = pygame.Rect(col * self.tile_size, row * self.tile_size,
                                  self.tile_size, self.tile_size)
                 if prect.colliderect(tr):
-                    return "Spike" if t == TILE_SPIKE else "Pit"
+                    return "Fire" if t == TILE_SPIKE else "Pit"
         return None
 
     def _touching_goal(self):
@@ -317,7 +341,7 @@ class MeatboyCore:
     def _bfs_norm_dist(self):
         """Player-cell BFS distance to goal, normalised to [0,1] (0 = at goal,
         1 = farthest reachable). Returns -1.0 when the cell is unreachable or
-        off-grid — the sentinel the shared tracker treats as "no information"
+        off-grid: the sentinel the shared tracker treats as "no information"
         (mirrors the platformer dijkstra_dist convention). This is a path
         distance (correct through walls), unlike euclidean goal_dist."""
         if self._dist is None:
@@ -366,8 +390,9 @@ class MeatboyCore:
     def _camera(self, view_w, view_h):
         cx = self.player.x + self.player.width / 2 - view_w / 2
         cy = self.player.y + self.player.height / 2 - view_h / 2
-        cx = max(0.0, min(cx, max(0.0, self.level_data.width - view_w)))
-        cy = max(0.0, min(cy, max(0.0, self.level_data.height - view_h)))
+        lw, lh = self.level_data.width, self.level_data.height
+        cx = (lw - view_w) / 2 if lw <= view_w else max(0.0, min(cx, lw - view_w))   # a small level sits centred
+        cy = (lh - view_h) / 2 if lh <= view_h else max(0.0, min(cy, lh - view_h))
         return cx, cy
 
     def render(self, surface=None, blit_only=False):
@@ -376,9 +401,14 @@ class MeatboyCore:
         from . import meatboy_art as A
         if surface is None:
             return
+        window = surface
+        if surface.get_width() > self.WIDTH:                        # the window with the debug panel
+            surface = surface.subsurface((0, 0, self.WIDTH, min(self.HEIGHT, surface.get_height())))
         ts, ld, p = self.tile_size, self.level_data, self.player
         vw, vh = surface.get_width(), surface.get_height()
         camx, camy = self._camera(vw, vh)
+        camx, camy = camx + self._cam_offset[0], camy + self._cam_offset[1]
+        self.camera_x, self.camera_y = camx, camy                   # the debug overlays draw with it
         surface.blit(A.backdrop(vw, vh), (0, 0))
         blood = self.__dict__.setdefault("_blood", set())         # (col, row, side) stained (drawing only)
         if self.alive:
@@ -405,23 +435,98 @@ class MeatboyCore:
                         pygame.draw.rect(surface, A.BLOOD, (x + ts - band, y, band, ts))
                 elif t == TILE_CRUMBLE:
                     surface.blit(A.crumble(ts), (x, y))
-                elif t == TILE_SPIKE:
-                    surface.blit(A.spikes(ts), (x, y))
+                elif t == TILE_SPIKE:                               # World 1 has no spikes: fire (1-11)
+                    surface.blit(A.fire(ts, (self._steps // 6 + c) % 3), (x, y))
                 elif t == TILE_GOAL:
                     girl = A.bandage_girl(ts)
                     surface.blit(girl, (x + (ts - girl.get_width()) // 2, y + ts - girl.get_height() + 4))
         for saw in ld.saws:
             saw.render(surface, saw.cx - camx, saw.cy - camy)
         if self.alive or self.won:
-            pose = 4 if getattr(p, "wall_dir", 0) and not p.on_ground else 3 if not p.on_ground else                 (1 + (self._steps // 5) % 2 if abs(p.vx) > 20 else 0)
-            side = p.height - 5                                     # a cube, as in the game: square body on legs
-            img = A.meat_boy(side, p.height, p.facing_right, pose)
-            surface.blit(img, (int(p.x + p.width / 2 - side / 2 - camx) - 4, int(p.y - camy) - 4))
+            pose = 4 if p.wall_dir else 3 if not p.on_ground else (1 + (self._steps // 5) % 2 if abs(p.vx) > 20 else 0)
+            img = A.meat_boy(p.width, p.height, p.facing_right, pose)  # a cube on stubby legs, the body's size
+            surface.blit(img, (int(p.x - camx) - 4, int(p.y - camy) - 4))
         else:                                                       # splat
             for k in range(10):
                 a = k * 0.63
                 pygame.draw.circle(surface, A.MEAT, (int(p.x - camx + p.width / 2 + 14 * math.cos(a)),
                                                      int(p.y - camy + p.height / 2 + 14 * math.sin(a))), 4)
+        A.timer_sign(surface, self._steps / 60.0)                   # the hanging sign at the top left
+        dm = getattr(self, "debug_manager", None)
+        if dm:
+            dm.render_overlays(window, self)
+            if dm.show_sensors:                                     # F1: what a PEAK agent senses here
+                self._draw_agent_rays(surface)
+
+    # ---- debug panel hooks (DebugManager / overlays.py read these, as they read Mario's core) ----
+    @property
+    def obs_width(self):
+        return self.window
+
+    obs_height = obs_width
+
+    @property
+    def obs_pad_x(self):
+        return self.window // 2
+
+    obs_pad_y = obs_pad_x
+
+    @property
+    def frame(self):
+        return self._steps
+
+    @property
+    def gravity(self):
+        return self.ctx.gravity
+
+    @property
+    def jump_force(self):
+        return float(self._jump["jump_vel"])
+
+    def _world_to_screen(self, gObj):
+        return gObj.x - self.camera_x, gObj.y - self.camera_y, True
+
+    def get_jump_arc_debug_state(self):
+        """The arc a jump starts now: off the ground, off a wall, or the one in flight."""
+        p = self.player
+        state = {"x": p.x, "y": p.y, "grounded": p.on_ground, "can_jump": True, "vx": p.vx, "vy": p.vy}
+        if p.on_ground:
+            state["vy"] = -self.jump_force
+        elif p.wall_dir:
+            state.update(vx=-p.wall_dir * float(self._wall["wall_jump_push"]), vy=-float(self._wall["wall_jump_vy"]))
+        return state
+
+    def get_debug_hud_strip_items(self):
+        p = self.player
+        state = ("WALL" if p.sliding else "AIR") if not p.on_ground else ("RUN" if p.run_held and p.vx else
+                                                                           "WALK" if p.vx else "STAND")
+        name = os.path.splitext(os.path.basename(self.current_level))[0].replace("world", "").split("_")
+        return [("LEVEL", f"{int(name[0])}-{int(name[1])}" if name[0].isdigit() else name[0], (210, 215, 228)),
+                ("TIME", f"{self._steps / 60:.2f}", (210, 215, 228)),
+                ("STATE", state, (80, 225, 115)),
+                ("WALL J", str(p.wall_jumps), (210, 215, 228)),
+                ("SPEED", f"{abs(p.vx):.0f}", (85, 190, 255))]
+
+    def _player_obs(self):
+        return self._build_scalars()[:_CORE_SCALARS]
+
+    def _tracking_obs(self):
+        return self._build_scalars()[_CORE_SCALARS:]
+
+    def get_obs_value_labels(self):
+        return (["Px", "Py", "Vx", "Vy", "Grnd", "FaceR", "WallL", "WallR", "Ceil", "GoalDX", "GoalDY"],
+                ["Run", "Rise", "Slide", "WallDir", "Stick", "WallJ"])
+
+    def _draw_agent_rays(self, surface):
+        """The agents' sensor rays (code/neuro/sensors.py) from where Meat Boy stands."""
+        from code.neuro.adapters import MeatboyAdapter
+        from code.neuro.sensors import read_sensors
+        probe = MeatboyAdapter.__new__(MeatboyAdapter)              # the adapter's queries over this live core
+        probe.core, probe.tile_size = self, self.tile_size
+        _, rays, _ = read_sensors(probe)
+        for x1, y1, x2, y2, hit in rays:
+            pygame.draw.line(surface, (255, 120, 30) if hit == 1 else (255, 40, 40) if hit == 2 else (255, 255, 255),
+                             (x1 - self.camera_x, y1 - self.camera_y), (x2 - self.camera_x, y2 - self.camera_y), 1)
 
 
 if __name__ == "__main__":
@@ -444,5 +549,5 @@ if __name__ == "__main__":
         if term or trunc:
             obs, info = core.reset()
     assert landed, "player never touched ground in 600 steps"
-    print(f"MeatboyCore smoke test OK — obs scalars={core.n_scalars}, "
+    print(f"MeatboyCore smoke test OK: obs scalars={core.n_scalars}, "
           f"action={core.action_space.nvec.tolist()}")

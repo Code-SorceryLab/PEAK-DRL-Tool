@@ -11,9 +11,8 @@ _SOLID = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_CRUMBLE}
 class MeatboyContext:
     """Physics constants the manager applies. Per-actor tuning (speeds, jump)
     lives on the player, not here."""
-    gravity: float = 1060.0
-    fast_fall_grav: float = 1060.0
-    max_fall_speed: float = 1400.0
+    gravity: float = 918.0
+    max_fall_speed: float = 500.0
     tile_size: int = 32
 
 
@@ -36,8 +35,8 @@ class MeatboyPhysicsManager:
         gObj = player.gObj
 
         # 1. gravity (player.control resets gravity_scale before this each frame)
-        grav = ctx.fast_fall_grav if player.vy > 0 else ctx.gravity
-        player.vy = min(player.vy + grav * player.gravity_scale * dt, ctx.max_fall_speed)
+        cap = ctx.max_fall_speed if player.fall_cap is None else player.fall_cap   # a wall slide caps lower
+        player.vy = min(player.vy + ctx.gravity * player.gravity_scale * dt, cap)
 
         # 2. CCD sub-steps so fast movers can't tunnel
         dist = max(abs(player.vx), abs(player.vy)) * dt

@@ -1,7 +1,7 @@
 {
   "game": "meatboy",
   "stage": "10",
-  "base_file": "meatboy/world1_11_salt_factory.txt",
+  "base_file": "meatboy/world1_11_fired.txt",
   "mutants": [
     {
       "id": "seal_route@10",
@@ -11,128 +11,170 @@
       "operator": "seal_route",
       "class": "breaking",
       "direction": "harder",
-      "description": "A wall along column 26, 18 tiles: the goal can no longer be reached",
+      "description": "A wall along column 34, 25 tiles: the goal can no longer be reached",
       "retrain": true,
-      "base_file": "meatboy/world1_11_salt_factory.txt",
+      "base_file": "meatboy/world1_11_fired.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          26,
+          34,
           1,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           2,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           3,
           ".",
           "#"
         ],
         [
-          26,
+          34,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          34,
           5,
           ".",
           "#"
         ],
         [
-          26,
-          6,
-          ".",
-          "#"
-        ],
-        [
-          26,
-          7,
-          ".",
-          "#"
-        ],
-        [
-          26,
+          34,
           8,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           9,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           10,
           ".",
           "#"
         ],
         [
-          26,
+          34,
+          11,
+          ".",
+          "#"
+        ],
+        [
+          34,
           12,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           13,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           14,
           ".",
           "#"
         ],
         [
-          26,
+          34,
+          15,
+          ".",
+          "#"
+        ],
+        [
+          34,
           16,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           17,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           18,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           19,
           ".",
           "#"
         ],
         [
-          26,
+          34,
           20,
           ".",
           "#"
         ],
         [
-          26,
+          34,
+          21,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          22,
+          ".",
+          "#"
+        ],
+        [
+          34,
           23,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          24,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          25,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          26,
+          ".",
+          "#"
+        ],
+        [
+          34,
+          27,
           ".",
           "#"
         ]
       ],
       "location": {
-        "col": 26,
-        "row": 12
+        "col": 34,
+        "row": 15
       },
       "parameter": {
-        "tiles": 18
+        "tiles": 25
       },
       "note": "placed by rule (eval_mutants.place)",
       "checks": {
@@ -148,32 +190,44 @@
       "operator": "widen_gap",
       "class": "degrading",
       "direction": "harder",
-      "description": "The gap at row 15, columns 7-14, widened by 2 to the right: 8 tiles -> 10",
+      "description": "The gap at row 6, columns 29-31, widened by 2 to the right: 3 tiles -> 5",
       "retrain": true,
-      "base_file": "meatboy/world1_11_salt_factory.txt",
+      "base_file": "meatboy/world1_11_fired.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          15,
-          15,
+          32,
+          6,
           "#",
           "."
         ],
         [
-          16,
-          15,
+          32,
+          7,
+          "#",
+          "."
+        ],
+        [
+          33,
+          6,
+          "#",
+          "."
+        ],
+        [
+          33,
+          7,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 16,
-        "row": 15
+        "col": 33,
+        "row": 6
       },
       "parameter": {
-        "tiles": 2
+        "tiles": 4
       },
       "note": "placed by rule (eval_mutants.place)",
       "checks": {
@@ -189,25 +243,25 @@
       "operator": "jump_velocity_down",
       "class": "degrading",
       "direction": "harder",
-      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "description": "Jump velocity x0.85: jump.jump_vel 470 -> 399.5",
       "retrain": true,
-      "base_file": "meatboy/world1_11_salt_factory.txt",
+      "base_file": "meatboy/world1_11_fired.txt",
       "family": "mechanics",
       "level_file": null,
       "cells": [],
       "location": null,
       "config": {
-        "jump.jump_vel": 408.0
+        "jump.jump_vel": 399.5
       },
       "parameter": {
         "key": "jump.jump_vel",
-        "from": 480.0,
-        "to": 408.0
+        "from": 470.0,
+        "to": 399.5
       },
       "checks": {
         "exit_reachable": true,
         "values": {
-          "jump.jump_vel": 408.0
+          "jump.jump_vel": 399.5
         }
       }
     },
@@ -219,23 +273,23 @@
       "operator": "off_route",
       "class": "neutral",
       "direction": "none",
-      "description": "The tile at row 21, column 0 hollowed out, closed on all four sides",
+      "description": "The tile at row 25, column 4 hollowed out, closed on all four sides",
       "retrain": true,
-      "base_file": "meatboy/world1_11_salt_factory.txt",
+      "base_file": "meatboy/world1_11_fired.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          0,
-          21,
+          4,
+          25,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 0,
-        "row": 21
+        "col": 4,
+        "row": 25
       },
       "parameter": {
         "tiles": 1
@@ -255,23 +309,23 @@
       "operator": "cosmetic_tile",
       "class": "neutral",
       "direction": "none",
-      "description": "The cell at row 0, column 32 written as ' ' instead of '.': the same tile",
+      "description": "The cell at row 1, column 2 written as ' ' instead of '.': the same tile",
       "retrain": false,
-      "base_file": "meatboy/world1_11_salt_factory.txt",
+      "base_file": "meatboy/world1_11_fired.txt",
       "family": "level",
       "level_file": "level.txt",
       "config": null,
       "cells": [
         [
-          32,
-          0,
+          2,
+          1,
           ".",
           " "
         ]
       ],
       "location": {
-        "col": 32,
-        "row": 0
+        "col": 2,
+        "row": 1
       },
       "parameter": {
         "tiles": 1

@@ -11,7 +11,7 @@
       "operator": "seal_route",
       "class": "breaking",
       "direction": "harder",
-      "description": "A wall along row 6, 13 tiles: the goal can no longer be reached",
+      "description": "A wall along row 4, 17 tiles: the goal can no longer be reached",
       "retrain": true,
       "base_file": "meatboy/world1_02_upward.txt",
       "family": "level",
@@ -19,90 +19,114 @@
       "config": null,
       "cells": [
         [
+          0,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          1,
+          4,
+          ".",
+          "#"
+        ],
+        [
           2,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           3,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           4,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           5,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           6,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           7,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           8,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           9,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           10,
-          6,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          11,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          12,
+          4,
+          ".",
+          "#"
+        ],
+        [
+          22,
+          4,
           ".",
           "#"
         ],
         [
           23,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           24,
-          6,
+          4,
           ".",
           "#"
         ],
         [
           25,
-          6,
-          ".",
-          "#"
-        ],
-        [
-          26,
-          6,
+          4,
           ".",
           "#"
         ]
       ],
       "location": {
         "col": 8,
-        "row": 6
+        "row": 4
       },
       "parameter": {
-        "tiles": 13
+        "tiles": 17
       },
       "note": "placed by rule (eval_mutants.place)",
       "checks": {
@@ -118,7 +142,7 @@
       "operator": "jump_velocity_down",
       "class": "degrading",
       "direction": "harder",
-      "description": "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+      "description": "Jump velocity x0.85: jump.jump_vel 470 -> 399.5",
       "retrain": true,
       "base_file": "meatboy/world1_02_upward.txt",
       "family": "mechanics",
@@ -126,17 +150,17 @@
       "cells": [],
       "location": null,
       "config": {
-        "jump.jump_vel": 408.0
+        "jump.jump_vel": 399.5
       },
       "parameter": {
         "key": "jump.jump_vel",
-        "from": 480.0,
-        "to": 408.0
+        "from": 470.0,
+        "to": 399.5
       },
       "checks": {
         "exit_reachable": true,
         "values": {
-          "jump.jump_vel": 408.0
+          "jump.jump_vel": 399.5
         }
       }
     },
@@ -148,7 +172,7 @@
       "operator": "off_route",
       "class": "neutral",
       "direction": "none",
-      "description": "The tile at row 21, column 1 hollowed out, closed on all four sides",
+      "description": "The tile at row 15, column 3 hollowed out, closed on all four sides",
       "retrain": true,
       "base_file": "meatboy/world1_02_upward.txt",
       "family": "level",
@@ -156,15 +180,15 @@
       "config": null,
       "cells": [
         [
-          1,
-          21,
+          3,
+          15,
           "#",
           "."
         ]
       ],
       "location": {
-        "col": 1,
-        "row": 21
+        "col": 3,
+        "row": 15
       },
       "parameter": {
         "tiles": 1
@@ -184,7 +208,7 @@
       "operator": "cosmetic_tile",
       "class": "neutral",
       "direction": "none",
-      "description": "The cell at row 0, column 2 written as ' ' instead of '.': the same tile",
+      "description": "The cell at row 0, column 0 written as ' ' instead of '.': the same tile",
       "retrain": false,
       "base_file": "meatboy/world1_02_upward.txt",
       "family": "level",
@@ -192,14 +216,14 @@
       "config": null,
       "cells": [
         [
-          2,
+          0,
           0,
           ".",
           " "
         ]
       ],
       "location": {
-        "col": 2,
+        "col": 0,
         "row": 0
       },
       "parameter": {

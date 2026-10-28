@@ -6,7 +6,7 @@
   "operator": "widen_gap",
   "class": "degrading",
   "direction": "harder",
-  "description": "The take-off side of the gap cut back by 2 tiles in every floor row: 12 tiles -> 14 at the surface",
+  "description": "The take-off ledge cut back by 2 tiles, down to the bottom of the level: 15 tiles -> 17",
   "retrain": true,
   "base_file": "meatboy/world1_03_the_gap.txt",
   "family": "level",
@@ -14,74 +14,50 @@
   "config": null,
   "cells": [
     [
-      5,
-      14,
-      "#",
-      "."
-    ],
-    [
-      5,
-      15,
-      "#",
-      "."
-    ],
-    [
-      6,
-      13,
-      "#",
-      "."
-    ],
-    [
-      6,
-      14,
-      "#",
-      "."
-    ],
-    [
-      6,
-      15,
-      "#",
-      "."
-    ],
-    [
-      7,
-      12,
-      "#",
-      "."
-    ],
-    [
-      7,
-      13,
-      "#",
-      "."
-    ],
-    [
-      8,
       11,
+      19,
       "#",
       "."
     ],
     [
-      8,
-      12,
-      "#",
-      "."
-    ],
-    [
-      9,
       11,
+      20,
+      "#",
+      "."
+    ],
+    [
+      11,
+      21,
+      "#",
+      "."
+    ],
+    [
+      12,
+      19,
+      "#",
+      "."
+    ],
+    [
+      12,
+      20,
+      "#",
+      "."
+    ],
+    [
+      12,
+      21,
       "#",
       "."
     ]
   ],
   "location": {
-    "col": 7,
-    "row": 12
+    "col": 12,
+    "row": 19
   },
   "parameter": {
-    "tiles": 10
+    "tiles": 6
   },
-  "note": "Spec: columns 12-13, rows 9-13 (gap 14 -> 16) on the June layout. Here the gap's left wall steps out one tile per row, so each row loses the 2 tiles next to the gap.",
+  "note": "Spec: columns 12-13, rows 9-13 (gap 14 -> 16) on the June layout. Here the ledge is 3 rows deep and the pit has no floor, so the 2 columns go from the surface to the bottom. A full run-up from the alcove's back wall still clears 17 tiles; a jump from the start no longer does.",
   "checks": {
     "exit_reachable": true,
     "same_level": false

@@ -6,7 +6,7 @@ import pytest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-from code.neuro.adapters import make_adapter
+from code.neuro.adapters import N_INPUTS_BY_GAME, make_adapter
 from code.neuro.sensors import read_sensors
 
 
@@ -19,7 +19,7 @@ def test_adapter_smoke(game):
     assert adapter.tile_size > 0
 
     vec, rays, _tiles = read_sensors(adapter)
-    assert vec.shape == (14,)
+    assert vec.shape == (N_INPUTS_BY_GAME.get(game, 14),)
     assert not np.any(np.isnan(vec))
     assert len(rays) >= 6
 

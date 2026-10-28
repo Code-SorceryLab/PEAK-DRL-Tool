@@ -271,21 +271,15 @@ class MeatboyStats(EpisodeStats):
         return float(self.core.player.vx)
 
     def _begin(self) -> None:
+        self._wall_jumps0 = int(self.core.player.wall_jumps)
         self._wall_jumps = 0
-        self._lockout = int(self.core.player.air_lockout)
         self._bfs_start = float(self.core._bfs_norm_dist())
         self._bfs_last = self._bfs_start
 
     def _frame(self) -> None:
-        # A wall jump is the only thing that raises air_lockout (to control_lockout_frames, 6);
-        # otherwise it only counts down. Its own flag is set and cleared inside one control()
-        # call, so the rise is what's visible between frames. (Needs control_lockout_frames >= 2.)
-        lockout = int(self.core.player.air_lockout)
-        if lockout > self._lockout:
-            self._wall_jumps += 1
-        self._lockout = lockout
+        self._wall_jumps = int(self.core.player.wall_jumps) - self._wall_jumps0   # the player counts its own
         d = float(self.core._bfs_norm_dist())
-        if d >= 0.0:  # -1 = off-grid (fell out) — keep the last cell the player stood on
+        if d >= 0.0:  # -1 = off-grid (fell out): keep the last cell the player stood on
             self._bfs_last = d
 
     def progress(self) -> float | None:

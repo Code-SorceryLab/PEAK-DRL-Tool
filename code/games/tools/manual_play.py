@@ -231,7 +231,11 @@ screen = core_game._surf if hasattr(core_game, "_surf") else \
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
 # load_level() to switch to the editor file (LevelLoader handles abs paths).
-if level_file and args.game != "megaman":
+if level_file and args.game == "meatboy":       # the level editor's play-test: that file is the only level
+    core_game.levels, core_game._level_idx = [level_file], 0
+    core_game.reset()
+    print(f"[Play] Loaded editor file: {Path(level_file).name}")
+elif level_file and args.game != "megaman":
     fp = Path(level_file)
     cm = core_game.config_manager
     if 'levels' not in cm.yaml_data:
@@ -784,7 +788,7 @@ while running:
             _banner("Recording starts now", (120, 230, 150))
         if args.quit_after:
             _draw_timer(int(args.quit_after * 60000) - play_ms, "TIME LEFT")
-        else:
+        elif args.game != "meatboy":                   # Meat Boy's own sign shows the attempt's time
             _draw_timer(attempt_ms, "TIME")
     pygame.display.flip()
 
@@ -795,6 +799,8 @@ while running:
         won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
         if NES_SHOW and not core_game.alive:
             _death_sequence()
+        if args.game == "meatboy" and not core_game.alive:
+            _hold(18)                                  # the splat, then straight back: the game's respawn is near instant
         if won and args.game == "bomberman":
             _hold(210)
         if recorder:

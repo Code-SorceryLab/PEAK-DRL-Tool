@@ -16,6 +16,7 @@ ROCK, ROCK_HI, ROCK_LO = (44, 36, 28), (76, 58, 48), (30, 24, 18)
 MOSS, MOSS_HI, MOSS_LO = (50, 62, 26), (70, 88, 36), (34, 44, 16)
 CRUMBLE, CRUMBLE_LO = (176, 150, 112), (120, 98, 70)
 SPIKE, SPIKE_HI = (120, 124, 130), (200, 204, 210)
+FIRE, FIRE_HI = (232, 92, 24), (252, 210, 70)
 MEAT, MEAT_HI, MEAT_LO = (190, 32, 26), (226, 70, 56), (120, 14, 12)
 BLOOD = (150, 20, 18)
 GIRL, GIRL_LO, BANDAGE = (232, 160, 168), (190, 116, 126), (246, 236, 214)
@@ -94,6 +95,19 @@ def spikes(ts: int) -> pygame.Surface:
     return s
 
 
+@lru_cache(maxsize=16)
+def fire(ts: int, phase: int) -> pygame.Surface:
+    """Fire (1-11 Fired): three tongues of flame; phase 0-2 flickers it."""
+    s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+    n = 3
+    for i in range(n):
+        x0, w = i * ts // n, ts // n
+        tip = ts // 6 + ((i + phase) % 3) * ts // 10
+        pygame.draw.polygon(s, FIRE, [(x0, ts), (x0 + w // 2, tip), (x0 + w, ts)])
+        pygame.draw.polygon(s, FIRE_HI, [(x0 + w // 4, ts), (x0 + w // 2, tip + ts // 3), (x0 + 3 * w // 4, ts)])
+    return s
+
+
 def _cube(s: pygame.Surface, rect: pygame.Rect, body, lo, hi) -> None:
     pygame.draw.rect(s, INK, rect.inflate(4, 4), border_radius=5)
     pygame.draw.rect(s, body, rect, border_radius=4)
@@ -140,3 +154,15 @@ def bandage_girl(ts: int) -> pygame.Surface:
         pygame.draw.circle(s, (250, 250, 250), (fx + int(3 * math.cos(a * 1.26)), fy + int(3 * math.sin(a * 1.26))), 2)
     pygame.draw.circle(s, (240, 200, 60), (fx, fy), 1)
     return s
+
+
+def timer_sign(surface: pygame.Surface, seconds: float) -> None:
+    """The game's timer: a white sign hung on two ropes at the top left, the attempt's seconds in red."""
+    from .modules.System.nes_font import nes_text      # a bitmap font: no font object to outlive pygame.quit()
+    board = pygame.Rect(56, 18, 92, 30)
+    for x0, x1 in ((24, board.left + 6), (180, board.right - 6)):
+        pygame.draw.line(surface, INK, (x0, 0), (x1, board.top), 3)
+    pygame.draw.rect(surface, INK, board.inflate(6, 6), border_radius=4)
+    pygame.draw.rect(surface, (244, 242, 236), board, border_radius=3)
+    text = nes_text(f"{seconds:.2f}", 2, (190, 24, 24))
+    surface.blit(text, text.get_rect(center=board.center))

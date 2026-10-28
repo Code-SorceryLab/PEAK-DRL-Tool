@@ -126,6 +126,11 @@ def read_sensors(adapter: "GameAdapter", mode: str = "rays") -> tuple[np.ndarray
     sense = getattr(adapter, "sense", None)  # a game may own its ray layout (see N_INPUTS_BY_GAME)
     if sense is not None:
         return sense(_march, RAY_MAX_DIST, HIT_SOLID, HIT_ENEMY, HIT_NONE, TILE_HIT, TILE_PROBE)
+    return shared_rays(adapter)
+
+
+def shared_rays(adapter: "GameAdapter") -> tuple[np.ndarray, list[Ray], list[Tile]]:
+    """The platformers' 14-slot ray vector (see the module docstring), rays and tile highlights."""
     ox, oy = adapter.x, adapter.y
     facing = -1.0 if adapter.vx < -1.0 else 1.0  # rays flip when moving left
     tile = float(adapter.tile_size)

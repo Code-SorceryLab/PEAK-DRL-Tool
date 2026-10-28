@@ -724,7 +724,7 @@ def _print_controls(game, level):
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
-    if game not in INDEXED_GAMES and game not in OWN_LEVEL_FILES:  # those cores have no debug manager
+    if game != "bomberman" and game not in OWN_LEVEL_FILES:  # those cores have no debug manager
         print()
         print(f"    {_BOLD('Debug overlays')}")
         for key, what in _DEBUG_KEYS:

@@ -18,8 +18,9 @@ copy parses to the same level, an off-route tile is walled in on all four sides,
 over the open tiles reaches the exit for every mutant except seal_route.
 
 Meat Boy's cells differ from the spec, whose coordinates fit the June layout of The Gap (42 x 14,
-flat floor, 14-tile gap). Kevin redrew it on 13 Oct (33 x 16, a cave with a 12-tile gap); the same
-five changes are placed on that layout, and each record's `note` says how.
+flat floor, 14-tile gap). The level was redrawn on 27 Oct at the real game's scale (40 x 22, two
+alcoves under saw-topped pillars, a 15-tile gap over an open pit); the same five changes are placed
+on that layout, and each record's `note` says how.
 Mega Man's five are segment 3 (Ledges) of code/games/megaman_mutants.py plus its global jump change.
 Mutants go to runs/<game>/mutants/<id>/ (mutant.json, level.txt, level.yaml when the level has one).
 """
@@ -74,28 +75,27 @@ CHANGES = {
          "The sky cell at row 2, column 10 written as ' ' instead of '.': the same tile", None),
     ]),
     "meatboy": ("meatboy/world1_03_the_gap.txt", [
-        ("seal_route", "breaking", column(28, range(6, 11), ".....", "#"),
-         "A wall down column 28, rows 6-10, from the ceiling to the floor just before the goal: "
+        ("seal_route", "breaking", column(30, range(13, 19), "......", "#"),
+         "A wall down column 30, rows 13-18, from the roof of Bandage Girl's alcove to its floor: "
          "the goal is closed in",
-         "Spec: column 33, rows 0-8, on the June layout. Column 28 is the last one before the goal "
-         "and meets the roof at row 5, so no wall jump can climb over it."),
-        ("widen_gap", "degrading",
-         [(11, 8, "#", "."), (11, 9, "#", "."), (12, 7, "#", "."), (12, 8, "#", "."), (13, 6, "#", "."),
-          (13, 7, "#", "."), (14, 5, "#", "."), (14, 6, "#", "."), (15, 5, "#", "."), (15, 6, "#", ".")],
-         "The take-off side of the gap cut back by 2 tiles in every floor row: 12 tiles -> 14 at the surface",
-         "Spec: columns 12-13, rows 9-13 (gap 14 -> 16) on the June layout. Here the gap's left wall "
-         "steps out one tile per row, so each row loses the 2 tiles next to the gap."),
-        ("jump_velocity_down", "degrading", [("jump.jump_vel", 480.0, 408.0)],
-         "Jump velocity x0.85: jump.jump_vel 480 -> 408",
+         "Spec: column 33, rows 0-8, on the June layout. Here Bandage Girl stands in an alcove under the "
+         "right pillar; column 30 is the first column under the pillar, so no wall jump can get over it."),
+        ("widen_gap", "degrading", [(r, c, "#", ".") for r in (19, 20, 21) for c in (11, 12)],
+         "The take-off ledge cut back by 2 tiles, down to the bottom of the level: 15 tiles -> 17",
+         "Spec: columns 12-13, rows 9-13 (gap 14 -> 16) on the June layout. Here the ledge is 3 rows "
+         "deep and the pit has no floor, so the 2 columns go from the surface to the bottom. A full run-up "
+         "from the alcove's back wall still clears 17 tiles; a jump from the start no longer does."),
+        ("jump_velocity_down", "degrading", [("jump.jump_vel", 470.0, 399.5)],
+         "Jump velocity x0.85: jump.jump_vel 470 -> 399.5",
          "The spec edits meatboy_config.yaml and reverts it; the mutant sets the value only in the "
-         "process that plays it, so the shared config never changes."),
+         "process that plays it, so the shared config never changes. A running jump still crosses 16 tiles."),
         ("off_route", "neutral", [(12, 5, "#", ".")],
-         "The floor tile at row 12, column 5 hollowed out, under the start ledge and closed on all four sides",
-         "The spec's cell. On this layout it lies 1 tile under the surface (3 on the June one); the "
-         "agents' rays and pit probe stop at the first solid tile, so they never reach it."),
+         "The rock tile at row 12, column 5 hollowed out, inside the left pillar and closed on all four sides",
+         "The spec's cell. On this layout it lies 1 tile left of the alcove's roof; the agents' rays and "
+         "pit probe stop at the first solid tile, so they never reach it."),
         ("cosmetic_tile", "neutral", [(0, 6, ".", " ")],
          "The air cell at row 0, column 6 written as ' ' instead of '.': the same tile",
-         "Spec: row 0, column 0, a wall tile on this layout. Column 6 is the top row's first air cell."),
+         "Spec: row 0, column 0. Both are sky on this layout; column 6 is kept from the earlier layout."),
     ]),
     "bomberman": ("bomberman/bm2_1_1.txt", [
         ("seal_route", "breaking", [(5, 9, "?", "#"), (5, 11, ".", "#")],
@@ -123,6 +123,7 @@ EFFECTIVE = {
 }
 EMPTY = (".", " ")                  # air or floor in every game's level text
 BOMBABLE = set("?@CFSRWXVDQ")      # Bomberman: a brick, or the exit or a power-up under one; a bomb opens it
+CRUMBLE = 7                         # Meat Boy's crumbling block (Map_parameters.TILE_CRUMBLE)
 GAP_FILL = set(".  O*%^")           # what may fill a gap: air, Mario's pit, Meat Boy's saws and spikes
 FUSE_SCALE = 150 / 240              # Bomberman's fuse_down scale (94 of 150), applied to every level's own fuse
 
@@ -158,7 +159,7 @@ def level_name(game: str, level: str) -> str:
     if game == "mario":
         return f"Super Mario Bros. {level.replace('Mario', '')}"
     if game == "meatboy":
-        world, n, *rest = stem.replace("world", "").split("_")
+        world, n, *rest = stem.replace("world", "", 1).split("_")
         return f"Super Meat Boy {int(world)}-{int(n)} {' '.join(rest).title()}"
     n, *rest = stem.split("_")
     return f"Bomberman {n} {' '.join(rest).title()}"
@@ -216,9 +217,11 @@ def _goal_tiles(adapter) -> set:
 
 
 def _passable(adapter, c: int, r: int) -> bool:
-    """Open, or (Bomberman) a tile a bomb opens: a brick, or the exit or a power-up under one."""
+    """Open, or a tile that opens: (Bomberman) a brick, or the exit or a power-up under one a bomb opens;
+    (Meat Boy) a crumbling block, gone a moment after a touch."""
     ld = adapter.core.level_data
-    return _tile_open(adapter, c, r) or (hasattr(ld, "exit") and ld.grid[r][c] in BOMBABLE)
+    return (_tile_open(adapter, c, r) or (hasattr(ld, "exit") and ld.grid[r][c] in BOMBABLE)
+            or ld.grid[r][c] == CRUMBLE)
 
 
 def _start(adapter) -> tuple[int, int]:
