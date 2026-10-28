@@ -264,9 +264,13 @@ class PhysicsManager:
             fell_out    = player.gObj.y + player.gObj.height > level_data.height + PIT_GRACE_PX
             left_out    = player.gObj.x + player.gObj.width < -OOB_MARGIN_PX
             right_out   = player.gObj.x > level_data.width  + OOB_MARGIN_PX
+            # an `O` pit tile kills once his centre is in it (half his body below the floor line: no landing left)
+            cx, cy = player.gObj.x + player.gObj.width / 2, player.gObj.y + player.gObj.height / 2
+            in_pit = any(p.x <= cx < p.x + p.width and p.y <= cy < p.y + p.height
+                         for p in getattr(level_data, "pits", ()))
 
-            if fell_out or left_out or right_out:
-                cause = "Pit" if fell_out else "OOB"
+            if fell_out or in_pit or left_out or right_out:
+                cause = "Pit" if fell_out or in_pit else "OOB"
                 core._handle_death(cause)
                 return   # no further physics this frame
 
@@ -571,6 +575,8 @@ class PhysicsManager:
                     player.gObj.x = trect.right
             player.vx = 0
             rect = player.gObj.get_rect()
+        if player.gObj.x < 0:   # the level's left edge is a wall, as the agents' rays sense it (adapters.py)
+            player.gObj.x, player.vx = 0.0, 0
 
     def _resolve_player_world_y(self, core, level_data):
         """
@@ -713,7 +719,7 @@ class PhysicsManager:
                 elif t_type == EntityType.GOAL:
                     # Guard: goal must not be the left-wall spawn tile (x < 1 tile)
                     goal_is_real = target.gObj.x > TILE_SIZE
-                    if not core.reached_goal and goal_is_real:
+                    if core.alive and not core.reached_goal and goal_is_real:   # killed this frame: no win
                         # Time bonus only — no flat 1000pt base.
                         # The old formula (1000 + timer*10) gave up to 4000pts per
                         # level which dominated the score and made the metric
@@ -780,16 +786,14 @@ class PhysicsManager:
             enemy.gObj.active = False
             player.vy = -360.0                # SMB: 3 px/frame up off an enemy
             core.award_stomp()
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            enemy.gObj.count_kill(core)
             return
 
         # 2. Star -- kill enemy without taking damage
         if player.power_machine.is_star_active:
             enemy.gObj.active = False
             core.score += 100
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            enemy.gObj.count_kill(core)
             return
 
         # 3. Take a hit through the state machine
@@ -823,8 +827,7 @@ class PhysicsManager:
         enemy.gObj.active = False
         proj.gObj.active  = False
         core.score += 200 if hasattr(enemy, "on_stomp") else 100   # SMB: Goomba 100, Koopa 200
-        if hasattr(core, 'kills_step'):
-            core.kills_step += 1
+        enemy.gObj.count_kill(core)
 
     def _handle_player_powerup(self, core, player, powerup):
         """
@@ -962,7 +965,7 @@ class PhysicsManager:
             if g.active and abs(g.y + g.height - top) <= 6 and g.x < x1 and g.x + g.width > x0:
                 g.active = False
                 core.score += 200 if hasattr(e, "on_stomp") else 100
-                core.kills_step += 1
+                g.count_kill(core)
 
     def _check_hidden_blocks(self, core) -> None:
         """The invisible 1-UP block appears when Mario jumps into it from below."""

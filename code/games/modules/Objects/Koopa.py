@@ -367,8 +367,7 @@ class Koopa:
             self._apply_size()
             player.vy = STOMP_BOUNCE
             core.award_stomp()
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            self.gObj.count_kill(core)
 
         elif s == KoopaState.FLYING:
             self.sm.pop()            # FLYING gone → ALIVE is now top
@@ -376,8 +375,7 @@ class Koopa:
             self._apply_size()
             player.vy = STOMP_BOUNCE
             core.award_stomp()
-            if hasattr(core, 'kills_step'):
-                core.kills_step += 1
+            self.gObj.count_kill(core)
 
         elif s == KoopaState.MOVING:
             self.sm.pop()            # MOVING gone → SHELL is now top
@@ -414,8 +412,7 @@ class Koopa:
                 # Star power — kill the koopa (a shell too)
                 self.gObj.active = False
                 core.score += 200                # SMB: a Koopa killed without a stomp is 200
-                if hasattr(core, 'kills_step'):
-                    core.kills_step += 1
+                self.gObj.count_kill(core)
                 return
 
             survived = player.power_machine.take_hit()
@@ -438,8 +435,7 @@ class Koopa:
         else:
             core.lives += 1
         self.chain = n + 1
-        if hasattr(core, 'kills_step'):
-            core.kills_step += 1
+        other_enemy.gObj.count_kill(core)
         return True
 
     # ── Render ────────────────────────────────────────────────────────────────

@@ -101,6 +101,8 @@ def parse_level(rows: list[str], sc: int, sr: int, tile: int, where: str = "leve
     rows = list(rows)
     while rows and not rows[-1].strip():
         rows.pop()
+    if not rows:
+        raise ValueError(f"{where}: empty level")
     cols = max(len(r) for r in rows)
     grid = [list(r.ljust(cols, VOID)) for r in rows]
     screens = {(x // sc, y // sr) for y, row in enumerate(grid) for x, ch in enumerate(row) if ch != VOID}
@@ -279,6 +281,7 @@ class MegamanCore:
         self.score = 0
         self.coins_total = 0
         self.kills_total = 0
+        self.killed_spawns = set()      # spawn points already credited: a respawned enemy is no new kill
         self.timer = self.time_limit or math.inf
         self.won = False
         self.alive = True

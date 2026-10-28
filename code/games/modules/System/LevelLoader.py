@@ -230,6 +230,8 @@ class LevelLoader:
         with open(path, "r") as file:
             lines = [ln.rstrip("\n") for ln in file.readlines()]
 
+        if not any(ln.strip() for ln in lines):
+            raise ValueError(f"{path}: empty level file")
         data.rows = len(lines)
         data.cols = max(len(ln) for ln in lines) if data.rows else 0
         data.width = data.cols * self.tile_size

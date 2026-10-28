@@ -373,7 +373,9 @@ ROUTINES = {"b": blader, "f": flea, "v": octopus, "h": octopus, "w": screw_bombe
 def kill(e: Enemy, core) -> bool:
     """An enemy ran out of HP. Returns True if it should be removed from the list."""
     core.score += STATS[e.kind][5]
-    core.kills_total += 1
+    if e.spawn < 0 or e.spawn not in core.killed_spawns:   # its spawn point re-arms; count the enemy once
+        core.killed_spawns.add(e.spawn)
+        core.kills_total += 1
     r = core.rng.randrange(128) % 100              # the console's seed is 7 bits wide, hence the skew
     drop = ("pearl" if 12 <= r < 65 else "weapon_small" if r < 80 else "life_small" if r < 95
             else "weapon_large" if r < 97 else "life_large" if r < 99 else "oneup" if r == 99 else None)

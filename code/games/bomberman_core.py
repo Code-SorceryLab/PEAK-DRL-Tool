@@ -152,6 +152,8 @@ class BombermanCore:
     def _load_level(self) -> LevelData:
         with open(self.level_file(), encoding="utf-8") as f:
             rows = [r.rstrip("\n") for r in f if r.strip()]
+        if not rows:
+            raise ValueError(f"{self.level_file()}: empty level file")
         cols = max(len(r) for r in rows)
         grid = [list(r.ljust(cols, WALL)) for r in rows]
         start = exit_ = None

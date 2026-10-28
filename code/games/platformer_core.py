@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
 import math
-import importlib
 import heapq
 import re
 from collections import deque
@@ -19,9 +18,6 @@ from .modules.System.EntityType import EntityType
 from .modules.Objects.GameObject import GameObject
 from .modules.Objects.Tile import Tile, create_tile
 from .modules.Objects.Player import Player
-from .modules.Objects.Enemy import Enemy
-from .modules.Objects.Powerup import Powerup
-from .modules.Objects.Coin import Coin
 from .modules.Objects.QuestionBlock import QuestionBlock
 from .modules.Objects.FireFlowerProjectile import FireFlowerProjectile
 
@@ -420,29 +416,10 @@ class PlatformerCore(gymnasium.Env):
         # locked_level: when set, reset() always returns to this level (editor playtest)
         self.locked_level = str(self.world) if kwargs.pop("lock_level", False) else None
 
-        # ── Mastery-gated curriculum ──────────────────────────────────────────
-        # Each level keeps a sliding window of the last N episode outcomes (1=win,
-        # 0=loss). At every episode boundary the win rate over that window drives
-        # the level selection decision:
-        #
-        #   win_rate >= ADVANCE_THRESHOLD  → move forward one level
-        #   win_rate <= FALLBACK_THRESHOLD → step back one level (if not at 0)
-        #   otherwise                      → stay and keep practising
-        #
-        # EXPLORE_PROB: with this probability the curriculum is ignored entirely
-        # and a uniformly random level is picked. Prevents the agent from
-        # catastrophically forgetting earlier levels once they are "mastered",
-        # and ensures all levels see at least some training traffic.
-        #
-        # Knobs exposed as kwargs so they can be tuned from the config YAML
-        # without touching this file.
+        # Per-level win window for the curriculum_win_rate diagnostic in _info(); old configs may still
+        # pass the removed curriculum's knobs.
         self._curriculum_window_size  =   int(kwargs.pop("curriculum_window" ,   5))
-        # NOTE: advance_threshold / fallback_threshold are intentionally NOT
-        # popped here. They are consumed by the ACTIVE batch curriculum below
-        # (self._batch_advance_threshold / self._batch_fallback_threshold).
-        # Popping them here was a dead "mastery-gated" path that silently
-        # starved the batch curriculum of its YAML-configured thresholds.
-        self._explore_prob            = float(kwargs.pop("explore_prob",       0.10))
+        kwargs.pop("explore_prob", None)
 
         # Per-level outcome windows — diagnostic sliding window feeding
         # curriculum_win_rate() in _info(). Persist across episodes, never reset.
@@ -467,11 +444,10 @@ class PlatformerCore(gymnasium.Env):
         self._max_unlocked_index = int(kwargs.pop("start_unlocked", 0))
 
         # ── Eval-trust flags (Task 1) ─────────────────────────────────────────
-        # curriculum_enabled=False: reset() pins to self.world and never touches
-        #   the shared curriculum/batch state.
+        # reset() stays on self.world: the old in-core training curriculum is gone (trainer.py picks levels).
         # terminate_on_goal=True: reaching the goal ENDS the episode (eval only),
         #   instead of the inline next-level transition done during training.
-        self.curriculum_enabled = bool(kwargs.pop("curriculum_enabled", True))
+        kwargs.pop("curriculum_enabled", None)   # callers still pass False
         self.terminate_on_goal  = bool(kwargs.pop("terminate_on_goal", False))
         # dijkstra_enabled=False: ABLATION — zero the Dijkstra obs channel (channel 3),
         # keeping the (4,H,W) shape so the extractor is unchanged. Lets developers test
@@ -513,20 +489,9 @@ class PlatformerCore(gymnasium.Env):
         self.max_lives = 3
         self.lives = self.max_lives
 
-        # ── Batch Curriculum ───────────────────────────────────────────────
-        self._batch_window            = int(kwargs.pop("batch_window", 10))
-        # SOLE consumer of advance_threshold / fallback_threshold kwargs (see
-        # the curriculum block above). Defaults apply only when YAML omits them.
-        self._batch_advance_threshold = float(kwargs.pop("advance_threshold", 0.30))
-        self._batch_fallback_threshold= float(kwargs.pop("fallback_threshold", 0.20))
-        self._max_stay_windows        = int(kwargs.pop("max_stay_windows", 2))  # reduced from 3
-        self._review_prob             = float(kwargs.pop("review_prob", 0.25))
-        self._curriculum_position     = 0
-        self._batch_results: list     = []
+        for k in ("batch_window", "advance_threshold", "fallback_threshold", "max_stay_windows", "review_prob"):
+            kwargs.pop(k, None)   # the old curriculum's knobs; old configs may still pass them
         self._episode_won_current     = False
-        self._is_review_episode       = False
-        self._windows_on_level        = 0
-        self._consecutive_fallbacks   = {}
         self._level_visits     = {lvl: 0 for lvl in self.level_order}
         self._level_wins       = {lvl: 0 for lvl in self.level_order}
 
@@ -680,13 +645,6 @@ class PlatformerCore(gymnasium.Env):
         # --- Velocity Alignment (cached from _tracking_obs each step) ---
         self._step_dx = 0.0   # unit vector toward cheapest reachable 8-direction tile, X
         self._step_dy = 0.0   # unit vector toward cheapest reachable 8-direction tile, Y
-
-    def _load_reward_fn(self, persona_name):
-        try:
-            mod = importlib.import_module("code.rewards.train_platformer")
-            return getattr(mod, persona_name, None)
-        except ImportError:
-            return None
 
     def get_action_space(self): return self._act_space
     def get_observation_space(self): return self._obs_space
@@ -846,11 +804,6 @@ class PlatformerCore(gymnasium.Env):
     def reset(self, seed=None, options=None) -> np.ndarray:
         super().reset(seed=seed)
 
-        # Record episode result into batch — only if it was a curriculum episode
-        # (NOT a review episode, which played a different level)
-        if self.curriculum_enabled and self.level_order and not self.locked_level and not self._is_review_episode:
-            self._batch_results.append(self._episode_won_current)
-
         # Record into the per-level diagnostic window (feeds curriculum_win_rate
         # in _info()). self.world still names the level that was just played —
         # it is reassigned to the next level later in this method. Use setdefault
@@ -860,13 +813,8 @@ class PlatformerCore(gymnasium.Env):
                 self.world, deque(maxlen=self._curriculum_window_size))
             win_dq.append(1 if self._episode_won_current else 0)
 
-        # Evaluate batch when window is full
-        if self.curriculum_enabled and len(self._batch_results) >= self._batch_window and self.level_order and not self.locked_level:
-            self._evaluate_curriculum_batch()
-
         self.reset_metrics()
         self._episode_won_current = False
-        self._is_review_episode = False
 
         if self.locked_level:
             self.world = self.locked_level
@@ -874,69 +822,17 @@ class PlatformerCore(gymnasium.Env):
                 self.current_index_world = self.level_order.index(self.locked_level)
             else:
                 self.current_index_world = 0
-        elif not self.curriculum_enabled and self.level_order:
-            # Eval / playback: stay on the level we were constructed with.
+        elif self.level_order:
+            # Stay on the level we were constructed with.
             if self.world in self.level_order:
                 self.current_index_world = self.level_order.index(self.world)
             else:
                 self.current_index_world = 0
                 self.world = self.level_order[self.current_index_world]
-        elif self.level_order:
-            self._curriculum_position = max(0, min(
-                self._curriculum_position, len(self.level_order) - 1))
-
-            # ── Review rotation: 25% chance to play a random earlier level ──
-            # Keeps skills sharp on mastered levels, distributes visits,
-            # prevents catastrophic forgetting. Results don't count for batch.
-            if (self._curriculum_position > 0
-                    and self.np_random.random() < self._review_prob):
-                review_idx = int(self.np_random.integers(0, self._curriculum_position))
-                self.current_index_world = review_idx
-                self._is_review_episode = True
-            else:
-                self.current_index_world = self._curriculum_position
-
-            self.world = self.level_order[self.current_index_world]
 
         self._level_visits[self.world] = self._level_visits.get(self.world, 0) + 1
         self.load_level()
         return self._obs(), self._info()
-
-    def _evaluate_curriculum_batch(self):
-        wins = sum(1 for r in self._batch_results if r)
-        total = len(self._batch_results)
-        win_rate = wins / total if total > 0 else 0.0
-        pos = self._curriculum_position
-        level_name = self.level_order[pos] if pos < len(self.level_order) else "?"
-        consec_fb = self._consecutive_fallbacks.get(pos, 0)
-
-        effective_advance = self._batch_advance_threshold
-        if consec_fb >= 2:
-            effective_advance = max(0.10, effective_advance - 0.10)
-
-        if win_rate >= effective_advance and pos < len(self.level_order) - 1:
-            self._curriculum_position += 1
-            self._windows_on_level = 0
-            self._consecutive_fallbacks[pos] = 0
-            print(f"  🎓 [Curriculum] ADVANCE → Lvl {self._curriculum_position} "
-                  f"'{self.level_order[self._curriculum_position]}' "
-                  f"({wins}/{total} = {win_rate:.0%})")
-        elif win_rate <= self._batch_fallback_threshold and pos > 0:
-            self._curriculum_position -= 1
-            self._windows_on_level = 0
-            self._consecutive_fallbacks[pos] = consec_fb + 1
-            print(f"  ⬇️  [Curriculum] FALLBACK → Lvl {self._curriculum_position} "
-                  f"'{self.level_order[self._curriculum_position]}' "
-                  f"({wins}/{total} = {win_rate:.0%}, fb={consec_fb + 1})")
-        else:
-            self._windows_on_level += 1
-            if self._windows_on_level >= self._max_stay_windows and pos > 0:
-                self._curriculum_position -= 1
-                self._windows_on_level = 0
-                print(f"  ⏳ [Curriculum] FORCE FALLBACK → Lvl {self._curriculum_position} "
-                      f"(stuck {self._max_stay_windows} windows)")
-
-        self._batch_results.clear()
 
     def load_level(self, preserve_power: bool = False):
         self.alive = True
@@ -1067,10 +963,7 @@ class PlatformerCore(gymnasium.Env):
     def complete_level(self):
         self._level_wins[self.world] = self._level_wins.get(self.world, 0) + 1
 
-        # Batch curriculum: mark win if this is the current curriculum level
-        if self._curriculum_position < len(self.level_order):
-            if self.world == self.level_order[self._curriculum_position]:
-                self._episode_won_current = True
+        self._episode_won_current = True   # feeds the per-level win window (curriculum_win_rate in _info)
 
         # Store next level index but do NOT advance self.world yet.
         # self.world must stay as the completed level until _info() is called
@@ -1411,13 +1304,17 @@ class PlatformerCore(gymnasium.Env):
         # Single query, dispatched by type. Spike beats enemy on tile conflicts
         # because |-1.0| is not > |+1.0|, so spike value written first is kept.
         # Insert spikes after enemies so spike overwrites on equal magnitude.
+        # By type_id, not class: Koopas are not Enemy subclasses, and would be missing.
         for h in self.physics_manager.hazard_hash.query_rect(wx, wy, ww, wh):
             if not h.gObj.active:
                 continue
-            if isinstance(h, Enemy):
+            if h.gObj.type_id == EntityType.ENEMY:
                 _place(hazard_grid, h.gObj.x, h.gObj.y, +1.0)
-            elif isinstance(h, Spike):
+            elif h.gObj.type_id == EntityType.SPIKE:
                 _place(hazard_grid, h.gObj.x, h.gObj.y, -1.0)
+        for bar in self.level_data.firebars:     # not in hazard_hash; sensed like enemies, as the rays do
+            for bx, by in bar.balls():
+                _place(hazard_grid, bx, by, +1.0)
 
         # ── Collectible hash: goal (1.0), powerup (0.69), coin (0.35) ────────
         # Single query, dispatched by type. Goal wins all tile conflicts.
@@ -1426,9 +1323,9 @@ class PlatformerCore(gymnasium.Env):
                 continue
             if hasattr(c, 'collected') and c.collected:
                 continue
-            if isinstance(c, Coin):
-                _place(collect_grid, c.gObj.x, c.gObj.y, 0.35)
-            elif isinstance(c, Powerup):
+            if c.gObj.type_id == EntityType.COIN:      # by type_id: Mushroom, Star, FireFlower and 1-UP
+                _place(collect_grid, c.gObj.x, c.gObj.y, 0.35)   # are not Powerup subclasses
+            elif c.gObj.type_id == EntityType.POWERUP:
                 _place(collect_grid, c.gObj.x, c.gObj.y, 0.69)
             else:
                 # Goal or any unknown collectible — treat as highest importance
@@ -1493,7 +1390,7 @@ class PlatformerCore(gymnasium.Env):
             if map_col < 0 or map_col >= map_cols:
                 return False
             t = grid[map_row][map_col]
-            return t not in (TILE_AIR, TILE_SPIKE)
+            return t not in (TILE_AIR, TILE_SPIKE, TILE_PIT)   # an `O` pit is a gap, not floor
 
         for ly in range(self.obs_height):
             for lx in range(self.obs_width):
