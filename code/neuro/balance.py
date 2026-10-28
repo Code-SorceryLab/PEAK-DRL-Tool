@@ -104,7 +104,8 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
               best_fitness: float, best_gen: int) -> dict:
     """Fold one probe's per-generation history into a cell (pure; also used by --rebuild)."""
     first_win = next((r["gen"] for r in hist if r["wins"] > 0), None)
-    tail = hist[-WIN_WINDOW:]
+    # the WIN_WINDOW gens from the first win on; a budget that ends sooner must not reach back before it
+    tail = [r for r in hist if first_win is not None and r["gen"] >= first_win][-WIN_WINDOW:] or hist[-WIN_WINDOW:]
     episodes = len(tail) * pop_size
     causes: dict[str, int] = {}
     stuck = 0

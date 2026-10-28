@@ -46,13 +46,14 @@ def pad_state() -> tuple[int, int, bool, bool, bool]:
     return dx, dy, held(PAD_JUMP), held(PAD_FIRE), held(PAD_RUN)
 
 
-def held() -> tuple:
-    """(dx, dy, a, b, select, start) held on the pad or keyboard."""
+def held(jump_keys=()) -> tuple:
+    """(dx, dy, a, b, select, start) held on the pad or keyboard; `jump_keys` (W in Mario) count as A, not up."""
     k = pygame.key.get_pressed()
     px, py, pjump, pfire, prun = pad_state()
+    up = any(k[key] for key in (pygame.K_w, pygame.K_UP) if key not in jump_keys)
     dx = int(k[pygame.K_d] or k[pygame.K_RIGHT]) - int(k[pygame.K_a] or k[pygame.K_LEFT]) or px
-    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(k[pygame.K_w] or k[pygame.K_UP]) or py
-    a = bool(k[pygame.K_SPACE] or pjump)
+    dy = int(k[pygame.K_s] or k[pygame.K_DOWN]) - int(up) or py
+    a = bool(k[pygame.K_SPACE] or pjump or any(k[key] for key in jump_keys))
     b = bool(k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j] or k[pygame.K_z] or pfire or prun)
     return dx, dy, a, b, button(pygame.CONTROLLER_BUTTON_BACK), button(pygame.CONTROLLER_BUTTON_START)
 

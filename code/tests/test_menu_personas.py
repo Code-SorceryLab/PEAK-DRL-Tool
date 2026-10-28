@@ -101,9 +101,11 @@ def test_manual_play_records_nothing_by_default(monkeypatch):
     assert "--record" not in cmds[0]
 
 
-def _study_popup(played: list, ask=lambda *a, **k: 0) -> SimpleNamespace:
-    """A fake game select pop-up: A on every screen (or ask), and each attempt recorded as a Mario death."""
+def _study_popup(played: list, ask=lambda *a, **k: 0, runs=()) -> SimpleNamespace:
+    """A fake game select pop-up: A on every screen (or ask). Each attempt records one row per life, the causes
+    taken from runs in order (("Pit",) = died once, then quit), then a cleared level ("Success",)."""
     import csv
+    runs = list(runs)
 
     def run_game(cmd, env):
         if "--record" not in cmd:                          # the warm-up
@@ -116,7 +118,8 @@ def _study_popup(played: list, ask=lambda *a, **k: 0) -> SimpleNamespace:
                                    "avg_vx", "progress_ratio", "route", "enemies_killed", "bricks_destroyed",
                                    "elapsed_time"])
             w.writeheader()
-            w.writerow({"world": "Mario1-1", "cause_of_death": "Pit", "route": "[(1.0, 2.0)]", "elapsed_time": 3})
+            for cause in (runs.pop(0) if runs else ("Success",)):
+                w.writerow({"world": "Mario1-1", "cause_of_death": cause, "route": "[(1.0, 2.0)]", "elapsed_time": 3})
 
     return SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=ask, show_game=lambda game: None,
                            run_game=run_game)
@@ -156,6 +159,33 @@ def test_esc_or_b_on_a_study_screen_ends_the_session_only_when_confirmed(monkeyp
     assert menu.study_session(SimpleNamespace(ask_text=lambda title: None)) is False   # ESC on the ID: close the pop-up
 
 
+def _asker(asked: list, answers: dict):
+    def ask(title, items, choice=0, hint="", size=4, b_backs=True, games=None):
+        asked.append(title)
+        return answers[title].pop(0) if answers.get(title) else 0
+    return ask
+
+
+def test_a_run_quit_before_its_last_life_is_kept_as_quit_and_offered_again(monkeypatch, tmp_path):
+    import csv
+    monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
+    asked, played = [], []
+    menu.study_session(_study_popup(played, _asker(asked, {}), runs=[("Pit",), ("Pit", "Pit", "Pit")]))
+    assert asked.count("NOT FINISHED") == 1                # only the quit run is offered again (TRY AGAIN)
+    run1 = list(csv.DictReader(open(tmp_path / "P1" / "mario" / "baseline" / "run1" / "episodes.csv")))
+    assert [(r["run_result"], r["lives_used"]) for r in run1] == [("quit", "1")] + [("game_over", "3")] * 3
+    assert [r["life"] for r in run1] == ["1", "1", "2", "3"] and all(r["recorded_at"] for r in run1)   # tell runs apart
+    assert len(played) == 9                                # 8 attempts and the retry
+
+
+def test_end_session_on_the_retry_screen_ends_the_session(monkeypatch, tmp_path):
+    monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
+    played = []
+    ask = _asker([], {"NOT FINISHED": [None], "END SESSION?": [1]})   # ESC there, then YES, END IT
+    assert menu.study_session(_study_popup(played, ask, runs=[("Pit",)])) is True
+    assert len(played) == 1
+
+
 def test_ga_sweep_passes_the_chosen_worker_count(monkeypatch):
     picks = iter(["rays", "stop"])                  # sensors, no --confirm
     toggles = iter([["gens_dummy"], ["meatboy"], ["experienced"]])   # GA axes, games, personas
@@ -173,3 +203,18 @@ def test_ga_sweep_passes_the_chosen_worker_count(monkeypatch):
     menu.run_ga_sweep()
     (cmd,) = cmds
     assert cmd[cmd.index("--workers") + 1] == "10"
+
+
+def test_deleting_everything_under_runs_keeps_the_user_study(monkeypatch, tmp_path):
+    (tmp_path / "user_study" / "P1").mkdir(parents=True)
+    (tmp_path / "probes" / "mario").mkdir(parents=True)
+    (tmp_path / "notes.txt").write_text("x")
+    monkeypatch.setattr(menu, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(menu, "STUDY_DIR", tmp_path / "user_study")
+    monkeypatch.setattr(menu, "_RUN_GROUPS", [])
+    monkeypatch.setattr(menu, "get_run_dirs", lambda: [])
+    monkeypatch.setattr(menu, "_refresh_screen", lambda: None)
+    monkeypatch.setattr(menu, "toggle_select", lambda *a, **k: ["EVERYTHING under runs/"])
+    monkeypatch.setattr("builtins.input", lambda *a: "y")
+    menu.delete_logs_and_models()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["user_study"]   # people's play cannot be run again

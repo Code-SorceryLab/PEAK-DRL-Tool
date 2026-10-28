@@ -353,6 +353,8 @@ def reproduce_page(game: str, agents: list[dict]) -> str:
             ("python -m code.neuro.command_center --open", "this Command Center, on your machine")]
     width = max(len(c) for c, _ in cmds) + 2
     rebuild = "\n".join(esc(f"{c.ljust(width)}# {why}") for c, why in cmds)
+    sha = _git(".", "rev-parse", "HEAD", check=False)       # a copy outside git (a cluster tar) has none to name
+    checkout = f"\ngit checkout {sha}" if sha else ""
     steps = f"""
 <h2><i class="ico sprout"></i>Reproduce: {esc(NAMES[game])}</h2>
 <p class="lede">Every agent below was trained with one of the seeds {", ".join(map(str, PAPER_SEEDS))}, the seeds
@@ -360,7 +362,7 @@ behind the published numbers. Each one is a folder with its network (best.npz) a
 (state.json). Levels are named as the game's files and the commands name them (0 is the first level of an indexed game).</p>
 <h3>1. Set up</h3>
 <pre><code>git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
-cd PEAK-DRL-Tool
+cd PEAK-DRL-Tool{checkout}
 pip install -r requirements.txt</code></pre>
 <h3>2. Get the agents</h3>
 <p>All {len(rows)} agents of this game: <a href="agents/{game}.zip" download>agents/{game}.zip</a>.
@@ -413,6 +415,8 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
         raise SystemExit(f"{out_dir} is not an earlier Command Center build; not replacing it")
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir)
+    nojekyll = os.path.join(out_dir, ".nojekyll")     # GitHub Pages: serve the files as they are
+    open(nojekyll, "w").close()                       # first, so a build that fails part way is still replaced
     data = report.load_data()
     results = {g: ast_metrics.evaluate(g) for g in GAMES}
     pages = {"howitworks.html": report.instructions_page(data)}
@@ -424,7 +428,7 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
         pages[f"{g}-gasweep.html"] = report.gasweep_page(g, data)
         pages[f"{g}-ablation.html"] = report.ablation_page(g, data)
     walls: dict[str, dict] = {}
-    written = [os.path.join(out_dir, "agents", f"{g}.zip") for g in GAMES]
+    written = [nojekyll] + [os.path.join(out_dir, "agents", f"{g}.zip") for g in GAMES]
     for g in GAMES:
         walls[g] = {}
         for p in PERSONAS:
@@ -447,7 +451,6 @@ def build_site(out_dir: str = SITE_DIR, videos_dir: str = VIDEOS_DIR) -> list[st
                         f.write(f'PEAK_TRACK("{g}/{p}",{data});\n')
                     written.append(path)
     pages["index.html"] = shell(walls)
-    pages[".nojekyll"] = ""                       # GitHub Pages: serve the files as they are
     for name, text in pages.items():
         path = os.path.join(out_dir, name)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -491,13 +494,19 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
     """Put the built site on gh-pages as one commit with no history (so the videos never pile up in
     every clone), after keeping the old landing page as tag LANDING_TAG; with `push`, force-push it
     to origin (GitHub Pages serves that branch). Refuses while the results have uncommitted changes,
-    so the site only ever shows committed numbers and agents. Returns the new commit."""
+    so the site only ever shows committed numbers and agents, and while HEAD is on no remote branch,
+    since the Reproduce tab tells readers to check it out. Returns the new commit."""
     meta = (":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store")      # macOS metadata on exFAT, never a result
-    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", "runs/probes", *meta)
+    dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", "runs/probes",
+                 ":(glob)runs/*/state.json", *meta)                  # every run the How it works tab lists
     if dirty:
         raise SystemExit(f"uncommitted results; commit them first so the site shows committed numbers:\n{dirty}")
     if not os.path.isfile(os.path.join(site_dir, "index.html")):
         raise SystemExit(f"no site in {site_dir}: build it first (python -m code.neuro.command_center)")
+    sha = _git(repo, "rev-parse", "HEAD")
+    if not _git(repo, "branch", "-r", "--contains", sha):
+        raise SystemExit(f"commit {sha} is on no remote branch, so readers cannot check out what the Reproduce tab "
+                         "names; push it first")
     live = ""                                                            # the gh-pages commit origin serves now
     if push:
         out = _git(repo, "ls-remote", "origin", "refs/heads/gh-pages")
@@ -515,7 +524,7 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
         _git(repo, "--work-tree", os.path.abspath(site_dir), "add", "--force", "-A", "--", ":/",
              ":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store", env=env)   # macOS metadata on exFAT
         tree = _git(repo, "write-tree", env=env)
-    commit = _git(repo, "commit-tree", tree, "-m", f"PEAK Command Center {datetime.now():%Y-%m-%d %H:%M}")
+    commit = _git(repo, "commit-tree", tree, "-m", f"PEAK Command Center {datetime.now():%Y-%m-%d %H:%M} from {sha}")
     _git(repo, "update-ref", "refs/heads/gh-pages", commit)
     if push:
         if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{LANDING_TAG}", check=False) and \

@@ -65,3 +65,11 @@ def test_the_random_baseline_is_compared_with_itself_on_the_original(tmp_path, m
                        [row(level="Mario1-1", cause="Enemy", end=(900.0, 96.0))] * 3)
     rnd = am.evaluate("mario")["seal_route"]["random"]["vs_base"]
     assert rnd["cause_changed"] and not rnd["counted"]          # it never wins, so it never counts
+
+
+def test_persona_flags_leave_out_comparisons_that_do_not_count():
+    per = [{"class": "breaking", ("replay", "clumsy"): "not counted", ("replay", "killer"): "broken"},
+           {"class": "breaking", ("replay", "clumsy"): "broken", ("replay", "killer"): "unchanged"},
+           {"class": "neutral", ("replay", "clumsy"): "changed"}]          # neutral: a false alarm, not a flag
+    # ast_rule.md: an unsolved original ("not counted") is left out of every tally, its denominator too
+    assert ap.persona_flags(per, "replay", ["clumsy", "killer"]) == {"clumsy": (1, 1), "killer": (1, 2)}

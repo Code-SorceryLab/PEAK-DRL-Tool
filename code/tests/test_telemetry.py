@@ -65,3 +65,14 @@ def test_two_human_players_get_a_pooled_group(tmp_path):
     groups = {g["player"]: g for g in telemetry.build([str(tmp_path)])["groups"]}
     assert set(groups) == {"ana (human)", "ben (human)", telemetry.POOLED}
     assert groups[telemetry.POOLED]["episodes"] == 2
+
+
+def test_read_turns_the_older_2d_agent_csv_into_this_schema(tmp_path):
+    from code.neuro.episodes import append_rows
+    from code.stats import ast_metrics
+    # what 2D manual play (Play a Mutant, the study) still writes, in code/neuro/episodes.py's HEADER order
+    path = append_rows(str(tmp_path), [["al", "mario", "Mario1-1", "Success", 3, 0, 1.5, 1.0,
+                                        "[(1.0, 2.0), (30.0, 4.0)]", 0, 0, 12.5]])
+    (row,) = episode_log.read(path)
+    assert (row["level"], row["status"], row["end_x"], row["frames"]) == ("Mario1-1", "WON", 30.0, 750)
+    assert ast_metrics.win_rate([row])["al"] == [1, 1]        # a human win counts as a win

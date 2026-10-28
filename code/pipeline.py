@@ -121,7 +121,7 @@ def pick_section(section: str, stage: str, attempts: int = 12, shortlist: int = 
     try:
         with open(MANIFEST, encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:                  # only then: a broken file holds the other sections' picks
         data = {"stage": stage, "legs": {}}
     data.setdefault("legs", {})[section] = best
     with open(MANIFEST, "w", encoding="utf-8") as f:
@@ -202,6 +202,22 @@ def _last_line(path: str) -> str:
         return lines[-1].strip()[:200] if lines else ""
     except OSError:
         return ""
+
+
+def start_training(jobs: Jobs, section: str, seeds: int, gens: int) -> None:
+    """The Train button: `seeds` new runs of the section, warm-started from the run the relay uses."""
+    taken = [int(m.group(1)) for d in glob.glob(os.path.join(RUNS, section, "seed*"))
+             if (m := re.fullmatch(r"seed(\d+)", os.path.basename(d)))]
+    first = (max(taken, default=0) // 100 + 1) * 100 + 1          # a new hundred: these runs belong together
+    source = (manifest().get(section) or {}).get("run")
+    for n in range(first, first + seeds):
+        run_dir = os.path.join(RUNS, section, f"seed{n}")
+        cmd = [sys.executable, "-m", "code.neuro.trainer", "--game", GAME, "--level", section, "--seed", str(n),
+               "--gens", str(gens), "--no-serve", "--run-dir", run_dir]
+        if source and os.path.exists(os.path.join(source, "best.npz")):
+            cmd += ["--seed-from", source]
+        os.makedirs(run_dir)                       # claimed now: the trainer makes it only after generation 1
+        jobs.start(f"Train {section} seed{n}, {gens} generations", cmd)
 
 
 # ── pages ────────────────────────────────────────────────────────────────────────────────────
@@ -541,17 +557,7 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
         if action == "stop":
             jobs.stop(clamp(q.get("job"), 0, 10 ** 6, 0))
         elif action == "train" and section in section_names:
-            seeds, gens = clamp(q.get("seeds"), 1, 8, 3), clamp(q.get("gens"), 5, 500, 80)
-            taken = [int(m.group(1)) for d in glob.glob(os.path.join(RUNS, section, "seed*"))
-                     if (m := re.fullmatch(r"seed(\d+)", os.path.basename(d)))]
-            first = (max(taken, default=0) // 100 + 1) * 100 + 1          # a new hundred: these runs belong together
-            source = (manifest().get(section) or {}).get("run")
-            for n in range(first, first + seeds):
-                cmd = [sys.executable, "-m", "code.neuro.trainer", "--game", GAME, "--level", section, "--seed", str(n),
-                       "--gens", str(gens), "--no-serve", "--run-dir", os.path.join(RUNS, section, f"seed{n}")]
-                if source and os.path.exists(os.path.join(source, "best.npz")):
-                    cmd += ["--seed-from", source]
-                jobs.start(f"Train {section} seed{n}, {gens} generations", cmd)
+            start_training(jobs, section, clamp(q.get("seeds"), 1, 8, 3), clamp(q.get("gens"), 5, 500, 80))
         elif action == "mutants":
             jobs.start("Generate mutants", [sys.executable, "-m", "code.games.megaman_mutants", "--stage", stage], group="mutants")
         elif action == "pick" and section in section_names:
@@ -596,6 +602,8 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
 
         def do_GET(self) -> None:
             u = urllib.parse.urlparse(self.path)
+            if not telemetry.local_request(self.headers, port, u.path == "/watch"):
+                return self._send(403, "forbidden")
             try:
                 if u.path == "/jobs":
                     return self._send(200, json.dumps(jobs.view()), "application/json")
@@ -611,6 +619,8 @@ def serve(stage: str, port: int, open_browser: bool) -> None:
                 self._send(500, note("This page could not be built", f"<pre>{esc(type(e).__name__)}: {esc(str(e))}</pre>"))
 
         def do_POST(self) -> None:
+            if not telemetry.local_request(self.headers, port, changes_state=True):
+                return self._send(403, "forbidden")
             if urllib.parse.urlparse(self.path).path != "/do":
                 return self._send(404, "not found")
             origin = self.headers.get("Origin")           # buttons on these pages only, not another site's form

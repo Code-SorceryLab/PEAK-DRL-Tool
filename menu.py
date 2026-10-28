@@ -736,31 +736,15 @@ def _print_controls(game, level):
 # ── User study ────────────────────────────────────────────────────────────────
 WARMUP_MINUTES = 5          # warm-up: a normal playthrough of the game, stopped after this long, not recorded
 BASELINE_RUNS = 3           # recorded attempts on the evaluation level
+STUDY_LIVES = 3             # lives per recorded run; fewer rows than this and no win means it was quit
 STUDY_DIR = RUNS_DIR / "user_study"
 
 
 def _study_row(old: dict, game: str, participant: str, phase: str, run: int) -> dict:
-    """One manual-play row in the telemetry schema the website reads (code/stats/episode_log.py).
-    Mario / Meat Boy / Bomberman manual play still writes the older agent CSV; Mega Man already
-    writes this schema and only gets the study's labels."""
-    import ast
-    labels = {"persona": participant, "source": "human", "session": f"{participant}/{phase}",
-              "gen": 0, "agent": run}
-    if "status" in old:
-        return {**old, **labels}
-    won = old.get("cause_of_death") == "Success"
-    route = [list(p) for p in ast.literal_eval(old["route"] or "[]")]
-    secs = float(old.get("elapsed_time") or 0)
-    row = {"game": game, "level": str(old.get("world")), **labels,
-           "status": "WON" if won else "DEAD", "cause": "" if won else old.get("cause_of_death", ""),
-           "frames": round(secs * 60), "time_s": secs, "progress": float(old.get("progress_ratio") or 0),
-           "jumps": int(old.get("jump_count") or 0), "coins": int(old.get("coins_collected") or 0),
-           "kills": int(old.get("enemies_killed") or 0), "avg_speed": float(old.get("avg_vx") or 0),
-           "end_x": route[-1][0] if route else None, "end_y": route[-1][1] if route else None,
-           "tile": 32, "route": route}
-    if game == "bomberman":
-        row["bricks"] = int(old.get("bricks_destroyed") or 0)
-    return row
+    """One manual-play row (episode_log.read already turned 2D manual play's older CSV into its schema)
+    with the study's labels."""
+    return {**old, "game": game, "persona": participant, "source": "human", "session": f"{participant}/{phase}",
+            "gen": 0, "agent": run}
 
 
 def _study_env(mutant: dict | None = None) -> dict:
@@ -774,29 +758,29 @@ def _study_env(mutant: dict | None = None) -> dict:
 def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant: dict | None = None) -> bool:
     """Play one recorded run on the evaluation level (or its mutant) with the game's usual 3 lives,
     a row per life; store it as
-    runs/user_study/<participant>/<game>/<phase>/run<run>/episodes.csv. False if none was recorded."""
-    import csv
+    runs/user_study/<participant>/<game>/<phase>/run<run>/episodes.csv. False if none was recorded, or if the
+    run was quit before its last life (its rows are kept, labelled quit, so it can be played again)."""
     import tempfile
     from code.games.eval_mutants import EVAL_LEVELS
     from code.stats import episode_log
     tmp = Path(tempfile.mkdtemp(prefix="study_"))
     cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
            "--fps", "60", "--level", EVAL_LEVELS[game][0], "--record", str(tmp), "--player", participant,
-           "--episodes", "1"]
+           "--episodes", "1", "--lives", str(STUDY_LIVES)]
     ui.run_game(cmd, _study_env(mutant))
     found = list(tmp.glob("*/*/episodes.csv"))
-    rows = []
-    if found:
-        with open(found[0], encoding="utf-8", newline="") as f:
-            rows = list(csv.DictReader(f)) if game != "megaman" else episode_log.read(str(found[0]))
+    rows = episode_log.read(str(found[0])) if found else []
     inputs = found[0].with_name("inputs.csv") if found else None
     inputs_text = inputs.read_text(encoding="utf-8") if inputs and inputs.exists() else None
     shutil.rmtree(tmp, ignore_errors=True)
     if not rows:
         return False
     rows = [_study_row(r, game, participant, phase, run) for r in rows]
-    result = "cleared" if any(r["status"] == "WON" for r in rows) else "game_over"   # a run ends on either
-    rows = [{**r, "run_result": result, "lives_used": len(rows)} for r in rows]
+    result = ("cleared" if any(r["status"] == "WON" for r in rows)
+              else "game_over" if len(rows) >= STUDY_LIVES else "quit")   # quit: the window closed with lives left
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")      # a session played again with ADD TO lands in the same folders
+    rows = [{**r, "run_result": result, "lives_used": len(rows), "life": i, "recorded_at": stamp}
+            for i, r in enumerate(rows, 1)]
     if mutant:
         rows = [{**r, "mutant": mutant["id"], "mutant_class": mutant["class"]} for r in rows]
     out = STUDY_DIR / participant / game / phase / f"run{run}" / "episodes.csv"
@@ -805,9 +789,9 @@ def _study_attempt(ui, game: str, participant: str, phase: str, run: int, mutant
         log = out.with_name("inputs.csv")
         with open(log, "a", encoding="utf-8", newline="") as f:
             f.write(inputs_text if not log.exists() or not log.stat().st_size else inputs_text.split("\n", 1)[1])
-    print(f"    {_GRN('Cleared the level') if result == 'cleared' else _RED('Game over')} "
-          f"({len(rows)} {'life' if len(rows) == 1 else 'lives'})   Saved  →  {_CYAN(str(out))}")
-    return True
+    said = {"cleared": _GRN("Cleared the level"), "game_over": _RED("Game over"), "quit": _YEL("Quit early")}
+    print(f"    {said[result]} ({len(rows)} {'life' if len(rows) == 1 else 'lives'})   Saved  →  {_CYAN(str(out))}")
+    return result != "quit"
 
 
 def _study_ask(ui, *a, **k):
@@ -820,13 +804,16 @@ def _study_ask(ui, *a, **k):
 
 
 def _study_attempts(ui, game: str, participant: str, phase: str, plays: list) -> bool:
-    """Each play (None, or a mutant) once, as run1, run2, ...; a window closed before an attempt
-    ended asks to try that one again. False if the experimenter ended the session."""
+    """Each play (None, or a mutant) once, as run1, run2, ...; a run that ended early (window closed, or quit
+    with lives left) asks to try that one again. False if the experimenter ended the session."""
     for run, mutant in enumerate(plays, 1):
         if _study_ask(ui, phase.upper(), [f"ATTEMPT {run} OF {len(plays)}"], None, "A  START") is None:
             return False
         while not _study_attempt(ui, game, participant, phase, run, mutant):
-            if _study_ask(ui, "NOT RECORDED", ["TRY AGAIN", "SKIP"], 0, "WINDOW CLOSED EARLY") != 0:
+            got = _study_ask(ui, "NOT FINISHED", ["TRY AGAIN", "SKIP"], 0, "THE RUN ENDED EARLY")
+            if got is None:
+                return False
+            if got == 1:
                 break
     return True
 
@@ -952,6 +939,10 @@ def watch_all_models():
 
     run_dir = _pick_run()
     if not run_dir:
+        return
+    if any(d in run_dir.parents for d in (RUNS_DIR / "probes", RUNS_DIR / "ast")):
+        print(_RED("\n    That is a finished probe: training it on would overwrite a published agent. "
+                   "Watch it with Watch Trained Agent (6)."))
         return
 
     game = guess_game_for_run(run_dir)
@@ -1446,8 +1437,8 @@ def delete_logs_and_models():
         print("Aborted. Nothing was deleted.")
         return
     paths = [p for t, p in targets if t in chosen]
-    if RUNS_DIR in paths:
-        paths = [RUNS_DIR]
+    if RUNS_DIR in paths:              # all of it but the user study: people's play cannot be run again
+        paths = sorted(p for p in RUNS_DIR.iterdir() if p != STUDY_DIR)
     print()
     for p in paths:
         print(f"    {_RED('✖')}  {p}")
@@ -1458,7 +1449,7 @@ def delete_logs_and_models():
     for path in paths:
         for attempt in range(3):
             try:
-                shutil.rmtree(path)
+                shutil.rmtree(path) if path.is_dir() else path.unlink()
                 print(f"    {_GRN('✓')}  deleted {path}")
                 break
             except Exception as e:

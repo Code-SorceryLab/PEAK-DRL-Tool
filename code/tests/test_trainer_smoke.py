@@ -27,3 +27,23 @@ def test_one_generation_with_feedback_and_memory(tmp_path):
     net = make_net(loaded.cfg)
     assert net.n_params == loaded.n_params == 8 * (14 + 2 + 2 + 1) + (8 + 1) * 5
     net.set_weights(np.load(tmp_path / "best.npz")["weights"])   # replay-style rebuild fits
+
+
+def test_resume_keeps_the_runs_own_persona_and_locked_level(tmp_path, monkeypatch):
+    import sys
+    from code.neuro import trainer as tr
+    pop = Population(GAConfig(), 10)
+    pop.persona, pop.locked_level = "novice", "Mario1-3"       # a locked novice probe
+    pop.save(str(tmp_path))
+    seen = {}
+
+    class Fake:
+        def __init__(self, game, level, cfg, run_dir, state=None, population=None, persona=None):
+            seen.update(level=level, persona=persona.name)
+
+        def run(self, gens):
+            pass
+    monkeypatch.setattr(tr, "Trainer", Fake)
+    monkeypatch.setattr(sys, "argv", ["trainer", "--game", "mario", "--resume", str(tmp_path), "--no-serve"])
+    tr.main()                                                   # what menu "Watch All Models" runs
+    assert seen == {"level": "Mario1-3", "persona": "novice"}
