@@ -41,6 +41,12 @@ class SpatialHash:
                     self.contents[cell] = []
                 self.contents[cell].append(obj)
     
+    def remove(self, obj) -> None:
+        """Take an object out of every cell (a brick that was broken)."""
+        for items in self.contents.values():
+            if obj in items:
+                items.remove(obj)
+
     def query(self, obj) -> Set[any]:
         """
         Returns a set of unique objects that resides in the same cells as the given object.

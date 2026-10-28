@@ -69,8 +69,8 @@ class PowerState(Enum):
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-STAR_DURATION : float = 10.0   # seconds star power lasts
-HIT_IFRAMES   : float = 2.0    # seconds of i-frames after surviving a hit
+STAR_DURATION : float = 12.25  # seconds star power lasts (SMB: 35 interval ticks x 21 frames)
+HIT_IFRAMES   : float = 2.8    # seconds of i-frames after surviving a hit (SMB: InjuryTimer $08 = 168 frames)
 SMALL_HEIGHT  : int   = 32     # px — player height in SMALL state
 BIG_HEIGHT    : int   = 42     # px — player height in BIG / FIRE state
 
@@ -166,8 +166,8 @@ class PlayerStateMachine:
         if self.has(PowerState.FIRE):
             return False
         if not self.has(PowerState.BIG):
-            # Auto-upgrade to BIG first so FIRE always has BIG beneath it
-            self._stack.append(PowerState.BIG)
+            self._stack.append(PowerState.BIG)   # SMB: a flower taken while small only makes Mario big
+            return True
         self._stack.append(PowerState.FIRE)
         return True
 
@@ -205,9 +205,9 @@ class PlayerStateMachine:
         if self._iframes_timer > 0.0:
             return True
 
-        # 3. Have a power tier to lose
+        # 3. Have a power tier to lose: SMB drops BIG or FIRE straight to SMALL
         if self.state != PowerState.SMALL:
-            self._pop()
+            self._stack = [PowerState.SMALL]
             self._iframes_timer = self._hit_iframes
             return True
 

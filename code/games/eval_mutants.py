@@ -53,20 +53,21 @@ def column(col: int, rows: range, before: str, after: str) -> list:
 # changes are config values (dotted key, before, after). id, class, change, description, note.
 CHANGES = {
     "mario": ("platformer/world1_1.txt", [
-        ("seal_route", "breaking", column(90, range(14), "......=.......", "#"),
-         "A wall down column 90, rows 0-13 (it takes the place of the = tile at row 6): the flag "
+        ("seal_route", "breaking", column(190, range(14), "." * 14, "#"),
+         "A wall down column 190, rows 0-13, between the last staircase and the flagpole: the flag "
          "can no longer be reached", None),
         ("widen_gap", "degrading",
-         [(14, c, "#", " ") for c in (86, 87)] + [(r, c, "#", "O") for r in range(15, 22) for c in (86, 87)],
-         "The second pit (columns 83-85) widened by 2 to the right: 3 tiles -> 5", None),
+         [(14, c, "#", ".") for c in (89, 90)] + [(r, c, "#", "O") for r in range(15, 22) for c in (89, 90)],
+         "The second pit (columns 86-88) widened by 2 to the right: 3 tiles -> 5", None),
         ("jump_velocity_down", "degrading",
          [("player.jump.min_velocity", -495.0, -420.75), ("player.jump.max_velocity", -800.0, -680.0)],
          "Jump velocity x0.85: take-off -495 -> -420.75 px/s, the cap -800 -> -680",
          "The spec edits physics.jump_velocity in world1_1.yaml, but the game never reads that block "
          "(LevelLoader takes only `dynamics` from it), so that edit would change nothing. This scales "
          "the jump values the game does read; the small run-speed bonus (up to 57 px/s) is unchanged. "
-         "A full jump still rises 4 tiles (5 before) and the tallest step on the route is 3, so 1-1 "
-         "stays solvable."),
+         "A full running jump rises 3.75 tiles (5 before). 1-1's pipes at columns 46 and 57 are 4 tall, "
+         "as in SMB: the 3-tall pipe at 38 is a step up onto 46, but nothing steps up onto 57 (even "
+         "x0.9 cannot clear it from the ground), so only a Goomba bounce may get past it."),
         ("off_route", "neutral", [(19, 75, "#", ".")],
          "The ground tile at row 19, column 75 hollowed out, 5 tiles under the surface", None),
         ("cosmetic_tile", "neutral", [(2, 10, ".", " ")],

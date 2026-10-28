@@ -11,6 +11,8 @@ class QuestionBlock:
     contains: str = "coin"
     hit: bool = False
     solid: bool = True   # QBlocks are solid — required by _get_tile_rects_near filter
+    hidden: bool = False # the invisible 1-UP block: no tile until bumped from below
+    deadline: int = -1   # the 10-coin brick: frame its coins stop (set on the first bump)
     
     @property
     def x(self): return self.gObj.x
@@ -27,6 +29,12 @@ class QuestionBlock:
         return (self.x // MapP.TILE_SIZE, self.y // MapP.TILE_SIZE)
     
     def render(self, surface: pygame.Surface, sx: float, sy: float):
+        if self.hidden:
+            return
+        if not self.hit and self.contains in ("brick", "coins", "starbrick"):   # looks like any brick
+            pygame.draw.rect(surface, MapP.COLOR_PLATFORM, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE))
+            pygame.draw.rect(surface, MapP.COLOR_BLACK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE), 1)
+            return
         pygame.draw.rect(surface, MapP.COLOR_QBLOCK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE))
         pygame.draw.rect(surface, MapP.COLOR_BLACK, (sx, sy, MapP.TILE_SIZE, MapP.TILE_SIZE), 1)
 

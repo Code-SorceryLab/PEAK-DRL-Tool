@@ -22,7 +22,7 @@
     "from": -495.0,
     "to": -420.75
   },
-  "note": "The spec edits physics.jump_velocity in world1_1.yaml, but the game never reads that block (LevelLoader takes only `dynamics` from it), so that edit would change nothing. This scales the jump values the game does read; the small run-speed bonus (up to 57 px/s) is unchanged. A full jump still rises 4 tiles (5 before) and the tallest step on the route is 3, so 1-1 stays solvable.",
+  "note": "The spec edits physics.jump_velocity in world1_1.yaml, but the game never reads that block (LevelLoader takes only `dynamics` from it), so that edit would change nothing. This scales the jump values the game does read; the small run-speed bonus (up to 57 px/s) is unchanged. A full running jump rises 3.75 tiles (5 before). 1-1's pipes at columns 46 and 57 are 4 tall, as in SMB: the 3-tall pipe at 38 is a step up onto 46, but nothing steps up onto 57 (even x0.9 cannot clear it from the ground), so only a Goomba bounce may get past it.",
   "checks": {
     "exit_reachable": true,
     "values": {

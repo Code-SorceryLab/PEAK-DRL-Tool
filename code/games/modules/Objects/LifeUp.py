@@ -18,7 +18,7 @@ class LifeUp:
     Handled by PhysicsManager._solve_aabb_collision (bounce_x=True).
     """
     gObj:  GameObject
-    vx:    float = 60.0
+    vx:    float = 120.0   # SMB: 1 px/frame
     vy:    float = 0.0
     kind:  str   = "life"
 

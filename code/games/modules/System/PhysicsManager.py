@@ -31,6 +31,7 @@ class PhysicsContext:
     AIR_FRICTION: float = AIR_FRICTION
     AIR_CONTROL: float = AIR_CONTROL
     SKID_DECEL: float = SKID_DECEL
+    AIR_TURN_DECEL: float = AIR_TURN_DECEL
     GRAVITY: float = GRAVITY
     FAST_FALL_GRAV: float = FAST_FALL_GRAV
     MAX_FALL_SPEED: float = MAX_FALL_SPEED
@@ -601,6 +602,7 @@ class PhysicsManager:
                 player.vy        = 0
                 player.on_ground = True
                 player.jump_hold = 0
+                core.stomp_chain = 0           # SMB: the stomp chain lasts until Mario lands
             else:
                 player.gObj.y = trect.bottom
                 player.vy     = 0
@@ -608,6 +610,7 @@ class PhysicsManager:
                     self._hit_qblock(core, col, row)
 
             rect = player.gObj.get_rect()
+        self._check_hidden_blocks(core)
 
     # --- DYNAMIC COLLISIONS ---
 
@@ -663,7 +666,7 @@ class PhysicsManager:
             nearby_enemies = self.hazard_hash.query(enemy)
             for other in nearby_enemies:
                 if other is not enemy and other.gObj.active:
-                    if isinstance(other, type(enemy)):
+                    if getattr(other.gObj, "type_id", None) == EntityType.ENEMY:   # not spikes or pits
                         if enemy.gObj.collides_with(other.gObj):
                             self._dispatch_collision(core, enemy, other)
 
@@ -775,8 +778,8 @@ class PhysicsManager:
         # 1. Stomp -- falling and feet above enemy midpoint
         if player_was_falling and player_bottom < enemy_center + 10:
             enemy.gObj.active = False
-            player.vy = JUMP_VEL_MIN * 0.6   # bounce
-            core.score += 100
+            player.vy = -360.0                # SMB: 3 px/frame up off an enemy
+            core.award_stomp()
             if hasattr(core, 'kills_step'):
                 core.kills_step += 1
             return
@@ -804,9 +807,11 @@ class PhysicsManager:
             self._credit_coin(core)
 
     def _credit_coin(self, core):
-        core.score += 10
+        core.score += 200                     # SMB: a coin is 200
         core.coins_step += 1
         core.coins_total += 1
+        if core.coins_total % 100 == 0:       # and every 100th is a life
+            core.lives += 1
 
     def _handle_projectile_enemy(self, core, proj, enemy):
         """
@@ -817,7 +822,7 @@ class PhysicsManager:
         """
         enemy.gObj.active = False
         proj.gObj.active  = False
-        core.score += 100
+        core.score += 200 if hasattr(enemy, "on_stomp") else 100   # SMB: Goomba 100, Koopa 200
         if hasattr(core, 'kills_step'):
             core.kills_step += 1
 
@@ -835,19 +840,18 @@ class PhysicsManager:
         powerup.gObj.active = False
         core.powerups_step += 1
 
-        if powerup.kind == "mushroom":
+        if powerup.kind == "mushroom":            # SMB: every power-up is 1000; the 1-UP is a life, no points
             player.power_machine.collect_mushroom()
-            core.score += 50
+            core.score += 1000
         elif powerup.kind == "flower":
             player.power_machine.collect_flower()
-            core.score += 50
+            core.score += 1000
         elif powerup.kind == "life":
             core.lives += 1
-            core.score += 200
         else:
             # "star" or unknown → star
             player.power_machine.collect_star()
-            core.score += 100
+            core.score += 1000
 
     def _handle_enemy_enemy(self, core, e1, e2):
         """
@@ -855,6 +859,9 @@ class PhysicsManager:
         - Horizontal: Bounces both enemies away from each other.
         - Vertical: Stacks them (sets velocity to 0).
         """
+        for shell, victim in ((e1, e2), (e2, e1)):     # a sliding shell runs straight through
+            if hasattr(shell, "on_enemy_touch") and shell.on_enemy_touch(victim, core):
+                return
         enemy = e1
         other = e2
         rect = enemy.gObj.get_rect()
@@ -888,64 +895,90 @@ class PhysicsManager:
 
     # --- HELPERS ---
 
+    BRICK_BREAK_POINTS = 50       # SMB: a brick big Mario breaks
+    MULTI_COIN_FRAMES = 231       # SMB: the 10-coin brick pays out for $0B interval ticks (~3.9 s)
+
     def _hit_qblock(self, core, col: int, row: int):
         """
-        Triggered when a player hits a Question Block from below.
-        Spawns the correct powerup class based on block.contains.
-
-        contains      spawns
-        ----------    ----------------
-        "coin"      → fly-up Coin
-        "mushroom"  → Mushroom  (walks, bounces)
-        "star"      → StarPowerup (bounces and jumps)
-        "flower"    → FireFlower  (stationary)
-        "life"      → LifePowerup (walks, bounces)
+        Mario bumps a block from below (SMB rules):
+          coin        a coin, counted at once
+          mushroom    a mushroom when Mario is small, a fire flower when he is big
+          flower      the same rule (a flower block is a power-up block)
+          star / life a star / a 1-UP mushroom
+          brick       big Mario breaks it (50 points); small Mario only bumps it
+          coins       the 10-coin brick: a coin per bump until ~3.9 s after the first one
+          starbrick   a brick with a star
+        Every bump also kills an enemy standing on the block.
         """
         for block in core.level_data.qblocks:
-            b_col = int(block.gObj.x // TILE_SIZE)
-            b_row = int(block.gObj.y // TILE_SIZE)
+            if int(block.gObj.x // TILE_SIZE) != col or int(block.gObj.y // TILE_SIZE) != row or block.hit:
+                continue
+            self._bump_enemies_on(core, col, row)
+            spawn_x, spawn_y = col * TILE_SIZE, row * TILE_SIZE - 22
+            kind, big = block.contains, core.player.power_machine.state.name != "SMALL"
 
-            if b_col == col and b_row == row and not block.hit:
-                block.hit = True
-                spawn_x = col * TILE_SIZE
-                spawn_y = row * TILE_SIZE - 22
+            if kind == "brick":
+                if big:                                 # broken: gone for good
+                    block.hit = True
+                    block.gObj.active = False
+                    core.level_data.static_hash.remove(block)
+                    core.level_data.grid[row][col] = 0
+                    core.score += self.BRICK_BREAK_POINTS
+                return
+            if kind == "coins":
+                if block.deadline < 0:
+                    block.deadline = core.frame + self.MULTI_COIN_FRAMES
+                kind = "coin"
+                if core.frame < block.deadline:
+                    self._pop_coin(core, col, row)
+                    return                              # still paying out: stays a brick
+            if kind == "starbrick":
+                kind = "star"
 
-                if block.contains == "coin":
-                    c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
-                             flyup=True, vy=-280.0, life=0.3, auto_collect=True)
-                    c.gObj.type_id = EntityType.COIN
-                    core.level_data.coins.append(c)   # just the pop: the coin counts now, as on the NES
-                    self._credit_coin(core)
+            block.hit = True
+            if kind == "coin":
+                self._pop_coin(core, col, row)
+                return
+            if kind in ("mushroom", "flower"):
+                kind = "flower" if big else "mushroom"
+            cls = {"mushroom": Mushroom, "flower": FireFlower, "life": LifeUp}.get(kind, StarPowerUp)
+            p = cls(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
+            p.gObj.type_id = EntityType.POWERUP
+            core.level_data.powerups.append(p)
+            return
 
-                elif block.contains == "mushroom":
-                    p = Mushroom(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
-                    p.gObj.type_id = EntityType.POWERUP
-                    core.level_data.powerups.append(p)
+    def _pop_coin(self, core, col: int, row: int) -> None:
+        c = Coin(gObj=GameObject(col*TILE_SIZE+8, row*TILE_SIZE+8, 16, 16, True),
+                 flyup=True, vy=-280.0, life=0.3, auto_collect=True)
+        c.gObj.type_id = EntityType.COIN
+        core.level_data.coins.append(c)   # just the pop: the coin counts now, as on the NES
+        self._credit_coin(core)
 
-                elif block.contains == "star":
-                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
-                    p.gObj.type_id = EntityType.POWERUP
-                    core.level_data.powerups.append(p)
+    def _bump_enemies_on(self, core, col: int, row: int) -> None:
+        """An enemy standing on a bumped block dies (SMB: Goomba 100, others 200)."""
+        top, x0, x1 = row * TILE_SIZE, col * TILE_SIZE, (col + 1) * TILE_SIZE
+        for e in core.level_data.enemies:
+            g = e.gObj
+            if g.active and abs(g.y + g.height - top) <= 6 and g.x < x1 and g.x + g.width > x0:
+                g.active = False
+                core.score += 200 if hasattr(e, "on_stomp") else 100
+                core.kills_step += 1
 
-                elif block.contains == "flower":
-                    p = FireFlower(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
-                    p.gObj.type_id = EntityType.POWERUP
-                    core.level_data.powerups.append(p)
-
-                elif block.contains == "life":
-                    p = LifeUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
-                    p.gObj.type_id = EntityType.POWERUP
-                    core.level_data.powerups.append(p)
-
-                else:
-                    # Fallback — treat unknown as star
-                    p = StarPowerUp(gObj=GameObject(spawn_x, spawn_y, 20, 20, True))
-                    p.gObj.type_id = EntityType.POWERUP
-                    core.level_data.powerups.append(p)
-
-                if core.level_data.tiles[row][col]:
-                    core.level_data.tiles[row][col].type_id = EntityType.TILE
-                break
+    def _check_hidden_blocks(self, core) -> None:
+        """The invisible 1-UP block appears when Mario jumps into it from below."""
+        p = core.player
+        if p.vy >= 0:
+            return
+        head = pygame.Rect(p.gObj.x, p.gObj.y, p.gObj.width, 4)
+        for block in core.level_data.qblocks:
+            if block.hidden and head.colliderect(block.gObj.get_rect()):
+                block.hidden = False
+                col, row = int(block.gObj.x // TILE_SIZE), int(block.gObj.y // TILE_SIZE)
+                core.level_data.grid[row][col] = TILE_QBLOCK
+                core.level_data.static_hash.insert(block)
+                p.gObj.y, p.vy = block.gObj.y + block.gObj.height, 0
+                self._hit_qblock(core, col, row)
+                return
 
     def _get_tile_rects_near(self, level_data, obj):
         """

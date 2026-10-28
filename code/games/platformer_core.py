@@ -643,8 +643,20 @@ class PlatformerCore(gymnasium.Env):
 
         self.reset()
 
+    STOMP_CHAIN = (100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000)   # SMB, then a 1-UP each
+
+    def award_stomp(self) -> None:
+        """Points for a stomp: the chain climbs with every enemy stomped before Mario lands."""
+        n = self.stomp_chain
+        if n < len(self.STOMP_CHAIN):
+            self.score += self.STOMP_CHAIN[n]
+        else:
+            self.lives += 1
+        self.stomp_chain = n + 1
+
     def reset_metrics(self):
         """Helper to clear metrics on reset/death."""
+        self.stomp_chain = 0
         self.timer = self.timer_seconds
         self.time_last_step = time.time()
         self.dt = 0.0001
@@ -766,8 +778,9 @@ class PlatformerCore(gymnasium.Env):
             # --- Fire Flower projectile spawn ---
             if self.player.fire_requested:
                 self.player.fire_requested = False
-                proj = FireFlowerProjectile.from_player(self.player)
-                self.level_data.projectiles.append(proj)
+                if sum(p.gObj.active for p in self.level_data.projectiles) < 2:   # SMB: two fireballs at most
+                    proj = FireFlowerProjectile.from_player(self.player)
+                    self.level_data.projectiles.append(proj)
 
         self.physics_manager.update_system(self.dt, self)
         self.physics_manager.resolve_collisions(self)
@@ -2035,6 +2048,13 @@ class PlatformerCore(gymnasium.Env):
         colour = COLOR_POWERUP_STAR if (p.invincible_timer > 0 and (self.frame // 5) % 2) else \
             ((255, 100, 0) if p.powered_up else (255, 0, 0))
         p.color = colour
+        # SMB palettes: the star cycles colours every few frames; Fire Mario swaps red and white
+        if p.star_timer > 0:
+            p.palette = ("star", (self.frame // 3) % 8)
+        elif p.power_machine.state.name == "FIRE":
+            p.palette = "fire"
+        else:
+            p.palette = None
         p.render(surface, sx, sy, self.debug_manager.show_sensors)
 
     def _draw_ui(self, surface: pygame.Surface):
@@ -2043,7 +2063,7 @@ class PlatformerCore(gymnasium.Env):
         m = re.search(r"\d+-\d+", str(self.world))
         world = m.group(0) if m else str(self.world)[-5:]
         shadow = (0, 0, 0)
-        columns = [("MARIO", f"{self.score:06d}"), ("", f"$*{self.coins_total:02d}"),
+        columns = [("MARIO", f"{self.score:06d}"), ("", f"$*{self.coins_total % 100:02d}"),
                    ("WORLD", world), ("TIME", f"{max(0, int(self.timer)):03d}"), ("LIVES", f"*{self.lives}")]
         step = self.WIDTH // len(columns)
         for i, (label, value) in enumerate(columns):

@@ -99,6 +99,10 @@ class LevelLoader:
             '<': 'mushroom',
             'F': 'flower',
             'L': 'life',
+            'R': 'brick',        # breakable brick: big Mario breaks it, small Mario bumps it
+            'T': 'coins',        # the 10-coin brick: coins for a few seconds after the first bump
+            'Y': 'starbrick',    # a brick with a star in it
+            'I': 'hidden_life',  # the invisible 1-UP block: found only by jumping into it
         }
 
     def resolve_level_path(self, raw_file: str) -> str:
@@ -309,11 +313,14 @@ class LevelLoader:
                 # 5. Handle Complex Entities (QBlocks, Enemies, Start Pos)
                 elif ascii_char in self.QBLOCK_CONTAINS:
                     contains = self.QBLOCK_CONTAINS[ascii_char]
-                    data.grid[row][col] = TILE_QBLOCK
-                    qb = QuestionBlock(gObj=GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True), contains=contains)
+                    hidden = contains == "hidden_life"
+                    data.grid[row][col] = TILE_AIR if hidden else TILE_QBLOCK
+                    qb = QuestionBlock(gObj=GameObject(col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size, True),
+                                       contains="life" if hidden else contains, hidden=hidden)
                     qb.gObj.type_id = EntityType.QBLOCK
                     data.qblocks.append(qb)
-                    data.static_hash.insert(qb)
+                    if not hidden:
+                        data.static_hash.insert(qb)
 
                 elif ascii_char == 'C':
                     c = Coin(gObj=GameObject(col * self.tile_size + self.tile_size//2, row * self.tile_size + self.tile_size//2, self.tile_size//2, self.tile_size//2, True))

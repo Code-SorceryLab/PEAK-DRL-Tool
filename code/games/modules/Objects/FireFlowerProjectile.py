@@ -7,11 +7,11 @@ from ..System.EntityType import EntityType
 
 # ── Tunable parameters ────────────────────────────────────────────────────────
 # Horizontal speed (px/s).  Positive = rightward; sign is flipped for left-facing shots.
-PROJECTILE_SPEED    = 280.0
+PROJECTILE_SPEED    = 480.0   # SMB: 4 px/frame
 
 # Upward velocity applied on every ground bounce (negative = up in screen coords).
 # Increase magnitude for higher bounces, decrease for flatter arcs.
-PROJ_JUMP_VEL       = -260.0
+PROJ_JUMP_VEL       = -360.0  # SMB: 3 px/frame up off the floor
 
 # Gravity acceleration applied each frame (px/s²).
 # Matches world gravity for a natural arc; lower values produce floatier fireballs.

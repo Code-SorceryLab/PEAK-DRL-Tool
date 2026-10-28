@@ -42,10 +42,9 @@ Add this block at the TOP of _handle_player_enemy(), before the stomp check:
         return
 
 Also, in _handle_enemy_enemy(), add at the top:
-    if hasattr(e1, 'on_enemy_touch'):
-        e1.on_enemy_touch(e2)
-    if hasattr(e2, 'on_enemy_touch'):
-        e2.on_enemy_touch(e1)
+    for shell, victim in ((e1, e2), (e2, e1)):
+        if hasattr(shell, 'on_enemy_touch') and shell.on_enemy_touch(victim, core):
+            return
 """
 
 from __future__ import annotations
@@ -77,12 +76,12 @@ class KoopaState(Enum):
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
 
-SHELL_TIMEOUT : float = 5.0    # seconds before SHELL auto-pushes ALIVE
+SHELL_TIMEOUT : float = 5.6    # seconds before SHELL auto-pushes ALIVE (SMB: $10 ticks)
 WALK_SPEED    : float = 60.0   # px/s walking (ALIVE / FLYING)
-SHELL_SPEED   : float = 240.0  # px/s sliding (MOVING)
+SHELL_SPEED   : float = 360.0  # px/s sliding (MOVING); SMB: 3 px/frame
 FLY_AMP       : float = 38.0   # px — vertical oscillation amplitude (FLYING)
 FLY_FREQ      : float = 1.8    # Hz — oscillation frequency (FLYING)
-STOMP_BOUNCE  : float = -220.0 # player vy after stomping a Koopa
+STOMP_BOUNCE  : float = -360.0 # player vy after a stomp; SMB: 3 px/frame
 
 KOOPA_W       : int = 22
 KOOPA_H_FULL  : int = 30       # height when ALIVE / FLYING
@@ -347,6 +346,8 @@ class Koopa:
         MOVING  → pop → [SHELL]       stops the sliding shell, timer starts
         """
         s = self.sm.state
+        if player.power_machine.is_star_active:
+            return self.on_touch(player, core)
 
         if s == KoopaState.SHELL:
             # Stomping a shell kicks it, same as touching from the side.
@@ -355,6 +356,8 @@ class Koopa:
             if self.sm.push(KoopaState.MOVING):
                 self.vx = kick_dir * SHELL_SPEED
                 self._apply_size()
+                self.chain = 0
+                core.score += 400                # SMB: a kick is worth 400
             player.vy = STOMP_BOUNCE
 
         if s == KoopaState.ALIVE:
@@ -363,7 +366,7 @@ class Koopa:
             self.vx = 0.0
             self._apply_size()
             player.vy = STOMP_BOUNCE
-            core.score += 100
+            core.award_stomp()
             if hasattr(core, 'kills_step'):
                 core.kills_step += 1
 
@@ -372,7 +375,7 @@ class Koopa:
             self._fly_base_y = None  # reset oscillation baseline
             self._apply_size()
             player.vy = STOMP_BOUNCE
-            core.score += 100
+            core.award_stomp()
             if hasattr(core, 'kills_step'):
                 core.kills_step += 1
 
@@ -382,7 +385,7 @@ class Koopa:
             self.vx = 0.0
             self._apply_size()
             player.vy = STOMP_BOUNCE
-            core.score += 100
+            core.award_stomp()
 
     def on_touch(self, player, core) -> None:
         """
@@ -395,20 +398,22 @@ class Koopa:
         """
         s = self.sm.state
 
-        if s == KoopaState.SHELL:
+        if s == KoopaState.SHELL and not player.power_machine.is_star_active:
             # Kick the shell — direction is away from the player
             kick_dir = 1.0 if player.gObj.x < self.gObj.x else -1.0
             if self.sm.push(KoopaState.MOVING):
                 self.vx = kick_dir * SHELL_SPEED
                 self._apply_size()
+                self.chain = 0
+                core.score += 400                # SMB: a kick is worth 400
             # Touching a still shell does NOT hurt the player
 
         else:
             # ALIVE, FLYING, or MOVING — deal damage
             if player.power_machine.is_star_active:
-                # Star power — kill the koopa
+                # Star power — kill the koopa (a shell too)
                 self.gObj.active = False
-                core.score += 100
+                core.score += 200                # SMB: a Koopa killed without a stomp is 200
                 if hasattr(core, 'kills_step'):
                     core.kills_step += 1
                 return
@@ -417,13 +422,25 @@ class Koopa:
             if not survived:
                 core._handle_death("Koopa")
 
-    def on_enemy_touch(self, other_enemy) -> None:
+    SHELL_CHAIN = (500, 800, 1000, 2000, 4000, 5000, 8000)   # then a 1-UP per kill
+
+    def on_enemy_touch(self, other_enemy, core) -> bool:
         """
-        Called when this (MOVING) shell collides with another enemy.
-        Kills the other enemy and awards score.
+        Called when this shell touches another enemy. A sliding shell kills it and scores the
+        shell chain (SMB: 500, 800, 1000, 2000, 4000, 5000, 8000, then a 1-UP each). True if it did.
         """
-        if self.sm.state == KoopaState.MOVING and other_enemy.gObj.active:
-            other_enemy.gObj.active = False
+        if self.sm.state != KoopaState.MOVING or not other_enemy.gObj.active:
+            return False
+        other_enemy.gObj.active = False
+        n = getattr(self, "chain", 0)
+        if n < len(self.SHELL_CHAIN):
+            core.score += self.SHELL_CHAIN[n]
+        else:
+            core.lives += 1
+        self.chain = n + 1
+        if hasattr(core, 'kills_step'):
+            core.kills_step += 1
+        return True
 
     # ── Render ────────────────────────────────────────────────────────────────
 

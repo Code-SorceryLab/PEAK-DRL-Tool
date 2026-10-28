@@ -10,7 +10,7 @@ _JUMP_INTERVAL = 0.55
 # Jump strength (negative = upward)
 _JUMP_VEL      = -320.0
 # Horizontal walk speed
-_WALK_SPEED    = 80.0
+_WALK_SPEED    = 120.0   # SMB: 1 px/frame
 
 
 @dataclass

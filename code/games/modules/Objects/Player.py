@@ -26,12 +26,38 @@ class PlayerAnim(Enum):
 _FIRE_COOLDOWN = 0.35
 
 
+def _recolour(sprite: pygame.Surface, palette) -> pygame.Surface:
+    """A recoloured copy of a sprite, as SMB swaps Mario's palette.
+    "fire": the red robe and the white fur trade places (Fire Mario's red <-> white).
+    ("star", step): the hue turned step x 45 degrees, so the steps cycle the rainbow."""
+    out = sprite.copy()
+    px = pygame.surfarray.pixels3d(out)
+    rgb = px.astype(np.float32)
+    if palette == "fire":
+        r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+        red = (r > g + 50) & (r > b + 50)
+        light = (rgb.min(axis=2) > 110) & (rgb.max(axis=2) - rgb.min(axis=2) < 45)   # the fur and its grey shading
+        lum = rgb.mean(axis=2)
+        rgb[red] = (140 + 0.45 * r[red])[:, None]                      # red -> shaded white
+        rgb[light] = np.stack([lum[light], lum[light] * 0.2, lum[light] * 0.15], axis=1)   # white -> red
+    else:
+        a = np.radians(45 * palette[1])
+        c, s, k = np.cos(a), np.sin(a), (1 - np.cos(a)) / 3
+        q = np.sqrt(1 / 3) * s
+        m = np.array([[c + k, k - q, k + q], [k + q, c + k, k - q], [k - q, k + q, c + k]], np.float32)
+        rgb = rgb @ m.T                                                # rotate about the grey axis
+    px[...] = np.clip(rgb, 0, 255).astype(np.uint8)
+    del px
+    return out
+
+
 @dataclass
 class Player():
     gObj: GameObject
     vx: float = 0.0
     vy: float = 0.0
     color = (255, 0, 0)
+    palette = None          # set by the core each frame: None, "fire", or ("star", step)
     eye_radius = 3
     on_ground: bool = False
     facing_right: bool = True
@@ -59,6 +85,7 @@ class Player():
     jump_hold: int = 0
     jump_buffer: int = 0
     last_jump_pressed: bool = False
+    last_fire_pressed: bool = False
     run_pressed: bool = False
     dt: float = 1.0
 
@@ -223,8 +250,11 @@ class Player():
 
         # Fire input — try_fire() enforces cooldown and power state internally.
         # fire_requested is consumed by platformer_core.step() to spawn the projectile.
-        if agent_fire or kb_fire:
+        # SMB: a fireball on the B press only; holding B is the run button.
+        fire = agent_fire or kb_fire
+        if fire and not self.last_fire_pressed:
             self.try_fire()
+        self.last_fire_pressed = fire
 
     def try_fire(self) -> bool:
         """
@@ -274,6 +304,8 @@ class Player():
             along = self.input_dir * self.vx
             if self.on_ground and skidding:
                 self.vx += self.input_dir * ctx.SKID_DECEL * dt
+            elif skidding:
+                self.vx += self.input_dir * ctx.AIR_TURN_DECEL * dt
             elif along < target_max:
                 self.vx = self.input_dir * min(along + accel_rate * dt, target_max)
             elif self.on_ground:
@@ -313,6 +345,8 @@ class Player():
             current_size = (int(self.gObj.width), int(self.gObj.height))
             if (sprite.get_width(), sprite.get_height()) != current_size:
                 sprite = pygame.transform.scale(sprite, current_size)
+            if self.palette:
+                sprite = _recolour(sprite, self.palette)
             y_offset = sprite.get_height() - self.gObj.height
             surface.blit(sprite, (int(sx), int(sy - y_offset)))
             if debug:
