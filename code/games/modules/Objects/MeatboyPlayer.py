@@ -5,7 +5,7 @@ from .GameObject import GameObject
 
 
 class MeatboyPlayer:
-    """Monolithic Super Meat Boy character (the "old way", like Player/SonicPlayer).
+    """Monolithic Super Meat Boy character (the "old way", like Player).
 
     Owns its own kinematics and input, and inlines what used to be four
     composable abilities (WallSlide -> WallJump -> Move -> Jump) in that fixed

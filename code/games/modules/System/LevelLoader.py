@@ -26,8 +26,6 @@ from ..Objects.StarPowerUp import StarPowerUp
 from ..Objects.FireFlower import FireFlower
 from ..Objects.Goal import Goal
 from ..Objects.Ladder import Ladder
-from ..Objects.SlopeTile import SlopeTile, SLOPE_CHAR_MAP
-from ..Objects.Spring import Spring
 from ..Objects.Saw import Saw
 from ..Objects.FireBar import FireBar
 from .SpatialHash import SpatialHash
@@ -52,8 +50,6 @@ class LevelData:
     powerups:         List[Any]              = field(default_factory=list)
     goals:            List[Goal]               = field(default_factory=list)
     ladders:          List[Ladder]             = field(default_factory=list)
-    slope_tiles:      List[SlopeTile]          = field(default_factory=list)
-    springs:          List[Spring]             = field(default_factory=list)
     pits:             List[Any]               = field(default_factory=list)
     saws:             List[Saw]               = field(default_factory=list)
     firebars:         List[FireBar]           = field(default_factory=list)
@@ -262,29 +258,7 @@ class LevelLoader:
                     # to core._handle_death(). No separate hazard_hash needed.
                     data.static_hash.insert(spike)
 
-                # 2. Handle other Static Tiles via Dictionary
-                elif ascii_char in SLOPE_CHAR_MAP:
-                    slope_type = SLOPE_CHAR_MAP[ascii_char]
-                    slope_tile = SlopeTile.create(col, row, slope_type, self.tile_size)
-                    slope_tile.gObj.type_id = EntityType.TILE
-                    data.grid[row][col] = slope_tile.type_id
-                    data.tiles[row][col] = slope_tile
-                    data.slope_tiles.append(slope_tile)
-                    data.static_hash.insert(slope_tile)
-
-                elif ascii_char == 'S':
-                    spring = Spring(
-                        gObj=GameObject(
-                            col * self.tile_size,
-                            row * self.tile_size + (self.tile_size // 2),
-                            self.tile_size,
-                            self.tile_size // 2,
-                            True,
-                        )
-                    )
-                    data.springs.append(spring)
-
-                # 3. Handle other Static Tiles via Dictionary
+                # 2. Ladders
                 elif ascii_char == 'H':
                     ladder = Ladder.from_tile(col * self.tile_size, row * self.tile_size, self.tile_size)
                     data.grid[row][col] = TILE_AIR

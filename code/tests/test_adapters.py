@@ -10,7 +10,7 @@ from code.neuro.adapters import N_INPUTS_BY_GAME, make_adapter
 from code.neuro.sensors import read_sensors
 
 
-@pytest.mark.parametrize("game", ["mario", "sonic", "meatboy"])
+@pytest.mark.parametrize("game", ["mario", "meatboy"])
 def test_adapter_smoke(game):
     adapter = make_adapter(game, None, max_frames=300, win_bonus=100.0)
     adapter.reset()

@@ -29,8 +29,7 @@ DEBUG_PANEL_WIDTH = 350   # the side debug panel (human mode only), as Mario's
 class MeatboyCore:
     """Super Meat Boy: monolithic character (the "old way", like PlatformerCore).
 
-    A single MeatboyPlayer + a per-game MeatboyPhysicsManager, mirroring how
-    Sonic is structured. Mirrors the Gym contract GameEnv/train.py
+    A single MeatboyPlayer + a per-game MeatboyPhysicsManager. Mirrors the Gym contract GameEnv/train.py
     expect (reset/step/render + get_*_space)."""
 
     WIDTH = 1280      # the game's own window: 40 x 22.5 tiles, so most World 1 levels fit whole

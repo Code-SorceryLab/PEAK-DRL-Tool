@@ -5,7 +5,7 @@ from code.games.modules.System import music
 
 
 def test_every_game_the_selectors_launch_has_a_tune():
-    assert {"menu", "platformer", "sonic", "megaman", "meatboy", "bomberman"} <= music.TUNES.keys()
+    assert {"menu", "platformer", "megaman", "meatboy", "bomberman"} <= music.TUNES.keys()
 
 
 def test_every_tune_renders_its_bars_as_one_clean_loop():

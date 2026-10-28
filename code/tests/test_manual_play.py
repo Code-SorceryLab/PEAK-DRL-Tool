@@ -46,7 +46,7 @@ def test_a_meatboy_time_out_is_recorded_as_a_timeout():
 
 
 def test_inputs_log_a_jump_key_as_a_not_up(monkeypatch):
-    """W jumps in Mario, Meat Boy and Sonic (the up arrow too in the last two): it is logged as A."""
+    """W jumps in Mario and Meat Boy (the up arrow too in Meat Boy): it is logged as A."""
     keys = lift("JUMP_KEYS =", pygame=pygame)["JUMP_KEYS"]
     monkeypatch.setattr(gamepad, "pad", None)
 
@@ -59,7 +59,6 @@ def test_inputs_log_a_jump_key_as_a_not_up(monkeypatch):
     assert held("platformer", pygame.K_w) == (0, True)
     assert held("platformer", pygame.K_UP) == (-1, False)      # the up arrow does nothing in Mario: up, as held
     assert held("meatboy", pygame.K_w) == held("meatboy", pygame.K_UP) == (0, True)
-    assert held("sonic", pygame.K_w) == held("sonic", pygame.K_UP) == (0, True)
 
 
 def test_a_recorded_run_ignores_the_debug_keys(monkeypatch):

@@ -53,7 +53,6 @@ except ImportError:
 # ─── Tile definitions ─────────────────────────────────────────────
 GAME_LABELS = {
     "platformer": "Mario / Platformer",
-    "sonic": "Sonic",
     "megaman": "Mega Man (NES)",
     "meatboy": "Super Meat Boy",
 }
@@ -78,7 +77,6 @@ SAW_GAMES = {"meatboy"}
 
 GAME_FILE_GLOBS = {
     "platformer": ["world*.txt", "stage*.txt", "platform*.txt", "level*.txt", "testlevel*.txt"],
-    "sonic": ["green_hill*.txt", "sonic*.txt", "gh*.txt"],
     "megaman": ["*.txt"],
     "meatboy": ["*.txt"],
 }
@@ -97,15 +95,6 @@ TILE_LIBRARY = [
     ('C', 'Coin',           (255, 215, 0),   (80, 60, 0)),
     ('E', 'Enemy',          (180, 60, 180),  (255, 220, 255)),
     ('H', 'Ladder',         (120, 215, 255), (10, 60, 90)),
-    ('S', 'Spring',         (255, 90, 90),   (255, 230, 120)),
-    ('/', 'Slope Up',       (120, 190, 90),  (30, 70, 20)),
-    ('\\', 'Slope Down',    (120, 190, 90),  (30, 70, 20)),
-    ('(', 'Gentle Up',      (120, 190, 90),  (30, 70, 20)),
-    (')', 'Gentle Down',    (120, 190, 90),  (30, 70, 20)),
-    ('[', 'Top Up',         (120, 190, 90),  (30, 70, 20)),
-    (']', 'Top Down',       (120, 190, 90),  (30, 70, 20)),
-    ('U', 'Concave',        (120, 190, 90),  (30, 70, 20)),
-    ('n', 'Convex',         (120, 190, 90),  (30, 70, 20)),
     ('M', 'Met Enemy',      (80, 140, 255),  (235, 230, 120)),
     ('B', 'Bat Enemy',      (190, 120, 255), (255, 220, 255)),
     ('G', 'Goal',           (60, 200, 100),  (0, 60, 20)),
@@ -135,7 +124,6 @@ TILE_BY_CHAR = {t[0]: t for t in TILE_LIBRARY}
 TILE_BY_CHAR['.'] = TILE_BY_CHAR[' ']
 GAME_TILE_ORDER = {
     "platformer": [' ', '#', '=', '^', 'O', '?', '>', '<', 'F', 'L', 'C', 'E', 'G', 'P'],
-    "sonic": [' ', '#', '=', '^', 'O', 'S', '/', '\\', '(', ')', '[', ']', 'U', 'n', 'C', 'E', 'G', 'P'],
     "megaman": [' ', '#', 'H', '^', 'D', 'G', 'X', 'P',
                  'b', 'k', 'j', 'K', 'J', 'c', 'f', 'v', 'h', 's', 'e', 'w', 'W', '+'],
     "meatboy": [' ', '#', '%', '*', '^', 'G', 'P'],
@@ -457,12 +445,6 @@ class GameConfig:
         filename = self.normalize_level_file(filename)
         if self.game in GAME_LEVELS_CONFIG:
             return {"file": filename}
-        if self.game == "sonic":
-            return {
-                "file": filename,
-                "time_limit": 300,
-                "background_color": [0, 128, 255],
-            }
         return {
             "file": filename,
             "time_limit": 300,

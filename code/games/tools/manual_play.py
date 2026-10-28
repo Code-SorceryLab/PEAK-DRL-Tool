@@ -104,31 +104,6 @@ def _platformer_action(keys) -> list:
     return [move, int(bool(jump)), int(bool(fire))]
 
 
-def _sonic_action(keys) -> list:
-    """
-    Return a Sonic action [move, jump, down].
-    """
-    k = pygame.key.get_pressed()
-    px, py, pjump, _, prun = gamepad.pad_state()
-
-    left = k[pygame.K_a] or px < 0
-    right = k[pygame.K_d] or px > 0
-    jump = k[pygame.K_SPACE] or k[pygame.K_w] or k[pygame.K_UP] or pjump
-    run = k[pygame.K_LSHIFT] or k[pygame.K_RSHIFT] or k[pygame.K_j] or prun
-    down = k[pygame.K_s] or k[pygame.K_DOWN] or py > 0
-
-    if left and right:
-        move = 0
-    elif left:
-        move = 2 if run else 1
-    elif right:
-        move = 4 if run else 3
-    else:
-        move = 0
-
-    return [move, int(bool(jump)), int(bool(down))]
-
-
 def _bomberman_action(keys) -> list:
     """[dx, dy, bomb, detonate] — arrows / WASD move, A (SPACE or Z) drops a bomb, B (X or SHIFT)
     sets off a remote bomb, as on Bomberman II's pad."""
@@ -162,13 +137,12 @@ ACTION_MAPPING = {
     "bomberman": _bomberman_action,
     "megaman": _megaman_action,
     "mario": _platformer_action,
-    "sonic": _sonic_action,
     "meatboy": _meatboy_action,
 }
 
 _IDLE = {"megaman": [0, 0, 0, 0]}
 # Keys besides SPACE that jump: the pad overlay and inputs.csv show them as A, not as up
-JUMP_KEYS = {"platformer": (pygame.K_w,), "meatboy": (pygame.K_w, pygame.K_UP), "sonic": (pygame.K_w, pygame.K_UP)}
+JUMP_KEYS = {"platformer": (pygame.K_w,), "meatboy": (pygame.K_w, pygame.K_UP)}
 
 
 def _random_action() -> list:
@@ -207,8 +181,6 @@ elif level_id:
     env_kwargs['world'] = level_id
     env_kwargs['lock_level'] = True
     print(f"[Play] Loading level: {level_id}")
-elif args.game == "sonic":
-    env_kwargs['curriculum_enabled'] = False
 if args.game == "platformer":
     env_kwargs['skip_obs'] = True   # obs dict is unused in manual play
     env_kwargs['curriculum_enabled'] = False  # levels in campaign order, not the training curriculum's

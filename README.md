@@ -145,7 +145,7 @@ center. Every choice in it is the same checklist: type numbers to tick, Enter to
 # Train — dashboard at http://127.0.0.1:8000/<game>/index.html
 python -m code.neuro.trainer --game mario                              # curriculum over enabled levels
 python -m code.neuro.trainer --game mario --level Mario1-2 --turbo     # one level, max speed
-python -m code.neuro.trainer --game sonic --persona speedrunner         # see Player personas below
+python -m code.neuro.trainer --game meatboy --persona speedrunner       # see Player personas below
 python -m code.neuro.trainer --game mario --sensors grid --seed 7       # tile-grid sensors, custom seed
 python -m code.neuro.trainer --game mario --hidden 32 --memory 2       # bigger net, 2 Jordan memory units
 python -m code.neuro.trainer --resume runs/mario                       # continue a run
@@ -189,7 +189,7 @@ python -m code.games.tools.manual_play --game mario --level Mario1-1 --record --
 ```
 
 `A`/`D` or arrows move, `Shift` run, `Space`/`W` jump, `Z` fire (Mario / Megaman), `W`/`S` climb
-(Megaman), `S` roll (Sonic), `Esc` quits. `F1` rays · `F2` free camera (`IJKL`) · `F3` slow motion ·
+(Megaman), `Esc` quits. `F1` rays · `F2` free camera (`IJKL`) · `F3` slow motion ·
 `F4` hitboxes · `F5` agent max view.
 </details>
 
@@ -199,7 +199,7 @@ python -m code.games.tools.manual_play --game mario --level Mario1-1 --record --
 
 ```mermaid
 flowchart LR
-    A[("ASCII level<br/>game_config.yaml")] --> E["Game engine<br/>Mario · Megaman · Sonic<br/>Meat Boy · Bomberman"]
+    A[("ASCII level<br/>game_config.yaml")] --> E["Game engine<br/>Mario · Mega Man<br/>Meat Boy · Bomberman"]
     E --> S["Sensors<br/>14 rays or 368-cell grid"]
     S --> N["NeuralNet<br/>14 → 16 tanh → 3"]
     N -->|move · jump| E
@@ -212,7 +212,7 @@ flowchart LR
 
 | Layer | Where | What it does |
 |---|---|---|
-| Engines | `code/games/*_core.py` | Five deterministic Pygame games — four platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling. Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`) are the active roster; Sonic is archived (`ARCHIVED_GAMES`): off the menus and sweeps, still runnable with `--game sonic` |
+| Engines | `code/games/*_core.py` | Four deterministic Pygame games — three platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling: Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`). Sonic is archived: its code is kept in `archive/sonic/` (README there says how to restore it) |
 | Adapters | `code/neuro/adapters.py` | One `GameAdapter` face per engine: reset, step, solid/hazard queries, fitness, episode stats |
 | Sensors | `code/neuro/sensors.py` | Raycast marching + scalar senses → 14 floats; or a 3 × 11 × 11 tile window + body senses → 368 |
 | Evolution | `code/neuro/evolution.py` | `GAConfig` + `Population`: flat weight vectors, elitism, tournament, uniform crossover, gaussian mutation, checkpoints with RNG state |

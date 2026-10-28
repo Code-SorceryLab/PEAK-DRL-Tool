@@ -17,7 +17,7 @@ class MeatboyContext:
 
 
 class MeatboyPhysicsManager:
-    """Meat Boy's own physics manager (like SonicPhysicsManager / MegaPhysicsManager).
+    """Meat Boy's own physics manager (like MegaPhysicsManager).
 
     Applies gravity, integrates position with continuous (sub-stepped) collision,
     resolves X then Y, and reports contact flags. It does NOT decide velocity

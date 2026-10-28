@@ -51,7 +51,7 @@ def _active_games() -> list[str]:
 
 GAMES = _active_games()
 INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
-CONFIG_KEY = {"mario": "platformer", "sonic": "sonic"}
+CONFIG_KEY = {"mario": "platformer"}
 OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels in the game's own, editor-owned file
 
 # ============================================================================
@@ -748,8 +748,6 @@ def train_all_personas():
 _PLAY_CONTROLS = {
     "mario":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
                 ("Z", "Fire (with fire flower)")],
-    "sonic":   [("A / D", "Move"), ("SHIFT / J", "Run"), ("SPACE / W", "Jump"),
-                ("S", "Crouch / spin dash")],
     "meatboy": [("A / D  ← / →", "Move"), ("SHIFT", "Run"), ("SPACE / W / ↑", "Jump (wall-jump on contact)")],
     "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
     "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
@@ -1033,7 +1031,7 @@ def run_level_editor():
         print("  Checked: " + ", ".join(str(c) for c in candidates))
         return
 
-    game_choices = ["platformer", "sonic", "megaman"]
+    game_choices = ["platformer", "megaman"]
     game = pick_one("GAME  ·  which game to edit", game_choices, default=game_choices[0])
     if not game:
         return
@@ -1058,9 +1056,7 @@ def run_toggle_levels():
         print("\n  Could not find a readable game_config.yaml")
         return
 
-    game = pick_one("GAME  ·  whose levels to manage", ["platformer", "sonic"], default="platformer")
-    if not game:
-        return
+    game = "platformer"   # the one game whose levels live in game_config.yaml
     try:
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     except Exception as e:
