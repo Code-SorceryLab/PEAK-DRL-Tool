@@ -5,12 +5,15 @@ import pytest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-from code.games.bomberman_core import BRICK, EXIT, EXIT_HIDDEN, POWERUPS, WALL, Bomb, BombermanCore
+from code.games.bomberman_core import BRICK, ENEMY_GLYPHS, EXIT, EXIT_HIDDEN, POWERUPS, WALL, Bomb, BombermanCore
 from code.neuro.adapters import N_INPUTS_BY_GAME, list_levels, make_adapter
 from code.neuro.sensors import read_sensors, sensor_dim
 
-LEVELS = [str(i) for i in range(len(BombermanCore(render_mode="none").cfg["levels"]))]  # the whole ladder, not just the active level
-LEGAL = set("#.?GE kKMB") | set(POWERUPS) | {EXIT_HIDDEN}
+_CFG = BombermanCore(render_mode="none").cfg
+LEVELS = [str(i) for i in range(len(_CFG["levels"]))]  # the whole ladder, not just the active level
+CAMPAIGN = [str(i) for i in _CFG.get("campaign") or []]   # Bomberman II's areas: replicas, not training rungs
+TRAINING = [lv for lv in LEVELS if lv not in CAMPAIGN]
+LEGAL = set("#.?G ") | set(ENEMY_GLYPHS) | set(POWERUPS) | {EXIT_HIDDEN}
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +50,8 @@ def test_level_file_is_well_formed(core, level):
 # bomberman_config.yaml), so slicing to the enabled count keeps this aligned either way.
 LADDER_AUTHORED = ["walk", "bomb", "bomb", "bomb", "walk", "bomb", "walk", "walk",
                    "walk", "bomb", "bomb", "bomb", "bomb", "bomb", "bomb"]
-LADDER = LADDER_AUTHORED[:len(LEVELS)]
+LADDER = LADDER_AUTHORED[:len(TRAINING)]
+RUNG = {**dict(zip(TRAINING, LADDER)), **{lv: "bomb" for lv in CAMPAIGN}}   # every Bomberman II exit is under a brick
 
 
 def _walk_only_cost(core) -> int | None:
@@ -72,7 +76,7 @@ def _walk_only_cost(core) -> int | None:
 @pytest.mark.parametrize("level", LEVELS)
 def test_level_matches_its_rung(level):
     core = BombermanCore(render_mode="none", level_idx=int(level))
-    want = LADDER[int(level)]
+    want = RUNG[level]
     walkable = _walk_only_cost(core) is not None
     assert walkable == (want == "walk"), f"level {level} is meant to be a '{want}' level"
 
@@ -80,11 +84,11 @@ def test_level_matches_its_rung(level):
 def test_ladder_ramps_up():
     """The campaign is graded: level 1 is a plain walk, the last level is the gauntlet."""
     costs = [(BombermanCore(render_mode="none", level_idx=int(lv)).start_cost(),
-              len(BombermanCore(render_mode="none", level_idx=int(lv)).enemies)) for lv in LEVELS]
+              len(BombermanCore(render_mode="none", level_idx=int(lv)).enemies)) for lv in TRAINING]
     assert costs[0] == (22.0, 0), "level 1 is a plain walk to the exit"
     assert costs[1][0] > costs[0][0], "level 2 must cost a bomb"
-    assert len(LADDER) == len(LEVELS), "every level needs a rung"
-    assert len(LADDER_AUTHORED) >= len(LEVELS), "a level was added without a rung"
+    assert len(LADDER) == len(TRAINING), "every level needs a rung"
+    assert len(LADDER_AUTHORED) >= len(TRAINING), "a level was added without a rung"
     assert costs[-1][1] == max(n for _, n in costs) >= 2, "the ladder ends on its most crowded level"
 
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import os
 from collections import deque
 import numpy as np
@@ -121,6 +122,7 @@ class MeatboyCore:
         self.won = False
         self.death_cause = ""
         self._crumble_timers = {}
+        self._blood = set()
         # Clear the shaping anchor at the episode boundary. The shared
         # _ScoreTracker only resets on `terminated`, NOT on truncation, so
         # relying on it leaked a stale distance across timed-out episodes and
@@ -369,29 +371,57 @@ class MeatboyCore:
         return cx, cy
 
     def render(self, surface=None, blit_only=False):
+        """Super Meat Boy's World 1 look (meatboy_art): misty forest, moss-capped rock, the red cube
+        leaving blood on every surface he touches, Bandage Girl at the goal."""
+        from . import meatboy_art as A
         if surface is None:
             return
-        ts = self.tile_size
+        ts, ld, p = self.tile_size, self.level_data, self.player
         vw, vh = surface.get_width(), surface.get_height()
         camx, camy = self._camera(vw, vh)
-        surface.fill(COLOR_SKY)
-        c0 = max(0, int(camx // ts)); c1 = min(self.level_data.cols, int((camx + vw) // ts) + 1)
-        r0 = max(0, int(camy // ts)); r1 = min(self.level_data.rows, int((camy + vh) // ts) + 1)
+        surface.blit(A.backdrop(vw, vh), (0, 0))
+        blood = self.__dict__.setdefault("_blood", set())         # (col, row, side) stained (drawing only)
+        if self.alive:
+            cx, feet = p.x + p.width / 2, p.y + p.height
+            if p.on_ground:
+                blood.add((int(cx // ts), int((feet + 1) // ts), 0))
+            if getattr(p, "wall_dir", 0):
+                blood.add((int((cx + p.wall_dir * (p.width / 2 + 1)) // ts), int((p.y + p.height / 2) // ts), p.wall_dir))
+        solid = lambda c, r: 0 <= r < ld.rows and 0 <= c < ld.cols and ld.grid[r][c] in _SOLID
+        c0 = max(0, int(camx // ts)); c1 = min(ld.cols, int((camx + vw) // ts) + 1)
+        r0 = max(0, int(camy // ts)); r1 = min(ld.rows, int((camy + vh) // ts) + 1)
         for r in range(r0, r1):
             for c in range(c0, c1):
-                t = self.level_data.grid[r][c]
-                col = None
-                if t in _SOLID: col = COLOR_GROUND
-                elif t == TILE_CRUMBLE: col = COLOR_CRUMBLE
-                elif t == TILE_SPIKE: col = COLOR_SPIKE
-                elif t == TILE_GOAL: col = COLOR_GOAL
-                if col:
-                    pygame.draw.rect(surface, col, (c * ts - camx, r * ts - camy, ts, ts))
-        for saw in self.level_data.saws:
+                t, x, y = ld.grid[r][c], c * ts - camx, r * ts - camy
+                if t in _SOLID:
+                    surface.blit(A.ground(ts, not solid(c, r - 1), not solid(c - 1, r), not solid(c + 1, r),
+                                          not solid(c, r + 1), c * 7 + r * 13), (x, y))
+                    band = max(3, ts // 6)
+                    if (c, r, 0) in blood:                          # on the floor's top
+                        pygame.draw.rect(surface, A.BLOOD, (x, y, ts, band))
+                    if (c, r, 1) in blood:                          # a wall on his right: its left face
+                        pygame.draw.rect(surface, A.BLOOD, (x, y, band, ts))
+                    if (c, r, -1) in blood:
+                        pygame.draw.rect(surface, A.BLOOD, (x + ts - band, y, band, ts))
+                elif t == TILE_CRUMBLE:
+                    surface.blit(A.crumble(ts), (x, y))
+                elif t == TILE_SPIKE:
+                    surface.blit(A.spikes(ts), (x, y))
+                elif t == TILE_GOAL:
+                    girl = A.bandage_girl(ts)
+                    surface.blit(girl, (x + (ts - girl.get_width()) // 2, y + ts - girl.get_height() + 4))
+        for saw in ld.saws:
             saw.render(surface, saw.cx - camx, saw.cy - camy)
-        pygame.draw.rect(surface, (210, 40, 60),
-                         (int(self.player.x - camx), int(self.player.y - camy),
-                          self.player.width, self.player.height))
+        if self.alive or self.won:
+            pose = 4 if getattr(p, "wall_dir", 0) and not p.on_ground else 3 if not p.on_ground else                 (1 + (self._steps // 5) % 2 if abs(p.vx) > 20 else 0)
+            side = p.height - 5                                     # a cube, as in the game: square body on legs
+            img = A.meat_boy(side, p.height, p.facing_right, pose)
+            surface.blit(img, (int(p.x + p.width / 2 - side / 2 - camx) - 4, int(p.y - camy) - 4))
+        else:                                                       # splat
+            for k in range(10):
+                a = k * 0.63
+                pygame.draw.circle(surface, A.MEAT, (int(p.x - camx + p.width / 2 + 14 * math.cos(a)),
+                                                     int(p.y - camy + p.height / 2 + 14 * math.sin(a))), 4)
 
 
 if __name__ == "__main__":

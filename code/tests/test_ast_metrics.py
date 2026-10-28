@@ -62,13 +62,15 @@ def test_the_cosmetic_replay_must_match_attempt_for_attempt():
 
 def test_the_baseline_is_the_200_generation_setting_that_won_more(tmp_path, monkeypatch):
     from code.neuro import ast_eval, balance
+    from code.games.eval_mutants import EVAL_LEVELS
+    lv = EVAL_LEVELS["bomberman"][0]
     for tag, wr in (("p10g200", 0.4), ("p30g200_best", 0.6), ("p10g40", 0.9)):
         with open(tmp_path / f"report_bomberman_novice_{tag}.json", "w", encoding="utf-8") as f:
-            json.dump({"tag": tag, "levels": [{"level": "8", "win_rate_mean": wr}]}, f)
+            json.dump({"tag": tag, "levels": [{"level": lv, "win_rate_mean": wr}]}, f)
     monkeypatch.setattr(balance, "BALANCE_DIR", str(tmp_path))
     assert ast_eval.baseline_tag("bomberman", "novice") == "p30g200_best"
     dirs = ast_eval.agent_dirs("bomberman", "base", "novice")
-    assert dirs == [os.path.join("runs", "probes", "bomberman", "novice", "p30g200_best", f"8_{s}") for s in ast_eval.SEEDS]
+    assert dirs == [os.path.join("runs", "probes", "bomberman", "novice", "p30g200_best", f"{lv}_{s}") for s in ast_eval.SEEDS]
 
 
 def test_each_variant_is_compared_with_the_original_played_over_the_same_level(tmp_path, monkeypatch):

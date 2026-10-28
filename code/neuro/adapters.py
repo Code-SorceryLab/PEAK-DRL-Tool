@@ -683,7 +683,8 @@ class BombermanAdapter(_EventWeights):
         self.won = False
         self.status = "RUNNING"
         self._end_xy = None
-        self._level_coins = sum(row.count("C") + row.count("F") + row.count("S") for row in self.core.level_data.grid)
+        from code.games.bomberman_core import POWERUPS
+        self._level_coins = sum(ch in POWERUPS for row in self.core.level_data.grid for ch in row)
         self._level_enemies = self._count_enemies()
         self._start_cost = max(self.core.start_cost(), 1.0)
         self._best_cost = self._start_cost
@@ -712,11 +713,11 @@ class BombermanAdapter(_EventWeights):
 
     def qblock_count_near(self, r_tiles: int) -> int:
         """Bricks a bomb on the player's tile would reach (what bombing here buys)."""
-        from code.games.bomberman_core import Bomb
+        from code.games.bomberman_core import Bomb, DESTRUCTIBLE
         p = self.core.player
         tx, ty = self.core._center_tile(p.x, p.y, p.width, p.height)
         cells = self.core.blast_cells(Bomb(tx, ty, 0, p.blast_range))
-        return sum(1 for (x, y) in cells if self.core.tile(x, y) in ("?", "C", "F", "S", "@"))
+        return sum(1 for (x, y) in cells if self.core.tile(x, y) in DESTRUCTIBLE)
 
     def sense(self, march, ray_max, hit_solid, hit_enemy, hit_none, tile_hit, tile_probe):
         """16-slot ray vector (see SENSOR_LABELS) + overlay rays/tiles for the dashboard.

@@ -1,28 +1,39 @@
-# Bomberman clone — NES/SNES-style single-screen arena, 15x13 tiles.
+# Bomberman, played as Bomberman II (NES, Hudson 1991), normal mode. Numbers measured off a
+# normal-mode playthrough at 60 fps (1 tile = 16 NES px = 32 px here) and the US manual; areas 1-1
+# to 1-4 are that playthrough's layouts (levels/bomberman/bm2_*.txt).
 tile_size: 32
 fps: 60
-time_limit: 200            # seconds on the stage clock
+time_limit: 200            # T: on the single-screen areas of world 1; at 0 Bomberman dies
 player:
   size: 24                 # hitbox, px (smaller than a tile so corners can be cut)
-  walk_speed: 112          # px/s (3.5 tiles/s)
-  sprint_speed: 168        # speedrunner persona / speed power-up
+  walk_speed: 120          # 1 NES px/frame: 16 frames a tile (3.75 tiles/s)
+  sprint_speed: 168        # the Skate item (and the speedrunner persona)
+  vest_frames: 1800        # the Vest: 30 s of immunity to blasts
   corner_cut: 10           # px of slide toward an open lane when pushing against a pillar
   bombs: 1                 # starting bomb count
   range: 1                 # starting blast range (tiles per arm)
 bomb:
-  fuse_frames: 240         # 4 s. Was 150: at 2.5 s the agent could not walk clear of its own
-                           # blast, and 55-97 % of every level's deaths were self-inflicted.
-  blast_frames: 30         # how long the flames stay lethal
+  fuse_frames: 150         # 2.5 s from drop to flame (measured 148 and 151 frames)
+  blast_frames: 28         # flames last 7 animation steps of 4 frames
   danger_lookahead: 30     # frames: hazard channel marks cells that explode within this window
-enemies:                   # speed in px/s; chase = probability per tile of turning toward the player
-  E: {name: Ballom, speed: 48,  passes_bricks: false, chase: 0.0}
-  k: {name: Onil,   speed: 72,  passes_bricks: false, chase: 0.5}
-  K: {name: Pass,   speed: 112, passes_bricks: false, chase: 0.9}
-  M: {name: Doria,  speed: 40,  passes_bricks: true,  chase: 0.3}
-  B: {name: Ovape,  speed: 64,  passes_bricks: true,  chase: 0.2}
-scoring:
-  brick: 10
-  enemy: {E: 100, k: 200, K: 400, M: 1000, B: 2000}
+enemies:                   # speed in px/s (60 = 0.5 NES px/frame); chase = chance per tile of turning toward the
+  # player, within chase_range tiles; turn = chance of a new way at a crossing (0: only when blocked);
+  # reverse = chance of turning back; teleport = frames between jumps to a random open tile.
+  E: {name: Ballom,   speed: 60,  passes_bricks: false, chase: 0.0, turn: 0.0}   # turns only at walls
+  b: {name: Boyon,    speed: 60,  passes_bricks: true,  chase: 0.0, turn: 0.3, reverse: 0.3}
+  t: {name: Terupyo,  speed: 90,  passes_bricks: false, chase: 0.7, chase_range: 4}
+  n: {name: Nagacham, speed: 60,  passes_bricks: true,  chase: 0.0, teleport: 360}
+  K: {name: Pass,     speed: 112, passes_bricks: false, chase: 0.9}   # out of a bombed item
+  o: {name: Pontan,   speed: 75,  passes_bricks: false, chase: 0.2}   # out of a bombed door
+  p: {name: Pomori,   speed: 30,  passes_bricks: true,  chase: 0.0}
+  k: {name: Onil,     speed: 72,  passes_bricks: false, chase: 0.5}   # the training ladder's own
+  M: {name: Doria,    speed: 40,  passes_bricks: true,  chase: 0.3}
+  B: {name: Ovape,    speed: 64,  passes_bricks: true,  chase: 0.2}
+scoring:                   # Bomberman II pays nothing for bricks, items or clearing; each further enemy
+  brick: 0                 # one blast kills is worth double the last
+  clear: 0
+  enemy: {E: 100, b: 400, t: 200, n: 200, K: 400, o: 200, p: 100, k: 200, M: 1000, B: 2000}
+campaign: [12, 13, 14, 15] # Bomberman II world 1: beating one area leads to the next (manual play starts here)
 levels:                    # index = level id (menu / --level N); paths relative to levels/
   # An entry is either a bare path or {file: ..., <overrides>}:
   #   range           blast arms the player starts with (default player.range)
@@ -46,6 +57,12 @@ levels:                    # index = level id (menu / --level N); paths relative
   - {file: bomberman/10_brick_maze.txt,    enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/11_buried_exit.txt,   enemy_speed: 0.7, requires_clear: false}
   - {file: bomberman/12_chasers.txt,       enemy_speed: 0.7, requires_clear: false}
+  # Bomberman II, world 1, the single-screen areas (13 x 11 inside the frame): bricks, enemies, the exit
+  # and the area's item exactly where one normal-mode playthrough had them. 12 is the evaluation level.
+  - {file: bomberman/bm2_1_1.txt, name: "1-1"}     # 3 Ballom; Fire Up
+  - {file: bomberman/bm2_1_2.txt, name: "1-2"}     # 3 Ballom, Boyon; Bomb Up
+  - {file: bomberman/bm2_1_3.txt, name: "1-3"}     # 2 Ballom, Boyon, Terupyo; Fire Up
+  - {file: bomberman/bm2_1_4.txt, name: "1-4"}     # 4 Ballom, Nagacham; Remote Control
 
 disabled_levels:           # kept on disk, off the ladder: ids stay 0-11 for the enabled set.
   # 13-15 stayed 0/3 across every persona and both 40- and 80-generation budgets. They ask for

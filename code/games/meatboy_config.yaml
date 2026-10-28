@@ -10,10 +10,10 @@ player:
 physics:
   gravity: 1060.0          # JS: 0.2*2 px/f^2 @50fps -> ~1067 px/s^2
   fast_fall_grav: 1060.0   # JS has no fast-fall distinction
-  max_fall_speed: 1400.0
+  max_fall_speed: 450.0    # Super Meat Boy falls ~20 body-lengths/s (walkthrough, 1-13); was 1400
 movement:
-  walk_accel: 2600.0
-  run_accel: 4800.0        # JS: 0.9*2 px/f^2 -> ~4800 px/s^2
+  walk_accel: 810.0        # same 0.54 ratio to run_accel as before; was 2600
+  run_accel: 1500.0        # 0 -> 600 px/s in 0.4 s, as Super Meat Boy (walkthrough 1-13, 206.98-207.38 s); was 4800
   max_walk_speed: 300.0
   max_run_speed: 600.0     # JS sustained ~10.2 px/f (~544); cap 13 (~693)
   air_control: 1.0         # JS air accel == ground accel
@@ -28,9 +28,9 @@ jump:
   max_jumps: 1
 wall:
   slide_max_speed: 280.0   # JS slide terminal ~5.3 px/f -> ~283 px/s
-  wall_jump_vy: 580.0      # JS: 1.1*2*5 = 11 px/f -> ~587 px/s
-  wall_jump_push: 620.0    # JS: 1.2*2*5 = 12 px/f -> ~640 px/s
-  wall_jump_push_away: 800.0  # JS long jump: 1.5*2*5 = 15 px/f when holding away
+  wall_jump_vy: 500.0      # ~22 body-lengths/s up off a wall in Super Meat Boy (1-13); was 580
+  wall_jump_push: 500.0    # ~18-23 body-lengths/s away from the wall in Super Meat Boy; was 620
+  wall_jump_push_away: 645.0  # holding away: the same 1.3x the plain push as before; was 800
   control_lockout_frames: 6
 levels:
   - meatboy/world1_01_hello_world.txt

@@ -324,7 +324,8 @@ class BombermanStats(EpisodeStats):
         ld = core.level_data
         self._start_cost = max(float(core.start_cost()), 1.0)
         self._enemies = len(core.enemies)
-        self._powerups = sum(row.count("C") + row.count("F") + row.count("S") for row in ld.grid)
+        from code.games.bomberman_core import POWERUPS
+        self._powerups = sum(ch in POWERUPS for row in ld.grid for ch in row)
         self._exit_hidden = bool(ld.exit_hidden)
         self._exit_found_frame: int | None = None
         self._bricks_at_exit: int | None = None
