@@ -45,6 +45,28 @@ def test_a_meatboy_time_out_is_recorded_as_a_timeout():
     assert [row[3] for row in rows] == ["Timeout", "Dead"]
 
 
+def test_quitting_mid_life_still_records_it():
+    """A player stuck at a wall who quits: the life so far is a row, its cause Quit (TimeUp when the clock ran out)."""
+    from code.games.meatboy_core import MeatboyCore
+    core = MeatboyCore(max_steps=500)
+    rows = []
+    args = SimpleNamespace(player="p", random=True, game="meatboy", record="unused")   # random: no keyboard read
+    env = lift("class _Recorder:", args=args, core_game=core, level_id=None, level_file=None, os=os, Path=Path, JUMP_IDX={},
+               append_rows=lambda folder, new: rows.extend(new) or folder)
+    recorder = env["_Recorder"]()
+    save = lambda time_up: lift('cause="TimeUp" if time_up else "Quit"', args=args, recorder=recorder, time_up=time_up)
+    save(False)
+    assert rows == []                       # nothing played since the last row: nothing to save
+    for _ in range(10):
+        core.step([0, 0, 0])
+        recorder.step([0, 0, 0])
+    save(False)
+    recorder.begin()
+    recorder.step([0, 0, 0])
+    save(True)
+    assert [row[3] for row in rows] == ["Quit", "TimeUp"]
+
+
 def test_inputs_log_a_jump_key_as_a_not_up(monkeypatch):
     """W jumps in Mario and Meat Boy (the up arrow too in Meat Boy): it is logged as A."""
     keys = lift("JUMP_KEYS =", pygame=pygame)["JUMP_KEYS"]

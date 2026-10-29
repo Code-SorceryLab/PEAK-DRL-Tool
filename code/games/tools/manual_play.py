@@ -301,13 +301,14 @@ class _Recorder:
             self.best_cost = min(self.best_cost, core_game._bfs_norm_dist())
         self.last_xy = self._xy()
 
-    def end(self, xy=None, won=None) -> None:
+    def end(self, xy=None, won=None, cause=None) -> None:
         xy = xy or self._xy()
         if won is None:
             won = bool(getattr(core_game, "reached_goal", False) or getattr(core_game, "won", False))
-        cause = "Success" if won else str(getattr(core_game, "death_cause", "")
-                                          or getattr(core_game, "last_cause", "")
-                                          or ("Timeout" if core_game.alive else "Dead"))   # Meat Boy names no time-out
+        if cause is None:
+            cause = "Success" if won else str(getattr(core_game, "death_cause", "")
+                                              or getattr(core_game, "last_cause", "")
+                                              or ("Timeout" if core_game.alive else "Dead"))   # Meat Boy names no time-out
         if args.game in ("bomberman", "meatboy"):
             progress = 1.0 if won else 1.0 - self.best_cost / self.start_cost
         else:
@@ -347,8 +348,10 @@ class _StatsRecorder:
     def step(self, action) -> None:
         self.stats.on_step(bool(action[2]))
 
-    def end(self) -> None:
-        self.stats.finish("WON" if core_game.won else "DEAD")
+    def end(self, cause=None) -> None:
+        self.stats.finish("QUIT" if cause else "WON" if core_game.won else "DEAD")
+        if cause:
+            self.stats.cause = cause
         row = self.stats.to_dict()
         self._log.append(self.path, [row])
         self.recorded += 1
@@ -668,6 +671,7 @@ paused_at = 0
 pause_choice, pause_prev, pause_armed = 0, (0, False), False   # the pause menu cursor and its input edges
 select_was_held = False
 play_ms = attempt_ms = 0   # play time (pauses excluded): this session / this attempt
+time_up = False
 
 while running:
     tick_ms = clock.tick(args.fps)
@@ -676,6 +680,7 @@ while running:
         attempt_ms += tick_ms
     if args.quit_after and play_ms >= args.quit_after * 60000:
         print("[Play] Time is up", flush=True)
+        time_up = True
         break
 
     toggle_pause = False
@@ -833,6 +838,12 @@ while running:
         if demo:
             demo.begin()
 
+# The life in progress when the player quits (or the clock runs out) is still data: a stuck player who gives up
+if recorder and (recorder.stats.frames if args.game == "megaman" else recorder.frames):
+    if args.game == "megaman":
+        recorder.end(cause="TimeUp" if time_up else "Quit")
+    else:
+        recorder.end(won=False, cause="TimeUp" if time_up else "Quit")
 if input_log:
     input_log.close()
 pygame.quit()
