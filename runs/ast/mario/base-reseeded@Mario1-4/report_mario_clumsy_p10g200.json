@@ -1,0 +1,605 @@
+{
+  "game": "mario",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1111,
+    2222,
+    3333
+  ],
+  "train_time_s": 108.3,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1111,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 22.0,
+      "first_win_ci": 9.9,
+      "best_gen_mean": 22.0,
+      "best_gen_ci": 9.9,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Spike",
+      "dominant_cause_frac": 0.69,
+      "causes": {
+        "Stall": 71,
+        "Spike": 663,
+        "Fire": 223
+      },
+      "best_x_mean": 4497.9,
+      "stuck_frac_mean": 0.074,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0216,
+      "train_time_s": 108.3,
+      "completion_rate_mean": 0.003,
+      "mean_completion_time": 36.6,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.182,
+      "deaths_per_run_mean": 9.97,
+      "deaths_per_win_mean": 319.0,
+      "death_hist": [
+        293,
+        388,
+        138,
+        31,
+        71,
+        33,
+        2,
+        0,
+        1,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.617,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.003
+    }
+  ],
+  "cells": {
+    "Mario1-4": [
+      {
+        "level": "Mario1-4",
+        "seed": 1111,
+        "pop_size": 10,
+        "gens_run": 36,
+        "first_win_gen": 26,
+        "best_gen": 26,
+        "win_rate": 0.0,
+        "best": 9510.4,
+        "best_x": 4510.4,
+        "stuck_frac": 0.06944444444444445,
+        "causes": {
+          "Stall": 25,
+          "Spike": 229,
+          "Fire": 105
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0142,
+        "train_time_s": 45.8,
+        "completion_rate": 0.003,
+        "mean_completion_time": 36.2,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.193,
+        "deaths_per_run": 9.97,
+        "deaths_per_win": 359.0,
+        "death_hist": [
+          116,
+          112,
+          70,
+          10,
+          35,
+          16,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.657,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.008,
+        "curve": [
+          [
+            875.6,
+            219.1
+          ],
+          [
+            908.9,
+            468.4
+          ],
+          [
+            948.0,
+            677.3
+          ],
+          [
+            1506.1,
+            611.7
+          ],
+          [
+            893.9,
+            499.7
+          ],
+          [
+            875.2,
+            320.5
+          ],
+          [
+            1940.1,
+            688.2
+          ],
+          [
+            1852.1,
+            803.5
+          ],
+          [
+            1096.6,
+            714.3
+          ],
+          [
+            2745.1,
+            1057.8
+          ],
+          [
+            1991.3,
+            1136.0
+          ],
+          [
+            2122.7,
+            871.8
+          ],
+          [
+            2408.8,
+            1251.8
+          ],
+          [
+            1925.4,
+            1093.6
+          ],
+          [
+            1988.4,
+            970.9
+          ],
+          [
+            1544.8,
+            896.8
+          ],
+          [
+            2664.0,
+            1140.0
+          ],
+          [
+            1899.7,
+            981.7
+          ],
+          [
+            1932.6,
+            688.2
+          ],
+          [
+            2362.2,
+            1236.6
+          ],
+          [
+            1943.5,
+            1010.1
+          ],
+          [
+            2410.8,
+            906.7
+          ],
+          [
+            2730.9,
+            848.4
+          ],
+          [
+            1096.9,
+            718.7
+          ],
+          [
+            1968.7,
+            1085.0
+          ],
+          [
+            9510.4,
+            1974.4
+          ],
+          [
+            1919.2,
+            798.1
+          ],
+          [
+            1868.2,
+            785.5
+          ],
+          [
+            2664.5,
+            970.2
+          ],
+          [
+            1896.4,
+            936.3
+          ],
+          [
+            1097.0,
+            824.4
+          ],
+          [
+            2407.7,
+            1000.9
+          ],
+          [
+            2358.0,
+            999.0
+          ],
+          [
+            2664.8,
+            1337.5
+          ],
+          [
+            2169.1,
+            1048.6
+          ],
+          [
+            2615.5,
+            1479.0
+          ]
+        ],
+        "dir": "runs/ast/mario/base-reseeded@Mario1-4/probes/mario/clumsy/p10g200/Mario1-4_1111"
+      },
+      {
+        "level": "Mario1-4",
+        "seed": 2222,
+        "pop_size": 10,
+        "gens_run": 32,
+        "first_win_gen": 22,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 9490.3,
+        "best_x": 4490.3,
+        "stuck_frac": 0.0875,
+        "causes": {
+          "Stall": 28,
+          "Spike": 226,
+          "Fire": 65
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0217,
+        "train_time_s": 34.0,
+        "completion_rate": 0.003,
+        "mean_completion_time": 35.6,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.174,
+        "deaths_per_run": 9.97,
+        "deaths_per_win": 319.0,
+        "death_hist": [
+          91,
+          143,
+          44,
+          14,
+          17,
+          8,
+          1,
+          0,
+          1,
+          0
+        ],
+        "death_cluster_entropy": 0.614,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            456.7,
+            119.5
+          ],
+          [
+            842.9,
+            418.7
+          ],
+          [
+            846.1,
+            302.9
+          ],
+          [
+            901.2,
+            492.6
+          ],
+          [
+            899.9,
+            439.1
+          ],
+          [
+            2163.2,
+            772.0
+          ],
+          [
+            2179.9,
+            913.8
+          ],
+          [
+            1491.6,
+            695.7
+          ],
+          [
+            1485.5,
+            809.7
+          ],
+          [
+            2478.4,
+            736.9
+          ],
+          [
+            1581.2,
+            860.0
+          ],
+          [
+            2186.2,
+            1167.5
+          ],
+          [
+            1979.4,
+            1107.5
+          ],
+          [
+            2632.2,
+            971.7
+          ],
+          [
+            1897.3,
+            887.4
+          ],
+          [
+            992.4,
+            636.4
+          ],
+          [
+            1929.1,
+            854.2
+          ],
+          [
+            1968.3,
+            1018.7
+          ],
+          [
+            2449.0,
+            1092.6
+          ],
+          [
+            2441.0,
+            1008.2
+          ],
+          [
+            2751.8,
+            1055.5
+          ],
+          [
+            9490.3,
+            1517.6
+          ],
+          [
+            1096.2,
+            800.1
+          ],
+          [
+            1074.7,
+            557.8
+          ],
+          [
+            2662.6,
+            975.5
+          ],
+          [
+            1558.8,
+            879.7
+          ],
+          [
+            3915.6,
+            1273.1
+          ],
+          [
+            1942.6,
+            804.2
+          ],
+          [
+            1096.8,
+            609.8
+          ],
+          [
+            1905.7,
+            899.8
+          ],
+          [
+            2792.8,
+            1145.6
+          ],
+          [
+            1897.2,
+            740.6
+          ]
+        ],
+        "dir": "runs/ast/mario/base-reseeded@Mario1-4/probes/mario/clumsy/p10g200/Mario1-4_2222"
+      },
+      {
+        "level": "Mario1-4",
+        "seed": 3333,
+        "pop_size": 10,
+        "gens_run": 28,
+        "first_win_gen": 18,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 9493.1,
+        "best_x": 4493.1,
+        "stuck_frac": 0.06428571428571428,
+        "causes": {
+          "Stall": 18,
+          "Spike": 208,
+          "Fire": 53
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.029,
+        "train_time_s": 28.5,
+        "completion_rate": 0.004,
+        "mean_completion_time": 37.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.178,
+        "deaths_per_run": 9.96,
+        "deaths_per_win": 279.0,
+        "death_hist": [
+          86,
+          133,
+          24,
+          7,
+          19,
+          9,
+          1,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.579,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            876.5,
+            230.1
+          ],
+          [
+            977.5,
+            351.5
+          ],
+          [
+            876.8,
+            464.6
+          ],
+          [
+            873.7,
+            573.9
+          ],
+          [
+            904.8,
+            620.3
+          ],
+          [
+            891.4,
+            620.3
+          ],
+          [
+            883.8,
+            617.1
+          ],
+          [
+            888.1,
+            657.1
+          ],
+          [
+            904.1,
+            708.4
+          ],
+          [
+            885.7,
+            746.8
+          ],
+          [
+            890.8,
+            661.9
+          ],
+          [
+            896.7,
+            658.0
+          ],
+          [
+            1980.3,
+            733.3
+          ],
+          [
+            1952.4,
+            727.1
+          ],
+          [
+            1932.3,
+            785.8
+          ],
+          [
+            2645.7,
+            1363.1
+          ],
+          [
+            2183.8,
+            1326.6
+          ],
+          [
+            9493.1,
+            1906.3
+          ],
+          [
+            2510.8,
+            1073.2
+          ],
+          [
+            1948.0,
+            796.3
+          ],
+          [
+            942.5,
+            719.6
+          ],
+          [
+            1915.7,
+            906.9
+          ],
+          [
+            2513.4,
+            988.4
+          ],
+          [
+            2649.6,
+            1108.7
+          ],
+          [
+            2758.1,
+            883.8
+          ],
+          [
+            2798.7,
+            1327.3
+          ],
+          [
+            1935.7,
+            1096.0
+          ],
+          [
+            1937.2,
+            1231.1
+          ]
+        ],
+        "dir": "runs/ast/mario/base-reseeded@Mario1-4/probes/mario/clumsy/p10g200/Mario1-4_3333"
+      }
+    ]
+  }
+}

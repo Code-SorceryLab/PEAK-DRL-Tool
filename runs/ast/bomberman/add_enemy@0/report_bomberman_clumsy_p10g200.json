@@ -1,0 +1,443 @@
+{
+  "game": "bomberman",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 35.4,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 8.7,
+      "first_win_ci": 7.2,
+      "best_gen_mean": 8.7,
+      "best_gen_ci": 7.2,
+      "win_rate_mean": 0.01,
+      "win_rate_ci": 0.043,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.65,
+      "causes": {
+        "Bomb": 360,
+        "Enemy": 189,
+        "Stall": 5
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.01,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0985,
+      "train_time_s": 35.4,
+      "completion_rate_mean": 0.012,
+      "mean_completion_time": 10.6,
+      "completion_time_stddev": 1.2,
+      "progress_at_death_mean": 0.702,
+      "deaths_per_run_mean": 9.88,
+      "deaths_per_win_mean": 143.17,
+      "death_hist": [
+        35,
+        18,
+        30,
+        31,
+        35,
+        69,
+        33,
+        27,
+        36,
+        240
+      ],
+      "death_cluster_entropy_mean": 0.771,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.013
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 22,
+        "first_win_gen": 12,
+        "best_gen": 12,
+        "win_rate": 0.0,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 169,
+          "Enemy": 50
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0909,
+        "train_time_s": 14.5,
+        "completion_rate": 0.005,
+        "mean_completion_time": 11.0,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.611,
+        "deaths_per_run": 9.95,
+        "deaths_per_win": 219.0,
+        "death_hist": [
+          11,
+          8,
+          14,
+          21,
+          20,
+          39,
+          13,
+          14,
+          23,
+          56
+        ],
+        "death_cluster_entropy": 0.924,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            469.1,
+            186.0
+          ],
+          [
+            1064.5,
+            379.4
+          ],
+          [
+            680.0,
+            435.4
+          ],
+          [
+            620.0,
+            415.9
+          ],
+          [
+            1208.2,
+            623.5
+          ],
+          [
+            1140.0,
+            550.3
+          ],
+          [
+            1140.0,
+            718.5
+          ],
+          [
+            1178.2,
+            447.9
+          ],
+          [
+            1140.0,
+            454.9
+          ],
+          [
+            1132.7,
+            592.3
+          ],
+          [
+            973.6,
+            671.5
+          ],
+          [
+            6120.0,
+            1178.6
+          ],
+          [
+            1299.1,
+            749.3
+          ],
+          [
+            1011.8,
+            477.3
+          ],
+          [
+            1185.5,
+            693.8
+          ],
+          [
+            1253.6,
+            775.4
+          ],
+          [
+            1162.7,
+            520.2
+          ],
+          [
+            1162.7,
+            589.7
+          ],
+          [
+            1253.6,
+            642.4
+          ],
+          [
+            1344.5,
+            689.5
+          ],
+          [
+            1299.1,
+            991.4
+          ],
+          [
+            1314.5,
+            943.3
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@0/probes/bomberman/clumsy/p10g200/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 17,
+        "first_win_gen": 7,
+        "best_gen": 7,
+        "win_rate": 0.0,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 86,
+          "Enemy": 83
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0,
+        "train_time_s": 10.7,
+        "completion_rate": 0.006,
+        "mean_completion_time": 9.2,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.815,
+        "deaths_per_run": 9.94,
+        "deaths_per_win": 169.0,
+        "death_hist": [
+          7,
+          2,
+          5,
+          5,
+          6,
+          9,
+          14,
+          6,
+          12,
+          103
+        ],
+        "death_cluster_entropy": 0.644,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            996.4,
+            385.5
+          ],
+          [
+            469.1,
+            278.1
+          ],
+          [
+            680.0,
+            379.6
+          ],
+          [
+            680.0,
+            385.6
+          ],
+          [
+            680.0,
+            577.5
+          ],
+          [
+            680.0,
+            580.4
+          ],
+          [
+            6120.0,
+            1151.6
+          ],
+          [
+            680.0,
+            531.4
+          ],
+          [
+            680.0,
+            554.7
+          ],
+          [
+            680.0,
+            541.9
+          ],
+          [
+            680.0,
+            612.8
+          ],
+          [
+            680.0,
+            631.6
+          ],
+          [
+            680.0,
+            654.4
+          ],
+          [
+            740.0,
+            551.6
+          ],
+          [
+            680.0,
+            616.5
+          ],
+          [
+            680.0,
+            634.9
+          ],
+          [
+            680.0,
+            677.7
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@0/probes/bomberman/clumsy/p10g200/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 17,
+        "first_win_gen": 7,
+        "best_gen": 7,
+        "win_rate": 0.03,
+        "best": 6120.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.029411764705882353,
+        "causes": {
+          "Stall": 5,
+          "Bomb": 105,
+          "Enemy": 56
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.2046,
+        "train_time_s": 10.2,
+        "completion_rate": 0.024,
+        "mean_completion_time": 11.6,
+        "completion_time_stddev": 3.6,
+        "progress_at_death": 0.68,
+        "deaths_per_run": 9.76,
+        "deaths_per_win": 41.5,
+        "death_hist": [
+          17,
+          8,
+          11,
+          5,
+          9,
+          21,
+          6,
+          7,
+          1,
+          81
+        ],
+        "death_cluster_entropy": 0.746,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.04,
+        "curve": [
+          [
+            295.5,
+            144.5
+          ],
+          [
+            362.7,
+            203.3
+          ],
+          [
+            1162.7,
+            319.6
+          ],
+          [
+            560.0,
+            259.4
+          ],
+          [
+            378.2,
+            224.5
+          ],
+          [
+            680.0,
+            379.5
+          ],
+          [
+            6120.0,
+            1080.5
+          ],
+          [
+            680.0,
+            515.3
+          ],
+          [
+            740.0,
+            577.4
+          ],
+          [
+            6120.0,
+            1074.5
+          ],
+          [
+            740.0,
+            533.5
+          ],
+          [
+            1011.8,
+            660.4
+          ],
+          [
+            6120.0,
+            1233.9
+          ],
+          [
+            680.0,
+            531.3
+          ],
+          [
+            680.0,
+            628.7
+          ],
+          [
+            740.0,
+            578.0
+          ],
+          [
+            6120.0,
+            1189.3
+          ]
+        ],
+        "dir": "runs/ast/bomberman/add_enemy@0/probes/bomberman/clumsy/p10g200/0_31337"
+      }
+    ]
+  }
+}

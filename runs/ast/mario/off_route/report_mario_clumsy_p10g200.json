@@ -1,0 +1,376 @@
+{
+  "game": "mario",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 184.4,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 0
+  },
+  "levels": [
+    {
+      "level": "Mario1-1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 2.7,
+      "first_win_ci": 1.4,
+      "best_gen_mean": 9.3,
+      "best_gen_ci": 1.4,
+      "win_rate_mean": 0.21,
+      "win_rate_ci": 0.09,
+      "dominant_cause": "Pit",
+      "dominant_cause_frac": 0.5,
+      "causes": {
+        "Stall": 55,
+        "Enemy": 98,
+        "Pit": 158,
+        "?": 2
+      },
+      "best_x_mean": 6315.8,
+      "stuck_frac_mean": 0.144,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0544,
+      "train_time_s": 184.4,
+      "completion_rate_mean": 0.177,
+      "mean_completion_time": 49.6,
+      "completion_time_stddev": 2.8,
+      "progress_at_death_mean": 0.298,
+      "deaths_per_run_mean": 8.23,
+      "deaths_per_win_mean": 4.81,
+      "death_hist": [
+        94,
+        8,
+        39,
+        79,
+        53,
+        0,
+        1,
+        36,
+        2,
+        1
+      ],
+      "death_cluster_entropy_mean": 0.713,
+      "coin_collection_rate_mean": 0.148,
+      "novice_expert_gap_mean": 0.183
+    }
+  ],
+  "cells": {
+    "Mario1-1": [
+      {
+        "level": "Mario1-1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 9,
+        "win_rate": 0.17,
+        "best": 11315.8,
+        "best_x": 6315.8,
+        "stuck_frac": 0.2,
+        "causes": {
+          "Stall": 26,
+          "Enemy": 32,
+          "Pit": 54
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.058,
+        "train_time_s": 62.8,
+        "completion_rate": 0.138,
+        "mean_completion_time": 49.1,
+        "completion_time_stddev": 3.1,
+        "progress_at_death": 0.304,
+        "deaths_per_run": 8.62,
+        "deaths_per_win": 6.22,
+        "death_hist": [
+          33,
+          5,
+          16,
+          25,
+          15,
+          0,
+          1,
+          17,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.742,
+        "coin_collection_rate": 0.145,
+        "novice_expert_gap": 0.1,
+        "curve": [
+          [
+            1448.9,
+            401.3
+          ],
+          [
+            4936.8,
+            1265.7
+          ],
+          [
+            11313.7,
+            2211.3
+          ],
+          [
+            11315.5,
+            2535.6
+          ],
+          [
+            11314.4,
+            3230.9
+          ],
+          [
+            11314.6,
+            3302.4
+          ],
+          [
+            11313.9,
+            5338.7
+          ],
+          [
+            11315.5,
+            4145.9
+          ],
+          [
+            11315.8,
+            5778.7
+          ],
+          [
+            11315.2,
+            6005.8
+          ],
+          [
+            4937.0,
+            2253.6
+          ],
+          [
+            4936.8,
+            3296.3
+          ],
+          [
+            11314.1,
+            3702.5
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/clumsy/p10g200/Mario1-1_1234"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 9,
+        "win_rate": 0.22,
+        "best": 11315.9,
+        "best_x": 6315.9,
+        "stuck_frac": 0.10833333333333334,
+        "causes": {
+          "Enemy": 34,
+          "Stall": 13,
+          "Pit": 48,
+          "?": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0298,
+        "train_time_s": 57.8,
+        "completion_rate": 0.2,
+        "mean_completion_time": 50.0,
+        "completion_time_stddev": 2.4,
+        "progress_at_death": 0.299,
+        "deaths_per_run": 8.0,
+        "deaths_per_win": 4.0,
+        "death_hist": [
+          26,
+          3,
+          14,
+          27,
+          15,
+          0,
+          0,
+          9,
+          2,
+          0
+        ],
+        "death_cluster_entropy": 0.735,
+        "coin_collection_rate": 0.161,
+        "novice_expert_gap": 0.225,
+        "curve": [
+          [
+            2772.2,
+            931.5
+          ],
+          [
+            11313.8,
+            3795.7
+          ],
+          [
+            5589.7,
+            1956.6
+          ],
+          [
+            11313.0,
+            2260.6
+          ],
+          [
+            11315.7,
+            7432.8
+          ],
+          [
+            2822.7,
+            1555.4
+          ],
+          [
+            11314.3,
+            3888.5
+          ],
+          [
+            11313.2,
+            4037.0
+          ],
+          [
+            11315.9,
+            8510.8
+          ],
+          [
+            11315.0,
+            4746.4
+          ],
+          [
+            11314.4,
+            2799.4
+          ],
+          [
+            11313.2,
+            4635.9
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/clumsy/p10g200/Mario1-1_2025"
+      },
+      {
+        "level": "Mario1-1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 13,
+        "first_win_gen": 3,
+        "best_gen": 10,
+        "win_rate": 0.24,
+        "best": 11315.7,
+        "best_x": 6315.7,
+        "stuck_frac": 0.12307692307692308,
+        "causes": {
+          "Stall": 16,
+          "Enemy": 32,
+          "Pit": 56,
+          "?": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0754,
+        "train_time_s": 63.8,
+        "completion_rate": 0.192,
+        "mean_completion_time": 49.8,
+        "completion_time_stddev": 3.0,
+        "progress_at_death": 0.29,
+        "deaths_per_run": 8.08,
+        "deaths_per_win": 4.2,
+        "death_hist": [
+          35,
+          0,
+          9,
+          27,
+          23,
+          0,
+          0,
+          10,
+          0,
+          1
+        ],
+        "death_cluster_entropy": 0.663,
+        "coin_collection_rate": 0.139,
+        "novice_expert_gap": 0.225,
+        "curve": [
+          [
+            500.9,
+            175.3
+          ],
+          [
+            1734.6,
+            563.5
+          ],
+          [
+            11313.2,
+            2353.4
+          ],
+          [
+            11313.9,
+            2727.5
+          ],
+          [
+            11315.6,
+            4428.0
+          ],
+          [
+            11315.4,
+            5954.1
+          ],
+          [
+            11315.3,
+            3835.1
+          ],
+          [
+            11314.5,
+            4258.1
+          ],
+          [
+            11313.9,
+            4906.8
+          ],
+          [
+            11315.7,
+            5905.4
+          ],
+          [
+            11314.2,
+            5987.7
+          ],
+          [
+            11313.2,
+            4439.9
+          ],
+          [
+            11313.3,
+            3401.8
+          ]
+        ],
+        "dir": "runs/ast/mario/off_route/probes/mario/clumsy/p10g200/Mario1-1_31337"
+      }
+    ]
+  }
+}

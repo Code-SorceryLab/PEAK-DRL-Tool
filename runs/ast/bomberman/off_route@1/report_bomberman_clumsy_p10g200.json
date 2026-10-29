@@ -1,0 +1,698 @@
+{
+  "game": "bomberman",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 100.0,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 5,
+    "n_inputs": 16
+  },
+  "levels": [
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 30.0,
+      "first_win_ci": 27.7,
+      "best_gen_mean": 30.0,
+      "best_gen_ci": 27.7,
+      "win_rate_mean": 0.02,
+      "win_rate_ci": 0.05,
+      "dominant_cause": "Bomb",
+      "dominant_cause_frac": 0.95,
+      "causes": {
+        "Bomb": 1136,
+        "Stall": 2,
+        "Timeout": 53
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.001,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0088,
+      "train_time_s": 100.0,
+      "completion_rate_mean": 0.008,
+      "mean_completion_time": 29.0,
+      "completion_time_stddev": 4.1,
+      "progress_at_death_mean": 0.482,
+      "deaths_per_run_mean": 9.92,
+      "deaths_per_win_mean": 203.44,
+      "death_hist": [
+        45,
+        50,
+        61,
+        132,
+        387,
+        242,
+        140,
+        124,
+        3,
+        7
+      ],
+      "death_cluster_entropy_mean": 0.785,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.02
+    }
+  ],
+  "cells": {
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 50,
+        "first_win_gen": 40,
+        "best_gen": 40,
+        "win_rate": 0.04,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.004,
+        "causes": {
+          "Bomb": 491,
+          "Stall": 2,
+          "Timeout": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0076,
+        "train_time_s": 34.5,
+        "completion_rate": 0.01,
+        "mean_completion_time": 20.1,
+        "completion_time_stddev": 7.3,
+        "progress_at_death": 0.477,
+        "deaths_per_run": 9.9,
+        "deaths_per_win": 99.0,
+        "death_hist": [
+          12,
+          12,
+          15,
+          77,
+          210,
+          62,
+          61,
+          46,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.729,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.031,
+        "curve": [
+          [
+            504.4,
+            222.6
+          ],
+          [
+            504.4,
+            351.7
+          ],
+          [
+            504.4,
+            372.5
+          ],
+          [
+            578.5,
+            370.2
+          ],
+          [
+            578.5,
+            398.4
+          ],
+          [
+            541.5,
+            476.2
+          ],
+          [
+            578.5,
+            500.7
+          ],
+          [
+            541.5,
+            515.6
+          ],
+          [
+            578.5,
+            519.3
+          ],
+          [
+            578.5,
+            526.7
+          ],
+          [
+            578.5,
+            534.1
+          ],
+          [
+            789.6,
+            555.2
+          ],
+          [
+            789.6,
+            441.8
+          ],
+          [
+            863.7,
+            570.3
+          ],
+          [
+            578.5,
+            420.7
+          ],
+          [
+            578.5,
+            489.6
+          ],
+          [
+            541.5,
+            519.3
+          ],
+          [
+            578.5,
+            508.1
+          ],
+          [
+            766.7,
+            505.0
+          ],
+          [
+            578.5,
+            474.8
+          ],
+          [
+            578.5,
+            511.9
+          ],
+          [
+            826.7,
+            555.2
+          ],
+          [
+            578.5,
+            541.5
+          ],
+          [
+            766.7,
+            519.6
+          ],
+          [
+            766.7,
+            538.1
+          ],
+          [
+            826.7,
+            503.3
+          ],
+          [
+            578.5,
+            530.4
+          ],
+          [
+            826.7,
+            575.7
+          ],
+          [
+            766.7,
+            583.1
+          ],
+          [
+            766.7,
+            605.3
+          ],
+          [
+            826.7,
+            627.3
+          ],
+          [
+            863.7,
+            607.6
+          ],
+          [
+            863.7,
+            665.8
+          ],
+          [
+            863.7,
+            612.2
+          ],
+          [
+            863.7,
+            518.1
+          ],
+          [
+            826.7,
+            619.9
+          ],
+          [
+            863.7,
+            563.2
+          ],
+          [
+            863.7,
+            652.1
+          ],
+          [
+            863.7,
+            715.2
+          ],
+          [
+            6160.0,
+            1274.4
+          ],
+          [
+            863.7,
+            648.1
+          ],
+          [
+            6160.0,
+            1281.9
+          ],
+          [
+            6160.0,
+            1166.7
+          ],
+          [
+            863.7,
+            712.6
+          ],
+          [
+            863.7,
+            674.4
+          ],
+          [
+            863.7,
+            590.0
+          ],
+          [
+            863.7,
+            705.2
+          ],
+          [
+            863.7,
+            661.9
+          ],
+          [
+            6160.0,
+            1264.4
+          ],
+          [
+            6160.0,
+            1222.6
+          ]
+        ],
+        "dir": "runs/ast/bomberman/off_route@1/probes/bomberman/clumsy/p10g200/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 28,
+        "first_win_gen": 18,
+        "best_gen": 18,
+        "win_rate": 0.02,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 226,
+          "Timeout": 51
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0122,
+        "train_time_s": 43.9,
+        "completion_rate": 0.011,
+        "mean_completion_time": 54.1,
+        "completion_time_stddev": 5.1,
+        "progress_at_death": 0.534,
+        "deaths_per_run": 9.89,
+        "deaths_per_win": 92.33,
+        "death_hist": [
+          8,
+          9,
+          9,
+          20,
+          67,
+          49,
+          40,
+          65,
+          3,
+          7
+        ],
+        "death_cluster_entropy": 0.836,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.022,
+        "curve": [
+          [
+            504.4,
+            265.6
+          ],
+          [
+            789.6,
+            385.3
+          ],
+          [
+            826.7,
+            498.5
+          ],
+          [
+            766.7,
+            487.6
+          ],
+          [
+            789.6,
+            566.9
+          ],
+          [
+            863.7,
+            628.4
+          ],
+          [
+            863.7,
+            578.9
+          ],
+          [
+            863.7,
+            582.6
+          ],
+          [
+            863.7,
+            550.7
+          ],
+          [
+            900.7,
+            627.0
+          ],
+          [
+            863.7,
+            612.2
+          ],
+          [
+            863.7,
+            623.6
+          ],
+          [
+            863.7,
+            497.3
+          ],
+          [
+            863.7,
+            615.9
+          ],
+          [
+            863.7,
+            604.8
+          ],
+          [
+            863.7,
+            520.7
+          ],
+          [
+            863.7,
+            627.0
+          ],
+          [
+            6160.0,
+            1177.8
+          ],
+          [
+            937.8,
+            745.9
+          ],
+          [
+            6160.0,
+            1200.6
+          ],
+          [
+            1085.9,
+            804.1
+          ],
+          [
+            1085.9,
+            740.7
+          ],
+          [
+            1085.9,
+            861.1
+          ],
+          [
+            937.8,
+            785.6
+          ],
+          [
+            863.7,
+            856.3
+          ],
+          [
+            6160.0,
+            1375.9
+          ],
+          [
+            1085.9,
+            805.8
+          ],
+          [
+            863.7,
+            722.6
+          ]
+        ],
+        "dir": "runs/ast/bomberman/off_route@1/probes/bomberman/clumsy/p10g200/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 42,
+        "first_win_gen": 32,
+        "best_gen": 32,
+        "win_rate": 0.0,
+        "best": 6160.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0,
+        "causes": {
+          "Bomb": 419
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0067,
+        "train_time_s": 21.6,
+        "completion_rate": 0.002,
+        "mean_completion_time": 12.9,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.434,
+        "deaths_per_run": 9.98,
+        "deaths_per_win": 419.0,
+        "death_hist": [
+          25,
+          29,
+          37,
+          35,
+          110,
+          131,
+          39,
+          13,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.79,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.007,
+        "curve": [
+          [
+            578.5,
+            221.2
+          ],
+          [
+            578.5,
+            344.3
+          ],
+          [
+            578.5,
+            420.7
+          ],
+          [
+            826.7,
+            471.4
+          ],
+          [
+            578.5,
+            424.4
+          ],
+          [
+            541.5,
+            497.0
+          ],
+          [
+            541.5,
+            467.4
+          ],
+          [
+            578.5,
+            387.3
+          ],
+          [
+            826.7,
+            519.6
+          ],
+          [
+            578.5,
+            465.1
+          ],
+          [
+            826.7,
+            533.3
+          ],
+          [
+            789.6,
+            536.7
+          ],
+          [
+            826.7,
+            536.7
+          ],
+          [
+            578.5,
+            567.4
+          ],
+          [
+            578.5,
+            471.1
+          ],
+          [
+            803.7,
+            586.8
+          ],
+          [
+            826.7,
+            504.7
+          ],
+          [
+            863.7,
+            524.4
+          ],
+          [
+            826.7,
+            566.3
+          ],
+          [
+            863.7,
+            543.0
+          ],
+          [
+            826.7,
+            568.9
+          ],
+          [
+            766.7,
+            478.8
+          ],
+          [
+            578.5,
+            290.1
+          ],
+          [
+            578.5,
+            452.6
+          ],
+          [
+            863.7,
+            583.7
+          ],
+          [
+            789.6,
+            499.9
+          ],
+          [
+            766.7,
+            556.6
+          ],
+          [
+            826.7,
+            503.3
+          ],
+          [
+            826.7,
+            638.4
+          ],
+          [
+            826.7,
+            477.4
+          ],
+          [
+            826.7,
+            455.5
+          ],
+          [
+            6160.0,
+            1135.9
+          ],
+          [
+            578.5,
+            485.9
+          ],
+          [
+            803.7,
+            401.6
+          ],
+          [
+            803.7,
+            443.2
+          ],
+          [
+            826.7,
+            482.8
+          ],
+          [
+            863.7,
+            653.0
+          ],
+          [
+            789.6,
+            606.2
+          ],
+          [
+            863.7,
+            614.7
+          ],
+          [
+            863.7,
+            630.7
+          ],
+          [
+            863.7,
+            550.4
+          ],
+          [
+            863.7,
+            531.9
+          ]
+        ],
+        "dir": "runs/ast/bomberman/off_route@1/probes/bomberman/clumsy/p10g200/1_31337"
+      }
+    ]
+  }
+}
