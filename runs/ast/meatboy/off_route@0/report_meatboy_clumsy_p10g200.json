@@ -1,0 +1,445 @@
+{
+  "game": "meatboy",
+  "persona": "clumsy",
+  "tag": "p10g200",
+  "pop_size": 10,
+  "gens_budget": 200,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 38.0,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": false,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 21
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 9.3,
+      "first_win_ci": 23.5,
+      "best_gen_mean": 9.3,
+      "best_gen_ci": 23.5,
+      "win_rate_mean": 0.053,
+      "win_rate_ci": 0.146,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 1.0,
+      "causes": {
+        "Stall": 561
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.955,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "FLAT"
+      ],
+      "improvement_rate_mean": 0.1461,
+      "train_time_s": 38.0,
+      "completion_rate_mean": 0.045,
+      "mean_completion_time": 5.7,
+      "completion_time_stddev": 3.2,
+      "progress_at_death_mean": 0.575,
+      "deaths_per_run_mean": 9.56,
+      "deaths_per_win_mean": 53.74,
+      "death_hist": [
+        2,
+        19,
+        26,
+        8,
+        55,
+        306,
+        69,
+        51,
+        21,
+        4
+      ],
+      "death_cluster_entropy_mean": 0.669,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.077
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 12,
+        "first_win_gen": 2,
+        "best_gen": 2,
+        "win_rate": 0.12,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.8916666666666667,
+        "causes": {
+          "Stall": 107
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.3676,
+        "train_time_s": 8.0,
+        "completion_rate": 0.108,
+        "mean_completion_time": 5.9,
+        "completion_time_stddev": 2.0,
+        "progress_at_death": 0.605,
+        "deaths_per_run": 8.92,
+        "deaths_per_win": 8.23,
+        "death_hist": [
+          2,
+          3,
+          7,
+          1,
+          15,
+          22,
+          19,
+          21,
+          15,
+          2
+        ],
+        "death_cluster_entropy": 0.857,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.2,
+        "curve": [
+          [
+            647.1,
+            311.8
+          ],
+          [
+            6000.0,
+            958.8
+          ],
+          [
+            705.9,
+            582.4
+          ],
+          [
+            882.4,
+            588.2
+          ],
+          [
+            6000.0,
+            1717.6
+          ],
+          [
+            6000.0,
+            1211.8
+          ],
+          [
+            764.7,
+            605.9
+          ],
+          [
+            823.5,
+            688.2
+          ],
+          [
+            823.5,
+            688.2
+          ],
+          [
+            6000.0,
+            2347.1
+          ],
+          [
+            6000.0,
+            1747.1
+          ],
+          [
+            6000.0,
+            2829.4
+          ]
+        ],
+        "dir": "runs/ast/meatboy/off_route@0/probes/meatboy/clumsy/p10g200/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 30,
+        "first_win_gen": 20,
+        "best_gen": 20,
+        "win_rate": 0.03,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.9866666666666667,
+        "causes": {
+          "Stall": 296
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0076,
+        "train_time_s": 18.6,
+        "completion_rate": 0.013,
+        "mean_completion_time": 5.3,
+        "completion_time_stddev": 3.1,
+        "progress_at_death": 0.554,
+        "deaths_per_run": 9.87,
+        "deaths_per_win": 74.0,
+        "death_hist": [
+          0,
+          15,
+          14,
+          2,
+          12,
+          207,
+          25,
+          17,
+          2,
+          2
+        ],
+        "death_cluster_entropy": 0.499,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.03,
+        "curve": [
+          [
+            588.2,
+            388.2
+          ],
+          [
+            588.2,
+            488.2
+          ],
+          [
+            647.1,
+            523.5
+          ],
+          [
+            705.9,
+            570.6
+          ],
+          [
+            647.1,
+            570.6
+          ],
+          [
+            588.2,
+            576.5
+          ],
+          [
+            647.1,
+            576.5
+          ],
+          [
+            647.1,
+            582.4
+          ],
+          [
+            647.1,
+            588.2
+          ],
+          [
+            647.1,
+            594.1
+          ],
+          [
+            588.2,
+            558.8
+          ],
+          [
+            588.2,
+            582.4
+          ],
+          [
+            705.9,
+            570.6
+          ],
+          [
+            588.2,
+            582.4
+          ],
+          [
+            705.9,
+            588.2
+          ],
+          [
+            647.1,
+            594.1
+          ],
+          [
+            705.9,
+            535.3
+          ],
+          [
+            588.2,
+            541.2
+          ],
+          [
+            705.9,
+            605.9
+          ],
+          [
+            6000.0,
+            1141.2
+          ],
+          [
+            705.9,
+            564.7
+          ],
+          [
+            941.2,
+            517.6
+          ],
+          [
+            647.1,
+            511.8
+          ],
+          [
+            705.9,
+            605.9
+          ],
+          [
+            764.7,
+            617.6
+          ],
+          [
+            705.9,
+            458.8
+          ],
+          [
+            941.2,
+            558.8
+          ],
+          [
+            882.4,
+            582.4
+          ],
+          [
+            6000.0,
+            982.4
+          ],
+          [
+            6000.0,
+            1658.8
+          ]
+        ],
+        "dir": "runs/ast/meatboy/off_route@0/probes/meatboy/clumsy/p10g200/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 16,
+        "first_win_gen": 6,
+        "best_gen": 6,
+        "win_rate": 0.01,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.9875,
+        "causes": {
+          "Stall": 158
+        },
+        "trend": "FLAT",
+        "improvement_rate": 0.063,
+        "train_time_s": 11.4,
+        "completion_rate": 0.013,
+        "mean_completion_time": 6.0,
+        "completion_time_stddev": 4.4,
+        "progress_at_death": 0.566,
+        "deaths_per_run": 9.88,
+        "deaths_per_win": 79.0,
+        "death_hist": [
+          0,
+          1,
+          5,
+          5,
+          28,
+          77,
+          25,
+          13,
+          4,
+          0
+        ],
+        "death_cluster_entropy": 0.651,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            647.1,
+            452.9
+          ],
+          [
+            588.2,
+            541.2
+          ],
+          [
+            647.1,
+            541.2
+          ],
+          [
+            647.1,
+            570.6
+          ],
+          [
+            705.9,
+            576.5
+          ],
+          [
+            6000.0,
+            1076.5
+          ],
+          [
+            6000.0,
+            1129.4
+          ],
+          [
+            588.2,
+            452.9
+          ],
+          [
+            882.4,
+            600.0
+          ],
+          [
+            823.5,
+            617.6
+          ],
+          [
+            823.5,
+            641.2
+          ],
+          [
+            764.7,
+            605.9
+          ],
+          [
+            764.7,
+            582.4
+          ],
+          [
+            705.9,
+            558.8
+          ],
+          [
+            764.7,
+            582.4
+          ],
+          [
+            823.5,
+            611.8
+          ]
+        ],
+        "dir": "runs/ast/meatboy/off_route@0/probes/meatboy/clumsy/p10g200/0_31337"
+      }
+    ]
+  }
+}
