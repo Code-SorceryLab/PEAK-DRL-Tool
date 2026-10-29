@@ -124,7 +124,8 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4,
     if screen is None:                 # the first screen, or the first after a game closed the window
         screen = pygame.display.set_mode(SIZE)
         pygame.display.set_caption("PEAK  User Study" if args.study else "PEAK  Manual Play")
-        Window.from_display_module().focus()   # macOS leaves a reopened window without the keyboard
+        if sys.platform == "darwin":       # macOS leaves a reopened window without the keyboard
+            Window.from_display_module().focus()   # (on Windows the wrapper frees the window when dropped: a crash)
         if os.environ.get("PEAK_READY_FILE"):  # up: the menu's loading bar stops
             open(os.environ["PEAK_READY_FILE"], "a").close()
     screen.fill((0, 0, 0))
