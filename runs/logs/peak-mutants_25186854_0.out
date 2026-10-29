@@ -1,0 +1,135 @@
+[2026-10-28 04:13:59] START n=1 host=c629.nibi.sharcnet $PY -m code.games.eval_mutants --all-levels && $PY -m code.games.megaman_mutants
+mario Mario1-2: 4 placed; off_route skipped (no solid tile closed on all four sides)
+mario Mario1-3: 5 placed
+mario Mario1-4: 5 placed
+meatboy 0: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 1: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 3: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 4: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 5: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 6: 5 placed
+meatboy 7: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 8: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 9: 4 placed; widen_gap skipped (no gap with a ledge on each side and a drop under it)
+meatboy 10: 5 placed
+bomberman 0: 5 placed
+bomberman 1: 5 placed
+bomberman 2: 5 placed
+bomberman 3: 5 placed
+bomberman 4: 5 placed
+bomberman 5: 5 placed
+bomberman 6: 5 placed
+bomberman 7: 5 placed
+bomberman 8: 5 placed
+bomberman 9: 5 placed
+bomberman 10: 5 placed
+bomberman 11: 5 placed
+bomberman 13: 5 placed
+bomberman 14: 5 placed
+bomberman 15: 5 placed
+Super Mario Bros. 1-1  (runs/mario/mutants)
+  seal_route            breaking   retrain  A wall down column 190, rows 0-13, between the last staircase and the flagpole: the flag can no longer be reached
+  widen_gap             degrading  retrain  The second pit (columns 86-88) widened by 2 to the right: 3 tiles -> 5
+  jump_velocity_down    degrading  retrain  Jump velocity x0.85: take-off -495 -> -420.75 px/s, the cap -800 -> -680
+  off_route             neutral    retrain  The ground tile at row 19, column 75 hollowed out, 5 tiles under the surface
+  cosmetic_tile         neutral    replay   The sky cell at row 2, column 10 written as ' ' instead of '.': the same tile 
+
+Super Meat Boy 1-3 The Gap  (runs/meatboy/mutants)
+  seal_route            breaking   retrain  A wall down column 30, rows 13-18, from the roof of Bandage Girl's alcove to its floor: the goal is closed in
+  widen_gap             degrading  retrain  The take-off ledge cut back by 2 tiles, down to the bottom of the level: 15 tiles -> 17
+  jump_velocity_down    degrading  retrain  Jump velocity x0.85: jump.jump_vel 470 -> 399.5
+  off_route             neutral    retrain  The rock tile at row 12, column 5 hollowed out, inside the left pillar and closed on all four sides
+  cosmetic_tile         neutral    replay   The air cell at row 0, column 6 written as ' ' instead of '.': the same tile 
+
+Bomberman II 1-1  (runs/bomberman/mutants)
+  seal_route            breaking   retrain  Hard walls at row 5, columns 9 and 11 (a brick and a floor tile) close the exit into its pocket
+  add_enemy             degrading  retrain  A fourth Ballom at row 6, column 7, the floor tile nearest the centre; every enemy must die before the exit opens
+  fuse_down             degrading  retrain  Bomb fuse 150 -> 94 frames on this level (the same x0.625 as before)
+  off_route             neutral    retrain  The frame's top-left corner hollowed out, closed on all four sides
+  cosmetic_tile         neutral    replay   The floor cell at row 1, column 2 written as ' ' instead of '.': the same tile 
+
+Mega Man, the Cut Man stage  (runs/megaman/mutants)
+  no mutants yet: python -m code.games.megaman_mutants 
+
+MUTANT                    CLASS      SECTION             WHAT CHANGED
+s1-seal_route             breaking   CutMan-1-Street     A 8-tile wall across the route at (38, 125)
+s1-remove_ladder          breaking   CutMan-1-Street     The 6-tile ladder in column 53, rows 124-129, removed
+s1-widen_gap              degrading  CutMan-1-Street     The ledge at (31, 126) cut back by 2 tiles, widening the gap to its right
+s1-add_hazard             degrading  CutMan-1-Street     Spikes on the floor at (24, 125)
+s1-add_enemy              degrading  CutMan-1-Street     A Blader added at (38, 123), on the route
+s1-remove_enemy           degrading  CutMan-1-Street     The enemy 'b' at (21, 125) removed
+s1-cosmetic_tile          neutral    CutMan-1-Street     The air cell at (38, 125) written as ' ' instead of '.': the same tile
+s1-off_route              neutral    CutMan-1-Street     The solid tile at (38, 132), 2 tiles deep inside a wall, hollowed out
+s2-seal_route             breaking   CutMan-2-Climb      A 14-tile wall across the route at (57, 99)
+s2-remove_ladder          breaking   CutMan-2-Climb      The 5-tile ladder in column 50, rows 113-117, removed
+s2-widen_gap              breaking   CutMan-2-Climb      The ledge at (57, 88) cut back by 2 tiles, widening the gap to its left
+s2-add_hazard             degrading  CutMan-2-Climb      Spikes on the floor at (59, 87)
+s2-add_enemy              degrading  CutMan-2-Climb      A Blader added at (57, 95), on the route
+s2-remove_enemy           degrading  CutMan-2-Climb      The enemy 'j' at (57, 108) removed
+s2-cosmetic_tile          neutral    CutMan-2-Climb      The air cell at (57, 96) written as ' ' instead of '.': the same tile
+s2-off_route              neutral    CutMan-2-Climb      The solid tile at (60, 110), 2 tiles deep inside a wall, hollowed out
+s3-seal_route             breaking   CutMan-3-Ledges     A 15-tile wall across the route at (74, 67)
+s3-remove_ladder          breaking   CutMan-3-Ledges     The 6-tile ladder in column 85, rows 64-69, removed
+s3-widen_gap              degrading  CutMan-3-Ledges     The ledge at (73, 68) cut back by 2 tiles, widening the gap to its right
+s3-add_hazard             degrading  CutMan-3-Ledges     Spikes on the floor at (72, 67)
+s3-add_enemy              degrading  CutMan-3-Ledges     A Blader added at (75, 65), on the route
+s3-remove_enemy           degrading  CutMan-3-Ledges     The enemy 'f' at (71, 67) removed
+s3-cosmetic_tile          neutral    CutMan-3-Ledges     The air cell at (75, 67) written as ' ' instead of '.': the same tile
+s3-off_route              neutral    CutMan-3-Ledges     The solid tile at (71, 72), 2 tiles deep inside a wall, hollowed out
+s4-seal_route             breaking   CutMan-4-Shaft      A 2-tile wall across the route at (91, 42)
+s4-remove_ladder          breaking   CutMan-4-Shaft      The 5-tile ladder in column 84, rows 52-56, removed
+s4-add_hazard             degrading  CutMan-4-Shaft      Spikes on the floor at (87, 56)
+s4-add_enemy              degrading  CutMan-4-Shaft      A Blader added at (91, 42), on the route
+s4-remove_enemy           degrading  CutMan-4-Shaft      The enemy 'v' at (83, 22) removed
+s4-cosmetic_tile          neutral    CutMan-4-Shaft      The air cell at (90, 42) written as ' ' instead of '.': the same tile
+s4-off_route              neutral    CutMan-4-Shaft      The solid tile at (83, 42), 2 tiles deep inside a wall, hollowed out
+s5-seal_route             breaking   CutMan-5-Rooftop    A 6-tile wall across the route at (105, 5)
+s5-widen_gap              degrading  CutMan-5-Rooftop    The ledge at (111, 6) cut back by 2 tiles, widening the gap to its right
+s5-add_hazard             degrading  CutMan-5-Rooftop    Spikes on the floor at (106, 5)
+s5-add_enemy              degrading  CutMan-5-Rooftop    A Blader added at (106, 3), on the route
+s5-remove_enemy           degrading  CutMan-5-Rooftop    The enemy 'b' at (118, 4) removed
+s5-cosmetic_tile          neutral    CutMan-5-Rooftop    The air cell at (106, 5) written as ' ' instead of '.': the same tile
+s5-off_route              neutral    CutMan-5-Rooftop    The solid tile at (106, 8), 2 tiles deep inside a wall, hollowed out
+s6-seal_route             breaking   CutMan-6-Descent    A 12-tile wall across the route at (116, 45)
+s6-remove_ladder          degrading  CutMan-6-Descent    The 6-tile ladder in column 114, rows 43-48, removed
+s6-widen_gap              degrading  CutMan-6-Descent    The ledge at (115, 43) cut back by 2 tiles, widening the gap to its left
+s6-add_enemy              degrading  CutMan-6-Descent    A Blader added at (116, 45), on the route
+s6-remove_enemy           degrading  CutMan-6-Descent    The enemy 'e' at (126, 55) removed
+s6-cosmetic_tile          neutral    CutMan-6-Descent    The air cell at (116, 45) written as ' ' instead of '.': the same tile
+s6-off_route              neutral    CutMan-6-Descent    The solid tile at (115, 33), 2 tiles deep inside a wall, hollowed out
+s7-seal_route             breaking   CutMan-7-Corridor   A 4-tile wall across the route at (168, 54)
+s7-add_hazard             degrading  CutMan-7-Corridor   Spikes on the floor at (168, 54)
+s7-add_enemy              degrading  CutMan-7-Corridor   A Blader added at (168, 52), on the route
+s7-remove_enemy           degrading  CutMan-7-Corridor   The enemy 'w' at (157, 54) removed
+s7-cosmetic_tile          neutral    CutMan-7-Corridor   The air cell at (168, 54) written as ' ' instead of '.': the same tile
+s8-seal_route             breaking   CutMan-8-Boss       A 10-tile wall across the route at (198, 54)
+s8-cosmetic_tile          neutral    CutMan-8-Boss       The air cell at (199, 54) written as ' ' instead of '.': the same tile
+s8-off_route              neutral    CutMan-8-Boss       The solid tile at (199, 58), 1 tile deep inside a wall, hollowed out
+m-jump_velocity_down      degrading  whole game          player.jump_velocity changed from 4.871 to 4.14
+m-jump_velocity_low       breaking   whole game          player.jump_velocity changed from 4.871 to 3.41
+m-jump_velocity_up        degrading  whole game          player.jump_velocity changed from 4.871 to 5.358
+m-gravity_up              degrading  whole game          player.gravity changed from 0.25 to 0.3125
+m-run_speed_down          degrading  whole game          player.run_speed changed from 1.375 to 1.1
+m-air_speed_down          degrading  whole game          player.air_speed changed from 1.3125 to 1.05
+m-ladder_speed_down       degrading  whole game          player.ladder_speed changed from 0.75 to 0.5
+m-energy_down             degrading  whole game          player.hp changed from 28 to 20
+m-max_shots_down          degrading  whole game          buster.max_shots changed from 3 to 1
+m-time_limit_down         degrading  whole game          time_limit changed from 300 to 240
+
+63 mutants: 14 breaking, 34 degrading, 15 neutral
+
+Skipped (the operator has nothing to act on there):
+  CutMan-4-Shaft      widen_gap       the route crosses no gap here
+  CutMan-5-Rooftop    remove_ladder   the only ladders on the route here are shared with the next section or the one before
+  CutMan-6-Descent    add_hazard      the route crosses no flat floor three tiles wide here
+  CutMan-7-Corridor   remove_ladder   the route uses no ladder here
+  CutMan-7-Corridor   widen_gap       the route crosses no gap here
+  CutMan-7-Corridor   off_route       no wall thick enough to hide a change in
+  CutMan-8-Boss       remove_ladder   the route uses no ladder here
+  CutMan-8-Boss       widen_gap       the route crosses no gap here
+  CutMan-8-Boss       add_hazard      the route crosses no flat floor three tiles wide here
+  CutMan-8-Boss       add_enemy       no open cell on the route at least four tiles from every other enemy
+  CutMan-8-Boss       remove_enemy    no enemy in this section
+
+wrote runs/megaman/mutants/<mutant>/mutant.json (+ level.txt) and runs/megaman/mutants/mutants.json
+[2026-10-28 04:15:02] END rc=0 $PY -m code.games.eval_mutants --all-levels && $PY -m code.games.megaman_mutants

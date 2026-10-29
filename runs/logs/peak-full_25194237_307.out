@@ -1,0 +1,17 @@
+[2026-10-28 10:25:23] START n=308 host=c187.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona speedrunner --levels 15 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p30g200_best · runs/probes]
+
+[1/3] 15 seed 31337: best gen 135, win rate 0%, best_x 840.0, 0:15:48
+[2/3] 15 seed 2025: best gen 144, win rate 0%, best_x 880.0, 0:16:01
+[3/3] 15 seed 1234: best gen 177, win rate 0%, best_x 720.0, 0:17:39
+skip runs/probes/bomberman/speedrunner/p30g200_best/13_2025: unfinished (gen 163 of 200)
+skip runs/probes/bomberman/speedrunner/p30g200_best/7_1234: unfinished (gen 144 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+15            0/3             nevergen 152.0±54.9          0% ±0%       Bomb (73%)    813.3     8%  +0.5%/g  0:49:28  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_bomberman_speedrunner_p30g200_best.json  (0:18:08 wall)
+[2026-10-28 10:43:33] END rc=0 $PY -m code.neuro.balance --game bomberman --persona speedrunner --levels 15 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

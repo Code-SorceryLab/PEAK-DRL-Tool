@@ -1,0 +1,12 @@
+[2026-10-28 13:19:37] START n=201 host=c324.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona novice --levels 10 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [novice · p10g200 · runs/probes]
+
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+10            0/3             nevergen 146.0±104.0          0% ±0%       Bomb (73%)    833.4     3%  +3.5%/g  0:12:34  FLAT/IMPROVING/FLAT
+
+saved runs/balance_stage/report_bomberman_novice_p10g200.json  (0:00:00 wall)
+[2026-10-28 13:19:39] END rc=0 $PY -m code.neuro.balance --game bomberman --persona novice --levels 10 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

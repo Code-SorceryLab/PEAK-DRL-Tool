@@ -1,0 +1,17 @@
+[2026-10-28 14:55:22] START n=1003 host=c354.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona experienced --level CutMan-3-Ledges --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/m-jump_velocity_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona experienced --levels CutMan-3-Ledges --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/m-jump_velocity_down/probes --out runs/ast/megaman/m-jump_velocity_down --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [experienced · p30g200_best · runs/ast/megaman/m-jump_velocity_down/probes]
+
+[1/3] CutMan-3-Ledges seed 31337: best gen 72, win rate 4%, best_x 1000.0, 0:27:48
+[2/3] CutMan-3-Ledges seed 2025: best gen 93, win rate 0%, best_x 1000.0, 0:40:36
+[3/3] CutMan-3-Ledges seed 1234: best gen 141, win rate 0%, best_x 730.0, 1:36:08
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-2-Climb_2025: unfinished (gen 194 of 200)
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-3-Ledges2/3    gen 80.5±158.8gen 102.0±87.9          2% ±6%      Stall (78%)    910.0    74%  +0.2%/g  2:44:34  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/m-jump_velocity_down/report_megaman_experienced_p30g200_best.json  (1:37:24 wall)
+[2026-10-28 16:32:51] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona experienced --level CutMan-3-Ledges --workers $W

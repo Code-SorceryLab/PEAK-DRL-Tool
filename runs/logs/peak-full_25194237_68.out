@@ -1,0 +1,22 @@
+[2026-10-28 08:35:03] START n=69 host=c176.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona novice --levels 10 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [novice · p10g200 · runs/probes]
+
+[1/3] 10 seed 2025: best gen 22, win rate 0%, best_x 613.6, 0:00:57
+[2/3] 10 seed 1234: best gen 66, win rate 0%, best_x 590.9, 0:01:27
+[3/3] 10 seed 31337: best gen 53, win rate 0%, best_x 840.9, 0:02:01
+skip runs/probes/meatboy/novice/p10g200/3_31337: unfinished (gen 195 of 200)
+skip runs/probes/meatboy/novice/p10g200/6_1234: unfinished (gen 154 of 200)
+skip runs/probes/meatboy/novice/p10g200/8_1234: unfinished (gen 62 of 200)
+skip runs/probes/meatboy/novice/p10g200/8_2025: unfinished (gen 123 of 200)
+skip runs/probes/meatboy/novice/p10g200/8_31337: unfinished (gen 64 of 200)
+skip runs/probes/meatboy/novice/p10g200/9_1234: unfinished (gen 115 of 200)
+skip runs/probes/meatboy/novice/p10g200/9_2025: unfinished (gen 115 of 200)
+skip runs/probes/meatboy/novice/p10g200/9_31337: unfinished (gen 113 of 200)
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+10            0/3             nevergen 47.0±56.2          0% ±0%       Fire (88%)    681.8    10%  +0.9%/g  0:04:26  IMPROVING/FLAT/IMPROVING
+
+saved runs/balance_stage/report_meatboy_novice_p10g200.json  (0:02:26 wall)
+[2026-10-28 08:37:31] END rc=0 $PY -m code.neuro.balance --game meatboy --persona novice --levels 10 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

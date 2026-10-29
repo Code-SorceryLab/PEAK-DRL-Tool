@@ -1,0 +1,29 @@
+[2026-10-29 16:17:55] START n=462 host=c353.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona killer --level CutMan-6-Descent --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona killer --levels CutMan-6-Descent --seeds 1111 2222 3333 --gens 200 --root runs/ast/megaman/base-reseeded/probes --out runs/ast/megaman/base-reseeded --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p30g200_best · runs/ast/megaman/base-reseeded/probes]
+
+[1/3] CutMan-6-Descent seed 1111: best gen 75, win rate 4%, best_x 1000.0, 0:13:47
+[2/3] CutMan-6-Descent seed 3333: best gen 62, win rate 17%, best_x 1000.0, 0:15:27
+[3/3] CutMan-6-Descent seed 2222: best gen 67, win rate 12%, best_x 1000.0, 0:16:12
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-1-Street_2222: unfinished (gen 106 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-1-Street_3333: unfinished (gen 108 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-2-Climb_1111: unfinished (gen 107 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-2-Climb_2222: unfinished (gen 61 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-2-Climb_3333: unfinished (gen 54 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_1111: unfinished (gen 70 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_2222: unfinished (gen 111 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_3333: unfinished (gen 120 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-4-Shaft_1111: unfinished (gen 88 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-4-Shaft_2222: unfinished (gen 85 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-4-Shaft_3333: unfinished (gen 79 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-8-Boss_1111: unfinished (gen 42 of 200)
+skip runs/ast/megaman/base-reseeded/probes/megaman/killer/p30g200_best/CutMan-8-Boss_2222: unfinished (gen 45 of 200)
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-6-Descent3/3     gen 60.7±14.1gen 68.0±16.3        11% ±17%      Stall (58%)   1000.0    57%  +0.9%/g  0:45:27  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/base-reseeded/report_megaman_killer_p30g200_best.json  (0:16:27 wall)
+[2026-10-29 16:34:26] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona killer --level CutMan-6-Descent --workers $W

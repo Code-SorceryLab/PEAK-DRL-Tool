@@ -1,0 +1,6 @@
+[2026-10-29 16:23:34] START n=480 host=c559.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant s3-widen_gap --persona clumsy --level CutMan-3-Ledges --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/s3-widen_gap /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona clumsy --levels CutMan-3-Ledges --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/s3-widen_gap/probes --out runs/ast/megaman/s3-widen_gap --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/ast/megaman/s3-widen_gap/probes]
+
+[1/3] CutMan-3-Ledges seed 31337: best gen 63, win rate 0%, best_x 660.6, 0:44:06

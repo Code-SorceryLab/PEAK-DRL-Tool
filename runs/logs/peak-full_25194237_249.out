@@ -1,0 +1,22 @@
+[2026-10-28 09:56:33] START n=250 host=c244.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona experienced --levels 2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [experienced · p30g200_best · runs/probes]
+
+[1/3] 2 seed 2025: best gen 8, win rate 23%, best_x 1000.0, 0:01:45
+[2/3] 2 seed 31337: best gen 143, win rate 51%, best_x 1000.0, 0:05:52
+[3/3] 2 seed 1234: best gen 59, win rate 25%, best_x 1000.0, 0:08:38
+skip runs/probes/bomberman/experienced/p30g200_best/3_31337: unfinished (gen 100 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/5_31337: unfinished (gen 43 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/6_1234: unfinished (gen 64 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/6_31337: unfinished (gen 52 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/7_1234: unfinished (gen 39 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/7_2025: unfinished (gen 53 of 200)
+skip runs/probes/bomberman/experienced/p30g200_best/7_31337: unfinished (gen 65 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+2             3/3    gen 70.0±169.4gen 70.0±169.4        33% ±39%       Bomb (51%)   1000.0    25%  +2.1%/g  0:16:17  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_bomberman_experienced_p30g200_best.json  (0:09:14 wall)
+[2026-10-28 10:05:51] END rc=0 $PY -m code.neuro.balance --game bomberman --persona experienced --levels 2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

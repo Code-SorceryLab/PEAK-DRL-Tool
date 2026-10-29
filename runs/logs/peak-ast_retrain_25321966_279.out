@@ -1,0 +1,19 @@
+[2026-10-29 14:42:17] START n=280 host=c140.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@11 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@11 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 11 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@11/probes --out runs/ast/bomberman/fuse_down@11 --best --workers 3
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/ast/bomberman/fuse_down@11/probes]
+
+  note: bomberman level [11] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [11] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [11] has no coins — persona [collector] plays for the goal alone here
+[1/3] 11 seed 31337: best gen 66, win rate 0%, best_x 656.2, 0:05:03
+[2/3] 11 seed 2025: best gen 134, win rate 42%, best_x 1000.0, 0:12:33
+[3/3] 11 seed 1234: best gen 47, win rate 0%, best_x 562.5, 0:20:38
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+11            1/3         gen 134.0gen 82.3±113.6        14% ±60%       Bomb (69%)    739.6     4%  +0.5%/g  0:38:15  FLAT/IMPROVING/FLAT
+
+saved runs/ast/bomberman/fuse_down@11/report_bomberman_collector_p30g200_best.json  (0:21:35 wall)
+[2026-10-29 15:03:58] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@11 --persona collector --workers $W

@@ -1,0 +1,13 @@
+[2026-10-28 23:34:22] START n=400 host=c420.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant base-reseeded --persona speedrunner --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona speedrunner --levels 12 --seeds 1111 2222 3333 --gens 200 --root runs/ast/bomberman/base-reseeded/probes --out runs/ast/bomberman/base-reseeded --workers 3
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p10g200 · runs/ast/bomberman/base-reseeded/probes]
+
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+12            0/3             nevergen 121.0±155.9          0% ±0%       Bomb (61%)    681.2    21%  +1.7%/g  0:14:19  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/bomberman/base-reseeded/report_bomberman_speedrunner_p10g200.json  (0:00:00 wall)
+[2026-10-28 23:34:25] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant base-reseeded --persona speedrunner --workers $W

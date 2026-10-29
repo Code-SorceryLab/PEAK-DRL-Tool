@@ -1,0 +1,13 @@
+[2026-10-28 23:43:01] START n=419 host=c240.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down --persona killer --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona killer --levels 12 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down/probes --out runs/ast/bomberman/fuse_down --workers 3
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200 · runs/ast/bomberman/fuse_down/probes]
+
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+12            0/3             nevergen 97.3±170.5          0% ±0%       Bomb (96%)    492.8     4%  +0.9%/g  0:05:07  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/bomberman/fuse_down/report_bomberman_killer_p10g200.json  (0:00:00 wall)
+[2026-10-28 23:43:08] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down --persona killer --workers $W

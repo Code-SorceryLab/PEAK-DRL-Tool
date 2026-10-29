@@ -1,0 +1,16 @@
+[2026-10-28 17:47:48] START n=279 host=c31.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant widen_gap@6 --persona experienced --workers $W
+>>> PEAK_MUTANT=runs/meatboy/mutants/widen_gap@6 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona experienced --levels 6 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/widen_gap@6/probes --out runs/ast/meatboy/widen_gap@6 --best --workers 3
+--best: meatboy -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [experienced · p10g200_best · runs/ast/meatboy/widen_gap@6/probes]
+
+[1/3] 6 seed 31337: best gen 18, win rate 68%, best_x 1000.0, 0:00:30
+[2/3] 6 seed 1234: best gen 90, win rate 57%, best_x 1000.0, 0:01:24
+[3/3] 6 seed 2025: best gen 199, win rate 0%, best_x 640.0, 0:03:22
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+6             2/3    gen 54.0±457.4gen 102.3±226.4        42% ±91%      Stall (67%)    880.0    58%  +0.9%/g  0:05:16  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/meatboy/widen_gap@6/report_meatboy_experienced_p10g200_best.json  (0:03:45 wall)
+[2026-10-28 17:51:37] END rc=0 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant widen_gap@6 --persona experienced --workers $W

@@ -1,0 +1,19 @@
+[2026-10-28 16:07:11] START n=101 host=c181.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-4 --persona killer --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/widen_gap@Mario1-4 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona killer --levels Mario1-4 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/widen_gap@Mario1-4/probes --out runs/ast/mario/widen_gap@Mario1-4 --best --workers 3
+--best: mario -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200_best · runs/ast/mario/widen_gap@Mario1-4/probes]
+
+  note: mario level [Mario1-4] has no kills — persona [killer] plays for the goal alone here
+  note: mario level [Mario1-4] has no kills — persona [killer] plays for the goal alone here
+  note: mario level [Mario1-4] has no kills — persona [killer] plays for the goal alone here
+[1/3] Mario1-4 seed 31337: best gen 76, win rate 38%, best_x 4521.7, 0:02:43
+[2/3] Mario1-4 seed 1234: best gen 110, win rate 20%, best_x 4520.4, 0:04:06
+[3/3] Mario1-4 seed 2025: best gen 146, win rate 0%, best_x 2881.2, 0:05:38
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-4      2/3    gen 93.0±216.0gen 110.7±87.0        19% ±47%      Spike (45%)   3974.4    11%  +0.4%/g  0:12:28  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/mario/widen_gap@Mario1-4/report_mario_killer_p10g200_best.json  (0:06:31 wall)
+[2026-10-28 16:13:46] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-4 --persona killer --workers $W

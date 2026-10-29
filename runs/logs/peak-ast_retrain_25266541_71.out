@@ -1,0 +1,13 @@
+[2026-10-28 20:51:05] START n=72 host=c447.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-3 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/widen_gap@Mario1-3 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona collector --levels Mario1-3 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/widen_gap@Mario1-3/probes --out runs/ast/mario/widen_gap@Mario1-3 --workers 3
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200 · runs/ast/mario/widen_gap@Mario1-3/probes]
+
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      0/3             nevergen 110.3±140.4          0% ±0%        Pit (81%)   3034.5     1%  +0.5%/g  0:24:45  FLAT/IMPROVING/IMPROVING
+
+saved runs/ast/mario/widen_gap@Mario1-3/report_mario_collector_p10g200.json  (0:00:00 wall)
+[2026-10-28 20:51:07] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-3 --persona collector --workers $W

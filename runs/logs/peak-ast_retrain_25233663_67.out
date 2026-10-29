@@ -1,0 +1,15 @@
+[2026-10-28 15:49:10] START n=68 host=c348.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-3 --persona clumsy --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/widen_gap@Mario1-3 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona clumsy --levels Mario1-3 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/widen_gap@Mario1-3/probes --out runs/ast/mario/widen_gap@Mario1-3 --workers 3
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p10g200 · runs/ast/mario/widen_gap@Mario1-3/probes]
+
+[1/3] Mario1-3 seed 2025: best gen 91, win rate 0%, best_x 2429.9, 0:04:50
+[2/3] Mario1-3 seed 31337: best gen 11, win rate 0%, best_x 2932.4, 0:05:04
+[3/3] Mario1-3 seed 1234: best gen 57, win rate 0%, best_x 3882.8, 0:05:38
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      0/3             nevergen 53.0±99.7          0% ±0%        Pit (93%)   3081.7     2%  +0.9%/g  0:15:32  FLAT/FLAT/FLAT
+
+saved runs/ast/mario/widen_gap@Mario1-3/report_mario_clumsy_p10g200.json  (0:07:02 wall)
+[2026-10-28 15:56:16] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-3 --persona clumsy --workers $W

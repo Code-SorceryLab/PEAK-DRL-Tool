@@ -1,0 +1,15 @@
+[2026-10-28 19:30:10] START n=464 host=c490.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant seal_route@1 --persona clumsy --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/seal_route@1 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona clumsy --levels 1 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/seal_route@1/probes --out runs/ast/bomberman/seal_route@1 --workers 3
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p10g200 · runs/ast/bomberman/seal_route@1/probes]
+
+[1/3] 1 seed 31337: best gen 75, win rate 0%, best_x 0.0, 0:02:23
+[2/3] 1 seed 2025: best gen 19, win rate 0%, best_x 0.0, 0:02:14
+[3/3] 1 seed 1234: best gen 2, win rate 0%, best_x 0.0, 0:04:38
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+1             0/3             nevergen 32.0±94.9          0% ±0%       Bomb (95%)      0.0     1%  +0.0%/g  0:09:16  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/bomberman/seal_route@1/report_bomberman_clumsy_p10g200.json  (0:06:18 wall)
+[2026-10-28 19:36:31] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant seal_route@1 --persona clumsy --workers $W

@@ -1,0 +1,14 @@
+[2026-10-29 00:38:43] START n=1033 host=m6.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant s3-off_route --persona novice --level CutMan-3-Ledges --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/s3-off_route /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona novice --levels CutMan-3-Ledges --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/s3-off_route/probes --out runs/ast/megaman/s3-off_route --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [novice · p30g200_best · runs/ast/megaman/s3-off_route/probes]
+
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-3-Ledges3/3    gen 118.3±195.5gen 121.7±203.1          1% ±2%      Stall (58%)   1000.0    58%  +0.4%/g  1:46:02  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/s3-off_route/report_megaman_novice_p30g200_best.json  (0:00:01 wall)
+[2026-10-29 00:39:35] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant s3-off_route --persona novice --level CutMan-3-Ledges --workers $W

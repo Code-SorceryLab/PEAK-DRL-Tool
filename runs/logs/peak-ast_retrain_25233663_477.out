@@ -1,0 +1,16 @@
+[2026-10-28 19:35:28] START n=478 host=c341.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@1 --persona speedrunner --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@1 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona speedrunner --levels 1 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@1/probes --out runs/ast/bomberman/fuse_down@1 --best --workers 3
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p30g200_best · runs/ast/bomberman/fuse_down@1/probes]
+
+[1/3] 1 seed 2025: best gen 14, win rate 31%, best_x 1000.0, 0:01:30
+[2/3] 1 seed 1234: best gen 62, win rate 25%, best_x 1000.0, 0:05:46
+[3/3] 1 seed 31337: best gen 73, win rate 42%, best_x 1000.0, 0:06:14
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+1             3/3     gen 40.7±79.9gen 49.7±77.9        33% ±21%       Bomb (62%)   1000.0    11%  +5.5%/g  0:13:31  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/bomberman/fuse_down@1/report_bomberman_speedrunner_p30g200_best.json  (0:06:26 wall)
+[2026-10-28 19:41:57] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@1 --persona speedrunner --workers $W

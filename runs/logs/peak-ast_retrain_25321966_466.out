@@ -1,0 +1,10 @@
+[2026-10-29 16:17:58] START n=467 host=c392.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona collector --level CutMan-3-Ledges --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona collector --levels CutMan-3-Ledges --seeds 1111 2222 3333 --gens 200 --root runs/ast/megaman/base-reseeded/probes --out runs/ast/megaman/base-reseeded --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/ast/megaman/base-reseeded/probes]
+
+  note: megaman level [CutMan-3-Ledges] has no coins — persona [collector] plays for the goal alone here
+  note: megaman level [CutMan-3-Ledges] has no coins — persona [collector] plays for the goal alone here
+  note: megaman level [CutMan-3-Ledges] has no coins — persona [collector] plays for the goal alone here
+[1/3] CutMan-3-Ledges seed 2222: best gen 67, win rate 1%, best_x 1000.0, 0:23:57
+[2/3] CutMan-3-Ledges seed 1111: best gen 94, win rate 1%, best_x 1000.0, 0:34:18

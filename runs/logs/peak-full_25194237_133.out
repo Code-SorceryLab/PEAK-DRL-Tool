@@ -1,0 +1,15 @@
+[2026-10-28 09:05:46] START n=134 host=c185.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona speedrunner --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: meatboy -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p10g200_best · runs/probes]
+
+[1/3] 9 seed 31337: best gen 78, win rate 35%, best_x 1000.0, 0:02:31
+[2/3] 9 seed 1234: best gen 68, win rate 0%, best_x 758.6, 0:07:15
+[3/3] 9 seed 2025: best gen 182, win rate 0%, best_x 603.4, 0:07:28
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+9             1/3          gen 78.0gen 109.3±156.8        12% ±50%      Stall (63%)    787.3    63%  +0.4%/g  0:17:15  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_meatboy_speedrunner_p10g200_best.json  (0:08:07 wall)
+[2026-10-28 09:13:56] END rc=0 $PY -m code.neuro.balance --game meatboy --persona speedrunner --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

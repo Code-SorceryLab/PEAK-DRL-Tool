@@ -1,0 +1,22 @@
+[2026-10-29 15:50:22] START n=420 host=c370.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona collector --level CutMan-4-Shaft --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona collector --levels CutMan-4-Shaft --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/base-retrained/probes --out runs/ast/megaman/base-retrained --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/ast/megaman/base-retrained/probes]
+
+  note: megaman level [CutMan-4-Shaft] has no coins — persona [collector] plays for the goal alone here
+  note: megaman level [CutMan-4-Shaft] has no coins — persona [collector] plays for the goal alone here
+  note: megaman level [CutMan-4-Shaft] has no coins — persona [collector] plays for the goal alone here
+[1/3] CutMan-4-Shaft seed 2025: best gen 77, win rate 1%, best_x 1000.0, 0:20:55
+[2/3] CutMan-4-Shaft seed 31337: best gen 99, win rate 0%, best_x 1000.0, 0:34:11
+[3/3] CutMan-4-Shaft seed 1234: best gen 181, win rate 2%, best_x 1000.0, 0:49:09
+skip runs/ast/megaman/base-retrained/probes/megaman/collector/p30g200_best/CutMan-1-Street_31337: unfinished (gen 119 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/collector/p30g200_best/CutMan-3-Ledges_1234: unfinished (gen 146 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/collector/p30g200_best/CutMan-3-Ledges_31337: unfinished (gen 135 of 200)
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-4-Shaft3/3    gen 110.7±135.3gen 119.0±136.2          1% ±2%      Stall (73%)   1000.0    75%  +0.6%/g  1:44:17  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/base-retrained/report_megaman_collector_p30g200_best.json  (0:49:31 wall)
+[2026-10-29 16:39:55] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona collector --level CutMan-4-Shaft --workers $W

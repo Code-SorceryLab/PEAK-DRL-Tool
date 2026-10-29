@@ -1,0 +1,26 @@
+[2026-10-28 09:01:44] START n=129 host=c333.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona speedrunner --levels 7 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p10g200 · runs/probes]
+
+[1/3] 7 seed 2025: best gen 16, win rate 57%, best_x 1000.0, 0:00:13
+[2/3] 7 seed 1234: best gen 9, win rate 74%, best_x 1000.0, 0:00:12
+[3/3] 7 seed 31337: best gen 11, win rate 61%, best_x 1000.0, 0:00:15
+skip runs/probes/meatboy/speedrunner/p10g200/3_1234: unfinished (gen 13 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/3_2025: unfinished (gen 11 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/3_31337: unfinished (gen 10 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/4_1234: unfinished (gen 11 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/4_2025: unfinished (gen 17 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/4_31337: unfinished (gen 12 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/5_1234: unfinished (gen 18 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/5_2025: unfinished (gen 16 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/5_31337: unfinished (gen 15 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/6_1234: unfinished (gen 16 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/6_2025: unfinished (gen 19 of 200)
+skip runs/probes/meatboy/speedrunner/p10g200/6_31337: unfinished (gen 14 of 200)
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+7             3/3      gen 12.0±9.0 gen 12.0±9.0        64% ±22%        Saw (82%)   1000.0    13%  +5.1%/g  0:00:40  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_meatboy_speedrunner_p10g200.json  (0:00:19 wall)
+[2026-10-28 09:02:05] END rc=0 $PY -m code.neuro.balance --game meatboy --persona speedrunner --levels 7 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

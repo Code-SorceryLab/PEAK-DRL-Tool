@@ -1,0 +1,14 @@
+[2026-10-28 20:28:28] START n=39 host=c439.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant seal_route@Mario1-2 --persona experienced --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/seal_route@Mario1-2 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona experienced --levels Mario1-2 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/seal_route@Mario1-2/probes --out runs/ast/mario/seal_route@Mario1-2 --best --workers 3
+--best: mario -> {'anneal_factor': 0.3}
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [experienced · p10g200_best · runs/ast/mario/seal_route@Mario1-2/probes]
+
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-2      0/3             nevergen 108.7±161.6          0% ±0%      Stall (60%)   5321.0    60%  +3.9%/g  0:35:03  IMPROVING/FLAT/IMPROVING
+
+saved runs/ast/mario/seal_route@Mario1-2/report_mario_experienced_p10g200_best.json  (0:00:00 wall)
+[2026-10-28 20:28:31] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant seal_route@Mario1-2 --persona experienced --workers $W

@@ -1,0 +1,454 @@
+[2026-10-28 04:18:04] START n=3 host=c339.nibi.sharcnet GAMES=mario PERSONAS=experienced bash run_all.sh sweeps
+[2026-10-28 04:18:05] PHASE 1 full sweep (rays)
+[2026-10-28 04:18:05] START full mario experienced
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [experienced · p10g40 · runs/probes]
+
+[1/12] Mario1-4 seed 31337: best gen 4, win rate 27%, best_x 4523.4, 0:00:25
+[2/12] Mario1-4 seed 2025: best gen 16, win rate 10%, best_x 4522.6, 0:00:38
+[3/12] Mario1-4 seed 1234: best gen 8, win rate 0%, best_x 1978.1, 0:00:41
+[4/12] Mario1-1 seed 1234: best gen 5, win rate 62%, best_x 6317.0, 0:00:58
+[5/12] Mario1-3 seed 1234: best gen 13, win rate 0%, best_x 2275.5, 0:00:50
+[6/12] Mario1-1 seed 31337: best gen 5, win rate 82%, best_x 6329.5, 0:01:04
+[7/12] Mario1-1 seed 2025: best gen 13, win rate 59%, best_x 6317.9, 0:01:05
+[8/12] Mario1-3 seed 2025: best gen 12, win rate 0%, best_x 1505.6, 0:00:54
+[9/12] Mario1-3 seed 31337: best gen 33, win rate 10%, best_x 4841.7, 0:01:02
+[10/12] Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 4504.2, 0:01:31
+[11/12] Mario1-2 seed 31337: best gen 28, win rate 10%, best_x 5353.4, 0:01:57
+[12/12] Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:02:08
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      1/3          gen 33.0gen 19.3±29.4         3% ±14%        Pit (88%)   2874.3     4%  +1.2%/g  0:02:47  IMPROVING/FLAT/IMPROVING
+Mario1-2      1/3          gen 28.0 gen 26.7±5.7         3% ±14%      Stall (43%)   5112.9    42%  +1.8%/g  0:05:36  IMPROVING/IMPROVING/IMPROVING
+Mario1-4      2/3     gen 10.0±76.2 gen 9.3±15.2        12% ±34%       Fire (74%)   3674.7     5%  +8.7%/g  0:01:44  FLAT/IMPROVING/IMPROVING
+Mario1-1      3/3       gen 5.7±5.2 gen 7.7±11.5        68% ±31%      Enemy (42%)   6321.5    19% +15.1%/g  0:03:08  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/report_mario_experienced_p10g40.json  (0:02:45 wall)
+[2026-10-28 04:20:55] END full mario experienced rc=0
+[2026-10-28 04:20:55] PHASE 2 sensor ablation
+[2026-10-28 04:20:55] START ablation mario experienced rays
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [experienced · p10g40 · runs/ablation]
+
+[1/12] Mario1-4 seed 31337: best gen 4, win rate 27%, best_x 4523.4, 0:00:26
+[2/12] Mario1-4 seed 2025: best gen 16, win rate 10%, best_x 4522.6, 0:00:39
+[3/12] Mario1-1 seed 1234: best gen 5, win rate 62%, best_x 6317.0, 0:00:51
+[4/12] Mario1-3 seed 1234: best gen 13, win rate 0%, best_x 2275.5, 0:00:41
+[5/12] Mario1-3 seed 2025: best gen 12, win rate 0%, best_x 1505.6, 0:00:42
+[6/12] Mario1-4 seed 1234: best gen 8, win rate 0%, best_x 1978.1, 0:00:47
+[7/12] Mario1-1 seed 31337: best gen 5, win rate 82%, best_x 6329.5, 0:01:10
+[8/12] Mario1-1 seed 2025: best gen 13, win rate 59%, best_x 6317.9, 0:01:09
+[9/12] Mario1-3 seed 31337: best gen 33, win rate 10%, best_x 4841.7, 0:01:09
+[10/12] Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 4504.2, 0:01:34
+[11/12] Mario1-2 seed 31337: best gen 28, win rate 10%, best_x 5353.4, 0:01:46
+[12/12] Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:02:05
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      1/3          gen 33.0gen 19.3±29.4         3% ±14%        Pit (88%)   2874.3     4%  +1.2%/g  0:02:34  IMPROVING/FLAT/IMPROVING
+Mario1-2      1/3          gen 28.0 gen 26.7±5.7         3% ±14%      Stall (43%)   5112.9    42%  +1.8%/g  0:05:26  IMPROVING/IMPROVING/IMPROVING
+Mario1-4      2/3     gen 10.0±76.2 gen 9.3±15.2        12% ±34%       Fire (74%)   3674.7     5%  +8.7%/g  0:01:53  FLAT/IMPROVING/IMPROVING
+Mario1-1      3/3       gen 5.7±5.2 gen 7.7±11.5        68% ±31%      Enemy (42%)   6321.5    19% +15.1%/g  0:03:11  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/ablation_mario_experienced_p10g40.json  (0:02:23 wall)
+[2026-10-28 04:23:20] END ablation mario experienced rays rc=0
+[2026-10-28 04:23:20] START ablation mario experienced grid
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [experienced · p10g40_grid · runs/ablation]
+
+[1/12] Mario1-3 seed 1234: best gen 14, win rate 0%, best_x 1496.2, 0:01:00
+[2/12] Mario1-4 seed 1234: best gen 33, win rate 0%, best_x 2648.2, 0:01:17
+[3/12] Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 1561.6, 0:01:18
+[4/12] Mario1-4 seed 31337: best gen 11, win rate 0%, best_x 2183.3, 0:01:35
+[5/12] Mario1-3 seed 2025: best gen 21, win rate 0%, best_x 1864.8, 0:01:40
+[6/12] Mario1-1 seed 2025: best gen 35, win rate 0%, best_x 1449.0, 0:02:01
+[7/12] Mario1-2 seed 2025: best gen 12, win rate 0%, best_x 1211.4, 0:02:29
+[8/12] Mario1-4 seed 2025: best gen 32, win rate 0%, best_x 3688.0, 0:02:28
+[9/12] Mario1-2 seed 31337: best gen 35, win rate 0%, best_x 3272.8, 0:02:30
+[10/12] Mario1-2 seed 1234: best gen 12, win rate 0%, best_x 2596.4, 0:02:55
+[11/12] Mario1-1 seed 31337: best gen 9, win rate 0%, best_x 1198.7, 0:03:18
+[12/12] Mario1-1 seed 1234: best gen 31, win rate 0%, best_x 5960.9, 0:04:45
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-1      0/3             nevergen 25.0±34.8          0% ±0%      Stall (67%)   2869.5    67%  +0.9%/g  0:10:06  IMPROVING/IMPROVING/IMPROVING
+Mario1-2      0/3             nevergen 19.7±33.0          0% ±0%      Stall (66%)   2360.2    66%  +0.9%/g  0:07:55  IMPROVING/FLAT/IMPROVING
+Mario1-3      0/3             never gen 16.7±9.4          0% ±0%        Pit (77%)   1640.9    14%  +1.2%/g  0:03:58  IMPROVING/IMPROVING/IMPROVING
+Mario1-4      0/3             nevergen 25.3±30.9          0% ±0%       Fire (53%)   2839.8    18%  +1.1%/g  0:05:21  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/ablation_mario_experienced_p10g40_grid.json  (0:05:02 wall)
+[2026-10-28 04:28:24] END ablation mario experienced grid rc=0
+SENSOR ABLATION - mario  (first win = generations to first win ± 95% CI; win rate over the 10 gens after it)
+LEVEL               RAYS FIRST WIN     RAYS WIN RATE      GRID FIRST WIN     GRID WIN RATE
+------------------------------------------------------------------------------------------
+Mario1-1               gen 5.7±5.2       68% ±31%                  never        0% ±0%    
+Mario1-2                  gen 28.0        3% ±14%                  never        0% ±0%    
+Mario1-3                  gen 33.0        3% ±14%                  never        0% ±0%    
+Mario1-4             gen 10.0±76.2       12% ±34%                  never        0% ±0%    
+[2026-10-28 04:28:25] PHASE 3 GA sweep
+[2026-10-28 04:28:25] START gasweep mario experienced
+GA sweep [ablation]: 23 configs x 4 levels x 3 seeds = 276 probes, budget 40 gens each, ~34x one balance sweep, 16 worker(s)  [mario · experienced · rays]
+
+[1/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 2025: best gen 5, win rate 25%, best_x 6320.2, 0:02:19
+[2/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 1234: best gen 12, win rate 47%, best_x 6328.6, 0:02:44
+[3/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 1234: best gen 8, win rate 3%, best_x 5480.7, 0:02:45
+[4/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 31337: best gen 10, win rate 46%, best_x 6325.0, 0:02:47
+[5/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 1234: best gen 9, win rate 12%, best_x 4523.4, 0:03:22
+[6/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 31337: best gen 10, win rate 4%, best_x 4523.4, 0:03:25
+[7/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 1234: best gen 8, win rate 11%, best_x 4522.6, 0:00:55
+[8/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 1234: best gen 11, win rate 4%, best_x 4845.2, 0:04:36
+[9/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 2025: best gen 10, win rate 9%, best_x 4522.1, 0:05:16
+[10/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 2025: best gen 17, win rate 13%, best_x 5480.9, 0:03:23
+[11/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 1234: best gen 27, win rate 0%, best_x 3030.1, 0:02:52
+[12/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 2025: best gen 15, win rate 28%, best_x 4521.0, 0:01:23
+[13/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 31337: best gen 9, win rate 23%, best_x 4521.0, 0:01:31
+[14/276] p10g40_b8cc78_base · Mario1-1 seed 1234: best gen 5, win rate 62%, best_x 6317.0, 0:00:59
+[15/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 1234: best gen 12, win rate 3%, best_x 5481.0, 0:06:25
+[16/276] p10g40_b8cc78_base · Mario1-1 seed 31337: best gen 5, win rate 82%, best_x 6329.5, 0:01:02
+[17/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 2025: best gen 4, win rate 19%, best_x 6327.2, 0:07:22
+[18/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 2025: best gen 23, win rate 0%, best_x 3688.0, 0:04:16
+[19/276] p10g40_b8cc78_base · Mario1-1 seed 2025: best gen 13, win rate 59%, best_x 6317.9, 0:01:23
+[20/276] p10g40_b8cc78_base · Mario1-3 seed 1234: best gen 13, win rate 0%, best_x 2275.5, 0:00:41
+[21/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 31337: best gen 40, win rate 0%, best_x 3742.9, 0:03:45
+[22/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 2025: best gen 19, win rate 1%, best_x 4843.0, 0:07:45
+[23/276] p10g40_b8cc78_base · Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 4504.2, 0:01:27
+[24/276] p10g40_b8cc78_base · Mario1-4 seed 31337: best gen 4, win rate 27%, best_x 4523.4, 0:00:21
+[25/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 31337: best gen 11, win rate 35%, best_x 6327.2, 0:07:53
+[26/276] p10g40_b8cc78_base · Mario1-3 seed 2025: best gen 12, win rate 0%, best_x 1505.6, 0:00:42
+[27/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 31337: best gen 40, win rate 0%, best_x 5481.0, 0:05:11
+[28/276] p10g40_b8cc78_base · Mario1-4 seed 2025: best gen 16, win rate 10%, best_x 4522.6, 0:00:39
+[29/276] p10g40_b8cc78_base · Mario1-4 seed 1234: best gen 8, win rate 0%, best_x 1978.1, 0:00:48
+[30/276] p10g40_b8cc78_base · Mario1-2 seed 31337: best gen 28, win rate 10%, best_x 5353.4, 0:01:56
+[31/276] p10g40_b8cc78_base · Mario1-3 seed 31337: best gen 33, win rate 10%, best_x 4841.7, 0:01:10
+[32/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 2025: best gen 10, win rate 60%, best_x 6317.8, 0:00:56
+[33/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 31337: best gen 8, win rate 64%, best_x 6325.2, 0:00:55
+[34/276] p10g40_b8cc78_base · Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:02:15
+[35/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 1234: best gen 9, win rate 59%, best_x 6317.8, 0:01:20
+[36/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 1234: best gen 27, win rate 57%, best_x 4841.6, 0:00:46
+[37/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 2025: best gen 8, win rate 1%, best_x 5481.0, 0:09:02
+[38/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 2624.7, 0:01:15
+[39/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 1234: best gen 10, win rate 26%, best_x 6328.8, 0:09:24
+[40/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 31337: best gen 20, win rate 50%, best_x 4522.6, 0:00:36
+[41/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 2025: best gen 12, win rate 0%, best_x 1980.6, 0:00:49
+[42/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 1234: best gen 19, win rate 0%, best_x 2777.4, 0:01:00
+[43/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 2025: best gen 37, win rate 0%, best_x 2216.8, 0:01:22
+[44/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 1234: best gen 7, win rate 26%, best_x 6325.2, 0:00:50
+[45/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 31337: best gen 8, win rate 0%, best_x 2987.6, 0:01:17
+[46/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 2025: best gen 24, win rate 10%, best_x 5480.8, 0:01:50
+[47/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 2025: best gen 7, win rate 53%, best_x 6317.2, 0:01:04
+[48/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 31337: best gen 21, win rate 0%, best_x 5480.7, 0:01:59
+[49/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 31337: best gen 11, win rate 51%, best_x 6317.0, 0:01:12
+[50/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 1234: best gen 37, win rate 0%, best_x 1291.5, 0:00:43
+[51/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 2025: best gen 38, win rate 0%, best_x 1491.0, 0:00:48
+[52/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 31337: best gen 25, win rate 0%, best_x 800.6, 0:00:39
+[53/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 1234: best gen 21, win rate 33%, best_x 4523.4, 0:00:45
+[54/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 2025: best gen 21, win rate 0%, best_x 1981.0, 0:00:44
+[55/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 31337: best gen 34, win rate 0%, best_x 1868.9, 0:00:48
+[56/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 1234: best gen 13, win rate 57%, best_x 6317.8, 0:00:55
+[57/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 31337: best gen 18, win rate 5%, best_x 5481.0, 0:10:51
+[58/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 2025: best gen 15, win rate 41%, best_x 6317.2, 0:01:03
+[59/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 31337: best gen 10, win rate 48%, best_x 6320.0, 0:00:54
+[60/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 1234: best gen 6, win rate 0%, best_x 5481.0, 0:01:49
+[61/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 2025: best gen 15, win rate 0%, best_x 4445.8, 0:01:54
+[62/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 31337: best gen 12, win rate 34%, best_x 4521.8, 0:00:36
+[63/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 31337: best gen 30, win rate 0%, best_x 4938.3, 0:02:03
+[64/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 1234: best gen 28, win rate 0%, best_x 2473.1, 0:00:54
+[65/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 1234: best gen 17, win rate 25%, best_x 6317.2, 0:00:47
+[66/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 1234: best gen 20, win rate 0%, best_x 4393.0, 0:01:09
+[67/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 2025: best gen 37, win rate 0%, best_x 3913.0, 0:00:56
+[68/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 2025: best gen 9, win rate 39%, best_x 6325.2, 0:00:48
+[69/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 2025: best gen 14, win rate 0%, best_x 3016.5, 0:01:09
+[70/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 31337: best gen 27, win rate 0%, best_x 3007.5, 0:01:07
+[71/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 31337: best gen 12, win rate 30%, best_x 6320.2, 0:00:55
+[72/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 2025: best gen 13, win rate 19%, best_x 4522.6, 0:00:24
+[73/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 31337: best gen 10, win rate 0%, best_x 3848.9, 0:01:49
+[74/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 2025: best gen 26, win rate 48%, best_x 5480.7, 0:02:00
+[75/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 1864.0, 0:00:37
+[76/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 31337: best gen 13, win rate 14%, best_x 5481.0, 0:00:59
+[77/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 1234: best gen 6, win rate 0%, best_x 2408.7, 0:00:39
+[78/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3051.5, 0:00:44
+[79/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 1234: best gen 17, win rate 0%, best_x 5480.7, 0:02:20
+[80/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 2025: best gen 13, win rate 48%, best_x 6317.6, 0:00:51
+[81/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 1234: best gen 12, win rate 0%, best_x 5480.7, 0:01:29
+[82/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 31337: best gen 27, win rate 48%, best_x 4523.4, 0:00:50
+[83/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 2025: best gen 13, win rate 0%, best_x 5480.7, 0:01:34
+[84/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 31337: best gen 40, win rate 0%, best_x 3028.7, 0:01:05
+[85/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 1234: best gen 9, win rate 0%, best_x 1492.8, 0:00:44
+[86/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 2025: best gen 11, win rate 10%, best_x 5481.0, 0:01:01
+[87/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 31337: best gen 38, win rate 14%, best_x 4846.0, 0:13:11
+[88/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 31337: best gen 16, win rate 62%, best_x 6326.3, 0:01:24
+[89/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 1234: best gen 10, win rate 0%, best_x 1978.1, 0:00:40
+[90/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 31337: best gen 18, win rate 36%, best_x 4523.4, 0:00:38
+[91/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 2025: best gen 6, win rate 36%, best_x 6323.2, 0:00:36
+[92/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 2025: best gen 1, win rate 0%, best_x 1516.3, 0:00:48
+[93/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 31337: best gen 17, win rate 0%, best_x 1502.2, 0:00:51
+[94/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 31337: best gen 3, win rate 24%, best_x 6315.7, 0:00:45
+[95/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 2025: best gen 23, win rate 0%, best_x 1508.9, 0:00:57
+[96/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 1234: best gen 34, win rate 48%, best_x 6320.2, 0:01:52
+[97/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 1234: best gen 13, win rate 34%, best_x 6325.2, 0:00:56
+[98/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 1234: best gen 12, win rate 0%, best_x 5480.7, 0:01:44
+[99/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 31337: best gen 4, win rate 43%, best_x 4523.4, 0:00:26
+[100/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 2025: best gen 37, win rate 0%, best_x 1504.1, 0:00:48
+[101/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 1234: best gen 39, win rate 0%, best_x 3352.3, 0:00:50
+[102/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 1234: best gen 6, win rate 46%, best_x 6317.2, 0:00:48
+[103/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 2025: best gen 14, win rate 0%, best_x 2705.4, 0:00:53
+[104/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 31337: best gen 8, win rate 0%, best_x 1566.3, 0:00:56
+[105/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 31337: best gen 36, win rate 0%, best_x 5128.0, 0:02:04
+[106/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 31337: best gen 11, win rate 23%, best_x 6317.2, 0:00:53
+[107/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 2025: best gen 6, win rate 62%, best_x 6325.2, 0:00:58
+[108/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 2025: best gen 18, win rate 0%, best_x 4516.2, 0:01:30
+[109/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 1234: best gen 30, win rate 0%, best_x 3688.8, 0:01:16
+[110/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 31337: best gen 7, win rate 13%, best_x 4522.6, 0:00:29
+[111/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 1234: best gen 38, win rate 0%, best_x 5480.9, 0:02:01
+[112/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 1234: best gen 15, win rate 0%, best_x 557.8, 0:00:57
+[113/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 2025: best gen 18, win rate 0%, best_x 1509.9, 0:00:48
+[114/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 1234: best gen 24, win rate 0%, best_x 1978.1, 0:00:38
+[115/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 1234: best gen 33, win rate 0%, best_x 3848.7, 0:01:21
+[116/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 31337: best gen 40, win rate 0%, best_x 1736.0, 0:00:50
+[117/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 2025: best gen 23, win rate 0%, best_x 2205.0, 0:00:44
+[118/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 1234: best gen 1, win rate 0%, best_x 576.5, 0:00:37
+[119/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 2025: best gen 7, win rate 56%, best_x 6320.2, 0:00:59
+[120/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 31337: best gen 10, win rate 75%, best_x 6320.2, 0:01:05
+[121/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 31337: best gen 7, win rate 0%, best_x 5480.9, 0:02:21
+[122/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 2025: best gen 32, win rate 0%, best_x 5480.3, 0:01:57
+[123/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 31337: best gen 12, win rate 0%, best_x 4476.5, 0:01:44
+[124/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 1234: best gen 29, win rate 0%, best_x 3848.9, 0:01:05
+[125/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 1234: best gen 39, win rate 0%, best_x 831.5, 0:00:42
+[126/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 1234: best gen 40, win rate 0%, best_x 1848.9, 0:00:43
+[127/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 2025: best gen 3, win rate 35%, best_x 6320.2, 0:00:49
+[128/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 1234: best gen 9, win rate 40%, best_x 6320.2, 0:00:53
+[129/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 2025: best gen 6, win rate 0%, best_x 2435.4, 0:00:53
+[130/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 2025: best gen 38, win rate 15%, best_x 4521.8, 0:01:01
+[131/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 31337: best gen 30, win rate 43%, best_x 4522.6, 0:01:11
+[132/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 31337: best gen 10, win rate 10%, best_x 5355.4, 0:00:55
+[133/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 31337: best gen 9, win rate 0%, best_x 2822.8, 0:01:24
+[134/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 31337: best gen 11, win rate 63%, best_x 6324.9, 0:01:17
+[135/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 31337: best gen 5, win rate 10%, best_x 4522.6, 0:00:25
+[136/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 1234: best gen 17, win rate 35%, best_x 4521.8, 0:00:32
+[137/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 1234: best gen 16, win rate 0%, best_x 1483.8, 0:00:50
+[138/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 2025: best gen 17, win rate 0%, best_x 5481.0, 0:02:12
+[139/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 31337: best gen 39, win rate 20%, best_x 5480.9, 0:02:04
+[140/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 2025: best gen 32, win rate 0%, best_x 2159.1, 0:00:47
+[141/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 2025: best gen 30, win rate 0%, best_x 2296.8, 0:00:58
+[142/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 31337: best gen 17, win rate 0%, best_x 1810.3, 0:01:00
+[143/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 31337: best gen 6, win rate 80%, best_x 6325.2, 0:00:57
+[144/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 1234: best gen 17, win rate 0%, best_x 5480.7, 0:01:47
+[145/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 2025: best gen 30, win rate 0%, best_x 5480.7, 0:01:52
+[146/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 2025: best gen 17, win rate 72%, best_x 6328.9, 0:01:21
+[147/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 2025: best gen 39, win rate 0%, best_x 1306.6, 0:00:44
+[148/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 1234: best gen 22, win rate 0%, best_x 1499.8, 0:00:59
+[149/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 31337: best gen 8, win rate 80%, best_x 5356.8, 0:01:08
+[150/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 31337: best gen 38, win rate 0%, best_x 1491.8, 0:01:01
+[151/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 1234: best gen 13, win rate 0%, best_x 1849.2, 0:00:58
+[152/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 1234: best gen 8, win rate 0%, best_x 1448.7, 0:01:49
+[153/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 2025: best gen 40, win rate 0%, best_x 1843.9, 0:00:55
+[154/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 31337: best gen 29, win rate 0%, best_x 1973.2, 0:00:52
+[155/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 2025: best gen 10, win rate 45%, best_x 6317.8, 0:00:55
+[156/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 1234: best gen 14, win rate 53%, best_x 6325.2, 0:01:08
+[157/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 2025: best gen 19, win rate 0%, best_x 1961.0, 0:01:40
+[158/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 1234: best gen 14, win rate 0%, best_x 3272.7, 0:01:53
+[159/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 31337: best gen 7, win rate 65%, best_x 6329.4, 0:01:11
+[160/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 1234: best gen 27, win rate 0%, best_x 1506.6, 0:00:46
+[161/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 2025: best gen 8, win rate 42%, best_x 4522.6, 0:00:33
+[162/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 31337: best gen 14, win rate 10%, best_x 4521.8, 0:00:37
+[163/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 1929.4, 0:00:45
+[164/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 31337: best gen 3, win rate 0%, best_x 2452.5, 0:01:03
+[165/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 2025: best gen 32, win rate 0%, best_x 2775.0, 0:01:09
+[166/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 31337: best gen 3, win rate 60%, best_x 6325.2, 0:00:53
+[167/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 2025: best gen 10, win rate 41%, best_x 6316.7, 0:01:02
+[168/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 2025: best gen 1, win rate 0%, best_x 1166.3, 0:00:50
+[169/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 1234: best gen 30, win rate 27%, best_x 5480.7, 0:01:57
+[170/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 2025: best gen 5, win rate 0%, best_x 1245.4, 0:00:45
+[171/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 2025: best gen 20, win rate 0%, best_x 5480.7, 0:01:54
+[172/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 31337: best gen 4, win rate 0%, best_x 804.8, 0:00:42
+[173/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 31337: best gen 6, win rate 48%, best_x 5480.9, 0:01:02
+[174/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 31337: best gen 19, win rate 0%, best_x 5128.8, 0:01:55
+[175/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 1234: best gen 21, win rate 0%, best_x 1979.8, 0:00:45
+[176/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 1234: best gen 11, win rate 0%, best_x 1860.6, 0:01:01
+[177/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 1234: best gen 3, win rate 0%, best_x 1448.7, 0:01:42
+[178/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 1234: best gen 7, win rate 53%, best_x 6325.2, 0:00:55
+[179/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 2025: best gen 29, win rate 0%, best_x 2204.7, 0:00:57
+[180/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 2025: best gen 13, win rate 59%, best_x 6317.7, 0:01:05
+[181/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 31337: best gen 33, win rate 0%, best_x 2857.1, 0:01:08
+[182/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 31337: best gen 13, win rate 48%, best_x 6325.2, 0:01:00
+[183/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 2025: best gen 16, win rate 20%, best_x 4523.2, 0:00:31
+[184/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 31337: best gen 12, win rate 38%, best_x 4522.6, 0:00:35
+[185/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 1234: best gen 36, win rate 0%, best_x 3464.7, 0:01:59
+[186/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 1234: best gen 22, win rate 0%, best_x 1505.6, 0:00:49
+[187/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 1234: best gen 28, win rate 34%, best_x 4523.4, 0:00:58
+[188/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 1234: best gen 9, win rate 59%, best_x 6320.2, 0:00:53
+[189/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 31337: best gen 27, win rate 0%, best_x 2787.2, 0:01:12
+[190/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 2025: best gen 16, win rate 41%, best_x 6323.2, 0:01:08
+[191/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 1234: best gen 38, win rate 0%, best_x 4494.2, 0:01:46
+[192/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 1234: best gen 13, win rate 0%, best_x 2275.5, 0:00:49
+[193/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 2025: best gen 8, win rate 0%, best_x 1736.0, 0:01:33
+[194/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 31337: best gen 5, win rate 90%, best_x 6329.5, 0:01:12
+[195/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 1234: best gen 8, win rate 0%, best_x 1978.1, 0:00:46
+[196/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 31337: best gen 21, win rate 0%, best_x 4962.1, 0:01:50
+[197/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 31337: best gen 4, win rate 45%, best_x 4523.4, 0:00:28
+[198/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 2025: best gen 12, win rate 0%, best_x 1505.6, 0:00:53
+[199/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 2025: best gen 9, win rate 0%, best_x 4943.6, 0:01:54
+[200/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 2025: best gen 16, win rate 40%, best_x 4522.6, 0:00:43
+[201/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 31337: best gen 33, win rate 10%, best_x 4841.7, 0:01:04
+[202/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 1234: best gen 12, win rate 47%, best_x 6317.2, 0:00:45
+[203/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 31337: best gen 4, win rate 14%, best_x 4523.4, 0:00:21
+[204/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 4504.2, 0:01:43
+[205/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 31337: best gen 37, win rate 43%, best_x 5480.0, 0:01:58
+[206/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 2025: best gen 18, win rate 52%, best_x 6325.2, 0:01:00
+[207/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 2025: best gen 16, win rate 14%, best_x 4522.6, 0:00:38
+[208/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 2025: best gen 12, win rate 0%, best_x 1505.6, 0:00:45
+[209/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 31337: best gen 5, win rate 65%, best_x 6329.5, 0:01:08
+[210/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:02:06
+[211/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 1234: best gen 8, win rate 0%, best_x 1978.1, 0:00:46
+[212/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 1234: best gen 13, win rate 0%, best_x 2275.5, 0:00:52
+[213/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 2025: best gen 10, win rate 40%, best_x 6317.9, 0:00:45
+[214/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 31337: best gen 33, win rate 10%, best_x 4841.7, 0:01:09
+[215/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 1234: best gen 13, win rate 57%, best_x 6325.2, 0:01:06
+[216/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 4504.2, 0:01:39
+[217/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 31337: best gen 9, win rate 52%, best_x 6327.8, 0:01:05
+[218/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 31337: best gen 28, win rate 10%, best_x 5353.4, 0:01:47
+[219/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 2025: best gen 22, win rate 0%, best_x 1501.0, 0:00:44
+[220/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:01:58
+[221/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 2025: best gen 40, win rate 26%, best_x 4522.6, 0:00:47
+[222/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 2025: best gen 9, win rate 33%, best_x 6317.6, 0:00:36
+[223/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 1234: best gen 11, win rate 0%, best_x 2296.8, 0:00:55
+[224/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 31337: best gen 9, win rate 0%, best_x 2792.4, 0:00:53
+[225/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 1234: best gen 37, win rate 15%, best_x 4522.6, 0:01:02
+[226/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 31337: best gen 13, win rate 36%, best_x 6317.1, 0:00:48
+[227/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 31337: best gen 22, win rate 0%, best_x 2455.0, 0:01:11
+[228/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 1234: best gen 37, win rate 0%, best_x 5480.7, 0:01:39
+[229/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 2025: best gen 25, win rate 0%, best_x 4970.3, 0:01:44
+[230/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 1493.8, 0:00:45
+[231/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 31337: best gen 4, win rate 0%, best_x 801.5, 0:00:41
+[232/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 2025: best gen 21, win rate 0%, best_x 1821.4, 0:00:49
+[233/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 31337: best gen 36, win rate 0%, best_x 5481.0, 0:01:47
+[234/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 2025: best gen 1, win rate 0%, best_x 1516.3, 0:00:42
+[235/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 1234: best gen 20, win rate 0%, best_x 1882.8, 0:00:49
+[236/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 31337: best gen 21, win rate 66%, best_x 4523.4, 0:01:00
+[237/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 1234: best gen 15, win rate 10%, best_x 6315.5, 0:01:09
+[238/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 31337: best gen 12, win rate 38%, best_x 6320.2, 0:01:10
+[239/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 2025: best gen 25, win rate 0%, best_x 5481.0, 0:01:48
+[240/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 1234: best gen 33, win rate 0%, best_x 5993.0, 0:02:18
+[241/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 2025: best gen 19, win rate 58%, best_x 6325.0, 0:01:18
+[242/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 1234: best gen 8, win rate 0%, best_x 5480.7, 0:01:59
+[243/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 31337: best gen 38, win rate 0%, best_x 1495.9, 0:00:45
+[244/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 31337: best gen 32, win rate 0%, best_x 4467.1, 0:01:52
+[245/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 1234: best gen 32, win rate 0%, best_x 1500.8, 0:00:50
+[246/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 2025: best gen 26, win rate 32%, best_x 4841.3, 0:00:50
+[247/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 2025: best gen 28, win rate 42%, best_x 4523.4, 0:00:47
+[248/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 1234: best gen 26, win rate 0%, best_x 2229.1, 0:00:52
+[249/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 31337: best gen 35, win rate 0%, best_x 2214.4, 0:00:53
+[250/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 1234: best gen 3, win rate 10%, best_x 5353.5, 0:00:39
+[251/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 1234: best gen 2, win rate 65%, best_x 6318.2, 0:00:54
+[252/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 2025: best gen 4, win rate 33%, best_x 6327.2, 0:00:50
+[253/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 1234: best gen 10, win rate 44%, best_x 4522.6, 0:00:36
+[254/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 1234: best gen 39, win rate 0%, best_x 2292.4, 0:00:42
+[255/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 1234: best gen 2, win rate 0%, best_x 5480.7, 0:02:11
+[256/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 2025: best gen 18, win rate 13%, best_x 4522.6, 0:00:40
+[257/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 2025: best gen 31, win rate 0%, best_x 1477.9, 0:00:43
+[258/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 2025: best gen 15, win rate 0%, best_x 5128.7, 0:01:54
+[259/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 1234: best gen 5, win rate 46%, best_x 6325.2, 0:00:41
+[260/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 31337: best gen 8, win rate 0%, best_x 5480.7, 0:01:58
+[261/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 31337: best gen 25, win rate 0%, best_x 1998.6, 0:00:51
+[262/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 31337: best gen 11, win rate 0%, best_x 2963.7, 0:01:05
+[263/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 2025: best gen 11, win rate 0%, best_x 2629.3, 0:01:30
+[264/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 31337: best gen 20, win rate 16%, best_x 5480.7, 0:01:36
+[265/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 31337: best gen 34, win rate 44%, best_x 6317.2, 0:01:39
+[266/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 1234: best gen 18, win rate 13%, best_x 4520.7, 0:00:34
+[267/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 2025: best gen 11, win rate 0%, best_x 806.5, 0:00:37
+[268/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 31337: best gen 17, win rate 53%, best_x 6325.2, 0:01:13
+[269/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 2025: best gen 39, win rate 40%, best_x 6317.2, 0:01:14
+[270/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 2025: best gen 33, win rate 0%, best_x 4950.7, 0:01:06
+[271/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 2025: best gen 20, win rate 39%, best_x 4522.6, 0:00:39
+[272/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 31337: best gen 36, win rate 0%, best_x 2277.6, 0:00:54
+[273/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 31337: best gen 29, win rate 11%, best_x 5480.7, 0:01:27
+[274/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 1234: best gen 11, win rate 0%, best_x 3085.9, 0:01:20
+[275/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 31337: best gen 15, win rate 0%, best_x 2920.7, 0:01:07
+[276/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 1234: best gen 38, win rate 0%, best_x 5128.7, 0:01:55
+
+wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+  mario      (3 sweep(s))  mutation_sigma 0.02 · anneal_factor 0.3
+  megaman    (6 sweep(s))  pop_size 100 · tournament_k 8 · crossover_rate 0.95 · mutation_rate 0.5 · mutation_sigma 0.5 · anneal_factor 0.3 · init_sigma 0.25 · action_feedback True
+
+0:29:47 wall
+
+config                   params   solved  first win  win rate      time
+base                        291    4/4         24.8      22%   0:13:28
+hidden-8                    147    4/4         27.2      25%   0:14:08
+hidden-32                   579    2/4         29.7      14%   0:13:24
+hidden-64                  1155    3/4         27.8      19%   0:14:58
+pop_size-30                 291    3/4         17.2      16%   0:33:56
+pop_size-100                291    4/4          7.5      11%   1:28:38
+elite-1                     291    3/4         24.8      15%   0:10:57
+elite-6                     291    3/4         28.1      17%   0:13:39
+tournament_k-2              291    2/4         28.1      11%   0:13:25
+tournament_k-8              291    2/4         28.4      12%   0:12:13
+crossover_rate-0.0          291    3/4         32.4      17%   0:14:00
+crossover_rate-0.95         291    3/4         23.9      16%   0:12:10
+mutation_rate-0.005         291    2/4         31.8      19%   0:14:22
+mutation_rate-0.5           291    3/4         26.3      20%   0:13:57
+mutation_sigma-0.02         291    2/4         31.3      12%   0:12:51
+mutation_sigma-0.5          291    2/4         25.3      21%   0:14:13
+anneal_factor-0.3           291    4/4         24.8      27%   0:13:50
+anneal_factor-1.0           291    4/4         24.8      18%   0:12:52
+init_sigma-0.25             291    2/4         30.2      16%   0:13:42
+init_sigma-1.0              291    2/4         31.7      11%   0:14:13
+action_feedback-1           323    3/4         30.2      15%   0:14:41
+memory-2                    357    3/4         23.6      19%   0:11:51
+memory-3                    390    3/4         27.3      17%   0:12:51
+
+recommended config: anneal_factor=0.3 hidden=8
+
+confirm: probing the composite {'anneal_factor': 0.3, 'hidden': 8}
+GA sweep [confirm]: 1 configs x 4 levels x 3 seeds = 12 probes, budget 40 gens each, ~1x one balance sweep, 16 worker(s)  [mario · experienced · rays]
+
+[1/12] p10g40_b8cc78_best · Mario1-4 seed 31337: best gen 22, win rate 57%, best_x 4535.0, 0:00:40
+[2/12] p10g40_b8cc78_best · Mario1-1 seed 2025: best gen 5, win rate 73%, best_x 6317.6, 0:01:03
+[3/12] p10g40_b8cc78_best · Mario1-1 seed 31337: best gen 8, win rate 80%, best_x 6325.2, 0:01:05
+[4/12] p10g40_b8cc78_best · Mario1-3 seed 1234: best gen 27, win rate 64%, best_x 4841.6, 0:00:57
+[5/12] p10g40_b8cc78_best · Mario1-4 seed 1234: best gen 19, win rate 0%, best_x 2777.4, 0:00:58
+[6/12] p10g40_b8cc78_best · Mario1-4 seed 2025: best gen 12, win rate 0%, best_x 1980.6, 0:00:55
+[7/12] p10g40_b8cc78_best · Mario1-1 seed 1234: best gen 13, win rate 76%, best_x 6318.0, 0:01:17
+[8/12] p10g40_b8cc78_best · Mario1-3 seed 31337: best gen 8, win rate 0%, best_x 2987.6, 0:01:11
+[9/12] p10g40_b8cc78_best · Mario1-3 seed 2025: best gen 37, win rate 0%, best_x 2216.8, 0:01:27
+[10/12] p10g40_b8cc78_best · Mario1-2 seed 1234: best gen 28, win rate 0%, best_x 2624.7, 0:01:30
+[11/12] p10g40_b8cc78_best · Mario1-2 seed 2025: best gen 24, win rate 18%, best_x 5480.8, 0:01:40
+[12/12] p10g40_b8cc78_best · Mario1-2 seed 31337: best gen 21, win rate 0%, best_x 5480.7, 0:02:01
+
+wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+  mario      (4 sweep(s))  anneal_factor 0.3
+  megaman    (6 sweep(s))  pop_size 100 · tournament_k 8 · crossover_rate 0.95 · mutation_rate 0.5 · mutation_sigma 0.5 · anneal_factor 0.3 · init_sigma 0.25 · action_feedback True
+
+0:02:26 wall
+
+config                   params   solved  first win  win rate      time
+base                        291    4/4         24.8      22%   0:13:28
+hidden-8                    147    4/4         27.2      25%   0:14:08
+hidden-32                   579    2/4         29.7      14%   0:13:24
+hidden-64                  1155    3/4         27.8      19%   0:14:58
+pop_size-30                 291    3/4         17.2      16%   0:33:56
+pop_size-100                291    4/4          7.5      11%   1:28:38
+elite-1                     291    3/4         24.8      15%   0:10:57
+elite-6                     291    3/4         28.1      17%   0:13:39
+tournament_k-2              291    2/4         28.1      11%   0:13:25
+tournament_k-8              291    2/4         28.4      12%   0:12:13
+crossover_rate-0.0          291    3/4         32.4      17%   0:14:00
+crossover_rate-0.95         291    3/4         23.9      16%   0:12:10
+mutation_rate-0.005         291    2/4         31.8      19%   0:14:22
+mutation_rate-0.5           291    3/4         26.3      20%   0:13:57
+mutation_sigma-0.02         291    2/4         31.3      12%   0:12:51
+mutation_sigma-0.5          291    2/4         25.3      21%   0:14:13
+anneal_factor-0.3           291    4/4         24.8      27%   0:13:50
+anneal_factor-1.0           291    4/4         24.8      18%   0:12:52
+init_sigma-0.25             291    2/4         30.2      16%   0:13:42
+init_sigma-1.0              291    2/4         31.7      11%   0:14:13
+action_feedback-1           323    3/4         30.2      15%   0:14:41
+memory-2                    357    3/4         23.6      19%   0:11:51
+memory-3                    390    3/4         27.3      17%   0:12:51
+best                        147    4/4         27.2      31%   0:14:50
+
+recommended config: anneal_factor=0.3 hidden=8
+[2026-10-28 05:00:41] END gasweep mario experienced rc=0
+[2026-10-28 05:00:41] ALL DONE
+[2026-10-28 05:00:41] END rc=0 GAMES=mario PERSONAS=experienced bash run_all.sh sweeps

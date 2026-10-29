@@ -1,0 +1,13 @@
+[2026-10-28 21:49:24] START n=183 host=c214.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant jump_velocity_down@1 --persona experienced --workers $W
+>>> PEAK_MUTANT=runs/meatboy/mutants/jump_velocity_down@1 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona experienced --levels 1 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/jump_velocity_down@1/probes --out runs/ast/meatboy/jump_velocity_down@1 --workers 3
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [experienced · p10g200 · runs/ast/meatboy/jump_velocity_down@1/probes]
+
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+1             2/3    gen 20.5±133.4gen 14.3±37.2        34% ±74%      Stall (99%)    811.6    84%  +4.8%/g  0:03:25  IMPROVING/FLAT/IMPROVING
+
+saved runs/ast/meatboy/jump_velocity_down@1/report_meatboy_experienced_p10g200.json  (0:00:00 wall)
+[2026-10-28 21:49:30] END rc=0 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant jump_velocity_down@1 --persona experienced --workers $W

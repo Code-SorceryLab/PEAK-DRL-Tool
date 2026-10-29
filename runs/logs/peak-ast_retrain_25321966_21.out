@@ -1,0 +1,18 @@
+[2026-10-29 12:50:20] START n=22 host=c627.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant base-reseeded@3 --persona collector --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 3 --seeds 1111 2222 3333 --gens 200 --root runs/ast/bomberman/base-reseeded@3/probes --out runs/ast/bomberman/base-reseeded@3 --workers 3
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200 · runs/ast/bomberman/base-reseeded@3/probes]
+
+  note: bomberman level [3] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [3] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [3] has no coins — persona [collector] plays for the goal alone here
+[1/3] 3 seed 1111: best gen 46, win rate 0%, best_x 444.4, 0:01:45
+[2/3] 3 seed 3333: best gen 3, win rate 0%, best_x 740.7, 0:02:26
+[3/3] 3 seed 2222: best gen 4, win rate 0%, best_x 740.7, 0:02:57
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+3             0/3             nevergen 17.7±61.0          0% ±0%       Bomb (99%)    641.9     1%  +6.3%/g  0:07:08  IMPROVING/FLAT/IMPROVING
+
+saved runs/ast/bomberman/base-reseeded@3/report_bomberman_collector_p10g200.json  (0:03:49 wall)
+[2026-10-29 12:54:12] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant base-reseeded@3 --persona collector --workers $W

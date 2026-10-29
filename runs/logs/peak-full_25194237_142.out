@@ -1,0 +1,28 @@
+[2026-10-28 09:10:16] START n=143 host=c337.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona killer --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200 · runs/probes]
+
+  note: meatboy level [3] has no kills — persona [killer] plays for the goal alone here
+  note: meatboy level [3] has no kills — persona [killer] plays for the goal alone here
+  note: meatboy level [3] has no kills — persona [killer] plays for the goal alone here
+[1/3] 3 seed 31337: best gen 47, win rate 17%, best_x 1000.0, 0:01:33
+[2/3] 3 seed 1234: best gen 123, win rate 0%, best_x 500.0, 0:04:57
+[3/3] 3 seed 2025: best gen 179, win rate 0%, best_x 689.7, 0:05:26
+skip runs/probes/meatboy/killer/p10g200/10_1234: unfinished (gen 165 of 200)
+skip runs/probes/meatboy/killer/p10g200/10_2025: unfinished (gen 170 of 200)
+skip runs/probes/meatboy/killer/p10g200/7_1234: unfinished (gen 89 of 200)
+skip runs/probes/meatboy/killer/p10g200/7_2025: unfinished (gen 158 of 200)
+skip runs/probes/meatboy/killer/p10g200/7_31337: unfinished (gen 130 of 200)
+skip runs/probes/meatboy/killer/p10g200/8_1234: unfinished (gen 40 of 200)
+skip runs/probes/meatboy/killer/p10g200/8_2025: unfinished (gen 81 of 200)
+skip runs/probes/meatboy/killer/p10g200/8_31337: unfinished (gen 32 of 200)
+skip runs/probes/meatboy/killer/p10g200/9_1234: unfinished (gen 72 of 200)
+skip runs/probes/meatboy/killer/p10g200/9_2025: unfinished (gen 73 of 200)
+skip runs/probes/meatboy/killer/p10g200/9_31337: unfinished (gen 67 of 200)
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+3             1/3          gen 47.0gen 116.3±164.6         6% ±24%     Stall (100%)    729.9    99%  +0.7%/g  0:11:57  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_meatboy_killer_p10g200.json  (0:05:55 wall)
+[2026-10-28 09:16:13] END rc=0 $PY -m code.neuro.balance --game meatboy --persona killer --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

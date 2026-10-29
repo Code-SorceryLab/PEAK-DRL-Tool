@@ -1,0 +1,21 @@
+[2026-10-29 15:44:52] START n=410 host=c397.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona killer --level CutMan-2-Climb --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona killer --levels CutMan-2-Climb --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/base-retrained/probes --out runs/ast/megaman/base-retrained --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p30g200_best · runs/ast/megaman/base-retrained/probes]
+
+[1/3] CutMan-2-Climb seed 2025: best gen 46, win rate 21%, best_x 1000.0, 0:14:35
+[2/3] CutMan-2-Climb seed 1234: best gen 67, win rate 26%, best_x 1000.0, 0:24:23
+[3/3] CutMan-2-Climb seed 31337: best gen 133, win rate 4%, best_x 1000.0, 0:43:48
+skip runs/ast/megaman/base-retrained/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_1234: unfinished (gen 197 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_2025: unfinished (gen 112 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/killer/p30g200_best/CutMan-3-Ledges_31337: unfinished (gen 181 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/killer/p30g200_best/CutMan-4-Shaft_2025: unfinished (gen 131 of 200)
+skip runs/ast/megaman/base-retrained/probes/megaman/killer/p30g200_best/CutMan-6-Descent_31337: unfinished (gen 112 of 200)
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-2-Climb3/3    gen 74.7±115.1gen 82.0±112.8        17% ±29%      Stall (92%)   1000.0    88%  +1.2%/g  1:22:47  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/base-retrained/report_megaman_killer_p30g200_best.json  (0:44:35 wall)
+[2026-10-29 16:29:32] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona killer --level CutMan-2-Climb --workers $W

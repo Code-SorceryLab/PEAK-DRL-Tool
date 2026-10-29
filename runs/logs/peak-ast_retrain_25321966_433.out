@@ -1,0 +1,7 @@
+[2026-10-29 16:00:54] START n=434 host=c292.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona clumsy --level CutMan-2-Climb --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona clumsy --levels CutMan-2-Climb --seeds 1111 2222 3333 --gens 200 --root runs/ast/megaman/base-reseeded/probes --out runs/ast/megaman/base-reseeded --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/ast/megaman/base-reseeded/probes]
+
+[1/3] CutMan-2-Climb seed 3333: best gen 146, win rate 0%, best_x 1000.0, 0:56:18
+[2/3] CutMan-2-Climb seed 2222: best gen 59, win rate 0%, best_x 966.9, 1:07:07

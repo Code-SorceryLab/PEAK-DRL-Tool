@@ -1,0 +1,18 @@
+[2026-10-28 18:32:34] START n=359 host=c330.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant jump_velocity_down@9 --persona killer --workers $W
+>>> PEAK_MUTANT=runs/meatboy/mutants/jump_velocity_down@9 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona killer --levels 9 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/jump_velocity_down@9/probes --out runs/ast/meatboy/jump_velocity_down@9 --workers 3
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200 · runs/ast/meatboy/jump_velocity_down@9/probes]
+
+  note: meatboy level [9] has no kills — persona [killer] plays for the goal alone here
+  note: meatboy level [9] has no kills — persona [killer] plays for the goal alone here
+  note: meatboy level [9] has no kills — persona [killer] plays for the goal alone here
+[1/3] 9 seed 2025: best gen 164, win rate 0%, best_x 758.6, 0:03:40
+[2/3] 9 seed 31337: best gen 31, win rate 0%, best_x 775.9, 0:03:40
+[3/3] 9 seed 1234: best gen 197, win rate 0%, best_x 620.7, 0:04:21
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+9             0/3             nevergen 130.7±218.3          0% ±0%      Stall (57%)    718.4    57%  +0.4%/g  0:11:41  IMPROVING/IMPROVING/FLAT
+
+saved runs/ast/meatboy/jump_velocity_down@9/report_meatboy_killer_p10g200.json  (0:05:48 wall)
+[2026-10-28 18:38:26] END rc=0 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant jump_velocity_down@9 --persona killer --workers $W

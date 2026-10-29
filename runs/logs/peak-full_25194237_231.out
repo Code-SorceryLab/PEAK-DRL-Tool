@@ -1,0 +1,22 @@
+[2026-10-28 09:51:51] START n=232 host=c301.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/probes]
+
+[1/3] 9 seed 1234: best gen 18, win rate 0%, best_x 1000.0, 0:01:39
+[2/3] 9 seed 2025: best gen 55, win rate 0%, best_x 851.9, 0:05:16
+[3/3] 9 seed 31337: best gen 183, win rate 1%, best_x 1000.0, 0:08:55
+skip runs/probes/bomberman/clumsy/p30g200_best/11_1234: unfinished (gen 155 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/14_1234: unfinished (gen 168 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/14_2025: unfinished (gen 179 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/14_31337/state.json: unreadable ([Errno 116] Stale file handle)
+skip runs/probes/bomberman/clumsy/p30g200_best/15_1234: unfinished (gen 72 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/15_2025: unfinished (gen 69 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/15_31337: unfinished (gen 66 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+9             2/3    gen 95.5±984.7gen 85.3±215.1          0% ±1%       Bomb (89%)    950.6     1%  +1.7%/g  0:15:50  IMPROVING/DECLINING/IMPROVING
+
+saved runs/balance_stage/report_bomberman_clumsy_p30g200_best.json  (0:10:45 wall)
+[2026-10-28 10:02:39] END rc=0 $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

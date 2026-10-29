@@ -1,0 +1,23 @@
+[2026-10-28 10:49:52] START n=360 host=c3.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona collector --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/probes]
+
+  note: bomberman level [9] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [9] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [9] has no coins — persona [collector] plays for the goal alone here
+[1/3] 9 seed 2025: best gen 71, win rate 0%, best_x 851.9, 0:11:25
+[2/3] 9 seed 1234: best gen 64, win rate 0%, best_x 851.9, 0:13:21
+[3/3] 9 seed 31337: best gen 31, win rate 0%, best_x 851.9, 0:25:36
+skip runs/probes/bomberman/collector/p30g200_best/10_31337: unfinished (gen 165 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/13_2025: unfinished (gen 154 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/15_1234: unfinished (gen 117 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/15_2025: unfinished (gen 106 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/8_1234: unfinished (gen 162 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+9             0/3             nevergen 55.3±53.1          0% ±0%       Bomb (64%)    851.9     3%  +2.8%/g  0:50:23  FLAT/FLAT/IMPROVING
+
+saved runs/balance_stage/report_bomberman_collector_p30g200_best.json  (0:26:42 wall)
+[2026-10-28 11:16:41] END rc=0 $PY -m code.neuro.balance --game bomberman --persona collector --levels 9 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

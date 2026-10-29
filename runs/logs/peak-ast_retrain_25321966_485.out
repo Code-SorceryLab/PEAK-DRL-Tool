@@ -1,0 +1,5 @@
+[2026-10-29 16:28:59] START n=486 host=c557.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona novice --level CutMan-2-Climb --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/m-jump_velocity_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona novice --levels CutMan-2-Climb --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/m-jump_velocity_down/probes --out runs/ast/megaman/m-jump_velocity_down --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [novice · p30g200_best · runs/ast/megaman/m-jump_velocity_down/probes]
+

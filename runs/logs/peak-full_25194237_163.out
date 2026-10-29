@@ -1,0 +1,29 @@
+[2026-10-28 09:19:11] START n=164 host=c167.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona collector --levels 2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: meatboy -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200_best · runs/probes]
+
+  note: meatboy level [2] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [2] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [2] has no coins — persona [collector] plays for the goal alone here
+[1/3] 2 seed 2025: best gen 12, win rate 73%, best_x 1000.0, 0:00:12
+[2/3] 2 seed 1234: best gen 20, win rate 27%, best_x 1000.0, 0:00:17
+[3/3] 2 seed 31337: best gen 17, win rate 76%, best_x 1000.0, 0:00:17
+skip runs/probes/meatboy/collector/p10g200_best/1_1234: unfinished (gen 30 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/1_2025: unfinished (gen 29 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/3_1234: unfinished (gen 21 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/3_2025: unfinished (gen 17 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/3_31337: unfinished (gen 18 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/4_1234: unfinished (gen 29 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/4_2025: unfinished (gen 33 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/4_31337: unfinished (gen 24 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/5_1234: unfinished (gen 29 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/5_2025: unfinished (gen 20 of 200)
+skip runs/probes/meatboy/collector/p10g200_best/5_31337: unfinished (gen 19 of 200)
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+2             3/3     gen 16.3±10.0gen 16.3±10.0        59% ±68%        Pit (89%)   1000.0     9%  +1.5%/g  0:00:47  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_meatboy_collector_p10g200_best.json  (0:00:36 wall)
+[2026-10-28 09:19:53] END rc=0 $PY -m code.neuro.balance --game meatboy --persona collector --levels 2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

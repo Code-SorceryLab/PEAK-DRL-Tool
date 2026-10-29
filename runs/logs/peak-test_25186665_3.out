@@ -1,0 +1,12 @@
+[2026-10-28 04:09:50] START n=4 host=c629.nibi.sharcnet $PY -m code.neuro.balance --game megaman --persona experienced --levels CutMan-3-Ledges --gens 5 --seeds 1234 --workers $W --out runs/_test/balance --root runs/_test/probes
+balance probe: 1 levels x 1 seeds = 1 jobs, budget 5 gens each, 3 worker(s)  [experienced · p10g5 · runs/_test/probes]
+
+[1/1] CutMan-3-Ledges seed 1234: best gen 5, win rate 0%, best_x 574.6, 0:00:22
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-3-Ledges0/1             never      gen 5.0              0%      Stall (82%)    574.6    82%  +7.1%/g  0:00:22  IMPROVING
+
+saved runs/_test/balance/report_megaman_experienced_p10g5.json  (0:00:25 wall)
+[2026-10-28 04:10:19] END rc=0 $PY -m code.neuro.balance --game megaman --persona experienced --levels CutMan-3-Ledges --gens 5 --seeds 1234 --workers $W --out runs/_test/balance --root runs/_test/probes

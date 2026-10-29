@@ -1,0 +1,14 @@
+[2026-10-29 00:34:54] START n=1032 host=m6.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona collector --level CutMan-8-Boss --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/m-jump_velocity_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona collector --levels CutMan-8-Boss --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/m-jump_velocity_down/probes --out runs/ast/megaman/m-jump_velocity_down --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/ast/megaman/m-jump_velocity_down/probes]
+
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-8-Boss 3/3     gen 44.7±62.1gen 49.0±61.1         9% ±17%      Stall (59%)   1000.0    57%  +2.0%/g  1:12:47  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/m-jump_velocity_down/report_megaman_collector_p30g200_best.json  (0:00:01 wall)
+[2026-10-29 00:35:02] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona collector --level CutMan-8-Boss --workers $W

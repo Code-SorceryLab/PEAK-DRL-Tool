@@ -1,0 +1,12 @@
+[2026-10-28 12:49:46] START n=147 host=c363.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona killer --levels 5 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200 · runs/probes]
+
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+5             1/3          gen 25.0gen 96.3±224.6        13% ±55%      Stall (73%)    659.9    66%  +0.6%/g  0:06:58  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_meatboy_killer_p10g200.json  (0:00:00 wall)
+[2026-10-28 12:49:51] END rc=0 $PY -m code.neuro.balance --game meatboy --persona killer --levels 5 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

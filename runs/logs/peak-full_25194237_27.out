@@ -1,0 +1,15 @@
+[2026-10-28 08:17:14] START n=28 host=c174.nibi.sharcnet $PY -m code.neuro.balance --game mario --persona speedrunner --levels Mario1-2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: mario -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p10g200_best · runs/probes]
+
+[1/3] Mario1-2 seed 31337: best gen 32, win rate 42%, best_x 5480.0, 0:01:57
+[2/3] Mario1-2 seed 1234: best gen 102, win rate 48%, best_x 5481.0, 0:05:45
+[3/3] Mario1-2 seed 2025: best gen 24, win rate 0%, best_x 5481.0, 0:11:38
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-2      2/3    gen 65.0±470.1gen 52.7±106.6        30% ±65%      Stall (53%)   5480.7    48%  +1.9%/g  0:19:20  IMPROVING/FLAT/IMPROVING
+
+saved runs/balance_stage/report_mario_speedrunner_p10g200_best.json  (0:12:07 wall)
+[2026-10-28 08:29:24] END rc=0 $PY -m code.neuro.balance --game mario --persona speedrunner --levels Mario1-2 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

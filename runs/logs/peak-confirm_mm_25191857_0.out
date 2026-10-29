@@ -1,0 +1,66 @@
+[2026-10-28 06:40:34] START n=1 host=c328.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona novice --levels CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss --gens 40 --seeds 1234 2025 31337 --workers $W --axes --confirm
+
+confirm: probing the composite {'pop_size': 30, 'anneal_factor': 0.3, 'elite': 1, 'hidden': 64}
+GA sweep [confirm]: 1 configs x 8 levels x 3 seeds = 24 probes, budget 40 gens each, ~3x one balance sweep, 12 worker(s)  [megaman · novice · rays]
+
+[1/24] p30g40_b8cc78_best · CutMan-3-Ledges seed 31337: best gen 13, win rate 0%, best_x 978.0, 0:09:36
+[2/24] p30g40_b8cc78_best · CutMan-4-Shaft seed 31337: best gen 37, win rate 0%, best_x 266.8, 0:09:36
+[3/24] p30g40_b8cc78_best · CutMan-3-Ledges seed 1234: best gen 27, win rate 0%, best_x 953.6, 0:09:46
+[4/24] p30g40_b8cc78_best · CutMan-4-Shaft seed 2025: best gen 39, win rate 0%, best_x 875.1, 0:10:00
+[5/24] p30g40_b8cc78_best · CutMan-4-Shaft seed 1234: best gen 36, win rate 0%, best_x 834.1, 0:10:09
+[6/24] p30g40_b8cc78_best · CutMan-1-Street seed 1234: best gen 26, win rate 0%, best_x 756.1, 0:10:26
+[7/24] p30g40_b8cc78_best · CutMan-3-Ledges seed 2025: best gen 31, win rate 0%, best_x 721.8, 0:10:40
+[8/24] p30g40_b8cc78_best · CutMan-1-Street seed 2025: best gen 37, win rate 7%, best_x 1000.0, 0:11:23
+[9/24] p30g40_b8cc78_best · CutMan-5-Rooftop seed 31337: best gen 11, win rate 20%, best_x 1000.0, 0:01:54
+[10/24] p30g40_b8cc78_best · CutMan-2-Climb seed 2025: best gen 36, win rate 0%, best_x 837.9, 0:11:49
+[11/24] p30g40_b8cc78_best · CutMan-5-Rooftop seed 2025: best gen 11, win rate 46%, best_x 1000.0, 0:02:13
+[12/24] p30g40_b8cc78_best · CutMan-5-Rooftop seed 1234: best gen 11, win rate 73%, best_x 1000.0, 0:02:35
+[13/24] p30g40_b8cc78_best · CutMan-1-Street seed 31337: best gen 33, win rate 0%, best_x 801.0, 0:12:29
+[14/24] p30g40_b8cc78_best · CutMan-2-Climb seed 31337: best gen 33, win rate 0%, best_x 888.7, 0:12:53
+[15/24] p30g40_b8cc78_best · CutMan-7-Corridor seed 1234: best gen 1, win rate 89%, best_x 1000.0, 0:02:11
+[16/24] p30g40_b8cc78_best · CutMan-7-Corridor seed 2025: best gen 11, win rate 82%, best_x 1000.0, 0:02:12
+[17/24] p30g40_b8cc78_best · CutMan-7-Corridor seed 31337: best gen 1, win rate 80%, best_x 1000.0, 0:02:14
+[18/24] p30g40_b8cc78_best · CutMan-2-Climb seed 1234: best gen 35, win rate 0%, best_x 887.3, 0:14:43
+[19/24] p30g40_b8cc78_best · CutMan-6-Descent seed 31337: best gen 21, win rate 12%, best_x 1000.0, 0:05:55
+[20/24] p30g40_b8cc78_best · CutMan-8-Boss seed 31337: best gen 16, win rate 13%, best_x 1000.0, 0:06:10
+[21/24] p30g40_b8cc78_best · CutMan-6-Descent seed 1234: best gen 36, win rate 0%, best_x 1000.0, 0:08:31
+[22/24] p30g40_b8cc78_best · CutMan-8-Boss seed 2025: best gen 16, win rate 12%, best_x 1000.0, 0:07:05
+[23/24] p30g40_b8cc78_best · CutMan-6-Descent seed 2025: best gen 33, win rate 16%, best_x 1000.0, 0:09:29
+[24/24] p30g40_b8cc78_best · CutMan-8-Boss seed 1234: best gen 15, win rate 0%, best_x 1000.0, 0:13:17
+
+wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+  bomberman  (6 sweep(s))  pop_size 30 · tournament_k 8 · anneal_factor 0.3
+  mario      (6 sweep(s))  anneal_factor 0.3
+  meatboy    (6 sweep(s))  anneal_factor 0.3
+  megaman    (6 sweep(s))  pop_size 30 · elite 1 · mutation_rate 0.5 · anneal_factor 0.3
+
+0:25:43 wall
+
+config                   params   solved  first win  win rate      time
+base                        534    2/8         31.3      21%   1:06:05
+hidden-8                    270    2/8         31.1      21%   0:57:49
+hidden-32                  1062    3/8         30.7      20%   1:01:34
+hidden-64                  2118    3/8         30.8      22%   1:11:15
+pop_size-30                 534    5/8         26.4      22%   3:09:44
+pop_size-100                534    6/8         23.8      17%   9:57:27
+elite-1                     534    4/8         29.6      22%   1:01:03
+elite-6                     534    3/8         31.1      20%   1:06:56
+tournament_k-2              534    3/8         29.8      19%   1:02:24
+tournament_k-8              534    3/8         30.9      20%   1:08:41
+crossover_rate-0.0          534    2/8         31.3      17%   1:07:44
+crossover_rate-0.95         534    3/8         30.2      20%   1:06:01
+mutation_rate-0.005         534    2/8         32.1      18%   1:07:08
+mutation_rate-0.5           534    2/8         30.8      21%   1:04:54
+mutation_sigma-0.02         534    2/8         32.1      18%   1:08:16
+mutation_sigma-0.5          534    3/8         30.3      19%   1:03:18
+anneal_factor-0.3           534    2/8         31.3      22%   1:08:43
+anneal_factor-1.0           534    2/8         31.3      20%   1:09:36
+init_sigma-0.25             534    3/8         30.7      19%   1:04:50
+init_sigma-1.0              534    3/8         29.9      21%   1:00:42
+action_feedback-1           566    2/8         32.4      18%   0:59:39
+memory-2                    600    3/8         30.1      20%   1:03:20
+memory-3                    633    2/8         32.0      18%   1:03:45
+best                       2118    5/8         25.5      19%   3:17:28
+
+recommended config: pop_size=30 anneal_factor=0.3 elite=1 hidden=64
+[2026-10-28 07:06:23] END rc=0 $PY -m code.neuro.gasweep --game megaman --persona novice --levels CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss --gens 40 --seeds 1234 2025 31337 --workers $W --axes --confirm

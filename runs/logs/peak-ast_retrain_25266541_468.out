@@ -1,0 +1,14 @@
+[2026-10-29 00:04:12] START n=469 host=c114.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant add_enemy@1 --persona novice --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/add_enemy@1 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona novice --levels 1 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/add_enemy@1/probes --out runs/ast/bomberman/add_enemy@1 --best --workers 3
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [novice · p30g200_best · runs/ast/bomberman/add_enemy@1/probes]
+
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+1             0/3             nevergen 140.0±34.4          0% ±0%       Bomb (54%)    802.5     7%  +0.1%/g  0:25:17  FLAT/FLAT/IMPROVING
+
+saved runs/ast/bomberman/add_enemy@1/report_bomberman_novice_p30g200_best.json  (0:00:01 wall)
+[2026-10-29 00:04:20] END rc=0 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant add_enemy@1 --persona novice --workers $W

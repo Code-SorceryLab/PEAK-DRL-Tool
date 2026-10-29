@@ -1,0 +1,21 @@
+[2026-10-28 14:55:22] START n=1004 host=c354.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona experienced --level CutMan-4-Shaft --workers $W
+>>> PEAK_MUTANT=runs/megaman/mutants/m-jump_velocity_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona experienced --levels CutMan-4-Shaft --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/m-jump_velocity_down/probes --out runs/ast/megaman/m-jump_velocity_down --best --workers 3
+--best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [experienced · p30g200_best · runs/ast/megaman/m-jump_velocity_down/probes]
+
+[1/3] CutMan-4-Shaft seed 1234: best gen 139, win rate 0%, best_x 584.6, 1:00:53
+[2/3] CutMan-4-Shaft seed 2025: best gen 148, win rate 0%, best_x 584.8, 1:01:13
+[3/3] CutMan-4-Shaft seed 31337: best gen 152, win rate 0%, best_x 509.5, 1:13:52
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-1-Street_31337: unfinished (gen 180 of 200)
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-2-Climb_1234: unfinished (gen 192 of 200)
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-2-Climb_2025: unfinished (gen 151 of 200)
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-2-Climb_31337: unfinished (gen 192 of 200)
+skip runs/ast/megaman/m-jump_velocity_down/probes/megaman/experienced/p30g200_best/CutMan-3-Ledges_1234: unfinished (gen 159 of 200)
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-4-Shaft0/3             nevergen 146.3±16.5          0% ±0%      Stall (79%)    559.6    79%  +0.2%/g  3:15:59  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/m-jump_velocity_down/report_megaman_experienced_p30g200_best.json  (1:15:28 wall)
+[2026-10-28 16:10:55] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant m-jump_velocity_down --persona experienced --level CutMan-4-Shaft --workers $W

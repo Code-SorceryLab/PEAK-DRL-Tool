@@ -1,0 +1,38 @@
+[2026-10-28 10:49:53] START n=356 host=c315.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona collector --levels 7 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/probes]
+
+  note: bomberman level [7] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [7] has no coins — persona [collector] plays for the goal alone here
+  note: bomberman level [7] has no coins — persona [collector] plays for the goal alone here
+[1/3] 7 seed 1234: best gen 117, win rate 0%, best_x 1000.0, 0:11:24
+[2/3] 7 seed 2025: best gen 190, win rate 0%, best_x 1000.0, 0:10:56
+[3/3] 7 seed 31337: best gen 128, win rate 0%, best_x 1000.0, 0:12:51
+skip runs/probes/bomberman/collector/p30g200_best/10_2025: unfinished (gen 102 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/10_31337: unfinished (gen 85 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/11_2025: unfinished (gen 100 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/11_31337: unfinished (gen 168 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/12_2025: unfinished (gen 117 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/12_31337: unfinished (gen 133 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/13_1234: unfinished (gen 154 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/13_2025: unfinished (gen 81 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/13_31337: unfinished (gen 131 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/14_2025: unfinished (gen 116 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/14_31337: unfinished (gen 150 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/15_1234: unfinished (gen 34 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/15_2025: unfinished (gen 27 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/15_31337: unfinished (gen 65 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/5_2025: unfinished (gen 163 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/6_31337: unfinished (gen 171 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/8_1234: unfinished (gen 82 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/8_2025: unfinished (gen 148 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/9_1234: unfinished (gen 187 of 200)
+skip runs/probes/bomberman/collector/p30g200_best/9_31337: unfinished (gen 112 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+7             0/3             nevergen 145.0±97.8          0% ±0%       Bomb (67%)   1000.0     4%  +7.8%/g  0:35:11  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_bomberman_collector_p30g200_best.json  (0:13:48 wall)
+[2026-10-28 11:03:45] END rc=0 $PY -m code.neuro.balance --game bomberman --persona collector --levels 7 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

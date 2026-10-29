@@ -1,0 +1,15 @@
+[2026-10-28 17:42:02] START n=266 host=c46.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant base-reseeded@6 --persona clumsy --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona clumsy --levels 6 --seeds 1111 2222 3333 --gens 200 --root runs/ast/meatboy/base-reseeded@6/probes --out runs/ast/meatboy/base-reseeded@6 --workers 3
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p10g200 · runs/ast/meatboy/base-reseeded@6/probes]
+
+[1/3] 6 seed 1111: best gen 100, win rate 0%, best_x 360.0, 0:03:34
+[2/3] 6 seed 2222: best gen 128, win rate 0%, best_x 260.0, 0:03:36
+[3/3] 6 seed 3333: best gen 182, win rate 0%, best_x 660.0, 0:03:42
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+6             0/3             nevergen 136.7±103.6          0% ±0%      Stall (91%)    426.7    91%  +0.1%/g  0:10:54  IMPROVING/FLAT/IMPROVING
+
+saved runs/ast/meatboy/base-reseeded@6/report_meatboy_clumsy_p10g200.json  (0:04:21 wall)
+[2026-10-28 17:46:26] END rc=0 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant base-reseeded@6 --persona clumsy --workers $W

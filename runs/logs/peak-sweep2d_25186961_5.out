@@ -1,0 +1,541 @@
+[2026-10-28 04:18:05] START n=6 host=c391.nibi.sharcnet GAMES=mario PERSONAS=collector bash run_all.sh sweeps
+[2026-10-28 04:18:05] PHASE 1 full sweep (rays)
+[2026-10-28 04:18:05] START full mario collector
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [collector · p10g40 · runs/probes]
+
+/scratch/alotu/peak/.venv/lib/python3.11/site-packages/pygame/sysfont.py:228: UserWarning: Process running 'fc-list' timed-out! System fonts cannot be loaded on your platform
+  warnings.warn(
+/scratch/alotu/peak/.venv/lib/python3.11/site-packages/pygame/sysfont.py:228: UserWarning: Process running 'fc-list' timed-out! System fonts cannot be loaded on your platform
+  warnings.warn(
+/scratch/alotu/peak/.venv/lib/python3.11/site-packages/pygame/sysfont.py:228: UserWarning: Process running 'fc-list' timed-out! System fonts cannot be loaded on your platform
+  warnings.warn(
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[1/12] Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:44
+[2/12] Mario1-1 seed 2025: best gen 10, win rate 72%, best_x 6316.0, 0:01:02
+[3/12] Mario1-1 seed 31337: best gen 12, win rate 79%, best_x 6315.9, 0:01:07
+[4/12] Mario1-4 seed 31337: best gen 27, win rate 37%, best_x 4522.3, 0:00:59
+[5/12] Mario1-1 seed 1234: best gen 2, win rate 92%, best_x 6313.9, 0:01:12
+[6/12] Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:10
+[7/12] Mario1-2 seed 2025: best gen 16, win rate 42%, best_x 5355.9, 0:01:31
+[8/12] Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:26
+[9/12] Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:33
+[10/12] Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:30
+[11/12] Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:01:59
+[12/12] Mario1-2 seed 31337: best gen 39, win rate 35%, best_x 5481.0, 0:02:21
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      0/3             nevergen 22.7±28.8          0% ±0%        Pit (70%)   3023.4     5%  +1.6%/g  0:04:14  IMPROVING/IMPROVING/IMPROVING
+Mario1-4      1/3          gen 20.0gen 24.7±21.7        12% ±53%       Fire (69%)   3181.6    11%  +2.1%/g  0:03:10  IMPROVING/IMPROVING/IMPROVING
+Mario1-2      2/3    gen 24.5±146.1gen 19.3±45.3        26% ±56%        Pit (59%)   4475.5     8%  +3.6%/g  0:05:52  IMPROVING/IMPROVING/IMPROVING
+Mario1-1      3/3       gen 1.7±1.4 gen 8.0±13.1        81% ±25%      Enemy (39%)   6315.3    11% +10.8%/g  0:03:21  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/report_mario_collector_p10g40.json  (0:02:53 wall)
+[2026-10-28 04:21:02] END full mario collector rc=0
+[2026-10-28 04:21:02] PHASE 2 sensor ablation
+[2026-10-28 04:21:02] START ablation mario collector rays
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [collector · p10g40 · runs/ablation]
+
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[1/12] Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:39
+[2/12] Mario1-1 seed 2025: best gen 10, win rate 72%, best_x 6316.0, 0:01:05
+[3/12] Mario1-4 seed 31337: best gen 27, win rate 37%, best_x 4522.3, 0:00:57
+[4/12] Mario1-1 seed 31337: best gen 12, win rate 79%, best_x 6315.9, 0:01:10
+[5/12] Mario1-1 seed 1234: best gen 2, win rate 92%, best_x 6313.9, 0:01:12
+[6/12] Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:10
+[7/12] Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:20
+[8/12] Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:16
+[9/12] Mario1-2 seed 2025: best gen 16, win rate 42%, best_x 5355.9, 0:01:28
+[10/12] Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:35
+[11/12] Mario1-2 seed 31337: best gen 39, win rate 35%, best_x 5481.0, 0:02:12
+[12/12] Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:19
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-3      0/3             nevergen 22.7±28.8          0% ±0%        Pit (70%)   3023.4     5%  +1.6%/g  0:04:06  IMPROVING/IMPROVING/IMPROVING
+Mario1-4      1/3          gen 20.0gen 24.7±21.7        12% ±53%       Fire (69%)   3181.6    11%  +2.1%/g  0:02:53  IMPROVING/IMPROVING/IMPROVING
+Mario1-2      2/3    gen 24.5±146.1gen 19.3±45.3        26% ±56%        Pit (59%)   4475.5     8%  +3.6%/g  0:06:00  IMPROVING/IMPROVING/IMPROVING
+Mario1-1      3/3       gen 1.7±1.4 gen 8.0±13.1        81% ±25%      Enemy (39%)   6315.3    11% +10.8%/g  0:03:28  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/ablation_mario_collector_p10g40.json  (0:02:30 wall)
+[2026-10-28 04:23:34] END ablation mario collector rays rc=0
+[2026-10-28 04:23:35] START ablation mario collector grid
+balance probe: 4 levels x 3 seeds = 12 jobs, budget 40 gens each, 16 worker(s)  [collector · p10g40_grid · runs/ablation]
+
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[1/12] Mario1-3 seed 31337: best gen 34, win rate 0%, best_x 771.9, 0:01:17
+[2/12] Mario1-3 seed 2025: best gen 5, win rate 0%, best_x 726.8, 0:01:31
+[3/12] Mario1-4 seed 31337: best gen 35, win rate 0%, best_x 2693.6, 0:01:56
+[4/12] Mario1-3 seed 1234: best gen 12, win rate 0%, best_x 2470.7, 0:02:02
+[5/12] Mario1-4 seed 1234: best gen 33, win rate 0%, best_x 1161.3, 0:02:07
+[6/12] Mario1-1 seed 2025: best gen 39, win rate 0%, best_x 913.9, 0:02:09
+[7/12] Mario1-4 seed 2025: best gen 25, win rate 0%, best_x 2879.3, 0:02:07
+[8/12] Mario1-1 seed 31337: best gen 20, win rate 0%, best_x 1192.8, 0:02:28
+[9/12] Mario1-2 seed 2025: best gen 39, win rate 0%, best_x 1705.0, 0:02:32
+[10/12] Mario1-2 seed 31337: best gen 38, win rate 0%, best_x 3262.6, 0:02:41
+[11/12] Mario1-2 seed 1234: best gen 16, win rate 0%, best_x 3272.8, 0:02:50
+[12/12] Mario1-1 seed 1234: best gen 21, win rate 47%, best_x 6315.4, 0:03:23
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-2      0/3             nevergen 31.0±32.3          0% ±0%      Stall (79%)   2746.8    79%  +1.0%/g  0:08:05  IMPROVING/IMPROVING/IMPROVING
+Mario1-3      0/3             nevergen 17.0±37.6          0% ±0%        Pit (58%)   1323.1    31%  +2.1%/g  0:04:50  IMPROVING/FLAT/IMPROVING
+Mario1-4      0/3             nevergen 31.0±13.1          0% ±0%      Spike (48%)   2244.7    12%  +0.9%/g  0:06:11  FLAT/IMPROVING/IMPROVING
+Mario1-1      1/3          gen 13.0gen 26.7±26.6        16% ±67%      Stall (66%)   2807.4    59%  +0.6%/g  0:08:00  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance/ablation_mario_collector_p10g40_grid.json  (0:03:30 wall)
+[2026-10-28 04:27:06] END ablation mario collector grid rc=0
+SENSOR ABLATION - mario  (first win = generations to first win ± 95% CI; win rate over the 10 gens after it)
+LEVEL               RAYS FIRST WIN     RAYS WIN RATE      GRID FIRST WIN     GRID WIN RATE
+------------------------------------------------------------------------------------------
+Mario1-1               gen 1.7±1.4       81% ±25%               gen 13.0       16% ±67%   
+Mario1-2            gen 24.5±146.1       26% ±56%                  never        0% ±0%    
+Mario1-3                     never        0% ±0%                   never        0% ±0%    
+Mario1-4                  gen 20.0       12% ±53%                  never        0% ±0%    
+[2026-10-28 04:27:07] PHASE 3 GA sweep
+[2026-10-28 04:27:07] START gasweep mario collector
+GA sweep [ablation]: 23 configs x 4 levels x 3 seeds = 276 probes, budget 40 gens each, ~34x one balance sweep, 16 worker(s)  [mario · collector · rays]
+
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[1/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 2025: best gen 9, win rate 34%, best_x 6315.9, 0:02:32
+[2/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 1234: best gen 3, win rate 43%, best_x 6315.9, 0:02:56
+[3/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 1234: best gen 18, win rate 9%, best_x 5481.0, 0:03:00
+[4/276] p30g40_b8cc78_pop_size-30 · Mario1-1 seed 31337: best gen 11, win rate 36%, best_x 6316.0, 0:03:10
+[5/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 31337: best gen 10, win rate 6%, best_x 4528.9, 0:03:11
+[6/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 2025: best gen 17, win rate 9%, best_x 4527.3, 0:05:05
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[7/276] p100g40_b8cc78_pop_size-100 · Mario1-4 seed 1234: best gen 12, win rate 10%, best_x 4522.3, 0:05:34
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[8/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 31337: best gen 4, win rate 17%, best_x 5354.9, 0:02:43
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[9/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 2025: best gen 13, win rate 20%, best_x 4520.8, 0:01:16
+[10/276] p30g40_b8cc78_pop_size-30 · Mario1-2 seed 2025: best gen 21, win rate 16%, best_x 5481.0, 0:04:28
+[11/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 1234: best gen 14, win rate 0%, best_x 3039.9, 0:03:54
+[12/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 1234: best gen 9, win rate 34%, best_x 4522.3, 0:02:06
+[13/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 31337: best gen 8, win rate 7%, best_x 5480.8, 0:07:40
+[14/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 1234: best gen 13, win rate 8%, best_x 5481.0, 0:07:48
+[15/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 31337: best gen 23, win rate 0%, best_x 3029.2, 0:04:28
+[16/276] p10g40_b8cc78_base · Mario1-1 seed 2025: best gen 10, win rate 72%, best_x 6316.0, 0:01:13
+[17/276] p10g40_b8cc78_base · Mario1-1 seed 1234: best gen 2, win rate 92%, best_x 6313.9, 0:01:27
+[18/276] p10g40_b8cc78_base · Mario1-1 seed 31337: best gen 12, win rate 79%, best_x 6315.9, 0:01:17
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[19/276] p30g40_b8cc78_pop_size-30 · Mario1-3 seed 2025: best gen 27, win rate 0%, best_x 4393.0, 0:05:27
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[20/276] p100g40_b8cc78_pop_size-100 · Mario1-2 seed 2025: best gen 12, win rate 12%, best_x 5481.0, 0:09:20
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[21/276] p30g40_b8cc78_pop_size-30 · Mario1-4 seed 31337: best gen 21, win rate 34%, best_x 4529.7, 0:03:30
+[22/276] p10g40_b8cc78_base · Mario1-2 seed 2025: best gen 16, win rate 42%, best_x 5355.9, 0:01:41
+[23/276] p10g40_b8cc78_base · Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:44
+[24/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 2025: best gen 10, win rate 29%, best_x 6315.9, 0:09:38
+[25/276] p10g40_b8cc78_base · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:27
+[26/276] p10g40_b8cc78_base · Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:13
+[27/276] p10g40_b8cc78_base · Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:18
+[28/276] p10g40_b8cc78_base · Mario1-2 seed 31337: best gen 39, win rate 35%, best_x 5481.0, 0:02:18
+[29/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 1234: best gen 10, win rate 42%, best_x 6316.0, 0:10:21
+[30/276] p10g40_b8cc78_base · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:35
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[31/276] p10g40_b8cc78_base · Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:37
+[32/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 1234: best gen 36, win rate 0%, best_x 556.8, 0:00:37
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[33/276] p10g40_b8cc78_base · Mario1-4 seed 31337: best gen 27, win rate 37%, best_x 4522.3, 0:01:14
+[34/276] p100g40_b8cc78_pop_size-100 · Mario1-1 seed 31337: best gen 10, win rate 33%, best_x 6315.9, 0:10:43
+[35/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 1234: best gen 7, win rate 55%, best_x 6315.8, 0:01:15
+[36/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 2025: best gen 11, win rate 76%, best_x 6315.9, 0:01:17
+[37/276] p10g40_b8cc78_hidden-8 · Mario1-1 seed 31337: best gen 5, win rate 75%, best_x 6315.9, 0:01:14
+[38/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 31337: best gen 14, win rate 55%, best_x 5355.8, 0:01:26
+[39/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 31337: best gen 36, win rate 0%, best_x 2279.6, 0:00:59
+[40/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 1234: best gen 31, win rate 20%, best_x 4522.3, 0:01:04
+[41/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 31337: best gen 17, win rate 19%, best_x 4522.3, 0:00:51
+[42/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 1234: best gen 26, win rate 0%, best_x 2595.7, 0:01:55
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[43/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 31337: best gen 7, win rate 62%, best_x 6315.9, 0:01:10
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[44/276] p10g40_b8cc78_hidden-8 · Mario1-3 seed 2025: best gen 24, win rate 0%, best_x 3036.7, 0:01:38
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[45/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 1234: best gen 1, win rate 87%, best_x 6315.9, 0:01:23
+[46/276] p10g40_b8cc78_hidden-8 · Mario1-2 seed 2025: best gen 25, win rate 0%, best_x 4918.8, 0:02:24
+[47/276] p10g40_b8cc78_hidden-8 · Mario1-4 seed 2025: best gen 27, win rate 0%, best_x 3913.0, 0:01:40
+[48/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 1234: best gen 18, win rate 10%, best_x 4510.8, 0:00:53
+[49/276] p10g40_b8cc78_hidden-32 · Mario1-1 seed 2025: best gen 10, win rate 63%, best_x 6315.9, 0:01:54
+[50/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 31337: best gen 29, win rate 0%, best_x 976.8, 0:00:34
+[51/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 2025: best gen 40, win rate 0%, best_x 3057.7, 0:12:53
+[52/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 31337: best gen 23, win rate 0%, best_x 2428.1, 0:01:26
+[53/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 1234: best gen 16, win rate 0%, best_x 2598.6, 0:02:04
+[54/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 1234: best gen 29, win rate 0%, best_x 3004.9, 0:01:35
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[55/276] p10g40_b8cc78_hidden-32 · Mario1-3 seed 2025: best gen 18, win rate 0%, best_x 1595.7, 0:01:31
+[56/276] p10g40_b8cc78_hidden-32 · Mario1-4 seed 2025: best gen 8, win rate 0%, best_x 2547.4, 0:01:04
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[57/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 2025: best gen 5, win rate 82%, best_x 6315.9, 0:01:13
+[58/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 2025: best gen 37, win rate 10%, best_x 5354.9, 0:02:36
+[59/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 1234: best gen 1, win rate 90%, best_x 6313.9, 0:01:27
+[60/276] p10g40_b8cc78_hidden-32 · Mario1-2 seed 31337: best gen 37, win rate 10%, best_x 5481.0, 0:02:17
+[61/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 1234: best gen 11, win rate 10%, best_x 4520.8, 0:00:35
+[62/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 2025: best gen 8, win rate 33%, best_x 4521.0, 0:00:43
+[63/276] p10g40_b8cc78_hidden-64 · Mario1-1 seed 31337: best gen 14, win rate 59%, best_x 6316.0, 0:01:35
+[64/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 31337: best gen 13, win rate 16%, best_x 5354.0, 0:01:12
+[65/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 31337: best gen 37, win rate 0%, best_x 3352.3, 0:14:01
+[66/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 1234: best gen 31, win rate 0%, best_x 2988.1, 0:01:16
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[67/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 31337: best gen 30, win rate 0%, best_x 2453.0, 0:01:18
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[68/276] p10g40_b8cc78_hidden-64 · Mario1-4 seed 31337: best gen 15, win rate 0%, best_x 3912.9, 0:01:18
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[69/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 2025: best gen 10, win rate 61%, best_x 6315.9, 0:01:11
+[70/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 1234: best gen 11, win rate 76%, best_x 6316.0, 0:01:20
+[71/276] p10g40_b8cc78_hidden-64 · Mario1-3 seed 2025: best gen 34, win rate 0%, best_x 3024.2, 0:01:42
+[72/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 2025: best gen 10, win rate 0%, best_x 2595.5, 0:02:11
+[73/276] p10g40_b8cc78_elite-1 · Mario1-1 seed 31337: best gen 2, win rate 68%, best_x 6315.6, 0:01:24
+[74/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 1234: best gen 27, win rate 0%, best_x 1962.2, 0:00:39
+[75/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 2025: best gen 14, win rate 12%, best_x 5481.0, 0:01:24
+[76/276] p10g40_b8cc78_hidden-64 · Mario1-2 seed 1234: best gen 22, win rate 0%, best_x 5128.5, 0:02:39
+[77/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 31337: best gen 15, win rate 19%, best_x 4527.5, 0:00:47
+[78/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 31337: best gen 36, win rate 0%, best_x 3018.8, 0:01:13
+[79/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 1234: best gen 30, win rate 0%, best_x 3042.9, 0:01:26
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[80/276] p10g40_b8cc78_elite-1 · Mario1-3 seed 2025: best gen 38, win rate 0%, best_x 2807.3, 0:01:19
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[81/276] p10g40_b8cc78_elite-1 · Mario1-4 seed 2025: best gen 17, win rate 0%, best_x 2665.0, 0:01:05
+[82/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 31337: best gen 36, win rate 12%, best_x 5359.7, 0:01:45
+[83/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 2025: best gen 1, win rate 86%, best_x 6313.9, 0:01:15
+[84/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 1234: best gen 9, win rate 78%, best_x 6315.9, 0:01:18
+[85/276] p10g40_b8cc78_elite-1 · Mario1-2 seed 1234: best gen 23, win rate 17%, best_x 5354.9, 0:02:24
+[86/276] p10g40_b8cc78_elite-6 · Mario1-1 seed 31337: best gen 2, win rate 71%, best_x 6314.9, 0:01:13
+[87/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 1234: best gen 32, win rate 0%, best_x 2297.4, 0:01:05
+[88/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 2025: best gen 34, win rate 0%, best_x 2481.5, 0:00:55
+[89/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 2025: best gen 11, win rate 59%, best_x 6315.7, 0:01:04
+[90/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 1234: best gen 7, win rate 0%, best_x 2794.3, 0:01:18
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[91/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 1234: best gen 10, win rate 63%, best_x 6315.9, 0:01:21
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[92/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 31337: best gen 4, win rate 0%, best_x 2944.6, 0:01:36
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[93/276] p10g40_b8cc78_elite-6 · Mario1-4 seed 31337: best gen 33, win rate 36%, best_x 4521.2, 0:01:33
+[94/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 786.6, 0:00:44
+[95/276] p10g40_b8cc78_elite-6 · Mario1-3 seed 2025: best gen 27, win rate 0%, best_x 2826.1, 0:01:47
+[96/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 2025: best gen 23, win rate 58%, best_x 5355.9, 0:02:20
+[97/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 1234: best gen 16, win rate 0%, best_x 2608.8, 0:02:22
+[98/276] p10g40_b8cc78_tournament_k-2 · Mario1-1 seed 31337: best gen 15, win rate 84%, best_x 6315.9, 0:01:27
+[99/276] p10g40_b8cc78_elite-6 · Mario1-2 seed 31337: best gen 39, win rate 16%, best_x 5355.7, 0:02:34
+[100/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 31337: best gen 14, win rate 10%, best_x 5364.9, 0:01:31
+[101/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 1234: best gen 17, win rate 15%, best_x 4522.3, 0:00:45
+[102/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 1234: best gen 11, win rate 81%, best_x 6314.9, 0:01:20
+[103/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 2025: best gen 1, win rate 96%, best_x 6313.9, 0:01:17
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[104/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 2025: best gen 33, win rate 0%, best_x 5128.8, 0:02:17
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[105/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 31337: best gen 16, win rate 0%, best_x 2795.8, 0:01:26
+[106/276] p10g40_b8cc78_tournament_k-2 · Mario1-2 seed 1234: best gen 33, win rate 10%, best_x 5354.0, 0:02:19
+[107/276] p10g40_b8cc78_tournament_k-2 · Mario1-3 seed 2025: best gen 35, win rate 0%, best_x 3033.9, 0:01:54
+[108/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 1234: best gen 1, win rate 0%, best_x 558.7, 0:00:36
+[109/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 2025: best gen 7, win rate 22%, best_x 5481.0, 0:01:12
+[110/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 2025: best gen 32, win rate 0%, best_x 3688.8, 0:01:16
+[111/276] p10g40_b8cc78_tournament_k-8 · Mario1-1 seed 31337: best gen 9, win rate 79%, best_x 6315.9, 0:01:30
+[112/276] p10g40_b8cc78_tournament_k-2 · Mario1-4 seed 31337: best gen 35, win rate 10%, best_x 4520.8, 0:01:24
+[113/276] p100g40_b8cc78_pop_size-100 · Mario1-3 seed 1234: best gen 39, win rate 4%, best_x 4841.9, 0:19:10
+[114/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 1234: best gen 18, win rate 0%, best_x 456.9, 0:00:34
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[115/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 31337: best gen 17, win rate 0%, best_x 409.9, 0:00:26
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[116/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 2583.7, 0:01:28
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[117/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 31337: best gen 34, win rate 0%, best_x 3272.0, 0:01:57
+[118/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 2025: best gen 1, win rate 93%, best_x 6313.9, 0:01:13
+[119/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 1234: best gen 32, win rate 0%, best_x 1374.2, 0:00:45
+[120/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 1234: best gen 2, win rate 90%, best_x 6313.9, 0:01:22
+[121/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 1234: best gen 34, win rate 0%, best_x 988.5, 0:00:30
+[122/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 31337: best gen 22, win rate 0%, best_x 3689.0, 0:01:19
+[123/276] p10g40_b8cc78_tournament_k-8 · Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:34
+[124/276] p10g40_b8cc78_tournament_k-8 · Mario1-3 seed 2025: best gen 33, win rate 0%, best_x 4392.8, 0:02:16
+[125/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-1 seed 31337: best gen 8, win rate 69%, best_x 6315.4, 0:01:38
+[126/276] p10g40_b8cc78_tournament_k-8 · Mario1-4 seed 2025: best gen 13, win rate 0%, best_x 2665.0, 0:01:32
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[127/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 2025: best gen 35, win rate 0%, best_x 2465.8, 0:01:30
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[128/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 2025: best gen 18, win rate 0%, best_x 2664.9, 0:01:07
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[129/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 2025: best gen 12, win rate 37%, best_x 5354.8, 0:02:02
+[130/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-3 seed 31337: best gen 12, win rate 0%, best_x 2473.3, 0:01:42
+[131/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 2025: best gen 2, win rate 53%, best_x 6315.9, 0:01:02
+[132/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-2 seed 1234: best gen 35, win rate 0%, best_x 2595.5, 0:02:05
+[133/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 1234: best gen 2, win rate 91%, best_x 6313.9, 0:01:21
+[134/276] p10g40_b8cc78_crossover_rate-0.0 · Mario1-4 seed 31337: best gen 27, win rate 58%, best_x 4522.3, 0:01:21
+[135/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-1 seed 31337: best gen 2, win rate 75%, best_x 6314.9, 0:01:17
+[136/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 2025: best gen 11, win rate 38%, best_x 5356.8, 0:01:15
+[137/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 1234: best gen 38, win rate 0%, best_x 2761.8, 0:00:54
+[138/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 31337: best gen 8, win rate 10%, best_x 4521.7, 0:00:40
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[139/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-4 seed 2025: best gen 15, win rate 44%, best_x 4522.3, 0:00:56
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[140/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 1234: best gen 29, win rate 0%, best_x 2313.8, 0:01:18
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[141/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 2025: best gen 31, win rate 0%, best_x 3021.6, 0:01:28
+[142/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 31337: best gen 29, win rate 0%, best_x 3848.1, 0:01:47
+[143/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 2721.8, 0:01:47
+[144/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 31337: best gen 7, win rate 88%, best_x 6314.9, 0:01:15
+[145/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 1234: best gen 3, win rate 0%, best_x 982.5, 0:00:38
+[146/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 1234: best gen 2, win rate 94%, best_x 6313.9, 0:01:26
+[147/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-1 seed 2025: best gen 10, win rate 83%, best_x 6315.9, 0:01:21
+[148/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 2025: best gen 10, win rate 0%, best_x 1097.0, 0:00:46
+[149/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 1234: best gen 15, win rate 0%, best_x 2742.7, 0:01:43
+[150/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 1234: best gen 9, win rate 64%, best_x 6315.9, 0:01:14
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[151/276] p10g40_b8cc78_crossover_rate-0.95 · Mario1-2 seed 1234: best gen 37, win rate 0%, best_x 5480.8, 0:02:53
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[152/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 2025: best gen 7, win rate 59%, best_x 6315.7, 0:01:05
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[153/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 2025: best gen 34, win rate 0%, best_x 2437.9, 0:01:45
+[154/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-4 seed 31337: best gen 37, win rate 0%, best_x 3688.0, 0:01:34
+[155/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-3 seed 31337: best gen 29, win rate 0%, best_x 2434.8, 0:01:48
+[156/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-1 seed 31337: best gen 5, win rate 24%, best_x 6315.1, 0:01:16
+[157/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 1234: best gen 31, win rate 0%, best_x 2276.8, 0:01:17
+[158/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 2025: best gen 13, win rate 32%, best_x 5354.6, 0:01:27
+[159/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 31337: best gen 14, win rate 14%, best_x 5355.8, 0:01:27
+[160/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 1234: best gen 7, win rate 0%, best_x 1530.4, 0:00:40
+[161/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 2025: best gen 35, win rate 0%, best_x 5128.7, 0:02:50
+[162/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 1234: best gen 24, win rate 0%, best_x 5128.5, 0:03:08
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[163/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 2025: best gen 31, win rate 0%, best_x 4307.2, 0:01:45
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[164/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 31337: best gen 5, win rate 0%, best_x 2869.4, 0:01:12
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[165/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 31337: best gen 2, win rate 91%, best_x 6314.9, 0:01:19
+[166/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 1234: best gen 2, win rate 94%, best_x 6313.9, 0:01:23
+[167/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-1 seed 2025: best gen 6, win rate 83%, best_x 6315.9, 0:01:21
+[168/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-3 seed 31337: best gen 22, win rate 0%, best_x 2447.8, 0:01:35
+[169/276] p10g40_b8cc78_mutation_rate-0.005 · Mario1-2 seed 31337: best gen 29, win rate 76%, best_x 5354.6, 0:03:34
+[170/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-2 seed 1234: best gen 15, win rate 0%, best_x 5128.0, 0:02:23
+[171/276] p10g40_b8cc78_mutation_rate-0.5 · Mario1-4 seed 2025: best gen 8, win rate 0%, best_x 3604.1, 0:01:34
+[172/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 2025: best gen 13, win rate 0%, best_x 937.0, 0:00:39
+[173/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 1234: best gen 39, win rate 0%, best_x 1515.5, 0:00:44
+[174/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 31337: best gen 29, win rate 0%, best_x 745.0, 0:01:33
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[175/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 1234: best gen 19, win rate 0%, best_x 2300.6, 0:01:35
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[176/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 2025: best gen 33, win rate 0%, best_x 2437.9, 0:01:42
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[177/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-3 seed 31337: best gen 34, win rate 0%, best_x 2434.8, 0:01:42
+[178/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 2025: best gen 7, win rate 67%, best_x 6315.9, 0:01:10
+[179/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 1234: best gen 12, win rate 77%, best_x 6315.9, 0:01:16
+[180/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-1 seed 31337: best gen 8, win rate 76%, best_x 6315.9, 0:01:22
+[181/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-4 seed 31337: best gen 40, win rate 0%, best_x 2871.9, 0:01:28
+[182/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 1234: best gen 11, win rate 0%, best_x 3048.9, 0:01:12
+[183/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 31337: best gen 6, win rate 10%, best_x 4522.3, 0:00:29
+[184/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 2025: best gen 5, win rate 0%, best_x 2327.5, 0:01:12
+[185/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-3 seed 31337: best gen 23, win rate 0%, best_x 2292.2, 0:01:12
+[186/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 2025: best gen 19, win rate 10%, best_x 5353.8, 0:01:41
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[187/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 1234: best gen 29, win rate 0%, best_x 2660.2, 0:01:01
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[188/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 1234: best gen 31, win rate 0%, best_x 5060.9, 0:01:53
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[189/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 31337: best gen 6, win rate 50%, best_x 6315.9, 0:00:56
+[190/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-4 seed 2025: best gen 39, win rate 0%, best_x 2879.0, 0:01:20
+[191/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 2025: best gen 10, win rate 77%, best_x 6315.9, 0:01:04
+[192/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-1 seed 1234: best gen 2, win rate 93%, best_x 6313.9, 0:01:13
+[193/276] p10g40_b8cc78_mutation_sigma-0.5 · Mario1-2 seed 31337: best gen 40, win rate 10%, best_x 5354.0, 0:02:16
+[194/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 2025: best gen 35, win rate 69%, best_x 5359.8, 0:03:25
+[195/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:42
+[196/276] p10g40_b8cc78_mutation_sigma-0.02 · Mario1-2 seed 1234: best gen 18, win rate 0%, best_x 5128.5, 0:03:39
+[197/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:04
+[198/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:21
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[199/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 2025: best gen 16, win rate 47%, best_x 5355.9, 0:01:30
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[200/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 31337: best gen 22, win rate 53%, best_x 4522.3, 0:01:02
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[201/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:28
+[202/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 31337: best gen 6, win rate 67%, best_x 6315.9, 0:01:03
+[203/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:19
+[204/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 1234: best gen 12, win rate 90%, best_x 6315.9, 0:01:11
+[205/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-1 seed 2025: best gen 7, win rate 58%, best_x 6315.9, 0:01:15
+[206/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 31337: best gen 39, win rate 62%, best_x 5355.7, 0:02:03
+[207/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:40
+[208/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 2025: best gen 16, win rate 28%, best_x 5355.9, 0:01:22
+[209/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:19
+[210/276] p10g40_b8cc78_anneal_factor-0.3 · Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:28
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[211/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 31337: best gen 22, win rate 29%, best_x 4522.3, 0:00:55
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[212/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:26
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[213/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 1234: best gen 11, win rate 72%, best_x 6314.9, 0:01:00
+[214/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 2025: best gen 1, win rate 58%, best_x 6315.9, 0:00:57
+[215/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:17
+[216/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:01
+[217/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:30
+[218/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-1 seed 31337: best gen 9, win rate 59%, best_x 6315.9, 0:01:13
+[219/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 1234: best gen 18, win rate 0%, best_x 1376.6, 0:00:59
+[220/276] p10g40_b8cc78_anneal_factor-1.0 · Mario1-2 seed 31337: best gen 36, win rate 25%, best_x 5355.1, 0:02:31
+[221/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 1234: best gen 26, win rate 0%, best_x 2595.5, 0:01:42
+[222/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 2025: best gen 3, win rate 0%, best_x 982.7, 0:00:46
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[223/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 2025: best gen 9, win rate 75%, best_x 6315.9, 0:01:03
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[224/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 1234: best gen 11, win rate 77%, best_x 6313.9, 0:01:10
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[225/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 31337: best gen 9, win rate 0%, best_x 2645.4, 0:01:25
+[226/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 31337: best gen 29, win rate 0%, best_x 4902.9, 0:01:51
+[227/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-3 seed 2025: best gen 18, win rate 0%, best_x 2426.6, 0:01:34
+[228/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 1234: best gen 6, win rate 0%, best_x 2657.9, 0:01:25
+[229/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-4 seed 31337: best gen 16, win rate 0%, best_x 3912.8, 0:01:12
+[230/276] p10g40_b8cc78_init_sigma-0.25 · Mario1-2 seed 2025: best gen 20, win rate 10%, best_x 5353.1, 0:02:17
+[231/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-1 seed 31337: best gen 12, win rate 85%, best_x 6315.9, 0:01:35
+[232/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 1234: best gen 33, win rate 0%, best_x 2339.2, 0:00:48
+[233/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 2025: best gen 27, win rate 0%, best_x 2768.0, 0:01:04
+[234/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 2025: best gen 25, win rate 0%, best_x 2595.5, 0:01:51
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[235/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 31337: best gen 36, win rate 0%, best_x 2288.2, 0:01:12
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[236/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 2025: best gen 9, win rate 52%, best_x 6315.9, 0:01:08
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[237/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 1234: best gen 35, win rate 0%, best_x 2435.5, 0:01:33
+[238/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 31337: best gen 3, win rate 89%, best_x 6313.9, 0:01:17
+[239/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 1234: best gen 33, win rate 63%, best_x 5354.0, 0:02:24
+[240/276] p10g40_b8cc78_action_feedback-1 · Mario1-1 seed 1234: best gen 18, win rate 43%, best_x 6314.0, 0:01:26
+[241/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-3 seed 2025: best gen 39, win rate 0%, best_x 3042.3, 0:01:54
+[242/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-4 seed 31337: best gen 19, win rate 0%, best_x 3912.8, 0:01:33
+[243/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 1234: best gen 32, win rate 0%, best_x 1753.2, 0:01:00
+[244/276] p10g40_b8cc78_init_sigma-1.0 · Mario1-2 seed 31337: best gen 24, win rate 57%, best_x 5353.4, 0:02:31
+[245/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 1234: best gen 34, win rate 0%, best_x 1097.0, 0:00:41
+[246/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 2025: best gen 8, win rate 0%, best_x 2460.6, 0:01:08
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[247/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 31337: best gen 39, win rate 0%, best_x 3272.8, 0:01:55
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[248/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 1234: best gen 7, win rate 54%, best_x 6315.9, 0:01:05
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[249/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 2025: best gen 31, win rate 0%, best_x 2752.8, 0:01:03
+[250/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 2025: best gen 7, win rate 68%, best_x 6314.9, 0:01:08
+[251/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 1234: best gen 11, win rate 0%, best_x 3464.9, 0:02:17
+[252/276] p10g40_b8cc78_action_feedback-1 · Mario1-4 seed 31337: best gen 34, win rate 0%, best_x 2921.0, 0:01:28
+[253/276] p10g40_b8cc78_action_feedback-1 · Mario1-3 seed 31337: best gen 37, win rate 0%, best_x 2306.3, 0:01:43
+[254/276] p10g40_b8cc78_action_feedback-1 · Mario1-2 seed 2025: best gen 40, win rate 0%, best_x 4933.9, 0:02:38
+[255/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 1234: best gen 29, win rate 0%, best_x 3030.4, 0:01:14
+[256/276] p10g40_b8cc78_memory-2 · Mario1-1 seed 31337: best gen 8, win rate 58%, best_x 6315.9, 0:01:32
+[257/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 2025: best gen 18, win rate 0%, best_x 1006.6, 0:00:42
+[258/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 31337: best gen 40, win rate 0%, best_x 3688.9, 0:00:59
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[259/276] p10g40_b8cc78_memory-2 · Mario1-4 seed 1234: best gen 17, win rate 0%, best_x 2890.4, 0:01:19
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[260/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 1234: best gen 8, win rate 48%, best_x 6315.9, 0:01:14
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[261/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 31337: best gen 31, win rate 0%, best_x 2597.3, 0:02:02
+[262/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 2025: best gen 9, win rate 0%, best_x 3060.0, 0:01:59
+[263/276] p10g40_b8cc78_memory-2 · Mario1-3 seed 31337: best gen 16, win rate 0%, best_x 3040.4, 0:01:45
+[264/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 2025: best gen 12, win rate 0%, best_x 2598.6, 0:02:19
+[265/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 31337: best gen 8, win rate 67%, best_x 6315.9, 0:01:24
+[266/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 1234: best gen 4, win rate 0%, best_x 904.6, 0:00:31
+[267/276] p10g40_b8cc78_memory-3 · Mario1-1 seed 2025: best gen 36, win rate 0%, best_x 2767.2, 0:01:29
+[268/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 2025: best gen 14, win rate 0%, best_x 1001.0, 0:01:06
+[269/276] p10g40_b8cc78_memory-2 · Mario1-2 seed 1234: best gen 40, win rate 0%, best_x 5128.8, 0:02:41
+[270/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 2025: best gen 39, win rate 0%, best_x 2331.1, 0:01:27
+[271/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 2025: best gen 34, win rate 19%, best_x 4521.2, 0:01:00
+[272/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 1234: best gen 10, win rate 0%, best_x 2790.3, 0:01:37
+[273/276] p10g40_b8cc78_memory-3 · Mario1-3 seed 31337: best gen 23, win rate 0%, best_x 3363.3, 0:01:39
+[274/276] p10g40_b8cc78_memory-3 · Mario1-4 seed 31337: best gen 28, win rate 0%, best_x 2865.2, 0:01:12
+[275/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 31337: best gen 40, win rate 0%, best_x 5480.8, 0:02:50
+[276/276] p10g40_b8cc78_memory-3 · Mario1-2 seed 1234: best gen 9, win rate 0%, best_x 5480.8, 0:03:01
+
+wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+  mario      (5 sweep(s))  anneal_factor 0.3
+  megaman    (6 sweep(s))  pop_size 100 · tournament_k 8 · crossover_rate 0.95 · mutation_rate 0.5 · mutation_sigma 0.5 · anneal_factor 0.3 · init_sigma 0.25 · action_feedback True
+
+0:37:24 wall
+
+config                   params   solved  first win  win rate      time
+base                        291    3/4         26.2      30%   0:18:10
+hidden-8                    147    3/4         24.8      25%   0:16:25
+hidden-32                   579    3/4         28.7      20%   0:18:31
+hidden-64                  1155    3/4         22.8      24%   0:17:15
+pop_size-30                 291    3/4         15.8      20%   0:39:36
+pop_size-100                291    4/4         12.6      13%   1:55:29
+elite-1                     291    3/4         24.2      22%   0:16:01
+elite-6                     291    3/4         27.3      29%   0:19:20
+tournament_k-2              291    3/4         25.9      21%   0:17:33
+tournament_k-8              291    2/4         28.1      23%   0:17:40
+crossover_rate-0.0          291    3/4         26.8      29%   0:15:46
+crossover_rate-0.95         291    3/4         22.9      26%   0:16:42
+mutation_rate-0.005         291    2/4         29.5      28%   0:21:52
+mutation_rate-0.5           291    2/4         26.0      16%   0:17:01
+mutation_sigma-0.02         291    2/4         29.8      28%   0:20:34
+mutation_sigma-0.5          291    3/4         25.8      21%   0:16:09
+anneal_factor-0.3           291    3/4         26.2      32%   0:16:17
+anneal_factor-1.0           291    3/4         26.2      25%   0:16:36
+init_sigma-0.25             291    2/4         28.8      17%   0:16:27
+init_sigma-1.0              291    2/4         28.4      30%   0:18:43
+action_feedback-1           323    1/4         31.2      15%   0:17:51
+memory-2                    357    1/4         30.6      15%   0:18:51
+memory-3                    390    2/4         32.7      11%   0:18:34
+
+recommended config: anneal_factor=0.3
+
+confirm: probing the composite {'anneal_factor': 0.3}
+GA sweep [confirm]: 1 configs x 4 levels x 3 seeds = 12 probes, budget 40 gens each, ~1x one balance sweep, 16 worker(s)  [mario · collector · rays]
+
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+  note: mario level [Mario1-4] has no coins — persona [collector] plays for the goal alone here
+[1/12] p10g40_b8cc78_best · Mario1-4 seed 1234: best gen 32, win rate 0%, best_x 2357.4, 0:00:45
+[2/12] p10g40_b8cc78_best · Mario1-1 seed 31337: best gen 6, win rate 50%, best_x 6315.9, 0:00:56
+[3/12] p10g40_b8cc78_best · Mario1-1 seed 2025: best gen 10, win rate 77%, best_x 6315.9, 0:01:03
+[4/12] p10g40_b8cc78_best · Mario1-4 seed 31337: best gen 22, win rate 53%, best_x 4522.3, 0:01:02
+[5/12] p10g40_b8cc78_best · Mario1-1 seed 1234: best gen 2, win rate 93%, best_x 6313.9, 0:01:13
+[6/12] p10g40_b8cc78_best · Mario1-3 seed 2025: best gen 36, win rate 0%, best_x 3024.9, 0:01:13
+[7/12] p10g40_b8cc78_best · Mario1-4 seed 2025: best gen 15, win rate 0%, best_x 2665.0, 0:01:16
+[8/12] p10g40_b8cc78_best · Mario1-2 seed 2025: best gen 16, win rate 47%, best_x 5355.9, 0:01:29
+[9/12] p10g40_b8cc78_best · Mario1-3 seed 1234: best gen 17, win rate 0%, best_x 3000.7, 0:01:29
+[10/12] p10g40_b8cc78_best · Mario1-3 seed 31337: best gen 15, win rate 0%, best_x 3044.5, 0:01:37
+[11/12] p10g40_b8cc78_best · Mario1-2 seed 1234: best gen 3, win rate 0%, best_x 2589.5, 0:02:03
+[12/12] p10g40_b8cc78_best · Mario1-2 seed 31337: best gen 39, win rate 62%, best_x 5355.7, 0:02:05
+
+wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+  mario      (5 sweep(s))  anneal_factor 0.3
+  megaman    (6 sweep(s))  pop_size 100 · tournament_k 8 · crossover_rate 0.95 · mutation_rate 0.5 · mutation_sigma 0.5 · anneal_factor 0.3 · init_sigma 0.25 · action_feedback True
+
+0:02:16 wall
+
+config                   params   solved  first win  win rate      time
+base                        291    3/4         26.2      30%   0:18:10
+hidden-8                    147    3/4         24.8      25%   0:16:25
+hidden-32                   579    3/4         28.7      20%   0:18:31
+hidden-64                  1155    3/4         22.8      24%   0:17:15
+pop_size-30                 291    3/4         15.8      20%   0:39:36
+pop_size-100                291    4/4         12.6      13%   1:55:29
+elite-1                     291    3/4         24.2      22%   0:16:01
+elite-6                     291    3/4         27.3      29%   0:19:20
+tournament_k-2              291    3/4         25.9      21%   0:17:33
+tournament_k-8              291    2/4         28.1      23%   0:17:40
+crossover_rate-0.0          291    3/4         26.8      29%   0:15:46
+crossover_rate-0.95         291    3/4         22.9      26%   0:16:42
+mutation_rate-0.005         291    2/4         29.5      28%   0:21:52
+mutation_rate-0.5           291    2/4         26.0      16%   0:17:01
+mutation_sigma-0.02         291    2/4         29.8      28%   0:20:34
+mutation_sigma-0.5          291    3/4         25.8      21%   0:16:09
+anneal_factor-0.3           291    3/4         26.2      32%   0:16:17
+anneal_factor-1.0           291    3/4         26.2      25%   0:16:36
+init_sigma-0.25             291    2/4         28.8      17%   0:16:27
+init_sigma-1.0              291    2/4         28.4      30%   0:18:43
+action_feedback-1           323    1/4         31.2      15%   0:17:51
+memory-2                    357    1/4         30.6      15%   0:18:51
+memory-3                    390    2/4         32.7      11%   0:18:34
+best                        291    3/4         26.2      32%   0:16:16
+
+recommended config: anneal_factor=0.3
+[2026-10-28 05:06:51] END gasweep mario collector rc=0
+[2026-10-28 05:06:51] ALL DONE
+[2026-10-28 05:06:51] END rc=0 GAMES=mario PERSONAS=collector bash run_all.sh sweeps

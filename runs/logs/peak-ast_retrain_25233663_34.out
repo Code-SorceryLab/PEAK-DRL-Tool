@@ -1,0 +1,16 @@
+[2026-10-28 15:32:18] START n=35 host=c359.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded@Mario1-2 --persona killer --workers $W
+>>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona killer --levels Mario1-2 --seeds 1111 2222 3333 --gens 200 --root runs/ast/mario/base-reseeded@Mario1-2/probes --out runs/ast/mario/base-reseeded@Mario1-2 --best --workers 3
+--best: mario -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200_best · runs/ast/mario/base-reseeded@Mario1-2/probes]
+
+[1/3] Mario1-2 seed 2222: best gen 3, win rate 10%, best_x 5354.2, 0:01:03
+[2/3] Mario1-2 seed 3333: best gen 67, win rate 35%, best_x 5481.0, 0:04:22
+[3/3] Mario1-2 seed 1111: best gen 199, win rate 0%, best_x 3908.9, 0:10:38
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-2      2/3    gen 31.0±355.8gen 89.7±248.3        15% ±45%      Enemy (40%)   4914.7    26% +14.1%/g  0:16:04  FLAT/IMPROVING/IMPROVING
+
+saved runs/ast/mario/base-reseeded@Mario1-2/report_mario_killer_p10g200_best.json  (0:12:27 wall)
+[2026-10-28 15:44:49] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded@Mario1-2 --persona killer --workers $W

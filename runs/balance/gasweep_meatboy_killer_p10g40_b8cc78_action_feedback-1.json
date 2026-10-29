@@ -1,0 +1,6991 @@
+{
+  "game": "meatboy",
+  "persona": "killer",
+  "tag": "p10g40_b8cc78_action_feedback-1",
+  "pop_size": 10,
+  "gens_budget": 40,
+  "seeds": [
+    1234,
+    2025,
+    31337
+  ],
+  "train_time_s": 1235.9,
+  "ga_config": {
+    "pop_size": 10,
+    "elite": 4,
+    "tournament_k": 5,
+    "crossover_rate": 0.7,
+    "mutation_rate": 0.15,
+    "mutation_sigma": 0.15,
+    "init_sigma": 0.5,
+    "max_frames": 3600,
+    "stuck_frames": 300,
+    "advance_wins": 3,
+    "anneal_factor": 0.5,
+    "win_bonus": 5000.0,
+    "seed": 1234,
+    "sensors": "rays",
+    "hidden": 16,
+    "action_feedback": true,
+    "memory": 0,
+    "n_outputs": 3,
+    "n_inputs": 21
+  },
+  "levels": [
+    {
+      "level": "0",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 15.7,
+      "first_win_ci": 30.9,
+      "best_gen_mean": 15.7,
+      "best_gen_ci": 30.9,
+      "win_rate_mean": 0.46,
+      "win_rate_ci": 0.86,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.99,
+      "causes": {
+        "Stall": 621,
+        "Pit": 8
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.746,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0436,
+      "train_time_s": 67.7,
+      "completion_rate_mean": 0.245,
+      "mean_completion_time": 5.8,
+      "completion_time_stddev": 1.4,
+      "progress_at_death_mean": 0.521,
+      "deaths_per_run_mean": 7.55,
+      "deaths_per_win_mean": 13.14,
+      "death_hist": [
+        63,
+        22,
+        42,
+        13,
+        82,
+        96,
+        108,
+        50,
+        98,
+        55
+      ],
+      "death_cluster_entropy_mean": 0.89,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.501
+    },
+    {
+      "level": "1",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 13.7,
+      "best_gen_ci": 12.5,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 1.0,
+      "causes": {
+        "Stall": 1200
+      },
+      "best_x_mean": 550.7,
+      "stuck_frac_mean": 1.0,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0059,
+      "train_time_s": 113.1,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.427,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        80,
+        19,
+        2,
+        352,
+        496,
+        97,
+        154,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.511,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "2",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 3,
+      "first_win_mean": 22.0,
+      "first_win_ci": 34.8,
+      "best_gen_mean": 22.0,
+      "best_gen_ci": 34.8,
+      "win_rate_mean": 0.417,
+      "win_rate_ci": 0.749,
+      "dominant_cause": "Pit",
+      "dominant_cause_frac": 0.85,
+      "causes": {
+        "Pit": 678,
+        "Stall": 121
+      },
+      "best_x_mean": 1000.0,
+      "stuck_frac_mean": 0.122,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0279,
+      "train_time_s": 51.9,
+      "completion_rate_mean": 0.159,
+      "mean_completion_time": 4.3,
+      "completion_time_stddev": 0.0,
+      "progress_at_death_mean": 0.481,
+      "deaths_per_run_mean": 8.42,
+      "deaths_per_win_mean": 16.56,
+      "death_hist": [
+        67,
+        8,
+        29,
+        219,
+        56,
+        49,
+        82,
+        271,
+        18,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.701,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.36
+    },
+    {
+      "level": "3",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 27.7,
+      "best_gen_ci": 16.9,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 1.0,
+      "causes": {
+        "Stall": 1200
+      },
+      "best_x_mean": 373.6,
+      "stuck_frac_mean": 1.0,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0035,
+      "train_time_s": 189.5,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.215,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        210,
+        298,
+        407,
+        195,
+        90,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.573,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "4",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 12.7,
+      "best_gen_ci": 37.4,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 1.0,
+      "causes": {
+        "Stall": 1198,
+        "Pit": 2
+      },
+      "best_x_mean": 355.9,
+      "stuck_frac_mean": 0.998,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0143,
+      "train_time_s": 104.4,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.2,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        115,
+        354,
+        642,
+        7,
+        39,
+        2,
+        41,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.465,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "5",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 20.3,
+      "best_gen_ci": 3.8,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.88,
+      "causes": {
+        "Stall": 1058,
+        "Saw": 142
+      },
+      "best_x_mean": 435.4,
+      "stuck_frac_mean": 0.882,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0064,
+      "train_time_s": 139.6,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.274,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        85,
+        192,
+        597,
+        154,
+        90,
+        82,
+        0,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.527,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "6",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 2,
+      "first_win_mean": 34.0,
+      "first_win_ci": 12.7,
+      "best_gen_mean": 25.3,
+      "best_gen_ci": 37.4,
+      "win_rate_mean": 0.329,
+      "win_rate_ci": 0.707,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.74,
+      "causes": {
+        "Stall": 843,
+        "Pit": 168,
+        "Saw": 128
+      },
+      "best_x_mean": 726.7,
+      "stuck_frac_mean": 0.703,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0154,
+      "train_time_s": 141.6,
+      "completion_rate_mean": 0.051,
+      "mean_completion_time": 7.7,
+      "completion_time_stddev": 0.6,
+      "progress_at_death_mean": 0.274,
+      "deaths_per_run_mean": 9.49,
+      "deaths_per_win_mean": 141.6,
+      "death_hist": [
+        76,
+        738,
+        21,
+        43,
+        90,
+        0,
+        47,
+        17,
+        2,
+        105
+      ],
+      "death_cluster_entropy_mean": 0.466,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.156
+    },
+    {
+      "level": "7",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 15.7,
+      "best_gen_ci": 17.4,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.94,
+      "causes": {
+        "Stall": 66,
+        "Saw": 1134
+      },
+      "best_x_mean": 552.1,
+      "stuck_frac_mean": 0.055,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0163,
+      "train_time_s": 65.1,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.347,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        71,
+        401,
+        31,
+        518,
+        0,
+        53,
+        0,
+        0,
+        12,
+        114
+      ],
+      "death_cluster_entropy_mean": 0.496,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "8",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 34.3,
+      "best_gen_ci": 18.3,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Saw",
+      "dominant_cause_frac": 0.91,
+      "causes": {
+        "Saw": 1092,
+        "Stall": 108
+      },
+      "best_x_mean": 479.2,
+      "stuck_frac_mean": 0.09,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0038,
+      "train_time_s": 175.6,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.338,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        46,
+        19,
+        744,
+        135,
+        52,
+        91,
+        11,
+        102,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.406,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "9",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 18.7,
+      "best_gen_ci": 7.6,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Stall",
+      "dominant_cause_frac": 0.57,
+      "causes": {
+        "Stall": 689,
+        "Saw": 511
+      },
+      "best_x_mean": 603.4,
+      "stuck_frac_mean": 0.574,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0158,
+      "train_time_s": 133.8,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.359,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        78,
+        175,
+        362,
+        131,
+        121,
+        113,
+        201,
+        19,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.681,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    },
+    {
+      "level": "10",
+      "seeds": 3,
+      "pop_size": 10,
+      "solved_by": 0,
+      "first_win_mean": null,
+      "first_win_ci": null,
+      "best_gen_mean": 15.0,
+      "best_gen_ci": 25.9,
+      "win_rate_mean": 0.0,
+      "win_rate_ci": 0.0,
+      "dominant_cause": "Fire",
+      "dominant_cause_frac": 0.92,
+      "causes": {
+        "Stall": 87,
+        "Fire": 1098,
+        "Pit": 15
+      },
+      "best_x_mean": 439.4,
+      "stuck_frac_mean": 0.072,
+      "trends": [
+        "IMPROVING",
+        "IMPROVING",
+        "IMPROVING"
+      ],
+      "improvement_rate_mean": 0.0167,
+      "train_time_s": 53.6,
+      "completion_rate_mean": 0.0,
+      "mean_completion_time": null,
+      "completion_time_stddev": null,
+      "progress_at_death_mean": 0.275,
+      "deaths_per_run_mean": 10.0,
+      "deaths_per_win_mean": 400.0,
+      "death_hist": [
+        428,
+        235,
+        17,
+        82,
+        108,
+        272,
+        58,
+        0,
+        0,
+        0
+      ],
+      "death_cluster_entropy_mean": 0.539,
+      "coin_collection_rate_mean": 1.0,
+      "novice_expert_gap_mean": 0.0
+    }
+  ],
+  "cells": {
+    "0": [
+      {
+        "level": "0",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 30,
+        "best_gen": 30,
+        "win_rate": 0.1,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.9575,
+        "causes": {
+          "Stall": 383,
+          "Pit": 6
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0168,
+        "train_time_s": 38.0,
+        "completion_rate": 0.028,
+        "mean_completion_time": 9.1,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.627,
+        "deaths_per_run": 9.72,
+        "deaths_per_win": 35.36,
+        "death_hist": [
+          25,
+          5,
+          12,
+          5,
+          51,
+          63,
+          96,
+          6,
+          84,
+          42
+        ],
+        "death_cluster_entropy": 0.842,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.085,
+        "curve": [
+          [
+            588.2,
+            188.2
+          ],
+          [
+            588.2,
+            276.5
+          ],
+          [
+            588.2,
+            411.8
+          ],
+          [
+            588.2,
+            388.2
+          ],
+          [
+            588.2,
+            535.3
+          ],
+          [
+            647.1,
+            429.4
+          ],
+          [
+            647.1,
+            370.6
+          ],
+          [
+            647.1,
+            529.4
+          ],
+          [
+            647.1,
+            500.0
+          ],
+          [
+            647.1,
+            541.2
+          ],
+          [
+            647.1,
+            529.4
+          ],
+          [
+            647.1,
+            594.1
+          ],
+          [
+            941.2,
+            600.0
+          ],
+          [
+            941.2,
+            529.4
+          ],
+          [
+            941.2,
+            529.4
+          ],
+          [
+            941.2,
+            629.4
+          ],
+          [
+            941.2,
+            658.8
+          ],
+          [
+            941.2,
+            670.6
+          ],
+          [
+            941.2,
+            694.1
+          ],
+          [
+            941.2,
+            688.2
+          ],
+          [
+            941.2,
+            641.2
+          ],
+          [
+            941.2,
+            694.1
+          ],
+          [
+            941.2,
+            741.2
+          ],
+          [
+            941.2,
+            694.1
+          ],
+          [
+            941.2,
+            729.4
+          ],
+          [
+            941.2,
+            788.2
+          ],
+          [
+            941.2,
+            611.8
+          ],
+          [
+            941.2,
+            794.1
+          ],
+          [
+            941.2,
+            758.8
+          ],
+          [
+            6000.0,
+            1264.7
+          ],
+          [
+            6000.0,
+            1329.4
+          ],
+          [
+            6000.0,
+            1252.9
+          ],
+          [
+            6000.0,
+            1235.3
+          ],
+          [
+            6000.0,
+            1282.4
+          ],
+          [
+            6000.0,
+            1341.2
+          ],
+          [
+            6000.0,
+            1305.9
+          ],
+          [
+            6000.0,
+            1341.2
+          ],
+          [
+            6000.0,
+            1358.8
+          ],
+          [
+            6000.0,
+            1276.5
+          ],
+          [
+            6000.0,
+            1258.8
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/0_1234"
+      },
+      {
+        "level": "0",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 19,
+        "first_win_gen": 9,
+        "best_gen": 9,
+        "win_rate": 0.49,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.7315789473684211,
+        "causes": {
+          "Stall": 139,
+          "Pit": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0694,
+        "train_time_s": 19.0,
+        "completion_rate": 0.263,
+        "mean_completion_time": 6.0,
+        "completion_time_stddev": 3.6,
+        "progress_at_death": 0.418,
+        "deaths_per_run": 7.37,
+        "deaths_per_win": 2.8,
+        "death_hist": [
+          25,
+          10,
+          23,
+          7,
+          21,
+          21,
+          2,
+          15,
+          7,
+          9
+        ],
+        "death_cluster_entropy": 0.929,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.567,
+        "curve": [
+          [
+            294.1,
+            76.5
+          ],
+          [
+            470.6,
+            176.5
+          ],
+          [
+            470.6,
+            223.5
+          ],
+          [
+            529.4,
+            317.6
+          ],
+          [
+            529.4,
+            405.9
+          ],
+          [
+            529.4,
+            411.8
+          ],
+          [
+            529.4,
+            411.8
+          ],
+          [
+            823.5,
+            441.2
+          ],
+          [
+            6000.0,
+            1041.2
+          ],
+          [
+            6000.0,
+            1076.5
+          ],
+          [
+            6000.0,
+            2194.1
+          ],
+          [
+            6000.0,
+            3282.4
+          ],
+          [
+            6000.0,
+            3835.3
+          ],
+          [
+            6000.0,
+            3211.8
+          ],
+          [
+            6000.0,
+            4352.9
+          ],
+          [
+            6000.0,
+            3823.5
+          ],
+          [
+            6000.0,
+            3341.2
+          ],
+          [
+            6000.0,
+            3835.3
+          ],
+          [
+            6000.0,
+            3394.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/0_2025"
+      },
+      {
+        "level": "0",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 18,
+        "first_win_gen": 8,
+        "best_gen": 8,
+        "win_rate": 0.79,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.55,
+        "causes": {
+          "Stall": 99,
+          "Pit": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0445,
+        "train_time_s": 10.7,
+        "completion_rate": 0.444,
+        "mean_completion_time": 2.3,
+        "completion_time_stddev": 0.5,
+        "progress_at_death": 0.519,
+        "deaths_per_run": 5.56,
+        "deaths_per_win": 1.25,
+        "death_hist": [
+          13,
+          7,
+          7,
+          1,
+          10,
+          12,
+          10,
+          29,
+          7,
+          4
+        ],
+        "death_cluster_entropy": 0.9,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.85,
+        "curve": [
+          [
+            705.9,
+            205.9
+          ],
+          [
+            705.9,
+            335.3
+          ],
+          [
+            705.9,
+            458.8
+          ],
+          [
+            764.7,
+            576.5
+          ],
+          [
+            764.7,
+            505.9
+          ],
+          [
+            823.5,
+            664.7
+          ],
+          [
+            941.2,
+            605.9
+          ],
+          [
+            6000.0,
+            1158.8
+          ],
+          [
+            6000.0,
+            2852.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            3352.9
+          ],
+          [
+            6000.0,
+            5470.6
+          ],
+          [
+            6000.0,
+            5452.9
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5447.1
+          ],
+          [
+            6000.0,
+            4405.9
+          ],
+          [
+            6000.0,
+            4247.1
+          ],
+          [
+            6000.0,
+            5452.9
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/0_31337"
+      }
+    ],
+    "1": [
+      {
+        "level": "1",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 19,
+        "win_rate": 0.0,
+        "best": 565.2,
+        "best_x": 565.2,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0032,
+        "train_time_s": 35.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.434,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          14,
+          3,
+          1,
+          140,
+          146,
+          96,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.541,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            347.8,
+            126.1
+          ],
+          [
+            434.8,
+            282.6
+          ],
+          [
+            478.3,
+            334.8
+          ],
+          [
+            478.3,
+            352.2
+          ],
+          [
+            478.3,
+            321.7
+          ],
+          [
+            478.3,
+            352.2
+          ],
+          [
+            478.3,
+            352.2
+          ],
+          [
+            478.3,
+            387.0
+          ],
+          [
+            478.3,
+            365.2
+          ],
+          [
+            478.3,
+            434.8
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            478.3,
+            430.4
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            478.3,
+            443.5
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            565.2,
+            447.8
+          ],
+          [
+            565.2,
+            456.5
+          ],
+          [
+            565.2,
+            456.5
+          ],
+          [
+            565.2,
+            456.5
+          ],
+          [
+            565.2,
+            465.2
+          ],
+          [
+            565.2,
+            460.9
+          ],
+          [
+            565.2,
+            508.7
+          ],
+          [
+            565.2,
+            500.0
+          ],
+          [
+            565.2,
+            482.6
+          ],
+          [
+            565.2,
+            482.6
+          ],
+          [
+            565.2,
+            508.7
+          ],
+          [
+            565.2,
+            473.9
+          ],
+          [
+            565.2,
+            487.0
+          ],
+          [
+            565.2,
+            517.4
+          ],
+          [
+            565.2,
+            495.7
+          ],
+          [
+            565.2,
+            434.8
+          ],
+          [
+            565.2,
+            504.3
+          ],
+          [
+            565.2,
+            482.6
+          ],
+          [
+            565.2,
+            521.7
+          ],
+          [
+            565.2,
+            473.9
+          ],
+          [
+            565.2,
+            513.0
+          ],
+          [
+            565.2,
+            469.6
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/1_1234"
+      },
+      {
+        "level": "1",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 13,
+        "win_rate": 0.0,
+        "best": 478.3,
+        "best_x": 478.3,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0052,
+        "train_time_s": 35.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.382,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          30,
+          6,
+          1,
+          170,
+          193,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.429,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            347.8,
+            87.0
+          ],
+          [
+            347.8,
+            160.9
+          ],
+          [
+            347.8,
+            213.0
+          ],
+          [
+            347.8,
+            347.8
+          ],
+          [
+            347.8,
+            313.0
+          ],
+          [
+            347.8,
+            278.3
+          ],
+          [
+            347.8,
+            317.4
+          ],
+          [
+            347.8,
+            243.5
+          ],
+          [
+            347.8,
+            282.6
+          ],
+          [
+            347.8,
+            300.0
+          ],
+          [
+            391.3,
+            330.4
+          ],
+          [
+            391.3,
+            300.0
+          ],
+          [
+            478.3,
+            317.4
+          ],
+          [
+            478.3,
+            404.3
+          ],
+          [
+            478.3,
+            400.0
+          ],
+          [
+            478.3,
+            443.5
+          ],
+          [
+            478.3,
+            460.9
+          ],
+          [
+            478.3,
+            447.8
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            447.8
+          ],
+          [
+            478.3,
+            443.5
+          ],
+          [
+            478.3,
+            421.7
+          ],
+          [
+            478.3,
+            452.2
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            469.6
+          ],
+          [
+            478.3,
+            465.2
+          ],
+          [
+            478.3,
+            434.8
+          ],
+          [
+            478.3,
+            443.5
+          ],
+          [
+            478.3,
+            452.2
+          ],
+          [
+            478.3,
+            413.0
+          ],
+          [
+            478.3,
+            430.4
+          ],
+          [
+            478.3,
+            469.6
+          ],
+          [
+            478.3,
+            443.5
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            478.3,
+            417.4
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            413.0
+          ],
+          [
+            478.3,
+            404.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/1_2025"
+      },
+      {
+        "level": "1",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 9,
+        "win_rate": 0.0,
+        "best": 608.7,
+        "best_x": 608.7,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0093,
+        "train_time_s": 42.2,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.464,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          36,
+          10,
+          0,
+          42,
+          157,
+          1,
+          154,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.562,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            434.8,
+            200.0
+          ],
+          [
+            478.3,
+            282.6
+          ],
+          [
+            478.3,
+            278.3
+          ],
+          [
+            478.3,
+            382.6
+          ],
+          [
+            478.3,
+            395.7
+          ],
+          [
+            478.3,
+            439.1
+          ],
+          [
+            478.3,
+            373.9
+          ],
+          [
+            478.3,
+            426.1
+          ],
+          [
+            608.7,
+            443.5
+          ],
+          [
+            608.7,
+            443.5
+          ],
+          [
+            608.7,
+            452.2
+          ],
+          [
+            608.7,
+            352.2
+          ],
+          [
+            608.7,
+            482.6
+          ],
+          [
+            608.7,
+            465.2
+          ],
+          [
+            608.7,
+            508.7
+          ],
+          [
+            608.7,
+            478.3
+          ],
+          [
+            608.7,
+            504.3
+          ],
+          [
+            608.7,
+            526.1
+          ],
+          [
+            608.7,
+            326.1
+          ],
+          [
+            608.7,
+            526.1
+          ],
+          [
+            608.7,
+            530.4
+          ],
+          [
+            608.7,
+            552.2
+          ],
+          [
+            608.7,
+            500.0
+          ],
+          [
+            608.7,
+            491.3
+          ],
+          [
+            608.7,
+            465.2
+          ],
+          [
+            608.7,
+            473.9
+          ],
+          [
+            608.7,
+            539.1
+          ],
+          [
+            608.7,
+            560.9
+          ],
+          [
+            608.7,
+            456.5
+          ],
+          [
+            608.7,
+            565.2
+          ],
+          [
+            608.7,
+            543.5
+          ],
+          [
+            608.7,
+            526.1
+          ],
+          [
+            608.7,
+            534.8
+          ],
+          [
+            608.7,
+            513.0
+          ],
+          [
+            608.7,
+            517.4
+          ],
+          [
+            608.7,
+            517.4
+          ],
+          [
+            608.7,
+            534.8
+          ],
+          [
+            608.7,
+            465.2
+          ],
+          [
+            608.7,
+            517.4
+          ],
+          [
+            608.7,
+            460.9
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/1_31337"
+      }
+    ],
+    "2": [
+      {
+        "level": "2",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 36,
+        "best_gen": 36,
+        "win_rate": 0.45,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.195,
+        "causes": {
+          "Pit": 303,
+          "Stall": 78
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0077,
+        "train_time_s": 21.5,
+        "completion_rate": 0.048,
+        "mean_completion_time": 2.6,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.579,
+        "deaths_per_run": 9.53,
+        "deaths_per_win": 20.05,
+        "death_hist": [
+          29,
+          5,
+          12,
+          27,
+          52,
+          7,
+          44,
+          191,
+          14,
+          0
+        ],
+        "death_cluster_entropy": 0.7,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.146,
+        "curve": [
+          [
+            409.1,
+            118.2
+          ],
+          [
+            409.1,
+            118.2
+          ],
+          [
+            409.1,
+            213.6
+          ],
+          [
+            409.1,
+            309.1
+          ],
+          [
+            454.5,
+            250.0
+          ],
+          [
+            636.4,
+            309.1
+          ],
+          [
+            636.4,
+            390.9
+          ],
+          [
+            727.3,
+            486.4
+          ],
+          [
+            727.3,
+            540.9
+          ],
+          [
+            727.3,
+            568.2
+          ],
+          [
+            727.3,
+            677.3
+          ],
+          [
+            727.3,
+            663.6
+          ],
+          [
+            727.3,
+            659.1
+          ],
+          [
+            727.3,
+            604.5
+          ],
+          [
+            727.3,
+            609.1
+          ],
+          [
+            727.3,
+            636.4
+          ],
+          [
+            727.3,
+            604.5
+          ],
+          [
+            727.3,
+            718.2
+          ],
+          [
+            727.3,
+            654.5
+          ],
+          [
+            727.3,
+            700.0
+          ],
+          [
+            727.3,
+            595.5
+          ],
+          [
+            727.3,
+            663.6
+          ],
+          [
+            727.3,
+            690.9
+          ],
+          [
+            727.3,
+            654.5
+          ],
+          [
+            727.3,
+            600.0
+          ],
+          [
+            727.3,
+            609.1
+          ],
+          [
+            727.3,
+            713.6
+          ],
+          [
+            772.7,
+            654.5
+          ],
+          [
+            772.7,
+            627.3
+          ],
+          [
+            772.7,
+            668.2
+          ],
+          [
+            772.7,
+            613.6
+          ],
+          [
+            818.2,
+            686.4
+          ],
+          [
+            818.2,
+            759.1
+          ],
+          [
+            818.2,
+            750.0
+          ],
+          [
+            818.2,
+            740.9
+          ],
+          [
+            6000.0,
+            1218.2
+          ],
+          [
+            6000.0,
+            1781.8
+          ],
+          [
+            6000.0,
+            2872.7
+          ],
+          [
+            6000.0,
+            4909.1
+          ],
+          [
+            6000.0,
+            2804.5
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/2_1234"
+      },
+      {
+        "level": "2",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 32,
+        "first_win_gen": 22,
+        "best_gen": 22,
+        "win_rate": 0.1,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.0875,
+        "causes": {
+          "Pit": 281,
+          "Stall": 28
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0233,
+        "train_time_s": 13.3,
+        "completion_rate": 0.034,
+        "mean_completion_time": 7.5,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.423,
+        "deaths_per_run": 9.66,
+        "deaths_per_win": 28.09,
+        "death_hist": [
+          23,
+          1,
+          13,
+          162,
+          1,
+          20,
+          17,
+          68,
+          4,
+          0
+        ],
+        "death_cluster_entropy": 0.62,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.1,
+        "curve": [
+          [
+            318.2,
+            63.6
+          ],
+          [
+            318.2,
+            122.7
+          ],
+          [
+            318.2,
+            213.6
+          ],
+          [
+            318.2,
+            254.5
+          ],
+          [
+            318.2,
+            286.4
+          ],
+          [
+            318.2,
+            254.5
+          ],
+          [
+            318.2,
+            304.5
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            318.2,
+            318.2
+          ],
+          [
+            590.9,
+            336.4
+          ],
+          [
+            727.3,
+            418.2
+          ],
+          [
+            727.3,
+            472.7
+          ],
+          [
+            727.3,
+            490.9
+          ],
+          [
+            727.3,
+            550.0
+          ],
+          [
+            727.3,
+            600.0
+          ],
+          [
+            727.3,
+            609.1
+          ],
+          [
+            727.3,
+            568.2
+          ],
+          [
+            6000.0,
+            1109.1
+          ],
+          [
+            6000.0,
+            1063.6
+          ],
+          [
+            6000.0,
+            1177.3
+          ],
+          [
+            6000.0,
+            1172.7
+          ],
+          [
+            6000.0,
+            1136.4
+          ],
+          [
+            6000.0,
+            1131.8
+          ],
+          [
+            6000.0,
+            1031.8
+          ],
+          [
+            6000.0,
+            1145.5
+          ],
+          [
+            6000.0,
+            1054.5
+          ],
+          [
+            6000.0,
+            1100.0
+          ],
+          [
+            6000.0,
+            1090.9
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/2_2025"
+      },
+      {
+        "level": "2",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 18,
+        "first_win_gen": 8,
+        "best_gen": 8,
+        "win_rate": 0.7,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.08333333333333333,
+        "causes": {
+          "Stall": 15,
+          "Pit": 94
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0528,
+        "train_time_s": 17.1,
+        "completion_rate": 0.394,
+        "mean_completion_time": 2.9,
+        "completion_time_stddev": 0.1,
+        "progress_at_death": 0.44,
+        "deaths_per_run": 6.06,
+        "deaths_per_win": 1.54,
+        "death_hist": [
+          15,
+          2,
+          4,
+          30,
+          3,
+          22,
+          21,
+          12,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.784,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.833,
+        "curve": [
+          [
+            318.2,
+            50.0
+          ],
+          [
+            545.5,
+            159.1
+          ],
+          [
+            681.8,
+            331.8
+          ],
+          [
+            681.8,
+            509.1
+          ],
+          [
+            681.8,
+            540.9
+          ],
+          [
+            681.8,
+            513.6
+          ],
+          [
+            727.3,
+            618.2
+          ],
+          [
+            6000.0,
+            1204.5
+          ],
+          [
+            6000.0,
+            1722.7
+          ],
+          [
+            6000.0,
+            3809.1
+          ],
+          [
+            6000.0,
+            3159.1
+          ],
+          [
+            6000.0,
+            4377.3
+          ],
+          [
+            6000.0,
+            3727.3
+          ],
+          [
+            6000.0,
+            5431.8
+          ],
+          [
+            6000.0,
+            4904.5
+          ],
+          [
+            6000.0,
+            4863.6
+          ],
+          [
+            6000.0,
+            6000.0
+          ],
+          [
+            6000.0,
+            5472.7
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/2_31337"
+      }
+    ],
+    "3": [
+      {
+        "level": "3",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 30,
+        "win_rate": 0.0,
+        "best": 448.3,
+        "best_x": 448.3,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0047,
+        "train_time_s": 65.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.24,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          59,
+          96,
+          149,
+          53,
+          43,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.652,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            293.1,
+            79.3
+          ],
+          [
+            293.1,
+            120.7
+          ],
+          [
+            293.1,
+            156.9
+          ],
+          [
+            293.1,
+            175.9
+          ],
+          [
+            293.1,
+            198.3
+          ],
+          [
+            293.1,
+            251.7
+          ],
+          [
+            293.1,
+            219.0
+          ],
+          [
+            293.1,
+            224.1
+          ],
+          [
+            293.1,
+            210.3
+          ],
+          [
+            293.1,
+            203.4
+          ],
+          [
+            293.1,
+            225.9
+          ],
+          [
+            293.1,
+            250.0
+          ],
+          [
+            293.1,
+            241.4
+          ],
+          [
+            293.1,
+            229.3
+          ],
+          [
+            293.1,
+            198.3
+          ],
+          [
+            293.1,
+            246.6
+          ],
+          [
+            293.1,
+            232.8
+          ],
+          [
+            293.1,
+            201.7
+          ],
+          [
+            293.1,
+            250.0
+          ],
+          [
+            293.1,
+            200.0
+          ],
+          [
+            293.1,
+            222.4
+          ],
+          [
+            310.3,
+            239.7
+          ],
+          [
+            310.3,
+            258.6
+          ],
+          [
+            310.3,
+            258.6
+          ],
+          [
+            431.0,
+            301.7
+          ],
+          [
+            431.0,
+            237.9
+          ],
+          [
+            431.0,
+            306.9
+          ],
+          [
+            431.0,
+            234.5
+          ],
+          [
+            431.0,
+            279.3
+          ],
+          [
+            448.3,
+            284.5
+          ],
+          [
+            448.3,
+            308.6
+          ],
+          [
+            448.3,
+            269.0
+          ],
+          [
+            448.3,
+            313.8
+          ],
+          [
+            448.3,
+            274.1
+          ],
+          [
+            448.3,
+            243.1
+          ],
+          [
+            448.3,
+            277.6
+          ],
+          [
+            448.3,
+            315.5
+          ],
+          [
+            448.3,
+            310.3
+          ],
+          [
+            448.3,
+            263.8
+          ],
+          [
+            448.3,
+            289.7
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/3_1234"
+      },
+      {
+        "level": "3",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 33,
+        "win_rate": 0.0,
+        "best": 431.0,
+        "best_x": 431.0,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.004,
+        "train_time_s": 67.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.248,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          52,
+          123,
+          36,
+          142,
+          47,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.636,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            206.9,
+            48.3
+          ],
+          [
+            206.9,
+            113.8
+          ],
+          [
+            310.3,
+            184.5
+          ],
+          [
+            310.3,
+            234.5
+          ],
+          [
+            310.3,
+            213.8
+          ],
+          [
+            310.3,
+            243.1
+          ],
+          [
+            310.3,
+            232.8
+          ],
+          [
+            310.3,
+            243.1
+          ],
+          [
+            344.8,
+            253.4
+          ],
+          [
+            344.8,
+            219.0
+          ],
+          [
+            344.8,
+            239.7
+          ],
+          [
+            344.8,
+            232.8
+          ],
+          [
+            344.8,
+            241.4
+          ],
+          [
+            344.8,
+            231.0
+          ],
+          [
+            344.8,
+            256.9
+          ],
+          [
+            344.8,
+            217.2
+          ],
+          [
+            344.8,
+            224.1
+          ],
+          [
+            344.8,
+            237.9
+          ],
+          [
+            344.8,
+            201.7
+          ],
+          [
+            344.8,
+            243.1
+          ],
+          [
+            344.8,
+            234.5
+          ],
+          [
+            344.8,
+            227.6
+          ],
+          [
+            344.8,
+            263.8
+          ],
+          [
+            344.8,
+            198.3
+          ],
+          [
+            344.8,
+            255.2
+          ],
+          [
+            344.8,
+            236.2
+          ],
+          [
+            344.8,
+            224.1
+          ],
+          [
+            362.1,
+            239.7
+          ],
+          [
+            413.8,
+            274.1
+          ],
+          [
+            413.8,
+            267.2
+          ],
+          [
+            413.8,
+            270.7
+          ],
+          [
+            413.8,
+            286.2
+          ],
+          [
+            431.0,
+            286.2
+          ],
+          [
+            431.0,
+            324.1
+          ],
+          [
+            431.0,
+            306.9
+          ],
+          [
+            431.0,
+            315.5
+          ],
+          [
+            431.0,
+            310.3
+          ],
+          [
+            431.0,
+            387.9
+          ],
+          [
+            431.0,
+            358.6
+          ],
+          [
+            431.0,
+            329.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/3_2025"
+      },
+      {
+        "level": "3",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 241.4,
+        "best_x": 241.4,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0019,
+        "train_time_s": 56.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.156,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          99,
+          79,
+          222,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.431,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            155.2,
+            53.4
+          ],
+          [
+            155.2,
+            81.0
+          ],
+          [
+            206.9,
+            122.4
+          ],
+          [
+            206.9,
+            129.3
+          ],
+          [
+            206.9,
+            125.9
+          ],
+          [
+            206.9,
+            155.2
+          ],
+          [
+            206.9,
+            103.4
+          ],
+          [
+            206.9,
+            120.7
+          ],
+          [
+            206.9,
+            117.2
+          ],
+          [
+            206.9,
+            162.1
+          ],
+          [
+            206.9,
+            158.6
+          ],
+          [
+            206.9,
+            146.6
+          ],
+          [
+            206.9,
+            141.4
+          ],
+          [
+            206.9,
+            125.9
+          ],
+          [
+            206.9,
+            165.5
+          ],
+          [
+            206.9,
+            160.3
+          ],
+          [
+            206.9,
+            144.8
+          ],
+          [
+            206.9,
+            163.8
+          ],
+          [
+            206.9,
+            110.3
+          ],
+          [
+            241.4,
+            162.1
+          ],
+          [
+            241.4,
+            158.6
+          ],
+          [
+            241.4,
+            187.9
+          ],
+          [
+            241.4,
+            158.6
+          ],
+          [
+            241.4,
+            160.3
+          ],
+          [
+            241.4,
+            212.1
+          ],
+          [
+            241.4,
+            177.6
+          ],
+          [
+            241.4,
+            198.3
+          ],
+          [
+            241.4,
+            196.6
+          ],
+          [
+            241.4,
+            193.1
+          ],
+          [
+            241.4,
+            163.8
+          ],
+          [
+            241.4,
+            177.6
+          ],
+          [
+            241.4,
+            158.6
+          ],
+          [
+            241.4,
+            172.4
+          ],
+          [
+            241.4,
+            181.0
+          ],
+          [
+            241.4,
+            174.1
+          ],
+          [
+            241.4,
+            172.4
+          ],
+          [
+            241.4,
+            165.5
+          ],
+          [
+            241.4,
+            196.6
+          ],
+          [
+            241.4,
+            186.2
+          ],
+          [
+            241.4,
+            213.8
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/3_31337"
+      }
+    ],
+    "4": [
+      {
+        "level": "4",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 30,
+        "win_rate": 0.0,
+        "best": 661.0,
+        "best_x": 661.0,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0096,
+        "train_time_s": 41.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.262,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          26,
+          124,
+          161,
+          7,
+          39,
+          2,
+          41,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.636,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            169.5,
+            83.1
+          ],
+          [
+            169.5,
+            108.5
+          ],
+          [
+            169.5,
+            125.4
+          ],
+          [
+            186.4,
+            149.2
+          ],
+          [
+            203.4,
+            161.0
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            179.7
+          ],
+          [
+            203.4,
+            191.5
+          ],
+          [
+            203.4,
+            169.5
+          ],
+          [
+            203.4,
+            174.6
+          ],
+          [
+            203.4,
+            178.0
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            169.5
+          ],
+          [
+            203.4,
+            196.6
+          ],
+          [
+            203.4,
+            200.0
+          ],
+          [
+            203.4,
+            193.2
+          ],
+          [
+            203.4,
+            196.6
+          ],
+          [
+            203.4,
+            174.6
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            166.1
+          ],
+          [
+            288.1,
+            155.9
+          ],
+          [
+            288.1,
+            218.6
+          ],
+          [
+            288.1,
+            222.0
+          ],
+          [
+            288.1,
+            233.9
+          ],
+          [
+            440.7,
+            267.8
+          ],
+          [
+            440.7,
+            276.3
+          ],
+          [
+            440.7,
+            305.1
+          ],
+          [
+            440.7,
+            362.7
+          ],
+          [
+            440.7,
+            361.0
+          ],
+          [
+            661.0,
+            369.5
+          ],
+          [
+            661.0,
+            335.6
+          ],
+          [
+            661.0,
+            378.0
+          ],
+          [
+            661.0,
+            425.4
+          ],
+          [
+            661.0,
+            389.8
+          ],
+          [
+            661.0,
+            450.8
+          ],
+          [
+            661.0,
+            467.8
+          ],
+          [
+            661.0,
+            379.7
+          ],
+          [
+            661.0,
+            515.3
+          ],
+          [
+            661.0,
+            464.4
+          ],
+          [
+            661.0,
+            515.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/4_1234"
+      },
+      {
+        "level": "4",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 5,
+        "win_rate": 0.0,
+        "best": 203.4,
+        "best_x": 203.4,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0106,
+        "train_time_s": 30.3,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.183,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          24,
+          87,
+          289,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.319,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            152.5,
+            30.5
+          ],
+          [
+            169.5,
+            79.7
+          ],
+          [
+            186.4,
+            115.3
+          ],
+          [
+            186.4,
+            128.8
+          ],
+          [
+            203.4,
+            154.2
+          ],
+          [
+            203.4,
+            186.4
+          ],
+          [
+            203.4,
+            193.2
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            191.5
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            189.8
+          ],
+          [
+            203.4,
+            191.5
+          ],
+          [
+            203.4,
+            186.4
+          ],
+          [
+            203.4,
+            186.4
+          ],
+          [
+            203.4,
+            181.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            193.2
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            193.2
+          ],
+          [
+            203.4,
+            188.1
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            194.9
+          ],
+          [
+            203.4,
+            181.4
+          ],
+          [
+            203.4,
+            193.2
+          ],
+          [
+            203.4,
+            186.4
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            203.4
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            198.3
+          ],
+          [
+            203.4,
+            194.9
+          ],
+          [
+            203.4,
+            200.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/4_2025"
+      },
+      {
+        "level": "4",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 3,
+        "win_rate": 0.0,
+        "best": 203.4,
+        "best_x": 203.4,
+        "stuck_frac": 0.995,
+        "causes": {
+          "Stall": 398,
+          "Pit": 2
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0227,
+        "train_time_s": 32.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.156,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          65,
+          143,
+          192,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.441,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            152.5,
+            40.7
+          ],
+          [
+            152.5,
+            42.4
+          ],
+          [
+            203.4,
+            76.3
+          ],
+          [
+            203.4,
+            159.3
+          ],
+          [
+            203.4,
+            139.0
+          ],
+          [
+            203.4,
+            162.7
+          ],
+          [
+            203.4,
+            127.1
+          ],
+          [
+            203.4,
+            140.7
+          ],
+          [
+            203.4,
+            176.3
+          ],
+          [
+            203.4,
+            174.6
+          ],
+          [
+            203.4,
+            183.1
+          ],
+          [
+            203.4,
+            166.1
+          ],
+          [
+            203.4,
+            162.7
+          ],
+          [
+            203.4,
+            191.5
+          ],
+          [
+            203.4,
+            144.1
+          ],
+          [
+            203.4,
+            161.0
+          ],
+          [
+            203.4,
+            178.0
+          ],
+          [
+            203.4,
+            169.5
+          ],
+          [
+            203.4,
+            154.2
+          ],
+          [
+            203.4,
+            157.6
+          ],
+          [
+            203.4,
+            159.3
+          ],
+          [
+            203.4,
+            181.4
+          ],
+          [
+            203.4,
+            171.2
+          ],
+          [
+            203.4,
+            181.4
+          ],
+          [
+            203.4,
+            157.6
+          ],
+          [
+            203.4,
+            161.0
+          ],
+          [
+            203.4,
+            186.4
+          ],
+          [
+            203.4,
+            178.0
+          ],
+          [
+            203.4,
+            171.2
+          ],
+          [
+            203.4,
+            171.2
+          ],
+          [
+            203.4,
+            164.4
+          ],
+          [
+            203.4,
+            155.9
+          ],
+          [
+            203.4,
+            166.1
+          ],
+          [
+            203.4,
+            188.1
+          ],
+          [
+            203.4,
+            188.1
+          ],
+          [
+            203.4,
+            172.9
+          ],
+          [
+            203.4,
+            132.2
+          ],
+          [
+            203.4,
+            144.1
+          ],
+          [
+            203.4,
+            162.7
+          ],
+          [
+            203.4,
+            159.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/4_31337"
+      }
+    ],
+    "5": [
+      {
+        "level": "5",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 19,
+        "win_rate": 0.0,
+        "best": 489.8,
+        "best_x": 489.8,
+        "stuck_frac": 0.745,
+        "causes": {
+          "Stall": 298,
+          "Saw": 102
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0094,
+        "train_time_s": 43.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.282,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          47,
+          40,
+          117,
+          136,
+          60,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.648,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            224.5,
+            57.1
+          ],
+          [
+            224.5,
+            112.2
+          ],
+          [
+            244.9,
+            200.0
+          ],
+          [
+            244.9,
+            191.8
+          ],
+          [
+            326.5,
+            214.3
+          ],
+          [
+            367.3,
+            261.2
+          ],
+          [
+            367.3,
+            283.7
+          ],
+          [
+            367.3,
+            322.4
+          ],
+          [
+            367.3,
+            263.3
+          ],
+          [
+            367.3,
+            310.2
+          ],
+          [
+            367.3,
+            244.9
+          ],
+          [
+            367.3,
+            275.5
+          ],
+          [
+            367.3,
+            212.2
+          ],
+          [
+            367.3,
+            242.9
+          ],
+          [
+            387.8,
+            295.9
+          ],
+          [
+            387.8,
+            304.1
+          ],
+          [
+            387.8,
+            295.9
+          ],
+          [
+            387.8,
+            263.3
+          ],
+          [
+            489.8,
+            355.1
+          ],
+          [
+            489.8,
+            289.8
+          ],
+          [
+            489.8,
+            277.6
+          ],
+          [
+            489.8,
+            312.2
+          ],
+          [
+            489.8,
+            316.3
+          ],
+          [
+            489.8,
+            324.5
+          ],
+          [
+            489.8,
+            218.4
+          ],
+          [
+            489.8,
+            285.7
+          ],
+          [
+            489.8,
+            361.2
+          ],
+          [
+            489.8,
+            326.5
+          ],
+          [
+            489.8,
+            338.8
+          ],
+          [
+            489.8,
+            304.1
+          ],
+          [
+            489.8,
+            318.4
+          ],
+          [
+            489.8,
+            269.4
+          ],
+          [
+            489.8,
+            346.9
+          ],
+          [
+            489.8,
+            302.0
+          ],
+          [
+            489.8,
+            283.7
+          ],
+          [
+            489.8,
+            357.1
+          ],
+          [
+            489.8,
+            353.1
+          ],
+          [
+            489.8,
+            340.8
+          ],
+          [
+            489.8,
+            314.3
+          ],
+          [
+            489.8,
+            322.4
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/5_1234"
+      },
+      {
+        "level": "5",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 285.7,
+        "best_x": 285.7,
+        "stuck_frac": 1.0,
+        "causes": {
+          "Stall": 400
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0008,
+        "train_time_s": 47.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.237,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          14,
+          87,
+          299,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.29,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            244.9,
+            61.2
+          ],
+          [
+            244.9,
+            124.5
+          ],
+          [
+            265.3,
+            185.7
+          ],
+          [
+            265.3,
+            195.9
+          ],
+          [
+            265.3,
+            244.9
+          ],
+          [
+            265.3,
+            251.0
+          ],
+          [
+            265.3,
+            246.9
+          ],
+          [
+            265.3,
+            253.1
+          ],
+          [
+            265.3,
+            238.8
+          ],
+          [
+            265.3,
+            246.9
+          ],
+          [
+            265.3,
+            236.7
+          ],
+          [
+            265.3,
+            251.0
+          ],
+          [
+            265.3,
+            230.6
+          ],
+          [
+            265.3,
+            234.7
+          ],
+          [
+            265.3,
+            251.0
+          ],
+          [
+            265.3,
+            236.7
+          ],
+          [
+            265.3,
+            230.6
+          ],
+          [
+            265.3,
+            236.7
+          ],
+          [
+            265.3,
+            234.7
+          ],
+          [
+            285.7,
+            242.9
+          ],
+          [
+            285.7,
+            246.9
+          ],
+          [
+            285.7,
+            234.7
+          ],
+          [
+            285.7,
+            244.9
+          ],
+          [
+            285.7,
+            244.9
+          ],
+          [
+            285.7,
+            234.7
+          ],
+          [
+            285.7,
+            261.2
+          ],
+          [
+            285.7,
+            255.1
+          ],
+          [
+            285.7,
+            257.1
+          ],
+          [
+            285.7,
+            238.8
+          ],
+          [
+            285.7,
+            251.0
+          ],
+          [
+            285.7,
+            257.1
+          ],
+          [
+            285.7,
+            263.3
+          ],
+          [
+            285.7,
+            269.4
+          ],
+          [
+            285.7,
+            267.3
+          ],
+          [
+            285.7,
+            253.1
+          ],
+          [
+            285.7,
+            261.2
+          ],
+          [
+            285.7,
+            234.7
+          ],
+          [
+            285.7,
+            267.3
+          ],
+          [
+            285.7,
+            244.9
+          ],
+          [
+            285.7,
+            249.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/5_2025"
+      },
+      {
+        "level": "5",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 530.6,
+        "best_x": 530.6,
+        "stuck_frac": 0.9,
+        "causes": {
+          "Stall": 360,
+          "Saw": 40
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0089,
+        "train_time_s": 48.5,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.303,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          24,
+          65,
+          181,
+          18,
+          30,
+          82,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.643,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            244.9,
+            67.3
+          ],
+          [
+            244.9,
+            110.2
+          ],
+          [
+            244.9,
+            153.1
+          ],
+          [
+            244.9,
+            153.1
+          ],
+          [
+            244.9,
+            153.1
+          ],
+          [
+            244.9,
+            177.6
+          ],
+          [
+            244.9,
+            214.3
+          ],
+          [
+            265.3,
+            249.0
+          ],
+          [
+            265.3,
+            232.7
+          ],
+          [
+            265.3,
+            236.7
+          ],
+          [
+            265.3,
+            222.4
+          ],
+          [
+            285.7,
+            242.9
+          ],
+          [
+            285.7,
+            246.9
+          ],
+          [
+            285.7,
+            236.7
+          ],
+          [
+            285.7,
+            253.1
+          ],
+          [
+            285.7,
+            255.1
+          ],
+          [
+            285.7,
+            265.3
+          ],
+          [
+            285.7,
+            267.3
+          ],
+          [
+            306.1,
+            265.3
+          ],
+          [
+            469.4,
+            285.7
+          ],
+          [
+            489.8,
+            310.2
+          ],
+          [
+            530.6,
+            391.8
+          ],
+          [
+            530.6,
+            410.2
+          ],
+          [
+            530.6,
+            387.8
+          ],
+          [
+            530.6,
+            330.6
+          ],
+          [
+            530.6,
+            404.1
+          ],
+          [
+            530.6,
+            383.7
+          ],
+          [
+            530.6,
+            400.0
+          ],
+          [
+            530.6,
+            387.8
+          ],
+          [
+            530.6,
+            373.5
+          ],
+          [
+            530.6,
+            422.4
+          ],
+          [
+            530.6,
+            404.1
+          ],
+          [
+            530.6,
+            410.2
+          ],
+          [
+            530.6,
+            395.9
+          ],
+          [
+            530.6,
+            377.6
+          ],
+          [
+            530.6,
+            381.6
+          ],
+          [
+            530.6,
+            498.0
+          ],
+          [
+            530.6,
+            351.0
+          ],
+          [
+            530.6,
+            393.9
+          ],
+          [
+            530.6,
+            402.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/5_31337"
+      }
+    ],
+    "6": [
+      {
+        "level": "6",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 35,
+        "best_gen": 35,
+        "win_rate": 0.5,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.465,
+        "causes": {
+          "Stall": 186,
+          "Pit": 112,
+          "Saw": 76
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0193,
+        "train_time_s": 53.0,
+        "completion_rate": 0.065,
+        "mean_completion_time": 8.3,
+        "completion_time_stddev": 0.2,
+        "progress_at_death": 0.451,
+        "deaths_per_run": 9.35,
+        "deaths_per_win": 14.38,
+        "death_hist": [
+          23,
+          141,
+          13,
+          17,
+          43,
+          0,
+          21,
+          9,
+          2,
+          105
+        ],
+        "death_cluster_entropy": 0.73,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.2,
+        "curve": [
+          [
+            140.0,
+            42.0
+          ],
+          [
+            180.0,
+            88.0
+          ],
+          [
+            180.0,
+            130.0
+          ],
+          [
+            180.0,
+            122.0
+          ],
+          [
+            460.0,
+            146.0
+          ],
+          [
+            460.0,
+            180.0
+          ],
+          [
+            460.0,
+            194.0
+          ],
+          [
+            460.0,
+            214.0
+          ],
+          [
+            460.0,
+            248.0
+          ],
+          [
+            480.0,
+            292.0
+          ],
+          [
+            480.0,
+            322.0
+          ],
+          [
+            480.0,
+            286.0
+          ],
+          [
+            720.0,
+            354.0
+          ],
+          [
+            940.0,
+            396.0
+          ],
+          [
+            940.0,
+            438.0
+          ],
+          [
+            940.0,
+            498.0
+          ],
+          [
+            940.0,
+            548.0
+          ],
+          [
+            940.0,
+            484.0
+          ],
+          [
+            940.0,
+            648.0
+          ],
+          [
+            940.0,
+            544.0
+          ],
+          [
+            940.0,
+            602.0
+          ],
+          [
+            940.0,
+            732.0
+          ],
+          [
+            940.0,
+            732.0
+          ],
+          [
+            940.0,
+            450.0
+          ],
+          [
+            940.0,
+            590.0
+          ],
+          [
+            940.0,
+            756.0
+          ],
+          [
+            940.0,
+            508.0
+          ],
+          [
+            940.0,
+            604.0
+          ],
+          [
+            940.0,
+            616.0
+          ],
+          [
+            940.0,
+            634.0
+          ],
+          [
+            940.0,
+            538.0
+          ],
+          [
+            940.0,
+            550.0
+          ],
+          [
+            940.0,
+            578.0
+          ],
+          [
+            940.0,
+            566.0
+          ],
+          [
+            6000.0,
+            1176.0
+          ],
+          [
+            6000.0,
+            1664.0
+          ],
+          [
+            6000.0,
+            3358.0
+          ],
+          [
+            6000.0,
+            3902.0
+          ],
+          [
+            6000.0,
+            4390.0
+          ],
+          [
+            6000.0,
+            3332.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/6_1234"
+      },
+      {
+        "level": "6",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 8,
+        "win_rate": 0.0,
+        "best": 180.0,
+        "best_x": 180.0,
+        "stuck_frac": 0.98,
+        "causes": {
+          "Stall": 392,
+          "Pit": 3,
+          "Saw": 5
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0099,
+        "train_time_s": 44.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.141,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          24,
+          376,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.099,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            100.0,
+            22.0
+          ],
+          [
+            100.0,
+            32.0
+          ],
+          [
+            100.0,
+            66.0
+          ],
+          [
+            160.0,
+            86.0
+          ],
+          [
+            160.0,
+            96.0
+          ],
+          [
+            160.0,
+            124.0
+          ],
+          [
+            160.0,
+            142.0
+          ],
+          [
+            180.0,
+            140.0
+          ],
+          [
+            180.0,
+            138.0
+          ],
+          [
+            180.0,
+            144.0
+          ],
+          [
+            180.0,
+            140.0
+          ],
+          [
+            180.0,
+            148.0
+          ],
+          [
+            180.0,
+            130.0
+          ],
+          [
+            180.0,
+            158.0
+          ],
+          [
+            180.0,
+            152.0
+          ],
+          [
+            180.0,
+            138.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            154.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            158.0
+          ],
+          [
+            180.0,
+            152.0
+          ],
+          [
+            180.0,
+            160.0
+          ],
+          [
+            180.0,
+            152.0
+          ],
+          [
+            180.0,
+            148.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            166.0
+          ],
+          [
+            180.0,
+            160.0
+          ],
+          [
+            180.0,
+            150.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            144.0
+          ],
+          [
+            180.0,
+            158.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            160.0
+          ],
+          [
+            180.0,
+            148.0
+          ],
+          [
+            180.0,
+            164.0
+          ],
+          [
+            180.0,
+            150.0
+          ],
+          [
+            180.0,
+            166.0
+          ],
+          [
+            180.0,
+            166.0
+          ],
+          [
+            180.0,
+            154.0
+          ],
+          [
+            180.0,
+            178.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/6_2025"
+      },
+      {
+        "level": "6",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": 33,
+        "best_gen": 33,
+        "win_rate": 0.4857142857142857,
+        "best": 6000.0,
+        "best_x": 1000.0,
+        "stuck_frac": 0.6625,
+        "causes": {
+          "Stall": 265,
+          "Pit": 53,
+          "Saw": 47
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.017,
+        "train_time_s": 43.9,
+        "completion_rate": 0.087,
+        "mean_completion_time": 7.0,
+        "completion_time_stddev": 0.9,
+        "progress_at_death": 0.23,
+        "deaths_per_run": 9.12,
+        "deaths_per_win": 10.43,
+        "death_hist": [
+          29,
+          221,
+          8,
+          26,
+          47,
+          0,
+          26,
+          8,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.57,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.269,
+        "curve": [
+          [
+            100.0,
+            46.0
+          ],
+          [
+            100.0,
+            76.0
+          ],
+          [
+            100.0,
+            80.0
+          ],
+          [
+            100.0,
+            80.0
+          ],
+          [
+            100.0,
+            100.0
+          ],
+          [
+            100.0,
+            90.0
+          ],
+          [
+            100.0,
+            100.0
+          ],
+          [
+            180.0,
+            110.0
+          ],
+          [
+            180.0,
+            110.0
+          ],
+          [
+            180.0,
+            124.0
+          ],
+          [
+            180.0,
+            112.0
+          ],
+          [
+            180.0,
+            120.0
+          ],
+          [
+            180.0,
+            136.0
+          ],
+          [
+            180.0,
+            170.0
+          ],
+          [
+            180.0,
+            140.0
+          ],
+          [
+            180.0,
+            132.0
+          ],
+          [
+            180.0,
+            156.0
+          ],
+          [
+            180.0,
+            160.0
+          ],
+          [
+            180.0,
+            124.0
+          ],
+          [
+            180.0,
+            124.0
+          ],
+          [
+            380.0,
+            142.0
+          ],
+          [
+            380.0,
+            200.0
+          ],
+          [
+            400.0,
+            228.0
+          ],
+          [
+            400.0,
+            272.0
+          ],
+          [
+            420.0,
+            278.0
+          ],
+          [
+            420.0,
+            304.0
+          ],
+          [
+            640.0,
+            332.0
+          ],
+          [
+            640.0,
+            324.0
+          ],
+          [
+            640.0,
+            352.0
+          ],
+          [
+            640.0,
+            376.0
+          ],
+          [
+            640.0,
+            416.0
+          ],
+          [
+            640.0,
+            492.0
+          ],
+          [
+            6000.0,
+            998.0
+          ],
+          [
+            6000.0,
+            1630.0
+          ],
+          [
+            6000.0,
+            1596.0
+          ],
+          [
+            6000.0,
+            2234.0
+          ],
+          [
+            6000.0,
+            3830.0
+          ],
+          [
+            6000.0,
+            4938.0
+          ],
+          [
+            6000.0,
+            4358.0
+          ],
+          [
+            6000.0,
+            3804.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/6_31337"
+      }
+    ],
+    "7": [
+      {
+        "level": "7",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 9,
+        "win_rate": 0.0,
+        "best": 375.0,
+        "best_x": 375.0,
+        "stuck_frac": 0.0625,
+        "causes": {
+          "Stall": 25,
+          "Saw": 375
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.013,
+        "train_time_s": 18.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.293,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          27,
+          120,
+          0,
+          253,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.362,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            187.5,
+            43.7
+          ],
+          [
+            187.5,
+            81.2
+          ],
+          [
+            187.5,
+            131.2
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            168.8
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            156.2
+          ],
+          [
+            187.5,
+            181.2
+          ],
+          [
+            375.0,
+            206.2
+          ],
+          [
+            375.0,
+            262.5
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            312.5
+          ],
+          [
+            375.0,
+            300.0
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            318.7
+          ],
+          [
+            375.0,
+            243.7
+          ],
+          [
+            375.0,
+            334.4
+          ],
+          [
+            375.0,
+            318.7
+          ],
+          [
+            375.0,
+            312.5
+          ],
+          [
+            375.0,
+            318.7
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            281.2
+          ],
+          [
+            375.0,
+            312.5
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            350.0
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            350.0
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            356.2
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/7_1234"
+      },
+      {
+        "level": "7",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 15,
+        "win_rate": 0.0,
+        "best": 375.0,
+        "best_x": 375.0,
+        "stuck_frac": 0.0575,
+        "causes": {
+          "Saw": 377,
+          "Stall": 23
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0049,
+        "train_time_s": 21.4,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.277,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          28,
+          153,
+          3,
+          216,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.401,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            187.5,
+            37.5
+          ],
+          [
+            187.5,
+            75.0
+          ],
+          [
+            187.5,
+            109.4
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            165.6
+          ],
+          [
+            187.5,
+            150.0
+          ],
+          [
+            187.5,
+            159.4
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            178.1
+          ],
+          [
+            187.5,
+            168.8
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            178.1
+          ],
+          [
+            375.0,
+            206.2
+          ],
+          [
+            375.0,
+            209.4
+          ],
+          [
+            375.0,
+            318.7
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            293.7
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            346.9
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            362.5
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            343.7
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            368.7
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            353.1
+          ],
+          [
+            375.0,
+            375.0
+          ],
+          [
+            375.0,
+            356.2
+          ],
+          [
+            375.0,
+            337.5
+          ],
+          [
+            375.0,
+            375.0
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/7_2025"
+      },
+      {
+        "level": "7",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 23,
+        "win_rate": 0.0,
+        "best": 906.2,
+        "best_x": 906.2,
+        "stuck_frac": 0.045,
+        "causes": {
+          "Stall": 18,
+          "Saw": 382
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.031,
+        "train_time_s": 25.0,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.472,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          16,
+          128,
+          28,
+          49,
+          0,
+          53,
+          0,
+          0,
+          12,
+          114
+        ],
+        "death_cluster_entropy": 0.724,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            187.5,
+            75.0
+          ],
+          [
+            187.5,
+            140.6
+          ],
+          [
+            187.5,
+            168.8
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            150.0
+          ],
+          [
+            187.5,
+            150.0
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            184.4
+          ],
+          [
+            187.5,
+            187.5
+          ],
+          [
+            187.5,
+            171.9
+          ],
+          [
+            250.0,
+            193.8
+          ],
+          [
+            250.0,
+            178.1
+          ],
+          [
+            250.0,
+            187.5
+          ],
+          [
+            343.7,
+            228.1
+          ],
+          [
+            343.7,
+            256.2
+          ],
+          [
+            343.7,
+            262.5
+          ],
+          [
+            531.2,
+            328.1
+          ],
+          [
+            531.2,
+            375.0
+          ],
+          [
+            531.2,
+            437.5
+          ],
+          [
+            531.2,
+            465.6
+          ],
+          [
+            812.5,
+            550.0
+          ],
+          [
+            812.5,
+            509.4
+          ],
+          [
+            906.2,
+            606.2
+          ],
+          [
+            906.2,
+            534.4
+          ],
+          [
+            906.2,
+            584.4
+          ],
+          [
+            906.2,
+            684.4
+          ],
+          [
+            906.2,
+            678.1
+          ],
+          [
+            906.2,
+            850.0
+          ],
+          [
+            906.2,
+            731.2
+          ],
+          [
+            906.2,
+            759.4
+          ],
+          [
+            906.2,
+            668.8
+          ],
+          [
+            906.2,
+            831.2
+          ],
+          [
+            906.2,
+            812.5
+          ],
+          [
+            906.2,
+            796.9
+          ],
+          [
+            906.2,
+            868.8
+          ],
+          [
+            906.2,
+            759.4
+          ],
+          [
+            906.2,
+            781.2
+          ],
+          [
+            906.2,
+            906.2
+          ],
+          [
+            906.2,
+            775.0
+          ],
+          [
+            906.2,
+            668.8
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/7_31337"
+      }
+    ],
+    "8": [
+      {
+        "level": "8",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 37,
+        "win_rate": 0.0,
+        "best": 718.8,
+        "best_x": 718.8,
+        "stuck_frac": 0.1425,
+        "causes": {
+          "Saw": 343,
+          "Stall": 57
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0092,
+        "train_time_s": 93.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.474,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          15,
+          7,
+          73,
+          50,
+          51,
+          91,
+          11,
+          102,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.787,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            296.9,
+            121.9
+          ],
+          [
+            296.9,
+            129.7
+          ],
+          [
+            296.9,
+            217.2
+          ],
+          [
+            312.5,
+            232.8
+          ],
+          [
+            468.8,
+            260.9
+          ],
+          [
+            468.8,
+            356.2
+          ],
+          [
+            484.4,
+            389.1
+          ],
+          [
+            484.4,
+            382.8
+          ],
+          [
+            531.2,
+            439.1
+          ],
+          [
+            531.2,
+            443.8
+          ],
+          [
+            531.2,
+            470.3
+          ],
+          [
+            531.2,
+            415.6
+          ],
+          [
+            531.2,
+            451.6
+          ],
+          [
+            531.2,
+            421.9
+          ],
+          [
+            562.5,
+            471.9
+          ],
+          [
+            562.5,
+            496.9
+          ],
+          [
+            562.5,
+            476.6
+          ],
+          [
+            562.5,
+            481.2
+          ],
+          [
+            703.1,
+            512.5
+          ],
+          [
+            703.1,
+            506.2
+          ],
+          [
+            703.1,
+            557.8
+          ],
+          [
+            703.1,
+            585.9
+          ],
+          [
+            703.1,
+            548.4
+          ],
+          [
+            703.1,
+            567.2
+          ],
+          [
+            703.1,
+            581.2
+          ],
+          [
+            703.1,
+            587.5
+          ],
+          [
+            703.1,
+            507.8
+          ],
+          [
+            703.1,
+            518.8
+          ],
+          [
+            703.1,
+            543.8
+          ],
+          [
+            703.1,
+            564.1
+          ],
+          [
+            703.1,
+            615.6
+          ],
+          [
+            703.1,
+            579.7
+          ],
+          [
+            703.1,
+            596.9
+          ],
+          [
+            703.1,
+            587.5
+          ],
+          [
+            703.1,
+            529.7
+          ],
+          [
+            703.1,
+            493.8
+          ],
+          [
+            718.8,
+            534.4
+          ],
+          [
+            718.8,
+            625.0
+          ],
+          [
+            718.8,
+            529.7
+          ],
+          [
+            718.8,
+            629.7
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/8_1234"
+      },
+      {
+        "level": "8",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 26,
+        "win_rate": 0.0,
+        "best": 312.5,
+        "best_x": 312.5,
+        "stuck_frac": 0.085,
+        "causes": {
+          "Saw": 366,
+          "Stall": 34
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0013,
+        "train_time_s": 41.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.268,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          17,
+          9,
+          289,
+          85,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.34,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            250.0,
+            60.9
+          ],
+          [
+            250.0,
+            114.1
+          ],
+          [
+            250.0,
+            160.9
+          ],
+          [
+            250.0,
+            240.6
+          ],
+          [
+            281.2,
+            253.1
+          ],
+          [
+            296.9,
+            232.8
+          ],
+          [
+            296.9,
+            232.8
+          ],
+          [
+            296.9,
+            267.2
+          ],
+          [
+            296.9,
+            279.7
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            287.5
+          ],
+          [
+            296.9,
+            284.4
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            285.9
+          ],
+          [
+            296.9,
+            285.9
+          ],
+          [
+            296.9,
+            289.1
+          ],
+          [
+            296.9,
+            284.4
+          ],
+          [
+            296.9,
+            287.5
+          ],
+          [
+            296.9,
+            276.6
+          ],
+          [
+            296.9,
+            284.4
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            265.6
+          ],
+          [
+            296.9,
+            284.4
+          ],
+          [
+            312.5,
+            284.4
+          ],
+          [
+            312.5,
+            285.9
+          ],
+          [
+            312.5,
+            282.8
+          ],
+          [
+            312.5,
+            298.4
+          ],
+          [
+            312.5,
+            292.2
+          ],
+          [
+            312.5,
+            275.0
+          ],
+          [
+            312.5,
+            295.3
+          ],
+          [
+            312.5,
+            281.2
+          ],
+          [
+            312.5,
+            284.4
+          ],
+          [
+            312.5,
+            300.0
+          ],
+          [
+            312.5,
+            300.0
+          ],
+          [
+            312.5,
+            293.8
+          ],
+          [
+            312.5,
+            312.5
+          ],
+          [
+            312.5,
+            278.1
+          ],
+          [
+            312.5,
+            287.5
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/8_2025"
+      },
+      {
+        "level": "8",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 40,
+        "win_rate": 0.0,
+        "best": 406.2,
+        "best_x": 406.2,
+        "stuck_frac": 0.0425,
+        "causes": {
+          "Stall": 17,
+          "Saw": 383
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0009,
+        "train_time_s": 40.7,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.272,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          14,
+          3,
+          382,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.092,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            250.0,
+            73.4
+          ],
+          [
+            250.0,
+            135.9
+          ],
+          [
+            250.0,
+            179.7
+          ],
+          [
+            250.0,
+            250.0
+          ],
+          [
+            281.2,
+            254.7
+          ],
+          [
+            296.9,
+            265.6
+          ],
+          [
+            296.9,
+            281.3
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            275.0
+          ],
+          [
+            296.9,
+            290.6
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            281.3
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            296.9,
+            279.7
+          ],
+          [
+            296.9,
+            287.5
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            296.9,
+            281.3
+          ],
+          [
+            296.9,
+            285.9
+          ],
+          [
+            296.9,
+            284.4
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            281.3
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            282.8
+          ],
+          [
+            296.9,
+            289.1
+          ],
+          [
+            296.9,
+            287.5
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            293.8
+          ],
+          [
+            296.9,
+            287.5
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            290.6
+          ],
+          [
+            296.9,
+            292.2
+          ],
+          [
+            296.9,
+            278.1
+          ],
+          [
+            406.2,
+            295.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/8_31337"
+      }
+    ],
+    "9": [
+      {
+        "level": "9",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 758.6,
+        "best_x": 758.6,
+        "stuck_frac": 0.5025,
+        "causes": {
+          "Stall": 201,
+          "Saw": 199
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0184,
+        "train_time_s": 46.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.366,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          16,
+          48,
+          151,
+          22,
+          56,
+          60,
+          28,
+          19,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.782,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            241.4,
+            56.9
+          ],
+          [
+            241.4,
+            172.4
+          ],
+          [
+            241.4,
+            213.8
+          ],
+          [
+            241.4,
+            231.0
+          ],
+          [
+            275.9,
+            219.0
+          ],
+          [
+            275.9,
+            217.2
+          ],
+          [
+            465.5,
+            277.6
+          ],
+          [
+            465.5,
+            294.8
+          ],
+          [
+            465.5,
+            320.7
+          ],
+          [
+            465.5,
+            362.1
+          ],
+          [
+            465.5,
+            339.7
+          ],
+          [
+            465.5,
+            325.9
+          ],
+          [
+            465.5,
+            351.7
+          ],
+          [
+            465.5,
+            319.0
+          ],
+          [
+            465.5,
+            317.2
+          ],
+          [
+            569.0,
+            377.6
+          ],
+          [
+            569.0,
+            346.6
+          ],
+          [
+            569.0,
+            344.8
+          ],
+          [
+            569.0,
+            406.9
+          ],
+          [
+            569.0,
+            405.2
+          ],
+          [
+            569.0,
+            369.0
+          ],
+          [
+            758.6,
+            529.3
+          ],
+          [
+            758.6,
+            425.9
+          ],
+          [
+            758.6,
+            422.4
+          ],
+          [
+            758.6,
+            425.9
+          ],
+          [
+            758.6,
+            401.7
+          ],
+          [
+            758.6,
+            431.0
+          ],
+          [
+            758.6,
+            410.3
+          ],
+          [
+            758.6,
+            517.2
+          ],
+          [
+            758.6,
+            425.9
+          ],
+          [
+            758.6,
+            436.2
+          ],
+          [
+            758.6,
+            455.2
+          ],
+          [
+            758.6,
+            475.9
+          ],
+          [
+            758.6,
+            439.7
+          ],
+          [
+            758.6,
+            379.3
+          ],
+          [
+            758.6,
+            444.8
+          ],
+          [
+            758.6,
+            429.3
+          ],
+          [
+            758.6,
+            470.7
+          ],
+          [
+            758.6,
+            443.1
+          ],
+          [
+            758.6,
+            403.4
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/9_1234"
+      },
+      {
+        "level": "9",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 16,
+        "win_rate": 0.0,
+        "best": 379.3,
+        "best_x": 379.3,
+        "stuck_frac": 0.3975,
+        "causes": {
+          "Saw": 241,
+          "Stall": 159
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0042,
+        "train_time_s": 29.6,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.233,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          41,
+          113,
+          152,
+          94,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.564,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            224.1,
+            32.8
+          ],
+          [
+            224.1,
+            75.9
+          ],
+          [
+            224.1,
+            122.4
+          ],
+          [
+            224.1,
+            186.2
+          ],
+          [
+            241.4,
+            212.1
+          ],
+          [
+            241.4,
+            217.2
+          ],
+          [
+            241.4,
+            231.0
+          ],
+          [
+            241.4,
+            219.0
+          ],
+          [
+            241.4,
+            182.8
+          ],
+          [
+            241.4,
+            208.6
+          ],
+          [
+            241.4,
+            213.8
+          ],
+          [
+            241.4,
+            213.8
+          ],
+          [
+            241.4,
+            196.6
+          ],
+          [
+            241.4,
+            224.1
+          ],
+          [
+            258.6,
+            227.6
+          ],
+          [
+            379.3,
+            237.9
+          ],
+          [
+            379.3,
+            246.6
+          ],
+          [
+            379.3,
+            222.4
+          ],
+          [
+            379.3,
+            232.8
+          ],
+          [
+            379.3,
+            251.7
+          ],
+          [
+            379.3,
+            239.7
+          ],
+          [
+            379.3,
+            260.3
+          ],
+          [
+            379.3,
+            286.2
+          ],
+          [
+            379.3,
+            234.5
+          ],
+          [
+            379.3,
+            281.0
+          ],
+          [
+            379.3,
+            294.8
+          ],
+          [
+            379.3,
+            239.7
+          ],
+          [
+            379.3,
+            286.2
+          ],
+          [
+            379.3,
+            281.0
+          ],
+          [
+            379.3,
+            269.0
+          ],
+          [
+            379.3,
+            279.3
+          ],
+          [
+            379.3,
+            274.1
+          ],
+          [
+            379.3,
+            270.7
+          ],
+          [
+            379.3,
+            267.2
+          ],
+          [
+            379.3,
+            248.3
+          ],
+          [
+            379.3,
+            263.8
+          ],
+          [
+            379.3,
+            253.4
+          ],
+          [
+            379.3,
+            262.1
+          ],
+          [
+            379.3,
+            270.7
+          ],
+          [
+            379.3,
+            298.3
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/9_2025"
+      },
+      {
+        "level": "9",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 18,
+        "win_rate": 0.0,
+        "best": 672.4,
+        "best_x": 672.4,
+        "stuck_frac": 0.8225,
+        "causes": {
+          "Stall": 329,
+          "Saw": 71
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0249,
+        "train_time_s": 58.1,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.478,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          21,
+          14,
+          59,
+          15,
+          65,
+          53,
+          173,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.696,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            241.4,
+            89.7
+          ],
+          [
+            241.4,
+            117.2
+          ],
+          [
+            241.4,
+            160.3
+          ],
+          [
+            379.3,
+            141.4
+          ],
+          [
+            396.6,
+            208.6
+          ],
+          [
+            413.8,
+            231.0
+          ],
+          [
+            603.4,
+            339.7
+          ],
+          [
+            637.9,
+            472.4
+          ],
+          [
+            655.2,
+            491.4
+          ],
+          [
+            655.2,
+            565.5
+          ],
+          [
+            655.2,
+            515.5
+          ],
+          [
+            655.2,
+            506.9
+          ],
+          [
+            655.2,
+            543.1
+          ],
+          [
+            655.2,
+            555.2
+          ],
+          [
+            655.2,
+            570.7
+          ],
+          [
+            655.2,
+            553.4
+          ],
+          [
+            655.2,
+            591.4
+          ],
+          [
+            672.4,
+            575.9
+          ],
+          [
+            672.4,
+            586.2
+          ],
+          [
+            672.4,
+            472.4
+          ],
+          [
+            672.4,
+            543.1
+          ],
+          [
+            672.4,
+            558.6
+          ],
+          [
+            672.4,
+            458.6
+          ],
+          [
+            672.4,
+            506.9
+          ],
+          [
+            672.4,
+            550.0
+          ],
+          [
+            672.4,
+            548.3
+          ],
+          [
+            672.4,
+            525.9
+          ],
+          [
+            672.4,
+            525.9
+          ],
+          [
+            672.4,
+            525.9
+          ],
+          [
+            672.4,
+            582.8
+          ],
+          [
+            672.4,
+            582.8
+          ],
+          [
+            672.4,
+            558.6
+          ],
+          [
+            672.4,
+            601.7
+          ],
+          [
+            672.4,
+            489.7
+          ],
+          [
+            672.4,
+            503.4
+          ],
+          [
+            672.4,
+            544.8
+          ],
+          [
+            672.4,
+            543.1
+          ],
+          [
+            672.4,
+            567.2
+          ],
+          [
+            672.4,
+            551.7
+          ],
+          [
+            672.4,
+            577.6
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/9_31337"
+      }
+    ],
+    "10": [
+      {
+        "level": "10",
+        "seed": 1234,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 22,
+        "win_rate": 0.0,
+        "best": 613.6,
+        "best_x": 613.6,
+        "stuck_frac": 0.055,
+        "causes": {
+          "Stall": 22,
+          "Fire": 364,
+          "Pit": 14
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0156,
+        "train_time_s": 17.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.392,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          92,
+          23,
+          16,
+          20,
+          61,
+          130,
+          58,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.744,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            90.9,
+            22.7
+          ],
+          [
+            90.9,
+            54.5
+          ],
+          [
+            204.5,
+            97.7
+          ],
+          [
+            477.3,
+            140.9
+          ],
+          [
+            477.3,
+            118.2
+          ],
+          [
+            477.3,
+            172.7
+          ],
+          [
+            477.3,
+            250.0
+          ],
+          [
+            522.7,
+            300.0
+          ],
+          [
+            522.7,
+            311.4
+          ],
+          [
+            522.7,
+            315.9
+          ],
+          [
+            522.7,
+            434.1
+          ],
+          [
+            590.9,
+            479.5
+          ],
+          [
+            590.9,
+            406.8
+          ],
+          [
+            590.9,
+            393.2
+          ],
+          [
+            590.9,
+            404.5
+          ],
+          [
+            590.9,
+            429.5
+          ],
+          [
+            590.9,
+            459.1
+          ],
+          [
+            590.9,
+            440.9
+          ],
+          [
+            590.9,
+            445.5
+          ],
+          [
+            590.9,
+            454.5
+          ],
+          [
+            590.9,
+            422.7
+          ],
+          [
+            613.6,
+            497.7
+          ],
+          [
+            613.6,
+            486.4
+          ],
+          [
+            613.6,
+            440.9
+          ],
+          [
+            613.6,
+            479.5
+          ],
+          [
+            613.6,
+            518.2
+          ],
+          [
+            613.6,
+            547.7
+          ],
+          [
+            613.6,
+            486.4
+          ],
+          [
+            613.6,
+            515.9
+          ],
+          [
+            613.6,
+            511.4
+          ],
+          [
+            613.6,
+            484.1
+          ],
+          [
+            613.6,
+            386.4
+          ],
+          [
+            613.6,
+            470.5
+          ],
+          [
+            613.6,
+            463.6
+          ],
+          [
+            613.6,
+            445.5
+          ],
+          [
+            613.6,
+            502.3
+          ],
+          [
+            613.6,
+            525.0
+          ],
+          [
+            613.6,
+            397.7
+          ],
+          [
+            613.6,
+            490.9
+          ],
+          [
+            613.6,
+            484.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/10_1234"
+      },
+      {
+        "level": "10",
+        "seed": 2025,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 20,
+        "win_rate": 0.0,
+        "best": 590.9,
+        "best_x": 590.9,
+        "stuck_frac": 0.0575,
+        "causes": {
+          "Fire": 376,
+          "Stall": 23,
+          "Pit": 1
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0251,
+        "train_time_s": 15.8,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.343,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          146,
+          2,
+          1,
+          62,
+          47,
+          142,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.572,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            90.9,
+            13.6
+          ],
+          [
+            90.9,
+            34.1
+          ],
+          [
+            90.9,
+            61.4
+          ],
+          [
+            90.9,
+            90.9
+          ],
+          [
+            90.9,
+            90.9
+          ],
+          [
+            90.9,
+            90.9
+          ],
+          [
+            90.9,
+            90.9
+          ],
+          [
+            90.9,
+            90.9
+          ],
+          [
+            363.6,
+            118.2
+          ],
+          [
+            363.6,
+            145.5
+          ],
+          [
+            363.6,
+            200.0
+          ],
+          [
+            454.5,
+            236.4
+          ],
+          [
+            477.3,
+            311.4
+          ],
+          [
+            477.3,
+            411.4
+          ],
+          [
+            477.3,
+            302.3
+          ],
+          [
+            477.3,
+            311.4
+          ],
+          [
+            500.0,
+            356.8
+          ],
+          [
+            500.0,
+            379.5
+          ],
+          [
+            500.0,
+            415.9
+          ],
+          [
+            590.9,
+            470.5
+          ],
+          [
+            590.9,
+            404.5
+          ],
+          [
+            590.9,
+            425.0
+          ],
+          [
+            590.9,
+            452.3
+          ],
+          [
+            590.9,
+            413.6
+          ],
+          [
+            590.9,
+            513.6
+          ],
+          [
+            590.9,
+            504.5
+          ],
+          [
+            590.9,
+            479.5
+          ],
+          [
+            590.9,
+            484.1
+          ],
+          [
+            590.9,
+            520.5
+          ],
+          [
+            590.9,
+            520.5
+          ],
+          [
+            590.9,
+            477.3
+          ],
+          [
+            590.9,
+            527.3
+          ],
+          [
+            590.9,
+            493.2
+          ],
+          [
+            590.9,
+            486.4
+          ],
+          [
+            590.9,
+            445.5
+          ],
+          [
+            590.9,
+            486.4
+          ],
+          [
+            590.9,
+            420.5
+          ],
+          [
+            590.9,
+            543.2
+          ],
+          [
+            590.9,
+            443.2
+          ],
+          [
+            590.9,
+            434.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/10_2025"
+      },
+      {
+        "level": "10",
+        "seed": 31337,
+        "pop_size": 10,
+        "gens_run": 40,
+        "first_win_gen": null,
+        "best_gen": 3,
+        "win_rate": 0.0,
+        "best": 113.6,
+        "best_x": 113.6,
+        "stuck_frac": 0.105,
+        "causes": {
+          "Stall": 42,
+          "Fire": 358
+        },
+        "trend": "IMPROVING",
+        "improvement_rate": 0.0093,
+        "train_time_s": 19.9,
+        "completion_rate": 0.0,
+        "mean_completion_time": null,
+        "completion_time_stddev": 0.0,
+        "progress_at_death": 0.091,
+        "deaths_per_run": 10.0,
+        "deaths_per_win": 400.0,
+        "death_hist": [
+          190,
+          210,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "death_cluster_entropy": 0.3,
+        "coin_collection_rate": 1.0,
+        "novice_expert_gap": 0.0,
+        "curve": [
+          [
+            90.9,
+            27.3
+          ],
+          [
+            90.9,
+            52.3
+          ],
+          [
+            113.6,
+            65.9
+          ],
+          [
+            113.6,
+            90.9
+          ],
+          [
+            113.6,
+            93.2
+          ],
+          [
+            113.6,
+            84.1
+          ],
+          [
+            113.6,
+            95.5
+          ],
+          [
+            113.6,
+            93.2
+          ],
+          [
+            113.6,
+            97.7
+          ],
+          [
+            113.6,
+            90.9
+          ],
+          [
+            113.6,
+            77.3
+          ],
+          [
+            113.6,
+            93.2
+          ],
+          [
+            113.6,
+            97.7
+          ],
+          [
+            113.6,
+            104.5
+          ],
+          [
+            113.6,
+            88.6
+          ],
+          [
+            113.6,
+            86.4
+          ],
+          [
+            113.6,
+            84.1
+          ],
+          [
+            113.6,
+            86.4
+          ],
+          [
+            113.6,
+            88.6
+          ],
+          [
+            113.6,
+            100.0
+          ],
+          [
+            113.6,
+            75.0
+          ],
+          [
+            113.6,
+            104.5
+          ],
+          [
+            113.6,
+            90.9
+          ],
+          [
+            113.6,
+            102.3
+          ],
+          [
+            113.6,
+            104.5
+          ],
+          [
+            113.6,
+            102.3
+          ],
+          [
+            113.6,
+            109.1
+          ],
+          [
+            113.6,
+            84.1
+          ],
+          [
+            113.6,
+            97.7
+          ],
+          [
+            113.6,
+            88.6
+          ],
+          [
+            113.6,
+            104.5
+          ],
+          [
+            113.6,
+            90.9
+          ],
+          [
+            113.6,
+            104.5
+          ],
+          [
+            113.6,
+            109.1
+          ],
+          [
+            113.6,
+            106.8
+          ],
+          [
+            113.6,
+            106.8
+          ],
+          [
+            113.6,
+            90.9
+          ],
+          [
+            113.6,
+            97.7
+          ],
+          [
+            113.6,
+            88.6
+          ],
+          [
+            113.6,
+            84.1
+          ]
+        ],
+        "dir": "runs/gasweep/meatboy/killer/p10g40_b8cc78_action_feedback-1/10_31337"
+      }
+    ]
+  }
+}

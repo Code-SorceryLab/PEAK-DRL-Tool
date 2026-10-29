@@ -1,0 +1,19 @@
+[2026-10-28 18:09:59] START n=318 host=c19.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant off_route@7 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/meatboy/mutants/off_route@7 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona collector --levels 7 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/off_route@7/probes --out runs/ast/meatboy/off_route@7 --best --workers 3
+--best: meatboy -> {'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200_best · runs/ast/meatboy/off_route@7/probes]
+
+  note: meatboy level [7] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [7] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [7] has no coins — persona [collector] plays for the goal alone here
+[1/3] 7 seed 2025: best gen 1, win rate 0%, best_x 375.0, 0:01:52
+[2/3] 7 seed 31337: best gen 148, win rate 67%, best_x 1000.0, 0:02:11
+[3/3] 7 seed 1234: best gen 11, win rate 0%, best_x 906.2, 0:03:19
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+7             1/3         gen 148.0gen 53.3±204.1        22% ±96%        Saw (95%)    760.4     5%  +1.7%/g  0:07:22  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/meatboy/off_route@7/report_meatboy_collector_p10g200_best.json  (0:05:07 wall)
+[2026-10-28 18:15:11] END rc=0 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant off_route@7 --persona collector --workers $W

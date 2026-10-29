@@ -1,0 +1,17 @@
+[2026-10-28 09:23:53] START n=175 host=c163.nibi.sharcnet $PY -m code.neuro.balance --game meatboy --persona collector --levels 8 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200 · runs/probes]
+
+  note: meatboy level [8] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [8] has no coins — persona [collector] plays for the goal alone here
+  note: meatboy level [8] has no coins — persona [collector] plays for the goal alone here
+[1/3] 8 seed 31337: best gen 47, win rate 39%, best_x 1000.0, 0:02:34
+[2/3] 8 seed 2025: best gen 148, win rate 0%, best_x 359.4, 0:03:35
+[3/3] 8 seed 1234: best gen 116, win rate 0%, best_x 750.0, 0:07:03
+
+LEVEL BALANCE REPORT - meatboy  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+8             1/3          gen 47.0gen 103.7±128.2        13% ±56%        Saw (93%)    703.1     7%  +0.2%/g  0:13:14  IMPROVING/FLAT/IMPROVING
+
+saved runs/balance_stage/report_meatboy_collector_p10g200.json  (0:09:11 wall)
+[2026-10-28 09:33:06] END rc=0 $PY -m code.neuro.balance --game meatboy --persona collector --levels 8 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage

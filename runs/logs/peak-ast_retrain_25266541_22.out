@@ -1,0 +1,13 @@
+[2026-10-28 20:23:03] START n=23 host=c412.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant jump_velocity_down --persona killer --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/jump_velocity_down /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona killer --levels Mario1-1 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/jump_velocity_down/probes --out runs/ast/mario/jump_velocity_down --workers 3
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200 · runs/ast/mario/jump_velocity_down/probes]
+
+
+LEVEL BALANCE REPORT - mario  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+Mario1-1      0/3             nevergen 81.7±134.3          0% ±0%      Stall (93%)   1449.0    93%  +0.6%/g  0:32:27  FLAT/FLAT/FLAT
+
+saved runs/ast/mario/jump_velocity_down/report_mario_killer_p10g200.json  (0:00:00 wall)
+[2026-10-28 20:23:06] END rc=0 $PY -m code.neuro.ast_eval retrain --game mario --mutant jump_velocity_down --persona killer --workers $W

@@ -1,0 +1,24 @@
+[2026-10-28 09:47:05] START n=226 host=c303.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 6 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/probes]
+
+[1/3] 6 seed 31337: best gen 4, win rate 0%, best_x 1000.0, 0:00:22
+[2/3] 6 seed 1234: best gen 10, win rate 0%, best_x 1000.0, 0:00:30
+[3/3] 6 seed 2025: best gen 6, win rate 0%, best_x 1000.0, 0:00:32
+skip runs/probes/bomberman/clumsy/p30g200_best/2_1234: unfinished (gen 120 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/5_1234: unfinished (gen 15 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/5_31337: unfinished (gen 16 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/7_1234: unfinished (gen 13 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/7_2025: unfinished (gen 21 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/7_31337: unfinished (gen 17 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/8_1234: unfinished (gen 18 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/8_2025: unfinished (gen 16 of 200)
+skip runs/probes/bomberman/clumsy/p30g200_best/8_31337: unfinished (gen 21 of 200)
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+6             3/3       gen 6.7±7.6  gen 6.7±7.6          0% ±0%       Bomb (58%)   1000.0     1% +11.9%/g  0:01:25  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/balance_stage/report_bomberman_clumsy_p30g200_best.json  (0:00:42 wall)
+[2026-10-28 09:47:51] END rc=0 $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 6 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best

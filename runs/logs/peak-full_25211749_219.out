@@ -1,0 +1,13 @@
+[2026-10-28 13:24:19] START n=220 host=c345.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+--best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
+skip 3 finished probe(s)
+balance probe: 1 levels x 3 seeds = 0 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/probes]
+
+
+LEVEL BALANCE REPORT - bomberman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+3             3/3     gen 10.3±24.1gen 12.3±23.9         7% ±27%       Bomb (99%)   1000.0     1% +19.2%/g  0:01:53  IMPROVING/FLAT/IMPROVING
+
+saved runs/balance_stage/report_bomberman_clumsy_p30g200_best.json  (0:00:00 wall)
+[2026-10-28 13:24:25] END rc=0 $PY -m code.neuro.balance --game bomberman --persona clumsy --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
