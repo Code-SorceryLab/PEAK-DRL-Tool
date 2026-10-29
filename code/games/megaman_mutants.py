@@ -1,6 +1,6 @@
 """Game mutants of a Mega Man stage: copies of the game that differ by one small change.
 
-    python -m code.games.megaman_mutants                 # -> runs/megaman/mutants/
+    python -m code.games.megaman_mutants                 # -> code/games/levels/mutants/megaman/
     python -m code.games.megaman_mutants --list          # what is there
 
 A mutant is a record (mutant.json) plus what it changes: its own copy of the stage file (level
@@ -24,8 +24,8 @@ The route field approximates the physics and is cautious, so spot-check a sample
 
 To play a mutant, name it in the environment; every command then runs on that copy of the game:
 
-    PEAK_MM1_MUTANT=runs/megaman/mutants/s3-seal_route python -m code.neuro.relay --episodes 20 \\
-        --out runs/megaman/mutants/s3-seal_route/relay
+    PEAK_MM1_MUTANT=code/games/levels/mutants/megaman/s3-seal_route python -m code.neuro.relay --episodes 20 \\
+        --out runs/megaman/relay/s3-seal_route
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ from .megaman_route import DRIFT_CELLS, JUMP_CELLS, route_field
 from .mutants import source_hash
 
 GAME = "megaman"
-OUT = os.path.join("runs", GAME, "mutants")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels", "mutants", GAME)
 LEVELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels")
 LEVEL_OPERATORS = ["seal_route", "remove_ladder", "widen_gap", "add_hazard", "add_enemy", "remove_enemy",
                    "cosmetic_tile", "off_route"]
@@ -411,7 +411,7 @@ def table(index: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate game mutants of a Mega Man stage")
     ap.add_argument("--stage", default="CutMan", help="the full-stage level id")
-    ap.add_argument("--out", default=OUT, help="where the mutants go (default: runs/megaman/mutants)")
+    ap.add_argument("--out", default=OUT, help="where the mutants go (default: code/games/levels/mutants/megaman)")
     ap.add_argument("--list", action="store_true", help="print the mutants already generated and exit")
     args = ap.parse_args()
     index = load(args.out) if args.list else generate(args.stage, args.out)

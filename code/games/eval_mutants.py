@@ -22,7 +22,8 @@ flat floor, 14-tile gap). The level was redrawn on 27 Oct at the real game's sca
 alcoves under saw-topped pillars, a 15-tile gap over an open pit); the same five changes are placed
 on that layout, and each record's `note` says how.
 Mega Man's five are segment 3 (Ledges) of code/games/megaman_mutants.py plus its global jump change.
-Mutants go to runs/<game>/mutants/<id>/ (mutant.json, level.txt, level.yaml when the level has one).
+Mutants go to code/games/levels/mutants/<game>/<id>/ (mutant.json, level.txt, level.yaml when the level
+has one): they are level data, next to the levels they are made from.
 """
 from __future__ import annotations
 
@@ -134,7 +135,7 @@ def _effective(key: str):
 
 
 def out_dir(game: str) -> str:
-    return os.path.join("runs", game, "mutants")
+    return os.path.join(LEVELS_DIR, "mutants", game)
 
 
 def level_file(game: str, level: str) -> str:

@@ -179,7 +179,7 @@ python -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded     # 
 python -m code.neuro.ast_eval play --game mario --random               # the random-action baseline (2D games)
 python -m code.stats.ast_paper                                         # paper-ast/: results tables, LaTeX, figures
 python -m code.stats.ast_metrics --page                                # metric tables + runs/balance/mutations.html
-PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
+PEAK_MUTANT=code/games/levels/mutants/mario/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
 
 # Play
 python -m code.games.tools.manual_play --game platformer --level Mario1-2
@@ -477,7 +477,7 @@ The cells are fixed by hand in `code/games/eval_mutants.py`; each names the char
 a level that changed since is refused rather than mutated in the wrong place, and every mutant is
 loaded in the game and checked before it is written (the change plays, a cosmetic copy parses the
 same, an off-route tile is walled in, a flood fill finds the exit only where it should). A mutant
-is a folder (`runs/<game>/mutants/<id>/`); name it in `PEAK_MUTANT` and any command plays it.
+is a folder (`code/games/levels/mutants/<game>/<id>/`); name it in `PEAK_MUTANT` and any command plays it.
 
 A playtest gives each agent one attempt with learning off: the best genome of each of the three
 seeds per persona, so a persona's win rate moves in steps of 1/3 (Mega Man plays its relay of

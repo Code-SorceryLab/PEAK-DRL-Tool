@@ -753,6 +753,15 @@ _PLAY_CONTROLS = {
     "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
                  ("I", "Toggle invincibility (debug)"), ("", "A controller works too: stick / d-pad, Cross, Square")],
 }
+# What each NES button does, for the study's controller screen (code/games/tools/manual_play.py reads them).
+# The pixel font has letters, digits and $*-./:>_ only.
+_PAD_CONTROLS = {
+    "mario":     {"dpad": "MOVE", "a": "JUMP", "b": "HOLD: RUN / TAP: FIREBALL", "select": "PAUSE", "start": "NOT USED"},
+    "meatboy":   {"dpad": "MOVE", "a": "JUMP / WALL-JUMP", "b": "RUN", "select": "PAUSE", "start": "NOT USED"},
+    "bomberman": {"dpad": "MOVE", "a": "DROP A BOMB", "b": "DETONATE: REMOTE ITEM", "select": "PAUSE",
+                  "start": "NOT USED"},
+    "megaman":   {"dpad": "MOVE / CLIMB LADDERS", "a": "JUMP", "b": "FIRE", "select": "PAUSE", "start": "NOT USED"},
+}
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
                ("F4", "Hitboxes"), ("F5", "Agent max view"), ("F6", "Background grid"),
                ("F7", "Close / open the debug panel")]
@@ -791,6 +800,7 @@ def _study_row(old: dict, game: str, participant: str, phase: str, run: int) -> 
 def _study_env(mutant: dict | None = None) -> dict:
     """A real window, playing the given mutant (or the unchanged game)."""
     env = {k: v for k, v in os.environ.items() if k not in ("SDL_VIDEODRIVER", "PEAK_MUTANT", "PEAK_MM1_MUTANT")}
+    env["PEAK_STUDY"] = "1"                 # manual play: no debug overlays for a participant
     if mutant:
         env["PEAK_MUTANT"] = str(mutant["dir"])
     return env
@@ -865,7 +875,6 @@ def study_session(ui) -> bool:
     level BASELINE_RUNS times, then its five mutants once each in a random order; each attempt in its own
     run folder. False when the ID screen was left with ESC (close the pop-up), else True (next participant)."""
     import random
-    import re
     from code.games.eval_mutants import EVAL_LEVELS, eval_set
     participant = "".join(c if c.isalnum() or c in "-_" else "_" for c in ui.ask_text("PARTICIPANT ID") or "")
     if not participant:
@@ -886,11 +895,10 @@ def study_session(ui) -> bool:
     where = STUDY_DIR / participant / game
     if where.exists() and ui.ask("ALREADY RECORDED", [f"ADD TO {participant}", "CANCEL"], 1, b_backs=False) != 0:
         return True
-    # The pixel font has no arrows or brackets: drop them, as the pad overlay in the game shows the buttons.
-    plain = lambda t: re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ./:-]", " ", t)).strip(" /")
-    if _study_ask(ui, "WARM-UP", [f"{plain(key):<10}{plain(what)}" for key, what in _PLAY_CONTROLS[game]], None,
-                  f"{WARMUP_MINUTES:g} MIN, NOT RECORDED      A  START", size=2) is None:
-        return True
+    while ui.show_controls("HOW TO PLAY", _PAD_CONTROLS[game],
+                           f"{WARMUP_MINUTES:g} MIN WARM-UP: NOT RECORDED      A  START") is None:   # ESC
+        if ui.ask("END SESSION?", ["NO, GO ON", "YES, END IT"], 0, "A  OK", b_backs=False) == 1:
+            return True
     ui.run_game([sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
                  "--fps", "60", "--quit-after", str(WARMUP_MINUTES),   # counts down on screen, pauses excluded
                  "--lives", "0"], _study_env())                        # practice: lives never run out
@@ -1358,7 +1366,8 @@ def play_mutant():
     env.pop("PEAK_MM1_MUTANT", None)
     env.pop("PEAK_MUTANT", None)
     if variant != "base":
-        env["PEAK_MUTANT"] = str(RUNS_DIR / game / "mutants" / variant)
+        from code.games.eval_mutants import out_dir   # lazy: the menu starts without numpy/pygame
+        env["PEAK_MUTANT"] = os.path.join(out_dir(game), variant)
     record = RUNS_DIR / "ast" / game / variant / "human"
     cmd = [sys.executable, "-m", "code.games.tools.manual_play", "--game", CONFIG_KEY.get(game, game),
            "--fps", "60", "--level", level, "--record", str(record), "--player", player]

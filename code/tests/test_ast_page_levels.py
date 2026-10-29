@@ -30,7 +30,8 @@ def mutants_dir(tmp_path_factory):
 
 @pytest.fixture
 def results(mutants_dir, tmp_path, monkeypatch):
-    monkeypatch.setattr(em, "out_dir", lambda game: mutants_dir if game == "meatboy" else os.path.join("runs", game, "mutants"))
+    real = em.out_dir
+    monkeypatch.setattr(em, "out_dir", lambda game: mutants_dir if game == "meatboy" else real(game))
     monkeypatch.setattr(am, "ROOT", str(tmp_path))
     won = [row("WON", seed=s, run=f"r/{s}") for s in (1, 2, 3)]
     dead = [row("DEAD", seed=s, run=f"r/{s}") for s in (1, 2, 3)]

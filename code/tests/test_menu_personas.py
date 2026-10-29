@@ -106,8 +106,10 @@ def _study_popup(played: list, ask=lambda *a, **k: 0, runs=()) -> SimpleNamespac
     taken from runs in order (("Pit",) = died once, then quit), then a cleared level ("Success",)."""
     import csv
     runs = list(runs)
+    studied, shown = [], []
 
     def run_game(cmd, env):
+        studied.append(env.get("PEAK_STUDY"))              # every study run plays with the debug overlays off
         if "--record" not in cmd:                          # the warm-up
             return
         played.append(env.get("PEAK_MUTANT"))
@@ -122,7 +124,8 @@ def _study_popup(played: list, ask=lambda *a, **k: 0, runs=()) -> SimpleNamespac
                 w.writerow({"world": "Mario1-1", "cause_of_death": cause, "route": "[(1.0, 2.0)]", "elapsed_time": 3})
 
     return SimpleNamespace(NAMES={}, ask_text=lambda title: "P1", ask=ask, show_game=lambda game: None,
-                           run_game=run_game)
+                           run_game=run_game, studied=studied, shown=shown,
+                           show_controls=lambda title, controls, hint="": shown.append(controls) or 0)
 
 
 def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, tmp_path):
@@ -130,7 +133,10 @@ def test_user_study_plays_baseline_then_every_mutant_once_shuffled(monkeypatch, 
     from code.games.eval_mutants import eval_set
     played = []                                            # PEAK_MUTANT per recorded attempt
     monkeypatch.setattr(menu, "STUDY_DIR", tmp_path)
-    menu.study_session(_study_popup(played))
+    popup = _study_popup(played)
+    menu.study_session(popup)
+    assert popup.shown == [menu._PAD_CONTROLS["mario"]]   # the controller screen before the warm-up
+    assert popup.studied == ["1"] * 9                      # warm-up, 3 baseline, 5 mutants: no debug overlays
     ids = {m["dir"]: m["id"] for m in eval_set("mario")}
     assert played[:3] == [None] * 3                        # baseline: the unchanged level
     assert sorted(played[3:]) == sorted(ids) and len(played) == 8

@@ -317,7 +317,7 @@ def host_agents(dest: str, games: list[str] = GAMES) -> list[dict]:
 
 def _replay(a: dict) -> str:
     """The command that watches this agent play, on the mutant it trained on when it has one."""
-    mutant = (f"PEAK_MUTANT=runs/{a['game']}/mutants/{a['variant']} "
+    mutant = (f"PEAK_MUTANT=code/games/levels/mutants/{a['game']}/{a['variant']} "
               if a["source"] == "ast" and a["variant"] not in ("base", "base-retrained") else "")
     return f"{mutant}python -m code.neuro.trainer --game {a['game']} --replay {a['path']}/best.npz"
 

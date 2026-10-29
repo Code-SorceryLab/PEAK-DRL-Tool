@@ -5,7 +5,7 @@ A mutant is a folder holding mutant.json and, for a level change, its own copy o
 (level.txt, plus level.yaml when the level has a sidecar). Each core asks here when it loads its
 config and its level, so level names and every command stay the same:
 
-    PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario --level Mario1-1
+    PEAK_MUTANT=code/games/levels/mutants/mario/seal_route python -m code.neuro.trainer --game mario --level Mario1-1
 """
 from __future__ import annotations
 

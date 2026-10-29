@@ -466,7 +466,7 @@ def test_a_mutant_agent_replays_on_its_mutant_and_good_is_not_hosted(tmp_path):
     row = {"game": "mario", "source": "ast", "variant": "seal_route", "persona": "novice", "tag": "p10g200",
            "level": "Mario1-1", "seed": 1234, "path": "agents/ast/mario/seal_route/probes/mario/novice/p10g200/Mario1-1_1234"}
     html = command_center.reproduce_page("mario", [row])
-    assert "PEAK_MUTANT=runs/mario/mutants/seal_route python -m code.neuro.trainer --game mario --replay" in html
+    assert "PEAK_MUTANT=code/games/levels/mutants/mario/seal_route python -m code.neuro.trainer --game mario --replay" in html
     agents = command_center.host_agents(str(tmp_path / "agents"), games=["meatboy"])
     assert agents and {a["persona"] for a in agents} <= set(command_center.PERSONAS)   # "good" was renamed experienced
 

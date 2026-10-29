@@ -167,6 +167,103 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4,
     pygame.display.flip()
 
 
+RED, SHELL, FACE = (206, 32, 40), (196, 196, 200), (36, 36, 40)   # the controller's colours
+
+
+def _dpad(screen, c, arm: int, colour=(12, 12, 14)) -> None:
+    for r in (pygame.Rect(0, 0, arm * 3, arm), pygame.Rect(0, 0, arm, arm * 3)):
+        r.center = c
+        pygame.draw.rect(screen, colour, r, border_radius=max(1, arm // 6))
+
+
+def _pill(screen, c, w: int, colour=(12, 12, 14)) -> None:
+    pygame.draw.rect(screen, colour, (c[0] - w // 2, c[1] - w // 6, w, w // 3), border_radius=w // 6)
+
+
+def _button(screen, c, r: int, letter: str | None = None) -> None:
+    pygame.draw.circle(screen, RED, c, r)
+    pygame.draw.circle(screen, (120, 14, 20), c, r, 2)
+    if letter:
+        img = nes_text(letter, 2, (252, 252, 252))
+        screen.blit(img, (c[0] - img.get_width() // 2 + 1, c[1] - img.get_height() // 2 + 1))
+
+
+def _pad_screen(title: str, controls: dict, hint: str) -> None:
+    """An NES controller, and under it each button's job in this game (controls: dpad, a, b, select,
+    start -> what it does). Drawn, not a picture: grey shell, black face, the red A and B."""
+    screen = pygame.display.get_surface()
+    if screen is None:
+        screen = pygame.display.set_mode(SIZE)
+    screen.fill((0, 0, 0))
+    w, h = SIZE
+    pygame.draw.rect(screen, (252, 252, 252), (16, 16, w - 32, h - 32), 4)
+    centre = lambda img, y: screen.blit(img, ((w - img.get_width()) // 2, y))
+    centre(nes_text(NAMES.get(game_shown, game_shown), 3, GOLD) if game_shown else nes_text("PEAK", 3, GREY), 48)
+    centre(nes_text(title, 5), 84)
+
+    body = pygame.Rect(0, 0, 380, 150)
+    body.center = (w // 2, 236)
+    pygame.draw.rect(screen, SHELL, body, border_radius=10)
+    pygame.draw.rect(screen, (120, 120, 128), body, 3, border_radius=10)
+    face = body.inflate(-28, -34)
+    pygame.draw.rect(screen, FACE, face, border_radius=6)
+    band = pygame.Rect(face.x + 118, face.y + 16, 100, face.h - 32)
+    for k in range(3):                                         # the grey bands in the middle
+        pygame.draw.rect(screen, (150, 150, 156), (band.x, band.y + k * 18, band.w, 12), border_radius=3)
+    _dpad(screen, (face.x + 58, face.centery), 20)
+    sel, start = (band.x + 26, band.bottom - 12), (band.x + 74, band.bottom - 12)
+    for c, name in ((sel, "SELECT"), (start, "START")):
+        _pill(screen, c, 30)
+        img = nes_text(name, 1, RED)
+        screen.blit(img, (c[0] - img.get_width() // 2, c[1] - 22))
+    for x, letter in ((face.right - 88, "B"), (face.right - 38, "A")):
+        c = (x, face.centery + 6)
+        pygame.draw.rect(screen, (150, 150, 156), (c[0] - 22, c[1] - 22, 44, 44), border_radius=6)
+        _button(screen, c, 17)
+        img = nes_text(letter, 2, RED)
+        screen.blit(img, (c[0] - img.get_width() // 2, c[1] + 26))
+
+    # the legend: an icon of the button, its name, what it does here
+    rows = [("dpad", "D-PAD"), ("a", "A"), ("b", "B"), ("select", "SELECT"), ("start", "START")]
+    x0, y = w // 2 - 200, 336
+    for key, name in rows:
+        if not controls.get(key):
+            continue
+        icon = (x0 + 18, y + 9)
+        if key == "dpad":                                     # grey: black would vanish on the black screen
+            _dpad(screen, icon, 8, (170, 170, 176))
+        elif key in ("a", "b"):
+            _button(screen, icon, 12, name)
+        else:
+            _pill(screen, icon, 26, (170, 170, 176))
+        screen.blit(nes_text(name, 2, GOLD), (x0 + 48, y + 2))
+        screen.blit(nes_text(controls[key], 2), (x0 + 170, y + 2))
+        y += 32
+    centre(nes_text(hint, 2, GREY), h - 64)
+    pygame.display.flip()
+
+
+def show_controls(title: str, controls: dict, hint: str = "A  START") -> int | None:
+    """The controller screen until A goes on (0) or ESC (None); the same keys as ask()."""
+    clock = pygame.time.Clock()
+    prev, armed = (0, True), False                    # wait for keys from the last screen to be let go
+    while True:
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                raise SystemExit
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return None
+            if event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
+                gamepad.open_pad(quiet=True)
+        dy, confirm = gamepad.menu_input()
+        armed |= confirm and not prev[1]
+        prev = (dy, confirm)
+        if armed and not confirm:
+            return 0
+        _pad_screen(title, controls, hint)
+
+
 def ask(title: str, items: list, choice: int | None = 0, hint: str = "A  OK", size: int = 4,
         b_backs: bool = True, games: list | None = None) -> int | None:
     """Show a list until A picks a row (its index), or ESC (or B / Backspace, if b_backs) backs out (None).

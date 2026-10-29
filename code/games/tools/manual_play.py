@@ -200,6 +200,14 @@ substeps = max(1, round(getattr(core_game, "fps", args.fps) / args.fps))  # fixe
 screen = core_game._surf if hasattr(core_game, "_surf") else \
     pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT + OVERLAY_BAND.get(args.game, 0)))
 
+STUDY = bool(os.environ.get("PEAK_STUDY"))      # set by the User Study (menu._study_env): a participant plays
+if STUDY and hasattr(core_game, "debug_manager"):  # every debug overlay off; the pad card stays
+    dm = core_game.debug_manager
+    dm.show_grid = dm.show_hitboxes = dm.show_sensors = False
+    if dm.show_panel and hasattr(core_game, "TOTAL_WIDTH"):
+        dm.show_panel = False
+        screen = core_game._surf = pygame.display.set_mode((core_game.WIDTH, core_game.HEIGHT))
+
 # ── Handle raw file path (unlisted level) ────────────────────────
 # Inject the entry directly into the live config_manager instance, then
 # load_level() to switch to the editor file (LevelLoader handles abs paths).
@@ -683,7 +691,7 @@ while running:
             _toggle_panel()
         elif event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
             gamepad.open_pad()
-        elif args.game == "megaman" and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+        elif args.game == "megaman" and not STUDY and event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             core_game.invincible = not core_game.invincible
             print(f"[Play] Invincible: {'on' if core_game.invincible else 'off'}")
 

@@ -20,7 +20,8 @@ def on_disk(tmp_path_factory):
 
 @pytest.fixture
 def placed(on_disk, monkeypatch, tmp_path):
-    monkeypatch.setattr(em, "out_dir", lambda game: on_disk if game == "meatboy" else os.path.join("runs", game, "mutants"))
+    real = em.out_dir
+    monkeypatch.setattr(em, "out_dir", lambda game: on_disk if game == "meatboy" else real(game))
     # level 5's 200-generation reports, where --best won (the trained runs/ data is not on every branch)
     reports = tmp_path / "balance"
     reports.mkdir()
