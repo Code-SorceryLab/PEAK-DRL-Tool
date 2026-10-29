@@ -1,115 +1,644 @@
 <p align="center">
-  <img src="docs/img/PEAK_LOGO.png" alt="PEAK — Platformer Engine by Al & Kevin" width="560">
+  <img src="docs/img/PEAK_LOGO.png" alt="PEAK: Platformer Engine by Al and Kevin" width="520">
 </p>
 
-<h3 align="center">Evolved neural agents as tireless playtesters for 2D platformers</h3>
+<h3 align="center">Small evolved neural networks that playtest 2D games, and a test of whether a playtest notices a one-tile change</h3>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/python-3.10+-4584b6?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/pygame-%E2%89%A5%202.5-1e1e22?style=flat-square" alt="Pygame">
-  <img src="https://img.shields.io/badge/agent-291%20weights-ef4444?style=flat-square" alt="291 weights">
-  <img src="https://img.shields.io/badge/deterministic-seed%2042-22c55e?style=flat-square" alt="Deterministic">
-  <img src="https://img.shields.io/badge/GPU-not%20required-9a9a9a?style=flat-square" alt="No GPU">
-  <img src="https://img.shields.io/badge/tests-154%20passing-22c55e?style=flat-square" alt="154 tests">
-</p>
+**PEAK** is a research tool from Ontario Tech University (Master's program). It plays 2D games with
+small neural networks that learn by evolution (a genetic algorithm, no gradients, no GPU). It then
+reports how hard each level is, for six kinds of player. It also makes small, controlled changes to a
+level ("mutants") and checks whether a playtest notices the change. People can play the same levels
+and mutants, so human and agent play can be compared.
 
-<p align="center">
-  <img src="docs/img/engines.png" alt="Four game engines — Mario-style, Megaman, Sonic, Meat Boy — each played by the same evolved agent; red lines are its raycast sensors" width="900">
-</p>
-<p align="center"><sub>Four of the five hand-written engines, one probe. The red fan is what the agent sees: six raycasts, a pit probe and an enemy corridor — 14 numbers into a 291-weight network. The fifth, a top-down Bomberman, senses on its own 16-slot vector.</sub></p>
-
-**PEAK** is a game-balancing engine built for Ontario Tech University's Master's program. Instead of
-asking humans to play a level a thousand times, it evolves populations of tiny neural networks
-(14 → 16 → 3, no gradients, no GPU) that play it for you and report back: win rate with confidence
-intervals, generations-to-first-win, where and why they die, which routes they find. Same seed,
-same run — bit for bit.
-
-> The previous deep-RL (stable-baselines3 PPO) version is preserved on the `archive/drl-sb3-final` branch.
+This README explains the whole system in simple words, and gives every setting, every experiment,
+every result we have now, and where each data file is. It is written so that the paper can be written
+from it.
 
 ---
 
-## See it work
+## Contents
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="docs/img/first_win.gif" alt="The first evolved genome to beat Mario 1-1" width="100%"><br>
-      <sub><b>The first win.</b> A population of ten discovers Mario 1-1's exit, captured live during evolution.</sub>
-    </td>
-    <td width="50%" align="center">
-      <img src="docs/img/dashboard.png" alt="Live training dashboard: watched specimen with raycasts, telemetry bars, fitness trajectory" width="100%"><br>
-      <sub><b>Live dashboard</b> (menu 11). Watched specimen with sensors, per-input telemetry, fitness trajectory, 5k+ steps/s in Turbo.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/img/cc_report.png" alt="Command Center: win rate per level per persona, config chips, overview table" width="100%"><br>
-      <sub><b>Command Center</b> (menu 12). Every probe on disk: win rate per level per persona, one HTML file.</sub>
-    </td>
-    <td align="center">
-      <img src="docs/img/cc_level.png" alt="Level dialog: 16 balance metrics, B1/B2/B3 bands, replay command, agent routes drawn on the level" width="100%"><br>
-      <sub><b>Level dialog.</b> 16 metrics with B1/B2/B3 bands, death heatmap, agent routes on the level, and a ▶ Watch button that replays the best genome.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/img/cc_gasweep.png" alt="GA sweep page: best value per knob across six sweeps, capacity verdict" width="100%"><br>
-      <sub><b>GA sweep page</b> (menu 15). Which hyperparameter beat the baseline, per game and persona, paired on identical seeds.</sub>
-    </td>
-    <td align="center">
-      <img src="docs/img/cc_ablation.png" alt="Sensor ablation page: rays vs grid at a glance" width="100%"><br>
-      <sub><b>Sensor ablation</b> (menu 14). Rays (14 inputs) vs tile grid (368 inputs) under identical GA, seeds and levels.</sub>
-    </td>
-  </tr>
-</table>
+1. [The short version](#1-the-short-version)
+2. [The four games and their levels](#2-the-four-games-and-their-levels)
+3. [The agent: what it sees, what it does, how it learns](#3-the-agent-what-it-sees-what-it-does-how-it-learns)
+4. [The six personas](#4-the-six-personas)
+5. [Words used in this README](#5-words-used-in-this-readme)
+6. [The experiments (the Nibi run of 2026-10-28)](#6-the-experiments-the-nibi-run-of-2026-10-28)
+7. [Mutation testing (AST): how it works](#7-mutation-testing-ast-how-it-works)
+8. [The pilot user study](#8-the-pilot-user-study)
+9. [Results](#9-results)
+10. [Known limits and caveats](#10-known-limits-and-caveats)
+11. [Where the data is](#11-where-the-data-is)
+12. [How to run it and reproduce the results](#12-how-to-run-it-and-reproduce-the-results)
+13. [Status on 2026-10-29](#13-status-on-2026-10-29)
+14. [Authors](#14-authors)
 
 ---
 
-## What the probes found
+## 1. The short version
 
-<!-- figures:auto -->
-Everything below comes straight out of `runs/balance/*.json` — the same data the command center renders. Figures regenerated 2026-10-24 from 45 sweep reports, 36 ablation arms and 438 GA-sweep configs (`python menu.py` → 16: fig_difficulty.png, fig_capacity.png, fig_sensors.png, fig_knobs.png).
-<!-- /figures:auto -->
-
-<p align="center">
-  <img src="docs/img/fig_difficulty.png" alt="Win rate per level per persona for Bomberman, Mario and Meat Boy at 200 generations" width="900">
-</p>
-
-**Levels rank themselves.** At 200 generations every persona solves Mario 1-1 on all three seeds
-(experienced 91 %, speedrunner 81 %, clumsy 3 %), while 1-3 is nearly a wall: only novice and
-collector win it, on one seed each. Meat Boy's sprinting personas own L2 (77 %) and are the only ones
-to solve L10; L4 stays below 6 % for everyone. Bomberman's ladder is not a ladder: L6 (≈ 80–90 %) is
-as easy as L0, and L1, L9–L11 are the hard rungs. Clumsy is the weakest persona in every game. That
-spread is the design signal the tool exists to produce.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/img/fig_capacity.png" alt="Generations to first win vs network size: flat across the network sizes swept" width="100%"></td>
-    <td width="50%"><img src="docs/img/fig_sensors.png" alt="Paired delta win rate grid minus rays: rays win in all 18 sweeps" width="100%"></td>
-  </tr>
-  <tr>
-    <td><sub><b>Bigger nets don't win sooner.</b> Across the network sizes swept, generations-to-first-win stays flat within the noise in all 18 sweeps (3 games × 6 personas). The bottleneck is the level, not the brain.</sub></td>
-    <td><sub><b>Fourteen rays beat 368 grid cells.</b> The tile-grid sensor loses in all 18 sweeps; the gap clears its 95 % CI for every persona except clumsy and Bomberman's novice. More input is more weights to evolve, not more insight.</sub></td>
-  </tr>
-</table>
-
-<p align="center">
-  <img src="docs/img/fig_knobs.png" alt="Heat-map of paired win-rate change for every GA knob value vs the baseline, 18 sweeps" width="760">
-</p>
-
-**One knob at a time.** 22 variants × 18 sweeps, each moved to its literature low or high bound
-(De Jong, Grefenstette, Miller & Goldberg, Such et al.). Annealing mutation harder after the first
-win (×0.3 instead of ×0.5) helps almost everywhere and clears the noise in 8 of 18 sweeps. A bigger
-population (30 or 100) is the largest single gain for Meat Boy (+8 to +10 points, significant for
-every persona but clumsy) yet costs Mario's experienced player 13 points at 100. Action feedback
-hurts Mario's sprinting personas and every Bomberman persona but novice and clumsy; memory units hurt
-Mario's sprinters. The per-game winners are written to `code/neuro/ga_best.yaml`; at 200 generations
-they beat the defaults for every Bomberman persona tested and for Mario's killer and collector, but
-not for Meat Boy.
+- **Games.** Four hand-written games in Python and Pygame: Mario (Super Mario Bros. 1-1 to 1-4),
+  Meat Boy (Super Meat Boy world 1), Bomberman (a ladder of levels plus Bomberman II 1-1 to 1-4) and
+  Mega Man (the Cut Man stage, in 8 sections). All four are deterministic: the same seed gives the
+  same game, frame by frame.
+- **Agents.** Each agent is a tiny neural network (for Mario: 14 inputs, 16 hidden units, 3 outputs,
+  291 weights). A genetic algorithm (GA) evolves a population of 10 networks. There is no gradient
+  training and no GPU.
+- **Personas.** Six player types: novice, clumsy, experienced, speedrunner, killer and collector.
+  They differ in their "hands" (reaction time, sprint, mistakes) and in what they are paid for
+  (the goal, enemies, coins, time).
+- **Balance measurement.** For every level, persona and seed, a fresh population trains for up to 200
+  generations. We record whether it ever wins (solved), how soon (first-win generation) and how often
+  it wins after that (win rate).
+- **GA settings.** A GA sweep changed one GA setting at a time and picked the best settings for each
+  game (`code/neuro/ga_best.yaml`). Training with them is called `--best`.
+- **Sensor ablation.** The normal sensor (a few raycasts, 14 to 26 numbers) was compared with a full
+  tile grid (368 numbers). The raycasts win clearly.
+- **Mutation testing (AST).** Each level gets five one-change copies: a sealed route, a harder gap
+  or enemy, a weaker jump or shorter bomb fuse, a tile nobody can reach, and a cosmetic change. Agents
+  are retrained on each copy, and the original agents replay each copy, to see whether play changes.
+- **Pilot user study.** Five people played one game each: the evaluation level 3 times, then its
+  five mutants once each in a random order.
+- **Where we are.** All training and the GA sweep are done. The retraining on mutants is done for
+  Mario, Meat Boy and Bomberman and is finishing for Mega Man. The playtests on mutants (`ast_play`)
+  and the final detection metrics (`final`) have not run yet (see [section 13](#13-status-on-2026-10-29)).
 
 ---
 
-## Quick start
+## 2. The four games and their levels
+
+Every game reads its levels from ASCII text files in `code/games/levels/<game>/`. The **evaluation
+level** is the one level of each game that the mutation testing and the user study use.
+
+| Game | Levels (as the code names them) | Evaluation level | Network inputs (rays mode) | Outputs | Weights |
+|---|---|---|---|---|---|
+| Mario | `Mario1-1`, `Mario1-2`, `Mario1-3`, `Mario1-4` (4 levels) | `Mario1-1` (Super Mario Bros. 1-1) | 14 | 3: left, right, jump | 291 |
+| Meat Boy | `0` to `10` (11 levels, files `world1_01_hello_world.txt` to `world1_11_fired.txt`) | `2` (Super Meat Boy 1-3 "The Gap", file `world1_03_the_gap.txt`) | 21 | 3: left, right, jump | 403 |
+| Bomberman | `0` to `15` (16 levels: `0` to `11` are files `01_open_floor.txt` to `12_chasers.txt`; `12` to `15` are Bomberman II 1-1 to 1-4, files `bm2_1_1.txt` to `bm2_1_4.txt`) | `12` (Bomberman II 1-1, file `bm2_1_1.txt`) | 16 | 5: left, right, up, down, bomb | 357 |
+| Mega Man | `CutMan-1-Street`, `-2-Climb`, `-3-Ledges`, `-4-Shaft`, `-5-Rooftop`, `-6-Descent`, `-7-Corridor`, `-8-Boss` (8 sections of one stage) | `CutMan` (the whole Cut Man stage) | 26 | 6: left, right, jump, up, down, fire | 534 |
+
+Level indices start at 0 in Meat Boy and Bomberman ("level 2" is the third file).
+
+**Mega Man is trained one section at a time.** Each of the 8 sections is a separate level for
+training. The whole stage is played by a **relay**: the agent of section 1 plays section 1, then
+the agent of section 2 takes over, and so on (`code/neuro/relay.py`).
+
+The level files, the game rules and the game settings:
+
+| What | Where |
+|---|---|
+| Level files | `code/games/levels/<game>/*.txt`, glyphs in `code/games/levels/common/ASCII_TILEMAP.md` |
+| Level lists and game settings | `code/games/game_config.yaml` (Mario), `code/games/meatboy_config.yaml`, `code/games/bomberman_config.yaml`, `code/games/megaman_config.yaml` and `code/games/megaman_levels.yaml` |
+| Game engines | `code/games/*_core.py` |
+| Mutant levels | `code/games/levels/mutants/<game>/<mutant id>/` |
+
+---
+
+## 3. The agent: what it sees, what it does, how it learns
+
+### 3.1 The network
+
+Each agent is a fixed-shape network: inputs, one hidden layer of 16 units with `tanh`, and outputs
+(`code/neuro/net.py`). The weights are one flat list of numbers. Evolution changes these numbers;
+nothing else is learned. The number of weights is `inputs x 16 + 16 + 16 x outputs + outputs`
+(14 inputs and 3 outputs give 291).
+
+### 3.2 What the agent sees (sensors)
+
+There are two sensor modes (`code/neuro/sensors.py`, `--sensors`):
+
+- **rays** (the default, used in every main result): a few raycasts plus a few body values. In
+  Mario: six raycasts (forward, forward-up and forward-down at 30 and 60 degrees, back), an enemy
+  corridor, a pit probe, the velocity, "on the ground" and "can jump", and nearby question blocks:
+  14 numbers. Meat Boy (21), Bomberman (16) and Mega Man (26) have their own sensor lists; each slot
+  has a name in the adapter's `SENSOR_LABELS` (`code/neuro/adapters.py`).
+- **grid**: an 11 x 11 tile window around the agent with 3 channels (solid, collectible, hazard),
+  plus 5 body values: 368 numbers. Used only in the sensor ablation.
+
+### 3.3 What the agent does
+
+Every frame the network reads its sensors and picks its buttons: left, right and jump in Mario and
+Meat Boy; plus up, down and bomb in Bomberman; plus fire in Mega Man.
+
+### 3.4 Fitness (what evolution rewards)
+
+Fitness is the furthest progress toward the exit, plus 5000 for a win, plus the persona's extras
+(section 4). Progress is the furthest x position in Mario; the path progress toward the exit in
+Meat Boy; the Dijkstra cost to the exit on a 0 to 1000 scale in Bomberman (a brick on the way costs
+6, so a useful bomb pays at once). The code is the `fitness()` method of each adapter in
+`code/neuro/adapters.py`.
+
+### 3.5 How one training run works
+
+A **population** of 10 networks starts with random weights. In each **generation**, every network
+plays the level once (one episode). An episode ends at a win, a death, the frame budget (3600 frames,
+60 seconds of game time) or a stall (300 frames with no new progress). Then the GA makes the next
+population:
+
+1. **Elitism**: the 4 best networks are copied unchanged.
+2. **Tournament selection**: each parent is the best of 5 networks picked at random.
+3. **Uniform crossover** (probability 0.7): each weight comes from one of two parents.
+4. **Gaussian mutation**: each weight changes with probability 0.15 by a normal step with sigma 0.15.
+5. **Annealing**: after the first win on a level, the mutation rate and sigma are multiplied by the
+   anneal factor (0.5 by default), so a winning population changes more slowly.
+
+One seed sets the random start, every GA choice and every game step, so a run is fully repeatable.
+
+### 3.6 The default GA settings
+
+From `GAConfig` in `code/neuro/evolution.py`:
+
+| Setting | Value | Setting | Value |
+|---|---|---|---|
+| Population size | 10 | Initial weight sigma | 0.5 |
+| Elite (copied unchanged) | 4 | Anneal factor after the first win | 0.5 |
+| Tournament size k | 5 | Frame budget per episode | 3600 (60 s) |
+| Crossover rate | 0.7 | Stall limit | 300 frames with no new progress |
+| Mutation rate | 0.15 | Win bonus | 5000 |
+| Mutation sigma | 0.15 | Hidden units | 16 (`tanh`), no memory units, no action feedback |
+
+### 3.7 The `--best` GA settings (from the GA sweep)
+
+The GA sweep (section 6.2) wrote these per-game settings to `code/neuro/ga_best.yaml` (generated
+2026-10-28 08:07; a copy is `runs/ga_best_2026-10-28.yaml`). `--best` uses them; every setting not
+named stays at the default.
+
+| Game | `--best` changes |
+|---|---|
+| Mario | anneal factor 0.3 |
+| Meat Boy | anneal factor 0.3 |
+| Bomberman | population 30, tournament k 8, anneal factor 0.3 |
+| Mega Man | population 30, elite 1, mutation rate 0.5, anneal factor 0.3 |
+
+Important: for Mario and Meat Boy, `--best` changes only the anneal factor, which acts only after
+the first win. So `--best` cannot change whether or when a level is first solved in those two games;
+it can only change the win rate after that.
+
+---
+
+## 4. The six personas
+
+A persona is the kind of player the agents imitate (`code/neuro/personas.py`). All personas use the
+same network. They differ in two ways: their **hands** (how often they get fresh senses, whether they
+can sprint, whether they make mistakes) and **what they are paid for**.
+
+| Persona | Sprint | Reacts every | Mistakes | Paid for |
+|---|---|---|---|---|
+| `novice` | no | 3rd frame | none | the goal |
+| `clumsy` | no | 4th frame | a 0.2 s (12-frame) mis-press with probability 0.03 per frame (about every 0.5 s) | the goal |
+| `experienced` | yes | every frame | none | the goal |
+| `speedrunner` | yes | every frame | none | the goal + 25 per second left on a win |
+| `killer` | no | every frame | none | the goal + enemies killed |
+| `collector` | no | every frame | none | the goal + coins and power-ups picked up |
+
+**Extras are shares of the goal.** For the killer, killing every enemy in the level pays as much as
+the goal; killing 3 of 21 pays 3/21 of it. The share is capped at 1, so kills cannot be farmed.
+A level with no enemies (or no coins) gives a plain player: the killer and the collector then play
+for the goal alone. Clumsy's mistakes are seeded, so a replay makes the same mistakes.
+
+---
+
+## 5. Words used in this README
+
+| Word | Meaning |
+|---|---|
+| **seed** | The number that fixes all randomness of one run. The paper seeds are **1234, 2025 and 31337**. |
+| **cell** | One training run: one game, level, persona, GA setting and seed. |
+| **generation** | One round in which each of the 10 networks plays the level once. |
+| **solved** | The cell won at least once, in any generation. |
+| **first-win generation** | The generation of the first win. |
+| **win rate** | The share of episodes won in the **10 generations after the first win** (100 episodes with a population of 10). A cell that never won has a win rate of 0. |
+| **budget** | The most generations a cell may run (200 in the main training, 40 in the sweeps). A cell stops 10 generations after its first win (`WIN_WINDOW = 10` in `code/neuro/balance.py`), so a solved cell usually runs fewer generations than the budget. |
+| **probe** | One cell's run folder: the best network (`best.npz`), the run state (`state.json`) and the episode log (`episodes.csv`). |
+| **report** | One JSON file that sums up the cells of one game, persona and setting (`runs/balance/report_*.json`). |
+| **tag** | The name of a setting in file names: `p10g200` = population 10, 200 generations; `p30g200_best` = population 30, 200 generations, `--best`. |
+| **mutant** | A copy of a level (or of a game setting) with exactly one change. |
+| **operator** | The kind of change a mutant makes (for example `seal_route`). |
+| **variant** | What the AST plays: `base` (the original), a mutant id, `base-reseeded` or `base-retrained`. |
+| **evaluation level** | The one level per game that the mutation testing and the user study use (section 2). |
+
+---
+
+## 6. The experiments (the Nibi run of 2026-10-28)
+
+All results in this README come from one pipeline run on the **Nibi** cluster (Digital Research
+Alliance of Canada), started 2026-10-28 at 04:05 and resumed 2026-10-29 at 12:37. Every task used
+3 CPU cores. The code was commit `79fc29691` (branch `USER-STUDY+SPRITIFY`). The pipeline script
+runs these stages in order; each stage waits for the one before it.
+
+| # | Stage | What it does | Tasks |
+|---|---|---|---|
+| 1 | `test` | A 5-generation smoke test per game | 4 |
+| 2 | `mutants` | Writes every mutant of every level (`eval_mutants --all-levels`, `megaman_mutants`) | 1 |
+| 3 | `sweep2d` | For Mario, Meat Boy, Bomberman and each persona: the 40-generation balance sweep, the sensor ablation and the GA sweep (`run_all.sh sweeps`) | 18 |
+| 4 | `sweep_mm` | The Mega Man GA sweep, one section at a time (6 personas x 8 sections) | 48 |
+| 5 | `gabest` | Writes `ga_best.yaml` from all sweeps (`gasweep --rebuild`) | 1 |
+| 6 | `confirm_mm` | Confirms the Mega Man winners over all 8 sections | 6 |
+| 7 | `gabest` | Writes `ga_best.yaml` again | 1 |
+| 8 | `full` | **The main training: 200 generations**, every persona and level, default GA and `--best` | 372 |
+| 9 | `reports` | Rebuilds every report from the probe folders (`balance --rebuild`) | 1 |
+| 10 | `ast_retrain` | Retrains every persona's 3 seeds on every mutant (200 generations) | 1038 |
+| 11 | `ast_play` | Playtests, replays and random baselines on the original and every mutant | 511 |
+| 12 | `final` | Computes the AST metrics and verdicts (`runs/ast/metrics.json`) | 1 |
+
+### 6.1 Main training (stage `full`)
+
+- **What:** every level of Mario (4), Meat Boy (11) and Bomberman (16), with each of the 6
+  personas, with the default GA and with `--best`, on seeds 1234, 2025 and 31337.
+- **Budget:** 200 generations per cell, stopped 10 generations after the first win.
+- **Size:** 2 settings x 6 personas x 31 levels x 3 seeds = 1116 cells.
+- **Mega Man** has no 200-generation run in this stage. Its 200-generation agents come from the AST
+  stage (`runs/ast/megaman/base-retrained`, section by section, with `--best`).
+- **Output:** `runs/balance/report_<game>_<persona>_<tag>.json` and the probe folders in
+  `runs/probes/<game>/<persona>/<tag>/<level>_<seed>/`.
+
+### 6.2 GA sweep (stages `sweep2d`, `sweep_mm`, `gabest`, `confirm_mm`)
+
+- **Question:** which GA setting helps, per game and persona?
+- **Method:** one setting at a time is moved to a low or a high value from the literature (De Jong,
+  Grefenstette, Miller and Goldberg, Such et al.), and everything else stays at the default. The
+  run is compared with the default run on the same seeds and levels. 22 variants per sweep:
+
+  | Setting | Values tried (default in brackets) |
+  |---|---|
+  | population size | 30, 100 (10) |
+  | elite | 1, 6 (4) |
+  | tournament k | 2, 8 (5) |
+  | crossover rate | 0.0, 0.95 (0.7) |
+  | mutation rate | 0.005, 0.5 (0.15) |
+  | mutation sigma | 0.02, 0.5 (0.15) |
+  | initial sigma | 0.25, 1.0 (0.5) |
+  | anneal factor | 0.3, 1.0 (0.5) |
+  | hidden units | 8, 32, 64 (16) |
+  | memory units | 2, 3 (0) |
+  | action feedback | on (off) |
+
+- **Budget:** 40 generations, seeds 1234, 2025, 31337, all levels of the game (Mega Man: each
+  section on its own).
+- **Choice:** the winning values of one sweep are combined and probed again (`--confirm`). A
+  setting goes into a game's `--best` only if it wins a **strict majority** of that game's sweeps
+  (one sweep per persona), so one lucky persona cannot move it.
+- **Output:** `runs/gasweep/<game>/<persona>/<tag>/...`, the reports
+  `runs/balance/gasweep_*.json` and `code/neuro/ga_best.yaml`.
+
+### 6.3 Sensor ablation (in stage `sweep2d`)
+
+- **Question:** does the agent need to see more?
+- **Method:** the same GA, seeds and levels, with `rays` sensors and with the `grid` sensor.
+- **Budget:** 40 generations, all personas, Mario, Meat Boy and Bomberman.
+- **Output:** `runs/ablation/...` and `runs/balance/ablation_*.json`.
+
+### 6.4 Mutation testing (stages `mutants`, `ast_retrain`, `ast_play`, `final`)
+
+Section 7 explains it in full.
+
+---
+
+## 7. Mutation testing (AST): how it works
+
+The question: **does a playtest notice one small change to a level?** Code:
+`code/games/eval_mutants.py`, `code/games/megaman_mutants.py`, `code/neuro/ast_eval.py`,
+`code/stats/ast_metrics.py`. The detection rule is written down in `paper-ast/ast_rule.md`.
+
+### 7.1 The five operators
+
+Each level gets five mutants. Each mutant makes exactly one change. Its class is set before any
+agent plays it.
+
+| Operator | What it changes | Class | Agents |
+|---|---|---|---|
+| `seal_route` | A wall across the route: the exit can no longer be reached | breaking | retrained |
+| `widen_gap` (Bomberman: `add_enemy`) | A gap 2 tiles wider (Bomberman: one more enemy) | degrading | retrained |
+| `jump_velocity_down` (Bomberman: `fuse_down`) | Jump velocity x0.85 (Bomberman: bomb fuse x0.625) | degrading | retrained |
+| `off_route` | One tile changed where no player can reach or sense it | neutral | retrained |
+| `cosmetic_tile` | A `.` written as a space: the level parses the same | equivalent | replayed only |
+
+### 7.2 Where the mutants are
+
+- **On the evaluation level** the changes are placed by hand (`CHANGES` in
+  `code/games/eval_mutants.py`). Examples on Mario 1-1: a wall down column 190 before the flagpole;
+  the second pit widened from 3 to 5 tiles; take-off jump velocity -495 to -420.75 px/s.
+  On Bomberman II 1-1: hard walls at row 5, columns 9 and 11 close the exit; a fourth Ballom at
+  row 6, column 7; the fuse 150 to 94 frames.
+- **On every other level** the same five operators are placed **by rule** (`place()` in
+  `eval_mutants.py`): the wall nearest the goal that cuts it off; the gap nearest the start widened by
+  2; one more enemy on the floor tile nearest the level's centre; the solid tile nearest the start
+  whose four neighbours are solid, hollowed out; the first `.` written as a space. These mutants are
+  named `<operator>@<level>` (for example `add_enemy@2`). Where no rule fits, the operator is skipped
+  and the reason is recorded.
+- **Mega Man** uses five mutants: `s3-seal_route`, `s3-widen_gap`, `s3-off_route`,
+  `s3-cosmetic_tile` (all in section 3, Ledges) and `m-jump_velocity_down` (the jump value of the
+  whole game). `megaman_mutants.py` also writes 59 more mutants for other sections and settings; the
+  evaluation uses the five above.
+- **Checks before writing:** each mutant is loaded in the game. The change must play; a cosmetic copy
+  must parse to the same level; an off-route tile must be walled in on all four sides; a flood fill
+  must find the exit for every mutant except `seal_route`.
+- Mutants on disk now: Mario 23, Meat Boy 58, Bomberman 96, Mega Man 64
+  (`code/games/levels/mutants/<game>/`).
+
+### 7.3 Retraining (stage `ast_retrain`)
+
+For every mutant except the cosmetic one, each persona's 3 seeds are trained from scratch on the
+mutant, exactly as the original was trained (200 generations, the same GA setting that won more on
+that level; Mega Man always `--best`, section by section). Two special variants are trained on the
+**unchanged** level:
+
+- `base-reseeded`: the original with **three new seeds**. It measures how much retraining alone
+  changes the results (the false-alarm check).
+- `base-retrained` (Mega Man only): the original with every section retrained exactly as the
+  mutants were. Mega Man's mutants are compared with it.
+
+**Retraining answers one question only: can the mutant still be finished?** A breaking mutant
+should no longer be solved; every other mutant still should.
+
+### 7.4 Playtests (stage `ast_play`)
+
+A playtest gives **each agent one attempt with learning off**: the best network of each of the 3
+seeds of each persona, so a persona's win rate moves in steps of 1/3. For one level this is
+6 personas x 3 seeds = 18 attempts. The games and agents are deterministic, so one attempt is the
+answer. Mega Man plays its relay of section agents, 20 attempts per scope, for each persona. The
+scopes are the full stage and each section for `base-retrained` and `m-jump_velocity_down`, and
+section 3 alone for the `s3-` mutants (most full-stage attempts end before section 3).
+
+Three kinds of playtest are written to `runs/ast/<game>/<variant>/`:
+
+| File | Who plays |
+|---|---|
+| `agents.csv` | The agents trained on that variant |
+| `agents_replay.csv` | **The original's frozen agents** on the mutant (`play --replay`) |
+| `agents_random.csv` | A random-action player, as many attempts as the agents (2D games only) |
+
+### 7.5 The detection rule (stage `final`)
+
+**Replay is the detector.** The original's frozen agents play the mutant and are compared with their
+own play on the original. Because they are frozen and deterministic, any difference comes from the
+change, not from seed noise. A mutant is **flagged** when any of these holds:
+
+| Signal | Test |
+|---|---|
+| completion lost | the original's agents win at least once; on the mutant they never win |
+| win rate | Fisher's exact test on wins vs losses, two-sided, p < 0.05 |
+| death cluster moved | the cluster of failed end tiles (Chebyshev radius 3) moves more than 3 tiles, or appears |
+| new top cause | the most common cause of failure changes |
+
+Each comparison gets one **verdict**: **broken** (completion lost), **changed** (any other signal),
+**unchanged** (no signal), or **not counted** (the original's agents never win on this level, so
+nothing can be lost). A breaking or degrading mutant is **caught** when flagged; a neutral one is
+**right** when unchanged. The cosmetic copy must match the original attempt for attempt.
+
+Reported beside the rule: the mutant's win rate against the spread of the original's per-seed win
+rates; a strict count (completion lost or Fisher only); and the false-alarm rate of the rule on
+`base-reseeded`. The rule was fixed on 2026-10-25, after pilot replays had been seen, so it is **not
+pre-registered** (`paper-ast/ast_rule.md`).
+
+### 7.6 The metrics
+
+`code/stats/ast_metrics.py` reads the attempts of agents and people and reports: completion, win
+rate, progress, end location, death cluster, cause mix, time to finish, play coverage, effort counts
+(jumps, coins, kills) and, for Mega Man, the section reached. `python -m code.stats.ast_paper` writes
+the paper's tables and figures to `paper-ast/`.
+
+---
+
+## 8. The pilot user study
+
+The study runs from the menu (`python menu.py`, option `u`) in one pop-up window, so the participant
+sees only the games (`study_session` in `menu.py`). For each participant:
+
+1. Type the participant ID and pick a game.
+2. **Warm-up:** 5 minutes of normal play of the game. It is **not recorded**.
+3. **Baseline:** the evaluation level, **3 runs**, each with the game's usual **3 lives**.
+4. **Mutation:** the evaluation level's **5 mutants, once each, in a random order**. The
+   participant is not told which mutant is which.
+
+Each run is stored as `runs/user_study/<participant>/<game>/<phase>/run<k>/episodes.csv` (one row per
+life) and `inputs.csv` (the button presses). Mutation rows also store `mutant` and `mutant_class`.
+A run quit before its last life is kept and labelled `quit`, and it can be played again.
+
+Data so far (pilot, committed by Kevin on 2026-10-29):
+
+| Participant | Game | Baseline runs | Mutation runs |
+|---|---|---|---|
+| p1 | Mario | 3 | 4 |
+| p2 | Mega Man | 3 | 5 |
+| p3 | Mario | 3 | 5 |
+| p4 | Mega Man | 3 | 4 |
+| p5 | Mario | 3 | 5 |
+| Test1, test111 | Meat Boy | 3 each | 5 each (test sessions, not participants) |
+
+---
+
+## 9. Results
+
+All numbers come from the files in `runs/` on this branch (the Nibi run). Seeds 1234, 2025, 31337.
+
+### 9.1 Main training, 200 generations (stage `full`)
+
+| Game | GA | Cells solved | Levels solved by any seed | Levels solved by all 18 (6 personas x 3 seeds) | Mean win rate | Median first-win generation | Evaluation level solved |
+|---|---|---|---|---|---|---|---|
+| Mario | default | 44 / 72 (61%) | 4 / 4 | 1 | 22.7% | 10 | 18 / 18 |
+| Mario | `--best` | 44 / 72 (61%) | 4 / 4 | 1 | 27.4% | 10 | 18 / 18 |
+| Meat Boy | default | 92 / 198 (46%) | 11 / 11 | 1 | 20.6% | 34 | 18 / 18 |
+| Meat Boy | `--best` | 92 / 198 (46%) | 11 / 11 | 1 | 25.2% | 34 | 18 / 18 |
+| Bomberman | default | 103 / 288 (36%) | 10 / 16 | 2 | 16.6% | 21 | **0 / 18** |
+| Bomberman | `--best` | 133 / 288 (46%) | 12 / 16 | 3 | 21.9% | 12 | **0 / 18** |
+
+"Mean win rate" counts a never-solved cell as 0. "Median first-win generation" is over solved cells.
+
+<p align="center">
+  <img src="docs/img/results_per_level.png" alt="Per level and persona: seeds that solved the level (of 3) and mean win rate, default GA and --best, for all four games" width="900">
+</p>
+<p align="center"><sub>Every level, persona and GA setting: how many of the 3 seeds solved it, and the mean win rate. Mega Man here is the 40-generation GA-sweep baseline, per section.</sub></p>
+
+<p align="center">
+  <img src="docs/img/results_per_persona.png" alt="Per game and persona: mean win rate, levels solved by any seed and by all three seeds" width="720">
+</p>
+
+What the training shows:
+
+- **Mario.** 1-1 is solved by every persona and seed (18/18). 1-3 is the wall: only 2 of 18 cells
+  (experienced and speedrunner, 1 seed each). 1-2 is 14/18 and 1-4 is 10/18.
+- **Meat Boy.** Level 2 (The Gap, the evaluation level) is 18/18 and level 0 is 16/18. Levels 9 and
+  10 are the hardest (2/18 each), then level 3 (3/18).
+- **Bomberman.** Levels 0 and 4 are 18/18. With the default GA, levels 8, 10, 12, 13, 14 and 15 are
+  never solved. `--best` (population 30) solves more cells (133 vs 103), first wins earlier (median
+  12 vs 21) and also solves levels 8 (2/18) and 10 (5/18). **The four Bomberman II levels (12 to 15),
+  the evaluation level 12 included, are never solved with either setting.**
+- **Mega Man** (40-generation GA-sweep baseline, each section on its own): only 5 Rooftop and
+  7 Corridor are solved (18/18 each); the other 6 sections are 0/18 at 40 generations.
+- **Personas.** Clumsy is the weakest persona in every game (mean win rate 1% to 9%). In Meat Boy,
+  experienced and speedrunner give exactly the same results, and so do killer and collector. Meat Boy
+  has no enemies or coins, which explains killer = collector; why the speedrunner's time bonus makes
+  no difference there has not been checked.
+- **`--best`** raises the mean win rate in all three games (Mario +4.7, Meat Boy +4.6, Bomberman
+  +5.3 points). In Mario and Meat Boy it cannot change the first wins (section 3.7), and it did not.
+
+### 9.2 GA sweep, 40 generations
+
+Win rate of the default GA (baseline) and of the confirmed combination of the sweep's winners, per
+game and persona (from `code/neuro/ga_best.yaml`):
+
+| Game | Persona | Baseline | Confirmed winners | Game | Persona | Baseline | Confirmed winners |
+|---|---|---|---|---|---|---|---|
+| Mario | novice | 30.4% | 35.3% | Bomberman | novice | 14.7% | 16.0% |
+| Mario | clumsy | 5.4% | 6.5% | Bomberman | clumsy | 9.0% | 8.0% |
+| Mario | experienced | 21.7% | 30.7% | Bomberman | experienced | 12.7% | 11.3% |
+| Mario | speedrunner | 19.9% | 22.8% | Bomberman | speedrunner | 13.2% | 13.2% |
+| Mario | killer | 23.3% | 7.3% | Bomberman | killer | 10.9% | 13.7% |
+| Mario | collector | 29.8% | 31.9% | Bomberman | collector | 10.9% | 13.7% |
+| Meat Boy | novice | 7.8% | 18.4% | Mega Man | novice | 21.4% | 18.7% |
+| Meat Boy | clumsy | 0.6% | 1.4% | Mega Man | clumsy | 14.4% | 6.9% |
+| Meat Boy | experienced | 19.7% | 31.0% | Mega Man | experienced | 20.8% | 19.4% |
+| Meat Boy | speedrunner | 19.7% | 31.0% | Mega Man | speedrunner | 20.6% | 23.0% |
+| Meat Boy | killer | 12.8% | 15.2% | Mega Man | killer | 22.4% | 22.4% |
+| Meat Boy | collector | 12.8% | 15.2% | Mega Man | collector | 20.8% | 19.4% |
+
+- A lower anneal factor (0.3) is the one change that wins in most sweeps of every game; it is in the
+  `--best` of all four games.
+- The full combination of one sweep's winners can be worse than the baseline (Mario killer 23.3% to
+  7.3%; Mega Man clumsy 14.4% to 6.9%). This is why `--best` keeps only the settings that win a
+  strict majority of a game's sweeps.
+
+### 9.3 Sensor ablation, 40 generations
+
+| Game | Sensors | Cells solved | Mean win rate |
+|---|---|---|---|
+| Mario | rays (14) | 37 / 72 (51%) | 21.7% |
+| Mario | grid (368) | 5 / 72 (7%) | 1.8% |
+| Meat Boy | rays (21) | 54 / 198 (27%) | 12.3% |
+| Meat Boy | grid (368) | 9 / 198 (5%) | 1.4% |
+| Bomberman | rays (16) | 62 / 288 (22%) | 11.9% |
+| Bomberman | grid (368) | 27 / 288 (9%) | 6.6% |
+
+The few raycasts beat the full tile grid in every game. More inputs means many more weights to
+evolve, not more useful information.
+
+### 9.4 Mutation testing: can the mutant still be finished? (stage `ast_retrain`)
+
+Share of retrained cells (persona x seed) that solved the mutant. "Evaluation level" is the
+hand-placed mutant (18 cells); "other levels" are the mutants placed by rule on every other level.
+
+| Game | Variant | Evaluation level | Other levels |
+|---|---|---|---|
+| Mario | `base-reseeded` (no change, new seeds) | 18 / 18 | 28 / 54 |
+| Mario | `seal_route` (breaking) | 0 / 18 | 0 / 54 |
+| Mario | `widen_gap` (degrading) | 18 / 18 | 27 / 54 |
+| Mario | `jump_velocity_down` (degrading) | **0 / 18** | 16 / 54 |
+| Mario | `off_route` (neutral) | 18 / 18 | 12 / 36 |
+| Meat Boy | `base-reseeded` | 16 / 18 | 51 / 180 |
+| Meat Boy | `seal_route` (breaking) | 0 / 18 | 0 / 180 |
+| Meat Boy | `widen_gap` (degrading) | 6 / 18 | 15 / 36 |
+| Meat Boy | `jump_velocity_down` (degrading) | 6 / 18 | 63 / 180 |
+| Meat Boy | `off_route` (neutral) | 18 / 18 | 77 / 180 |
+| Bomberman | `base-reseeded` | 0 / 18 | 124 / 270 |
+| Bomberman | `seal_route` (breaking) | 0 / 18 | 0 / 270 |
+| Bomberman | `add_enemy` (degrading) | 0 / 18 | 59 / 270 |
+| Bomberman | `fuse_down` (degrading) | 0 / 18 | 113 / 270 |
+| Bomberman | `off_route` (neutral) | 0 / 18 | 138 / 270 |
+
+- **Every `seal_route` mutant is unsolvable** for the retrained agents (0 of 666 cells), as its class
+  says.
+- **Neutral `off_route` stays solvable** where the original is solvable (Mario 1-1 and Meat Boy The
+  Gap: 18/18).
+- **Degrading mutants are harder:** Bomberman `add_enemy` 59/270 against 124/270 for the reseeded
+  original; Meat Boy `widen_gap` on The Gap 6/18 against 16/18.
+- **Mario `jump_velocity_down` on 1-1 is 0/18.** It is classed degrading, but no retrained agent
+  finishes 1-1 with the weaker jump. The mutant's own note explains it: with jump x0.85 the 4-tall
+  pipe at column 57 can no longer be cleared from the ground, so only a Goomba bounce gets past it.
+  For agents this mutant acts as a breaking one.
+- **Bomberman's evaluation level is 0/18 for every variant**, the original included, so all its
+  comparisons there are "not counted" (section 7.5). Bomberman's evidence comes from the other levels.
+- **Mega Man** retraining was still running when this data was copied; its numbers are not final.
+- The verdicts of the detection rule (replay) need `ast_play` and `final`, which have not run yet.
+
+---
+
+## 10. Known limits and caveats
+
+1. **Bomberman's evaluation level (12, Bomberman II 1-1) was never solved**, in training and in every
+   retrain. Its mutation comparisons are all "not counted". (An older version of this project used
+   level 8, "09 Two Balloms", as the evaluation level; `paper-ast/ast_rule.md` still says
+   "Bomberman 09". The code and this run use level 12.)
+2. **Mario `jump_velocity_down` behaves as breaking for agents** on 1-1 (section 9.4).
+3. **"Solved" is a low bar for clumsy.** 37 solved cells have a win rate of 0% (rounded), all clumsy:
+   the seed won once, then almost never in the next 10 generations.
+4. **Duplicate personas in Meat Boy:** experienced = speedrunner and killer = collector in every
+   cell, so Meat Boy has 4 distinct agent sets, not 6.
+5. **`--best` for Mario and Meat Boy only changes the anneal factor**, which acts after the first
+   win; first wins are the same as the default in every cell.
+6. **The detection rule is not pre-registered** (fixed on 2026-10-25, after pilot replays).
+7. **Retraining is not a detector.** In an earlier run, the rule fired in 6 of 10 comparisons of
+   `base-reseeded` against the unchanged original (`paper-ast/ast_rule.md`). The `final` stage
+   measures this again on this run's data.
+8. **Mega Man** sections trained from new seeds sometimes fail outright (Street and Climb in earlier
+   runs), so a Mega Man "no longer solvable" needs that caveat.
+9. **The replay-wall videos** in `runs/videos/` were recorded from older agents, not from this run's.
+10. **Pilot study:** p1 and p4 have 4 of the 5 mutation runs; Test1 and test111 are test sessions.
+11. **The win-rate window** is 10 generations (100 episodes), so a win rate is a short-run measure.
+
+---
+
+## 11. Where the data is
+
+### 11.1 Folders
+
+| Folder | What is in it | Written by |
+|---|---|---|
+| `runs/balance/` | Every report JSON: `report_*` (training), `gasweep_*` (GA sweep), `ablation_*` (sensor ablation) | `code/neuro/balance.py`, `gasweep.py` |
+| `runs/probes/<game>/<persona>/<tag>/<level>_<seed>/` | Main training: one probe folder per cell | `balance.py` |
+| `runs/gasweep/<game>/<persona>/<tag>/<level>_<seed>/` | GA sweep probes | `gasweep.py` |
+| `runs/ablation/<game>/<persona>/<tag>/<level>_<seed>/` | Sensor ablation probes | `balance.py --ablation` |
+| `runs/ast/<game>/<variant>/` | AST: the variant's report(s), `agents*.csv` playtests, and `probes/` (retrained agents) | `code/neuro/ast_eval.py` |
+| `runs/ast/metrics.json` | AST metrics and verdicts (after the `final` stage) | `code/stats/ast_metrics.py` |
+| `runs/user_study/<participant>/<game>/<phase>/run<k>/` | Pilot study: `episodes.csv` and `inputs.csv` | `menu.py` (option `u`) |
+| `runs/manual/<game>/<player>/` | Free manual play with `--record` | `code/games/tools/manual_play.py` |
+| `runs/logs/` | The Slurm job logs of every pipeline stage of the Nibi run | the cluster |
+| `runs/videos/<game>/<persona>.webm` | Replay-wall videos | `code/neuro/wall_video.py` |
+| `runs/site/` | The built Command Center website (not committed; rebuilt on demand) | `code/neuro/command_center.py` |
+| `code/neuro/ga_best.yaml` | The `--best` GA settings per game, with every sweep's numbers | `gasweep.py` |
+| `code/games/levels/mutants/<game>/<id>/` | Each mutant: `mutant.json` (what changed, class, why) and its level file | `eval_mutants.py`, `megaman_mutants.py` |
+| `paper-ast/` | The AST paper draft, the rule, tables and figures | `code/stats/ast_paper.py` and by hand |
+
+### 11.2 Files
+
+**`best.npz`** holds the best network of a run (its weights). **`state.json`** holds the run state:
+the GA settings (`config`), the persona, the best fitness, and the history of every generation
+(wins, average fitness, best progress, and each episode's result).
+
+**Report JSON** (`runs/balance/report_*.json`): `game`, `persona`, `tag`, `pop_size`,
+`gens_budget`, `seeds`, `ga_config` (the GA settings used), `train_time_s`, `levels` (one summary per
+level) and `cells` (one entry per level and seed). Main fields:
+
+| Field | Meaning |
+|---|---|
+| `cells.<level>[].first_win_gen` | first-win generation, or `null` if never solved |
+| `cells.<level>[].win_rate` | win rate in the 10 generations after the first win |
+| `cells.<level>[].gens_run` | generations actually run |
+| `cells.<level>[].best` | best fitness |
+| `cells.<level>[].causes` | count of each cause of failure (for example `Stall`, `Enemy`, `Pit`) |
+| `cells.<level>[].completion_rate`, `deaths_per_win`, `progress_at_death`, `stuck_frac`, `death_hist`, `death_cluster_entropy`, `coin_collection_rate`, `novice_expert_gap`, `improvement_rate`, `trend` | balance metrics of the cell |
+| `levels[].solved_by`, `seeds` | how many seeds solved the level, of how many |
+| `levels[].first_win_mean`, `first_win_ci` | mean first-win generation and its 95% confidence interval |
+| `levels[].win_rate_mean`, `win_rate_ci` | mean win rate and its 95% confidence interval |
+
+**Agent `episodes.csv`** (one row per episode, in each probe folder): `persona`, `game`, `world`
+(the level), `cause_of_death` (`success` for a win), `jump_count`, `coins_collected`, `avg_vx`,
+`progress_ratio`, `route` (sampled positions), `enemies_killed`, `bricks_destroyed`, `elapsed_time`.
+
+**Human and playtest files** (`runs/user_study/.../episodes.csv`, `runs/manual/...`, and the
+`agents*.csv` playtests; one row per attempt or life; written by `code/stats/episode_log.py`). Every
+file starts with the same 12 columns: `persona` (the participant ID for people), `game`, `level`,
+`source` (`human` or agent), `session`, `gen`, `agent`, `status` (`WON` for a win), `cause`,
+`frames`, `time_s`, `progress`. Each game then adds its own columns; for Mario these are `jumps`,
+`coins`, `kills`, `avg_speed`, `end_x`, `end_y`, `tile`, `bricks`, `run_result`, `lives_used`,
+`life`, `recorded_at` and `route`. Rows of the study's mutation phase also have `mutant` and
+`mutant_class`.
+
+---
+
+## 12. How to run it and reproduce the results
+
+### 12.1 Set up
 
 ```bash
 git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
@@ -118,457 +647,85 @@ pip install -r requirements.txt
 python menu.py
 ```
 
-The menu drives everything — train, watch, play, edit levels, run probes, test mutants, open the command
-center. Every choice in it is the same checklist: type numbers to tick, Enter to confirm, 0 to go back.
+The menu drives everything: train, watch, play, edit levels, run the sweeps, run the mutation
+testing, run the user study and open the Command Center.
 
-| | Train | | Play | | Tools & balance |
-|--:|---|--:|---|--:|---|
-| 1 | Project status | 5 | Play manually (any game / level) | 9 | Level editor |
-| 2 | Train single (game · level · persona · sensors) | 6 | Watch a trained agent | 10 | Toggle levels |
-| 3 | Train all levels of one game (persona · sensors · tag) | 7 | Watch all envs (dashboard grid) | 11 | Live dashboard |
-| 4 | Train the full game × level grid (persona · sensors · tag) | 8 | Watch a random agent | 12 | Command Center |
-| P | Train all personas as a curriculum (games · personas · seeds, one seed at a time): one agent per persona carries on level after level | | | 13 | Full sweep (games × personas × seeds) |
-| | | | | 14 | Sensor ablation (rays vs grid → `runs/ablation`) |
-| | | | | 15 | GA sweep (one knob at a time vs literature bounds) |
-| | | | | 16 | README figures (regenerate `docs/img/fig_*.png`, update README) |
-| | | | | 17 | Mutants: the five per game, checked against their spec cells |
-| | | | | 18 | Play a mutant yourself (each attempt logged under your name) |
-| | | | | 19 | Retrain on mutants (every persona's three seeds, the baseline's GA setting) |
-| | | | | 20 | Agent playtest: one attempt per agent, learning off, original vs mutants |
-| | | | | 21 | Mutation metrics + the Command Center's Mutations page (`runs/balance/mutations.html`) |
-| | | | | D | Delete runs (pick runs / probe trees, or everything) |
-
-<details>
-<summary><b>Command line equivalents</b></summary>
+### 12.2 The commands behind each experiment
 
 ```bash
-# Train — dashboard at http://127.0.0.1:8000/<game>/index.html
-python -m code.neuro.trainer --game mario                              # curriculum over enabled levels
-python -m code.neuro.trainer --game mario --level Mario1-2 --turbo     # one level, max speed
-python -m code.neuro.trainer --game meatboy --persona speedrunner       # see Player personas below
-python -m code.neuro.trainer --game mario --sensors grid --seed 7       # tile-grid sensors, custom seed
-python -m code.neuro.trainer --game mario --hidden 32 --memory 2       # bigger net, 2 Jordan memory units
-python -m code.neuro.trainer --resume runs/mario                       # continue a run
-python -m code.neuro.trainer --game mario --replay runs/mario/best.npz # watch the all-time best
+# Main training (one game, persona and level; 200 generations; the paper seeds)
+python -m code.neuro.balance --game mario --persona novice --levels Mario1-1 --gens 200 --seeds 1234 2025 31337
+python -m code.neuro.balance --game mario --persona novice --levels Mario1-1 --gens 200 --seeds 1234 2025 31337 --best
 
-# Probe — every enabled level × 3 seeds, parallel across cores
-python -m code.neuro.balance --game mario --gens 40 --persona experienced
-python -m code.neuro.balance --game mario --gens 40 --ablation --sensors grid   # ablation arm → runs/ablation
-python -m code.neuro.balance --game mario --gens 40 --compare --ablation        # rays-vs-grid table, no training
-python -m code.neuro.gasweep --game mario --gens 40 --axes hidden memory --confirm
-python -m code.neuro.gasweep --rebuild                                 # refresh code/neuro/ga_best.yaml only
+# GA sweep and sensor ablation (40 generations), as the cluster ran them
+GAMES=mario PERSONAS=novice bash run_all.sh sweeps
+python -m code.neuro.gasweep --game megaman --persona novice --levels CutMan-1-Street --gens 40 --seeds 1234 2025 31337
+python -m code.neuro.gasweep --rebuild                       # rewrite code/neuro/ga_best.yaml from the sweeps
 
-# Train or probe with what the sweep found for that game
-python -m code.neuro.trainer --game mario --best
-python -m code.neuro.balance --game mario --gens 40 --best
+# Mutants
+python -m code.games.eval_mutants --all-levels               # Mario, Meat Boy, Bomberman: every level
+python -m code.games.megaman_mutants                         # Mega Man
+python -m code.games.eval_mutants --list                     # the evaluation set of every game
 
-# Report
-python -m code.neuro.command_center --serve --open                     # the Command Center (menu 12)
-python -m code.neuro.figures --readme                                  # README figures + stamp (menu 16)
-streamlit run code/stats/dashboard/app.py                              # B1/B2/B3 stats dashboard
+# AST: retrain, playtest, replay, random baseline, metrics, paper tables
+python -m code.neuro.ast_eval retrain --game mario --mutant seal_route --persona novice
+python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona novice --level CutMan-1-Street
+python -m code.neuro.ast_eval play --game mario --variant base
+python -m code.neuro.ast_eval play --game mario --variant seal_route --replay
+python -m code.neuro.ast_eval play --game mario --variant base --random
+python -m code.stats.ast_metrics                             # runs/ast/metrics.json
+python -m code.stats.ast_paper                               # paper-ast/ tables and figures
 
-# Mutation testing (the AST evaluation, menu 17-21)
-python -m code.games.eval_mutants                                      # write Mario's, Meat Boy's, Bomberman's mutants
-python -m code.games.megaman_mutants                                   # Mega Man's (the evaluation uses five of them)
-python -m code.games.eval_mutants --list                               # the evaluation set of every game
-python -m code.neuro.ast_eval retrain --game mario --mutant widen_gap  # every persona's 3 seeds on the mutant
-python -m code.neuro.ast_eval play --game mario                        # one attempt per agent: original + mutants
-python -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained   # Mega Man's original, trained like its mutants
-python -m code.neuro.ast_eval play --game mario --replay               # the original's frozen agents on each mutant
-python -m code.neuro.ast_eval retrain --game mario --mutant base-reseeded     # the original, new seeds: the false-alarm check
-python -m code.neuro.ast_eval play --game mario --random               # the random-action baseline (2D games)
-python -m code.stats.ast_paper                                         # paper-ast/: results tables, LaTeX, figures
-python -m code.stats.ast_metrics --page                                # metric tables + runs/balance/mutations.html
-PEAK_MUTANT=code/games/levels/mutants/mario/seal_route python -m code.neuro.trainer --game mario   # any command, on a mutant
+# Rebuild reports from the probe folders, and build the website
+python -m code.neuro.balance --rebuild
+python -m code.neuro.command_center --open
 
-# Play
-python -m code.games.tools.manual_play --game platformer --level Mario1-2
-python -m code.games.tools.manual_play --game meatboy --level 3        # Meat Boy levels are indices
-python -m code.games.tools.manual_play --game mario --level Mario1-1 --record --player p1 --episodes 10
-                                                                       # log each attempt to runs/manual/<game>/<player>/episodes.csv
+# Watch an agent, or play a level or a mutant yourself
+python -m code.neuro.trainer --game mario --replay runs/probes/mario/novice/p10g200/Mario1-1_1234/best.npz
+PEAK_MUTANT=code/games/levels/mutants/mario/seal_route python -m code.games.tools.manual_play --game mario --level Mario1-1
 ```
 
-`A`/`D` or arrows move, `Shift` run, `Space`/`W` jump, `Z` fire (Mario / Megaman), `W`/`S` climb
-(Megaman), `Esc` quits. `F1` rays · `F2` free camera (`IJKL`) · `F3` slow motion ·
-`F4` hitboxes · `F5` agent max view.
-</details>
+### 12.3 On a cluster
 
----
+`run_all.sh` holds the sweep and Mega Man jobs (`./run_all.sh sweeps | megaman | ast-megaman | test`).
+The Nibi run used a pipeline script that runs the stages of section 6 as Slurm job arrays, one stage
+after the other, and resumes from any stage. Each stage's task list is one command per line, as in
+section 12.2.
 
-## How it works
-
-```mermaid
-flowchart LR
-    A[("ASCII level<br/>game_config.yaml")] --> E["Game engine<br/>Mario · Mega Man<br/>Meat Boy · Bomberman"]
-    E --> S["Sensors<br/>14 rays or 368-cell grid"]
-    S --> N["NeuralNet<br/>14 → 16 tanh → 3"]
-    N -->|move · jump| E
-    E -->|fitness = furthest x<br/>+5000 on a win| G["GA · pop 10<br/>elite 4 · tournament 5<br/>crossover · mutation"]
-    G -->|next generation| N
-    G --> P["Balance probes<br/>levels × 3 seeds × personas"]
-    P --> R["Command center<br/>report · ablation · GA sweep"]
-    R -.->|adjust, re-probe| A
-```
-
-| Layer | Where | What it does |
-|---|---|---|
-| Engines | `code/games/*_core.py` | Four deterministic Pygame games — three platformers and a top-down Bomberman — sharing ASCII level loading and debug tooling: Mario, Meat Boy, Bomberman and Mega Man (the NES Cut Man stage, `megaman`). Sonic is archived: its code is kept in `archive/sonic/` (README there says how to restore it) |
-| Adapters | `code/neuro/adapters.py` | One `GameAdapter` face per engine: reset, step, solid/hazard queries, fitness, episode stats |
-| Sensors | `code/neuro/sensors.py` | Raycast marching + scalar senses → 14 floats; or a 3 × 11 × 11 tile window + body senses → 368 |
-| Evolution | `code/neuro/evolution.py` | `GAConfig` + `Population`: flat weight vectors, elitism, tournament, uniform crossover, gaussian mutation, checkpoints with RNG state |
-| Trainer & dashboard | `code/neuro/trainer.py` · `server.py` · `web/index.html` | Ten envs stepped round-robin in one process; websocket dashboard with live frames, telemetry, manual takeover |
-| Balance | `code/neuro/balance.py` · `gasweep.py` · `report.py` | Multi-seed probes, GA hyperparameter sweep, self-contained HTML command center |
-| Stats | `code/stats/dashboard/` | Streamlit B1 challenge / B2 punishment / B3 diversity calibration over the episode CSVs |
-
-**Why neuroevolution.** A 291-weight reactive policy has no replay buffer, no optimizer, no value
-head and no GPU. The whole population plays one level simultaneously, each genome in its own
-engine instance, at 5,000+ env-steps/s on a laptop. A 2-level × 3-seed × 40-generation Mario probe
-costs about six CPU-minutes; Meat Boy's eleven levels about ten. And because one seed drives
-population init, mutation and every game step, two runs with the same seed are identical — the
-probe is a frozen, repeatable playtester you can diff level designs against.
-
----
-
-## Features
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**Neuroevolution core**
-- Fixed-topology GA over a numpy MLP; hidden size, last-action feedback and Jordan memory units are `GAConfig` knobs (`--hidden`, `--action-feedback`, `--memory`)
-- 14-sensor perception: six raycasts (forward, forward-up ±30°/60°, forward-down ±30°/60°, back), enemy corridor, pit probe, velocity, grounded / can-jump, nearby question blocks
-- Two sensor modes, `rays` (14) or `grid` (368), switchable per run
-- Fitness = furthest x reached, +5000 on a win, + time left × persona bonus, + persona event weights; Meat Boy uses BFS path progress
-- Curriculum: the population advances to the next enabled level after three winners in one generation
-- Full determinism from one seed
-
-**Player personas** (`code/neuro/personas.py`)
-- Six player types on two axes — skill (novice · clumsy · experienced) and play style (killer · collector · speedrunner); see [Player personas](#player-personas)
-
-</td>
-<td width="50%" valign="top">
-
-**Balance & analytics**
-- Per (level × seed) fresh populations → win rate ± 95 % CI, generations-to-first-win, dominant death cause, trend; hardest levels ranked first
-- `--workers N` spreads probes across cores (default cores − 1)
-- Per-episode CSVs: persona, cause of death, jumps, coins, velocity, progress at death, sampled route
-- Command center: per-game sections, radar, level dialogs with death heatmaps, routes, per-seed learning curves, the exact GA config, ▶ Watch replays
-- Rays-vs-grid ablation page; GA sweep page with capacity curve, per-axis bound tracks and a recommended config per game (`--confirm` probes it)
-- **Best config per game, written back as YAML**: every sweep updates `code/neuro/ga_best.yaml`, which `--best` feeds straight into training and probing
-
-**Live dashboard**
-- Grid of all ten envs with per-env HUD; large watched view with rays, hit dots, tile outlines, pit-probe boxes
-- Telemetry bars, fitness chart, per-generation ledger
-- Turbo (headless max speed), hitbox and grid overlays, level switching at the next generation
-- **Take control**: drive the watched env yourself while the other nine keep evolving
-- Frame encoding is skipped entirely while no browser tab is connected
-
-</td>
-</tr>
-</table>
-
----
-
-## Player personas
-
-A persona is the kind of player the evolved agents imitate. Pick one with `--persona <name>`
-or at the persona prompt in the TRAIN menus. Every persona plays the same game with the same
-291-weight network; they differ in two ways:
-
-- **Hands** (skill): how often the net gets fresh senses, whether sprint is unlocked, and how often
-  the input slips.
-- **Event weights** (play style): what the persona is paid for on the way to the goal.
-
-| Persona | Hands | Paid for | Use it to ask |
-|---|---|---|---|
-| `novice` | walk only, senses every 3rd frame | reaching the goal | can a new player finish this? |
-| `clumsy` | walk only, senses every 4th frame, a 0.2 s mis-press about every 0.5 s | reaching the goal | where does a clumsy player die? |
-| `experienced` | sprint, senses every frame, clean inputs (the default) | reaching the goal | the baseline: how far does skill carry? |
-| `killer` | walk, senses every frame | goal **+ enemies killed** | does fighting pay, or is it a detour? |
-| `collector` | walk, senses every frame | goal **+ coins / power-ups picked up** | are the pickups worth the risk? |
-| `speedrunner` | sprint, senses every frame | goal **+ 25 per second left** on a win | is there a fast route? |
-
-**Event weights are shares of the goal.** `weights={"kills": 1.0}` means that killing every enemy
-in the level pays as much as reaching the goal; killing 3 of 21 pays 3/21 of it. The share is
-per level and capped at 1, so one weight means the same thing in Mario (pixels) and Bomberman
-(a 0–1000 exit-cost scale), on crowded and empty levels, and kills cannot be farmed. This is the
-*procedural personas* idea of Holmgård et al. (MiniDungeons): one game, one controller, a
-different utility over game events per player archetype.
-
-**A level without the event gives a plain player.** Meat Boy has no enemies or pickups; most of the
-Bomberman ladder has no power-ups. The trainer prints
-`note: meatboy level [0] has no kills — persona [killer] plays for the goal alone here`.
-
-**Measured** (40 generations, 3 seeds × 20 test episodes, Mario 1-1, 21 enemies; measured before
-`experienced` took over the old `good` settings, so the walk-only row is the old `experienced`):
-
-| Player | Win % | Kills |
-|---|---|---|
-| walk-only, no bonus | 100 | 2.7 |
-| `killer` | 100 | **7.0** |
-| `experienced` (sprint) | 100 | 4.7 |
-| `clumsy` | **20** | 2.1 |
-
-The killer kills 2.6× as many enemies as a player with the same hands and no bonus, and still wins
-every time; weights 0.5, 1.0 and 2.0 gave the same kill count, so 1.0 is the default. On Mario 1-2
-(17 coins) the collector picked up 1.5–2.5 coins against 0 for the walk-only player.
-
-**Add a persona** — one entry in `PERSONAS`:
-
-```python
-"pacifist": Persona(name="pacifist", sprint=False, sensor_period=1, time_rate=0.0,
-                    weights={"kills": -1.0}, description="avoids killing"),
-```
-
-Events available today: `kills` and `coins` (`_EventWeights.events()` in `code/neuro/adapters.py`).
-New personas are opt-in in the sweep menus, because each one multiplies sweep cost. The persona is
-saved with the run (`state.json`) and replay uses it, including its reaction time and slips.
-
----
-
-## Configuration
-
-| Knob | Where | What it changes |
-|---|---|---|
-| GA hyperparameters | `GAConfig` in `code/neuro/evolution.py` | population 10 · elite 4 · tournament k 5 · crossover 0.7 · mutation rate 0.15 / σ 0.15 · init σ 0.5 · anneal ×0.5 after a level's first win (the sweep's one universal winner) · 3600-frame episodes · 300-frame stall kill · advance after 3 wins · win bonus 5000 · seed 42 · hidden 16 · feedback off · memory 0 |
-| Network shape | `--hidden / --action-feedback / --memory`, `code/neuro/net.py` | 147 / 291 / 579 / 1,155 weights for hidden 8 / 16 / 32 / 64; +2 inputs with feedback; +N in/out with memory |
-| Sensors | `--sensors rays\|grid`, `code/neuro/sensors.py` | ray angles, max distance 250 px, march step 8 px, pit-probe depth 4 tiles, grid half-width 5 |
-| Personas | `code/neuro/personas.py` | sprint, sensor reaction period, time-left bonus, input slips (`mistake_rate`, `slip_frames`), event `weights` — one dataclass per persona |
-| Levels | `code/games/levels/<game>/*.txt` + `game_config.yaml` / `meatboy_config.yaml` | ASCII tilemaps; enable/disable per level; the trainer re-reads the list every generation |
-| Game feel | per-game blocks in `game_config.yaml`, `meatboy_config.yaml` | gravity, jump velocity, run speed, coyote frames, wall-jump forces, per-level `time_limit` |
-| Balance probes | `code/neuro/balance.py` | seeds 1234 / 2025 / 31337 (keep for comparability), gens budget, `--workers` |
-| Stats bands | `code/stats/MarioThresholds.yaml` | B1 / B2 / B3 target bands and warning margins |
-| Dashboard | `--port` (HTTP 8000), websocket = HTTP port + 765 (8765) — pick another `--port` if something else holds 8765 | thumbnails 5 fps (1 in Turbo), watched env 20 fps |
-
-Deep dives: [`docs/GUIDE.md`](docs/GUIDE.md) (how the system works) and
-[`docs/BALANCE.md`](docs/BALANCE.md) (every metric, the personas, the GA-sweep bounds and citations,
-related work).
-
----
-
-## Levels
-
-Levels are ASCII files in `code/games/levels/<game>/` — paint them in the editor (menu 9) or by hand:
-
-```
-##################      #  solid ground          ?  question block (coin)
-#                #      =  one-way platform      C  coin
-#   =====        #      ^  spikes                E  enemy
-#   #   #        #      G  goal                  P  player spawn
-# P#   #     G   #
-#  # C #        ##      springs, saws, crumble blocks, slopes, ladders, power-ups
-#  ### ##########       and per-game entities: code/games/levels/common/ASCII_TILEMAP.md
-^^^^^^^^^^^^^^^^^^
-```
-
-Register a new file in `game_config.yaml` (or `meatboy_config.yaml`'s list) and the trainer picks it
-up at the next generation — no restart.
-
----
-
-## Adding a game to the engine
-
-PEAK is engine-agnostic: the evolution loop never imports a game. It talks to one small adapter
-face, and everything else — dashboard, probes, report, figures — follows from registering the
-game's key. Bomberman was added this way; the walkthrough below is that work, in order.
-
-### 1. Write the core — `code/games/<game>_core.py`
-
-A core owns the rules, the level, and the pixels. It must be **deterministic** (one seed → identical
-run) and **headless-capable** (`render_mode="none"`, no display required). The trainer only calls:
-
-| Member | Contract |
-|---|---|
-| `reset(*, seed=None, options=None)` | Rebuild the level and the entities. Advance to the next level if `self.won` is still `True` from the last episode (that is how manual play walks the campaign; the adapter clears the flag to stay pinned) |
-| `step(action)` | One fixed-`dt` tick → `(obs, reward, terminated, truncated, info)`. The reward is ignored — fitness lives in the adapter |
-| `render(surface=None, blit_only=False)` | Draw a frame onto the given surface |
-| `alive` · `won` · `score` · `death_cause` | Episode state. `death_cause` becomes the report's cause-of-death breakdown, so name the causes well ("Bomb", "Enemy", "Timeout") |
-| `tile_size` · `fps` · `WIDTH` · `HEIGHT` · `level_data` | Geometry the sensors and the dashboard canvas read |
-
-Give it a `__main__` smoke test that scripts a win and a death — cheaper than debugging through
-the GA later.
-
-### 2. Levels — `code/games/levels/<game>/*.txt` + `<game>_config.yaml`
-
-ASCII grids, one file per level, glyphs documented in `code/games/levels/common/ASCII_TILEMAP.md`.
-Name them `NN_slug.txt` so the campaign ordering is obvious, and list them in a `levels:` block:
-
-```yaml
-levels:                    # index = level id (menu / --level N)
-  - bomberman/01_open_floor.txt
-  - bomberman/02_first_bomb.txt
-```
-
-Levels addressed by index instead of by name go in `INDEXED_GAMES` (`adapters.py`, `menu.py`,
-`manual_play.py`). Design the ladder so each rung adds exactly one demand — the probe reads a
-ladder far better than it reads a difficulty cliff.
-
-### 3. Adapter — `code/neuro/adapters.py`
-
-One class implementing the `GameAdapter` protocol at the top of that file, plus an entry in
-`_ADAPTERS`. Beyond the obvious `reset` / `step` / `render`, three methods carry the interesting
-decisions:
-
-- **`solid_at(wx, wy)`** — what a raycast stops on. Include hazards the agent should see; exclude
-  things it can walk through (a bomb it is still standing on isn't a wall yet).
-- **`fitness()`** — the only thing evolution optimises. Use a *dense* signal: distance covered, or
-  cost-to-goal progress on a 0–1000 scale, plus the win bonus. Prefer a measure that improves the
-  moment the world improves — Bomberman scores Dijkstra cost-to-exit with bricks priced at 6, so
-  blowing up the right brick pays immediately, without moving.
-- **`episode_stats()`** — the per-episode CSV row: `end_x`, `level_len`, `cause`, `coins`, `kills`.
-  `end_x / level_len` becomes the reach percentage everywhere, so both must measure the same thing.
-
-Optional hooks a non-platformer will want:
-
-| Hook | Why |
-|---|---|
-| `N_OUTPUTS_BY_GAME` | Grow the network's output layer past `left/right/jump` — Bomberman uses 5 (jump = drop a bomb, plus up/down) |
-| `N_INPUTS_BY_GAME` + `sense()` + `SENSOR_LABELS` | Own the ray-mode sensor vector. `sensors.py` hands `sense()` the ray marcher and returns whatever you build; `SENSOR_LABELS` is what the dashboard's telemetry panel renders, so every slot gets a name and a one-line explanation |
-| `reach` | What the progress bar measures, when it isn't pixel-x |
-
-**Sensors are the whole ballgame.** Bomberman first trained with eight wall-distance rays and a
-single "this tile is about to burn" scalar: every agent in every episode died to its own bomb,
-because nothing in the vector said *which way is out*. Adding four slots — how soon each
-neighbouring tile burns — took the first win from never to generation 4. If a level is unsolvable,
-ask what the agent cannot see before you touch the fitness.
-
-### 4. Register the key everywhere it shows up
-
-```
-menu.py                     GAMES, _PLAY_CONTROLS, INDEXED_GAMES
-code/games/tools/manual_play.py   ACTION_MAPPING (keyboard → action), _random_action
-code/neuro/figures.py       GNAME (display name on the README figures)
-code/neuro/report.py        the config-section block, the game icon, glyph overrides
-code/neuro/web/index.html   TOPDOWN (which keymap manual takeover uses)
-```
-
-### 5. Prove it end to end
-
-```bash
-python -m pytest code/tests/test_<game>.py -q             # levels, rules, sensor dims
-python -m code.games.tools.manual_play --game <game> --random --fps 600
-python -m code.neuro.trainer --game <game> --level 0 --gens 40 --turbo --no-serve
-python -m code.neuro.balance --game <game> --gens 20      # then: python -m code.neuro.command_center
-```
-
-Level 0 should be solved within a handful of generations. If it isn't, the problem is the sensors
-or the fitness — not the GA.
-
----
-
-## Mutation testing
-
-Each game trains and is tested on one evaluation level, so a change to it is easy to make and to
-playtest: Super Mario Bros. 1-1, Super Meat Boy 1-3 The Gap, Bomberman 09 Two Balloms, and Mega Man's
-Cut Man stage (8 segments). The other levels stay loadable (`disabled_levels`, `active_levels`).
-
-Five one-change copies of each level ("mutants") test whether a playtest notices a change:
-
-| Operator | What it changes | Class | Agents |
-|---|---|---|---|
-| `seal_route` | a full-height wall across the route | breaking | retrained |
-| `widen_gap` (Bomberman `add_enemy`) | a wider gap, or one more enemy on the route | degrading | retrained |
-| `jump_velocity_down` (Bomberman `fuse_down`) | jump velocity ×0.85, or a shorter bomb fuse | degrading | retrained |
-| `off_route` | a tile no player can reach | neutral | retrained |
-| `cosmetic_tile` | `.` written as a space: the level parses the same | equivalent | replayed only (determinism) |
-
-The cells are fixed by hand in `code/games/eval_mutants.py`; each names the character it expects, so
-a level that changed since is refused rather than mutated in the wrong place, and every mutant is
-loaded in the game and checked before it is written (the change plays, a cosmetic copy parses the
-same, an off-route tile is walled in, a flood fill finds the exit only where it should). A mutant
-is a folder (`code/games/levels/mutants/<game>/<id>/`); name it in `PEAK_MUTANT` and any command plays it.
-
-A playtest gives each agent one attempt with learning off: the best genome of each of the three
-seeds per persona, so a persona's win rate moves in steps of 1/3 (Mega Man plays its relay of
-section agents). `code/stats/ast_metrics.py` reads the attempts, agents' and people's, and reports
-completion, win rate, progress, end location, death cluster, cause mix, time to finish, play
-coverage, effort counts and, for Mega Man, the segment reached. **Replay is the detector**: the
-original's frozen agents play each mutant (`play --replay`, `agents_replay.csv`), and the mutant is
-caught when completion is lost, the win rate changes (Fisher's exact test, p < 0.05), the death
-cluster moves more than three tiles or the top cause of death changes. Frozen agents replay attempt
-for attempt, so seed noise cannot reach the comparison; the cosmetic copy passes when every replay
-matches the original attempt for attempt. **Retraining answers one question**: can agents trained
-on the mutant still finish it? It is not used as a detector: `base-reseeded`, the original retrained
-with three new seeds, sets off the rule in 6 of 10 comparisons on the unchanged level. A comparison
-counts only where the original's agents win, and each gets one verdict: broken, changed or
-unchanged (the rule, and how it was fixed: `paper-ast/ast_rule.md`). Mega Man's relay legs are hand-picked runs
-of an older pipeline, so its mutants are compared with `base-retrained`, the original with every
-section retrained exactly as the mutants were, over the same section (the global jump change
-section by section).
-
-## Research use
-
-| Question | What to run | What to read |
-|---|---|---|
-| How hard is each level, and for whom? | menu 13 (full sweep) | win rate ± CI and first-win per level × persona; unsolved-at-budget levels flag sealed goals and mechanic-gated paths |
-| *Why* is it hard? | any probe → level dialog | death causes (Pit / Stall / Enemy / OOB / Spike), 10-bin death heatmap, route overlay |
-| Did my edit help? | edit → menu 13 again | same seeds, same GA — the probe is frozen, so the diff is the level |
-| How much skill does the design reward? | menu 13, compare personas | novice vs speedrunner completion on the same level (`skill gap` tile) |
-| Is the agent the bottleneck? | menu 14 + 15 | rays vs grid, hidden 8 → 64, memory units — if all flat, it's the level |
-| Does a playtest notice a one-tile change? | menu 17 → 19 → 20 → 21 | the Command Center's Mutations page: caught / missed per mutant, then where and how play changed |
-
----
-
-## Best hyperparameters per game
-
-Every GA sweep writes **`code/neuro/ga_best.yaml`** — the per-game recommendation, kept next to the
-code rather than buried in a run directory:
-
-```yaml
-games:
-  mario:
-    recommended:            # feeds --best
-      elite: 6
-      tournament_k: 2
-      anneal_factor: 0.5
-      memory: 2
-    per_sweep:
-      experienced / 40 gens / rays:
-        overrides: {anneal_factor: 0.5, memory: 2, tournament_k: 2, ...}
-        baseline_win_rate: 0.2333
-        confirmed_win_rate: 0.3533     # the composite --confirm actually probed
-```
-
-A knob only reaches `recommended` if it wins a **strict majority** of that game's
-(persona × budget × sensors) sweeps, so one lucky persona cannot move a default on its own;
-everything else stays at the `baseline` block the file also records. Then use it:
-
-```bash
-python -m code.neuro.gasweep --game mario --gens 40 --confirm   # sweep, then write the yaml
-python -m code.neuro.gasweep --rebuild                          # or just rewrite it from existing runs
-python -m code.neuro.trainer --game mario --best                # train with mario's winners
-python -m code.neuro.balance --game mario --gens 40 --best      # probe with them (tagged `_best`, never
-                                                                # overwriting baseline probes)
-```
-
-In code: `GAConfig.for_game("mario")`. Flags you pass explicitly always beat the file, and a game
-the sweep has never covered simply falls back to the baseline.
-
-***
-
-## Tests
+### 12.4 Tests
 
 ```bash
 python -m pytest code/tests -q
 ```
 
-80 tests: GA determinism (seeded mutation, crossover, elitism), net parameter counts and the
-feedback/memory carry, raycasts and the tile grid on synthetic levels, headless adapter and trainer
-smoke tests, balance-probe aggregation, the GA-sweep config / tag / verdict logic, and — for
-Bomberman — every level file's geometry and reachability, blast and chain-reaction rules, and the
-sensor contract; persona event weights (share of the goal, cap, dead events) and input slips.
+---
 
-Known wart: the top-level package is named `code`, which shadows a stdlib module. Renaming it
-touches every import under `code/games/` and hasn't been worth the churn.
+## 13. Status on 2026-10-29
+
+| Part | State |
+|---|---|
+| Main training (200 generations, 1116 cells) | Done |
+| GA sweep and `ga_best.yaml` | Done |
+| Sensor ablation | Done |
+| Mutants (all levels, all games) | Done |
+| Retraining on mutants: Mario, Meat Boy, Bomberman | Done |
+| Retraining on mutants: Mega Man | Finishing on Nibi; the data here is a copy taken while it ran |
+| Playtests, replays, random baselines (`ast_play`) | Not run yet |
+| Detection metrics and verdicts (`final`, `runs/ast/metrics.json`) | Not run yet |
+| Pilot user study | 5 participants (Mario 3, Mega Man 2) |
+| Replay-wall videos | Older agents; need a new recording |
+
+When `ast_play` and `final` finish, copy `runs/ast/` and `runs/logs/` again from the cluster, then
+rebuild the metrics and the website.
 
 ---
 
-## Authors
+## 14. Authors
 
-**Al (AI-Scripting)** · [LinkedIn](https://www.linkedin.com/in/al-mohamed-shifan-5266b924b/)  
+**Al (AI-Scripting)** · [LinkedIn](https://www.linkedin.com/in/al-mohamed-shifan-5266b924b/)
 **Kevin Chu** · [LinkedIn](https://www.linkedin.com/in/kevincchua/)
 
-Ontario Tech University, Master's Program. Game engines, evolution system and dashboards built from
-scratch in Python + Pygame + numpy; stats-dashboard metrics designed with Amr Abdalla's
-statistics-observer work.
+Ontario Tech University, Master's program. Game engines, the evolution system and the dashboards are
+built from scratch in Python, Pygame and numpy. The statistics-dashboard metrics were designed with
+Amr Abdalla's statistics-observer work. The earlier deep-RL version (stable-baselines3 PPO) is kept
+on the `archive/drl-sb3-final` branch.
