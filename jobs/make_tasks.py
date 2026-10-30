@@ -18,7 +18,8 @@ from code.neuro.adapters import list_levels
 from code.neuro.ast_eval import PERSONA_ORDER as PERSONAS
 from code.neuro.relay import stage_legs
 
-GAMES_2D = ("mario", "meatboy", "bomberman")
+GAMES = os.environ.get("PEAK_GAMES", "mario meatboy bomberman megaman").split()    # PEAK_GAMES=speedy: only that game
+GAMES_2D = tuple(g for g in GAMES if g != "megaman")
 SEEDS = "1234 2025 31337"
 SECTIONS = [leg.level for leg in stage_legs(ast_eval.MEGAMAN_STAGE)]
 QUICK = "GENS=5 SEEDS=1234"     # the derisking sweep: every stage of the real one, a few generations
@@ -28,7 +29,7 @@ def test() -> list[str]:
     """Step 6: one small training job per game, into runs/_test (not the real tree)."""
     level = dict(EVAL_LEVELS, megaman=("CutMan-3-Ledges",))
     return [f"$PY -m code.neuro.balance --game {g} --persona experienced --levels {level[g][0]} --gens 5 --seeds 1234 "
-            f"--workers $W --out runs/_test/balance --root runs/_test/probes" for g in (*GAMES_2D, "megaman")]
+            f"--workers $W --out runs/_test/balance --root runs/_test/probes" for g in GAMES]
 
 
 def quick_sweep() -> list[str]:
@@ -42,7 +43,7 @@ def quick_sweep() -> list[str]:
 def quick_best() -> list[str]:
     """Step 7, after quick_final's ga_best.yaml: every persona on its GA winners, every level."""
     return [f"$PY -m code.neuro.balance --game {g} --persona {p} --gens 5 --seeds {SEEDS} --workers $W --best"
-            for g in (*GAMES_2D, "megaman") for p in PERSONAS]
+            for g in GAMES for p in PERSONAS]
 
 
 def sweep2d() -> list[str]:
@@ -75,7 +76,7 @@ def ast_retrain() -> list[str]:
     """Step 8: every retrained variant of every game, one persona (and Mega Man section) a task. Mega Man's
     base-retrained is its full training (on --best, ast_eval.retrain_job)."""
     out = []
-    for g in (*GAMES_2D, "megaman"):
+    for g in GAMES:
         for v in ast_eval.variants(g):
             m = ast_eval.mutant(g, v)
             if not (m and m["retrain"]):
@@ -92,7 +93,7 @@ def ast_retrain() -> list[str]:
 def ast_play() -> list[str]:
     """Step 8: one playtest task per variant and mode, so no two tasks write the same CSV."""
     out = []
-    for g in (*GAMES_2D, "megaman"):
+    for g in GAMES:
         for v in ast_eval.variants(g):
             if g == "megaman" and v == "base":      # the hand-picked relay of an older pipeline: not in a fresh runs/
                 continue
@@ -108,7 +109,8 @@ def ast_play() -> list[str]:
 
 ONE_LINERS = {
     "quick_final": ["$PY -m code.neuro.gasweep --rebuild && $PY -m code.neuro.balance --rebuild"],
-    "mutants": ["$PY -m code.games.eval_mutants --all-levels && $PY -m code.games.megaman_mutants"],
+    "mutants": ["$PY -m code.games.eval_mutants --all-levels " + " ".join(f"--game {g}" for g in GAMES_2D)
+                + (" && $PY -m code.games.megaman_mutants" if "megaman" in GAMES else "")],
     "gabest": ["$PY -m code.neuro.gasweep --rebuild"],
     "reports": ["$PY -m code.neuro.balance --rebuild"],
     "final": ["$PY -m code.stats.ast_metrics"],

@@ -374,6 +374,29 @@ def test_the_screen_counts_lives_down():
     assert seen == [3, 2, 1]
 
 
+def test_the_debug_panel_draws_every_overlay():
+    import pygame
+    c = SpeedyCore(render_mode="human")
+    dm = c.debug_manager
+    dm.show_sensors = dm.show_hitboxes = dm.show_grid = dm.slow_motion = True
+    surf = pygame.Surface((c.TOTAL_WIDTH, c.HEIGHT))
+    for f in range(300):
+        c.step((1, int(f % 40 < 20), 0))
+        c.render(surf)
+    assert c.frames > 30                         # F3 runs every other frame
+    assert not dm._overlay_errors_seen
+
+
+def test_monitors_and_rocks_show_on_the_rays():
+    a = make_adapter("speedy", "green_hill_1", 3600, 1000.0)
+    m = next(o for o in a.core.objs if isinstance(o, Monitor))
+    m.wake(a.core)
+    a.core.awake = [m]
+    assert (m.x, m.y) in a.enemy_positions()
+    m.broken = True
+    assert (m.x, m.y) not in a.enemy_positions()
+
+
 def test_a_held_jump_output_repeats():
     a = make_adapter("speedy", "green_hill_1", 3600, 1000.0)
     jumps = 0

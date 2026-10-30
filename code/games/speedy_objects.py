@@ -8,6 +8,7 @@ Objects past the camera's reach sleep and reset, as the console's object manager
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 SIN256 = [math.sin(i * math.pi / 128) for i in range(256)]
 PUSH = 11                   # the body's push radius + 1 in every solid-object check
@@ -42,6 +43,12 @@ class Obj:
     def __init__(self, x: int, y: int):
         self.x0, self.y0 = x, y
         self.x, self.y = x, y
+
+    @property
+    def gObj(self) -> SimpleNamespace:
+        """The object as the debug panel reads every game's entities."""
+        return SimpleNamespace(x=self.x, y=self.y, width=2 * getattr(self, "hw", 8), height=2 * getattr(self, "hh", 8),
+                               active=self.alive)
 
     def wake(self, core) -> None:
         self.awake = True
@@ -197,6 +204,12 @@ class Shot(Obj):
 # ── level furniture ──────────────────────────────────────────────────────────
 
 class Monitor(Obj):
+    hw = hh = 16
+
+    @property
+    def hazard(self) -> bool:           # not harmful, but it stops a runner: the agents' rays must see it
+        return not self.broken
+
     def __init__(self, x, y, kind):
         super().__init__(x, y)
         self.kind = kind
@@ -387,6 +400,8 @@ class SpringSide(Obj):
 
 
 class Rock(Obj):
+    hazard = True                       # in the way, as a monitor is
+
     def update(self, core, p) -> None:
         self.solid(core, p, 16, 16)
 

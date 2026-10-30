@@ -777,7 +777,7 @@ def _print_controls(game, level):
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
-    if game != "bomberman" and game not in OWN_LEVEL_FILES:  # those cores have no debug manager
+    if game == "speedy" or (game != "bomberman" and game not in OWN_LEVEL_FILES):  # the others have no debug manager
         print()
         print(f"    {_BOLD('Debug overlays')}")
         for key, what in _DEBUG_KEYS:
@@ -1307,7 +1307,7 @@ def run_full_sweep():
 # MUTATE — the AST evaluation (code/games/eval_mutants.py, code/neuro/ast_eval.py, code/stats/ast_metrics.py)
 # ============================================================================
 
-AST_GAMES = ["mario", "meatboy", "bomberman", "megaman"]
+AST_GAMES = ["mario", "meatboy", "bomberman", "megaman", "speedy"]
 
 
 def _ast_games():

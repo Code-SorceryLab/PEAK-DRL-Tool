@@ -13,11 +13,13 @@ from __future__ import annotations
 import math
 import os
 from bisect import bisect_left, bisect_right
+from types import SimpleNamespace
 
 import pygame
 import yaml
 
-from . import speedy_level as lv
+from . import mutants, speedy_level as lv
+from .modules.System.debugging_mods.manager import DebugManager
 from .speedy_objects import ARENA_X, Boss, Effect, RingScatter, animate_player, build_objects, draw_world
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,13 +27,14 @@ SIN = [int(round(256 * math.sin(i * math.pi / 128))) for i in range(256)]
 COS = [SIN[(i + 64) & 255] for i in range(256)]
 
 ACC, DEC, TOP = 0x0C, 0x80, 0x600
-GRAVITY, JUMP, JUMP_CUT = 0x38, 0x680, -0x400
+GRAVITY, JUMP_CUT = 0x38, -0x400
 HURT_GRAVITY, INVULN = 0x30, 120
 FALL_SPEED = 0x280
 AIR_CAP = 0xFC0
 SHOES_ACC, SHOES_DEC, SHOES_TOP = 0x18, 0x80, 0xC00
 TIME_LIMIT = 10 * 60 * 60        # frames: the clock kills at 10:00
 STAND_H, STAND_W, ROLL_H, ROLL_W = 19, 9, 14, 7
+DEBUG_PANEL_WIDTH = 350          # the side debug panel in play, as Mario's and Meat Boy's
 COLS = 32                        # px per grid cell of the sensor window, as Mario's tile
 
 
@@ -74,6 +77,11 @@ class Player:
         self.acc, self.dec, self.top = ACC, DEC, TOP
 
     @property
+    def gObj(self) -> SimpleNamespace:
+        """The body as the debug panel reads every game's player."""
+        return SimpleNamespace(x=self.px - self.w, y=self.py - self.h, width=2 * self.w + 1, height=2 * self.h + 1)
+
+    @property
     def px(self) -> int:
         return self.x >> 8
 
@@ -85,6 +93,7 @@ class Player:
 class SpeedyCore:
     VIEW = (320, 224)                       # the console's picture
     WIDTH, HEIGHT = 960, 672                # the window: the picture at 3x
+    DEBUG_PANEL_X = WIDTH
     fps = 60
     hud_lives = None                        # manual_play's count of lives after this one
 
@@ -92,7 +101,17 @@ class SpeedyCore:
                  stall_frames: int = 0):
         with open(os.path.join(HERE, "speedy_config.yaml"), encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f) or {}
+        self.mutant = mutants.active("speedy")      # PEAK_MUTANT: play that copy of the game
+        mutants.apply_config(self.cfg, self.mutant)
+        self.jump = int(self.cfg["physics"]["jump"])
         self.render_mode = render_mode
+        self._cam_offset = [0.0, 0.0]       # F2 free camera
+        self._odd_frame = False             # F3 slow motion runs every other frame
+        if render_mode == "human":          # the core owns the window and its F1-F7 panel, as Meat Boy's does
+            pygame.init()
+            pygame.display.set_caption("SPEEDY (PEAK)")
+            self._surf = pygame.display.set_mode((self.TOTAL_WIDTH, self.HEIGHT))
+            self.debug_manager = DebugManager(print_help=True)
         self.names = list(self.cfg["levels"])
         self.level_name = level or self.names[0]
         self.max_steps, self.stall_frames = max_steps, stall_frames
@@ -118,7 +137,7 @@ class SpeedyCore:
         if fresh or self.render_mode == "none" or self.hud_lives == 0:
             self.checkpoint = None
             self.score = 0
-        self.level = self.level_data = lv.load(self.level_name)
+        self.level = self.level_data = lv.load(self.level_name, mutants.level_path(self.mutant, f"speedy/{self.level_name}.yaml"))
         L = self.level
         self.masks = list(L.masks)
         self.hit = 3                            # the mask bits the wall and ceiling sensors can see
@@ -161,6 +180,10 @@ class SpeedyCore:
         self.frozen = False
 
     @property
+    def TOTAL_WIDTH(self) -> int:
+        return self.WIDTH + DEBUG_PANEL_WIDTH if self.render_mode == "human" else self.WIDTH
+
+    @property
     def alive(self) -> bool:
         return not self.dead
 
@@ -195,6 +218,16 @@ class SpeedyCore:
     def step(self, action) -> tuple:
         """action: (move_x -1/0/1, jump 0/1, move_y -1/0/1). Gym's five values, the first two unused."""
         self.events = []
+        dm = getattr(self, "debug_manager", None)
+        if dm:
+            dm.update_input()
+            if dm.free_cam_active:              # F2: IJKL
+                self._cam_offset = [o + m / 60.0 for o, m in zip(self._cam_offset, dm.current_cam_move)]
+            else:
+                self._cam_offset = [0.0, 0.0]
+            self._odd_frame = not self._odd_frame
+            if dm.slow_motion and self._odd_frame:
+                return None, 0.0, False, False, {"won": False}
         if self.intro:
             self.intro -= 1
             return None, 0.0, False, False, {"won": False}
@@ -449,8 +482,8 @@ class SpeedyCore:
         if d < 6:
             return False
         a = (p.angle - 0x40) & 255
-        p.vx += (COS[a] * JUMP) >> 8
-        p.vy += (SIN[a] * JUMP) >> 8
+        p.vx += (COS[a] * self.jump) >> 8
+        p.vy += (SIN[a] * self.jump) >> 8
         p.air = True
         p.pushing = False
         p.jumping = True
@@ -946,6 +979,7 @@ class SpeedyCore:
 
     # ── what the agents read ─────────────────────────────────────────────────
 
+    @property
     def enemies(self) -> list:
         return [o for o in self.awake if o.alive and o.enemy]
 
@@ -979,12 +1013,92 @@ class SpeedyCore:
 
     def render(self, surface, blit_only: bool = False) -> None:
         from . import speedy_art as art
+        window = surface
+        if surface.get_width() > self.WIDTH:            # the window with the debug panel
+            surface = surface.subsurface((0, 0, self.WIDTH, min(self.HEIGHT, surface.get_height())))
         if self._view is None:
             self._view = pygame.Surface(self.VIEW)
+        dm = getattr(self, "debug_manager", None)
+        self.camera_x += self._cam_offset[0]            # F2 moves the picture, never the game's own camera
+        self.camera_y += self._cam_offset[1]
         draw_world(self, self._view)
+        if dm:
+            self._debug_on_view(self._view, dm)
+        self.camera_x -= self._cam_offset[0]
+        self.camera_y -= self._cam_offset[1]
         if self.intro:
             art.title_card(self._view, self.level.act, 1.0 - self.intro / 90)
         elif self.outro:
             art.results(self._view, self.level.act, self.bonus_time, self.bonus_rings, self.score,
                         min((240 - self.outro) / 90, 1.0))
         pygame.transform.scale(self._view, surface.get_size(), surface)
+        if dm:
+            dm.render_overlays(window, self, game_overlays=False)
+
+    def _debug_on_view(self, view, dm) -> None:
+        """F1, F4 and F6 on the console's picture, so they line up with the world before the scale-up."""
+        cx, cy = int(self.camera_x), int(self.camera_y)
+        p = self.player
+        if dm.show_grid:                                # F6: the 16 px tiles
+            for x in range(-(cx % 16), 320, 16):
+                pygame.draw.line(view, (70, 80, 110), (x, 0), (x, 224))
+            for y in range(-(cy % 16), 224, 16):
+                pygame.draw.line(view, (70, 80, 110), (0, y), (320, y))
+        if dm.show_hitboxes:                            # F4: the body, what it touches with, every hitbox
+            pygame.draw.rect(view, (60, 235, 60), (p.px - p.w - cx, p.py - p.h - cy, 2 * p.w + 1, 2 * p.h + 1), 1)
+            bx, by, bw, bh = self.touch_box(p)
+            pygame.draw.rect(view, (255, 235, 60), (bx - cx, by - cy, bw, bh), 1)
+            for o in self.awake:
+                if o.alive and o.enemy:
+                    pygame.draw.rect(view, (255, 55, 55), (o.x - o.hw - cx, o.y - o.hh - cy, 2 * o.hw, 2 * o.hh), 1)
+        if dm.show_sensors:                             # F1: what an agent senses from here, and the body's sensors
+            from code.neuro.adapters import SpeedyAdapter
+            from code.neuro.sensors import read_sensors
+            probe = SpeedyAdapter.__new__(SpeedyAdapter)
+            probe.core, probe.tile_size = self, self.tile_size
+            for x1, y1, x2, y2, hit in read_sensors(probe)[1]:
+                pygame.draw.line(view, (255, 120, 30) if hit == 1 else (255, 40, 40) if hit == 2 else (255, 230, 90),
+                                 (x1 - cx, y1 - cy), (x2 - cx, y2 - cy))
+            for sx, sy in ((p.px - p.w, p.py + p.h), (p.px + p.w, p.py + p.h), (p.px - 10, p.py), (p.px + 10, p.py),
+                           (p.px - p.w, p.py - p.h), (p.px + p.w, p.py - p.h)):
+                pygame.draw.circle(view, (255, 255, 255), (sx - cx, sy - cy), 1)
+
+    # ---- debug panel hooks (DebugManager / overlays.py read these, as they read Mario's core) ----
+    @property
+    def frame(self) -> int:
+        return self.frames
+
+    @property
+    def gravity(self) -> float:
+        return GRAVITY / 256.0
+
+    @property
+    def jump_force(self) -> float:
+        return self.jump / 256.0
+
+    def _world_to_screen(self, obj) -> tuple:
+        return obj.x - self.camera_x, obj.y - self.camera_y, True
+
+    def _player_obs(self):
+        import numpy as np
+        p = self.player
+        return np.array([p.px, p.py, p.vx / 256, p.vy / 256, not p.air, p.facing, p.angle, p.plane], dtype=np.float32)
+
+    def _tracking_obs(self):
+        import numpy as np
+        p = self.player
+        return np.array([p.gsp / 256, p.rolling, p.spin or 0.0, p.lock, p.invuln, self.rings_held], dtype=np.float32)
+
+    def get_obs_value_labels(self) -> tuple:
+        return ["Px", "Py", "Vx", "Vy", "Grnd", "Face", "Angle", "Plane"], ["Gsp", "Roll", "Spin", "Lock", "Inv", "Rings"]
+
+    def get_debug_hud_strip_items(self) -> list:
+        p = self.player
+        state = "HURT" if p.routine == "hurt" else "DEAD" if p.routine == "dead" else "SPIN" if p.spin is not None \
+            else "ROLL" if p.rolling else "AIR" if p.air else "RUN" if p.gsp else "STAND"
+        return [("LEVEL", f"ACT {self.level.act}", (210, 215, 228)),
+                ("TIME", f"{self.frames / 60:.2f}", (210, 215, 228)),
+                ("STATE", state, (80, 225, 115)),
+                ("ANGLE", f"{p.angle:02X}", (210, 215, 228)),
+                ("SPEED", f"{abs(p.gsp) / 256:.2f}", (85, 190, 255)),
+                ("PLANE", str(p.plane), (210, 215, 228))]

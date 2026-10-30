@@ -1,0 +1,162 @@
+{
+  "game": "speedy",
+  "stage": "green_hill_2",
+  "base_file": "speedy/green_hill_2.yaml",
+  "mutants": [
+    {
+      "id": "seal_route@green_hill_2",
+      "game": "speedy",
+      "stage": "green_hill_2",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A full-height wall 64 px before the goal: it can no longer be reached",
+      "retrain": true,
+      "base_file": "speedy/green_hill_2.yaml",
+      "base_sha1": "46a42ddfecade4ec1b6297b1fb704e8697c2c9d3",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          248,
+          29
+        ]
+      ],
+      "location": {
+        "col": 248,
+        "row": 29
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "wall_x": 7966,
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "widen_gap@green_hill_2",
+      "game": "speedy",
+      "stage": "green_hill_2",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The act's first log bridge removed: its gap must be jumped",
+      "retrain": true,
+      "base_file": "speedy/green_hill_2.yaml",
+      "base_sha1": "46a42ddfecade4ec1b6297b1fb704e8697c2c9d3",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          12,
+          8
+        ]
+      ],
+      "location": {
+        "col": 12,
+        "row": 8
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "bridge": [
+        296,
+        533,
+        268
+      ],
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "jump_velocity_down@green_hill_2",
+      "game": "speedy",
+      "stage": "green_hill_2",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: physics.jump 1664 -> 1414",
+      "retrain": true,
+      "base_file": "speedy/green_hill_2.yaml",
+      "base_sha1": "46a42ddfecade4ec1b6297b1fb704e8697c2c9d3",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "physics.jump": 1414
+      },
+      "parameter": {
+        "key": "physics.jump",
+        "from": 1664,
+        "to": 1414
+      },
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "off_route@green_hill_2",
+      "game": "speedy",
+      "stage": "green_hill_2",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "A 16 px hole inside solid dirt, closed on every side",
+      "retrain": true,
+      "base_file": "speedy/green_hill_2.yaml",
+      "base_sha1": "46a42ddfecade4ec1b6297b1fb704e8697c2c9d3",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          178,
+          46
+        ]
+      ],
+      "location": {
+        "col": 178,
+        "row": 46
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@green_hill_2",
+      "game": "speedy",
+      "stage": "green_hill_2",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "A comment in the level file: the level parses the same",
+      "retrain": false,
+      "base_file": "speedy/green_hill_2.yaml",
+      "base_sha1": "46a42ddfecade4ec1b6297b1fb704e8697c2c9d3",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [],
+      "location": null,
+      "parameter": {
+        "tiles": 0
+      },
+      "checks": {
+        "plays": true
+      }
+    }
+  ],
+  "skipped": []
+}

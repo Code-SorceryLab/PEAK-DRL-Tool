@@ -61,5 +61,26 @@ names its host and task-file line `n`); a chunked stage needs the same `OFFSET` 
 | 10 | `ast_play` (~510) | 1 | playtests, replays, random baselines |
 | 11 | `final` (1) | 1 | `runs/ast/metrics.json` |
 
+## Adding one game to finished results: SPEEDY
+
+`PEAK_GAMES=speedy` limits every task file to that game. It runs in its own folder, so the finished runs in
+`$SCRATCH/peak` are never touched. The mutants are already on disk, so the task files can be made first.
+
+    mkdir -p $SCRATCH/peak_speedy/runs/logs && cd $SCRATCH/peak_speedy && ln -sfn $SCRATCH/peak/.venv .venv
+    export PEAK_DIR=$SCRATCH/peak_speedy PEAK_GAMES=speedy
+    .venv/bin/python -m jobs.make_tasks
+    T=$(sub test 3 0-0 0:30:00)
+    M=$(AFTER=afterok DEP=$T sub mutants 1 0-0 0:30:00)
+    S=$(AFTER=afterok DEP=$M sub sweep2d 16)
+    G=$(DEP=$S sub gabest 1 0-0 0:30:00)
+    F=$(AFTER=afterok DEP=$G sub full 3)
+    R=$(DEP=$F sub reports 1 0-0 1:00:00)
+    A=$(AFTER=afterok DEP=$R sub ast_retrain 3)
+    P=$(DEP=$A sub ast_play 1)
+    Z=$(DEP=$P sub final 1 0-0 1:00:00)
+
+Copy `runs/balance`, `runs/probes/speedy` and `runs/ast/speedy` home beside the other games' results, and
+take only the `speedy` block from this folder's `ga_best.yaml`: its rebuild saw no other game's sweeps.
+
 Then copy `runs/` home without `episodes.csv`, rebuild the pages at home (`python -m code.stats.ast_metrics
 --page`, `python -m code.neuro.command_center --publish`) and commit.

@@ -54,7 +54,7 @@ from collections import Counter
 from code.stats import episode_log
 
 ROOT = os.path.join("runs", "ast")
-GAMES = ["mario", "meatboy", "bomberman", "megaman"]
+GAMES = ["mario", "meatboy", "bomberman", "megaman", "speedy"]
 RETRAINED = "base-retrained"            # Mega Man's original retrained like its mutants (code/neuro/ast_eval.py)
 RESEEDED = "base-reseeded"              # the original retrained with new seeds: the false-alarm check
 ORIGINALS = ("base", RETRAINED)

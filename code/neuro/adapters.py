@@ -46,7 +46,7 @@ class GameAdapter(Protocol):
 
 
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
-N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6}   # megaman: left, right, jump, up, down, fire
+N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6, "speedy": 5}   # megaman: left, right, jump, up, down, fire
 N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "meatboy": 21}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
 OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "speedy": "speedy_config.yaml"}  # named levels kept in the game's own file
 # Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,

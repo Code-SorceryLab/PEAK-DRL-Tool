@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import os
 from functools import lru_cache
+from types import SimpleNamespace
 
 import numpy as np
 import pygame
@@ -32,6 +33,7 @@ SHELL = 24                # solid kept under a surface above a carved walkway
 LUMP = 40                 # a "surface" this close over the path is a plant the tracing took for ground
 COS_CORNER = math.cos(math.radians(40))     # a turn sharper than this in the trace is a real corner
 GRASS = 10                # how far grass tips stand above the surface they grow on
+THIN_WALL = 32            # dirt this narrow with a room on both sides does not stop a body
 SLIVER = 2                # solid thinner than 2 * this + 1 px is a carving leftover
 SKIN = 8                  # how thick a steep face stays solid to a body in the air
 TUBE_WALL = 48            # how far around a tunnel the dirt stays solid on every side
@@ -123,6 +125,16 @@ def _skin(mask: np.ndarray) -> np.ndarray:
     for k in range(1, 2 * SKIN + 1):
         over[k:, :] |= air[:-k, :]
     return mask & side & ~over
+
+
+def _bridge_rows(m: np.ndarray, r: int) -> np.ndarray:
+    """m with every gap of up to 2r px along a row filled (a closing along x only)."""
+    def around(a: np.ndarray) -> np.ndarray:
+        c = np.zeros((a.shape[0], a.shape[1] + 1), dtype=np.int32)
+        c[:, 1:] = np.cumsum(a, axis=1, dtype=np.int32)
+        x0, x1 = np.clip(np.arange(a.shape[1]) - r, 0, a.shape[1]), np.clip(np.arange(a.shape[1]) + r + 1, 0, a.shape[1])
+        return c[:, x1] - c[:, x0]
+    return around(~(around(m) > 0)) == 0
 
 
 def _open(m: np.ndarray, r: int) -> np.ndarray:
@@ -256,8 +268,8 @@ def _angle_table(mask: np.ndarray, side: int) -> bytes:
 class Level:
     """One act: collision planes, angle tables and the object lists, read by SpeedyCore."""
 
-    def __init__(self, name: str):
-        with open(os.path.join(LEVEL_DIR, f"{name}.yaml"), encoding="utf-8") as f:
+    def __init__(self, name: str, path: str | None = None):
+        with open(path or os.path.join(LEVEL_DIR, f"{name}.yaml"), encoding="utf-8") as f:
             d = yaml.safe_load(f)
         with open(os.path.join(LEVEL_DIR, "tube.yaml"), encoding="utf-8") as f:
             tube = delta(yaml.safe_load(f)["tube"])
@@ -272,6 +284,7 @@ class Level:
         W = max(max(x for p in polys for x, _ in p), self.width + 64)
         self.px_w, self.px_h = W, H
         base = _fill((W, H), polys)
+        traced = base.copy()
         one_way = np.zeros_like(base)
         for line in _join([delta(s) for s in d.get("walk") or []]):
             _carve_walk(base, one_way, curve(line, closed=False))
@@ -281,8 +294,10 @@ class Level:
         for key, drop in (("monitors", 16), ("spring_up", 8), ("spring_up_red", 8), ("rock", 16)):
             for x, y, *_ in points(d.get(key)):
                 self._walk_under(base, one_way, x, x, y + drop)
-        for x0, y0, x1, y1 in points(d.get("open")):        # a passage no trace can show, seen in play
+        for x0, y0, x1, y1 in points(d.get("open")) + points(d.get("pocket")):    # a passage no trace shows; off_route's mutant
             base[y0:y1, x0:x1] = False
+        # a thin strip between two rooms is wall art, not a wall: the trace saw dirt, the original runs through it
+        base &= ~_bridge_rows(traced & ~base, THIN_WALL // 2)
         self.tubes = [(x, y, x + 256, y + 288) for x, y in d.get("tubes") or []]
         if self.tubes:
             bore = _fill((W, H), [[(x + tx, y + ty) for tx, ty in tube] for x, y in d["tubes"]])
@@ -290,7 +305,9 @@ class Level:
             one_way &= _box(bore, TUBE_WALL)[0] == 0        # a tunnel needs its walls to hold the body in
         base = _open(base, SLIVER)                          # carving leaves hairlines: invisible, yet you can stand on them
         one_way &= ~_skin(base)
-        for x0, x1, y in d.get("bridges") or []:            # the logs are objects
+        for x0, y0, x1, y1 in points(d.get("block")):       # seal_route's mutant
+            base[y0:y1, x0:x1], one_way[y0:y1, x0:x1] = True, False
+        for x0, x1, y in (d.get("bridges") or []) + (d.get("gaps") or []):     # the logs are objects
             base[max(y - 32, 0):y + 24, x0 + 24:x1 - 23] = False
         self.loops = []
         planes = [base, base.copy()]
@@ -307,6 +324,8 @@ class Level:
             planes[0][y0:y1, cx - 128:cx - 16] = False      # the way in: run through the left leg
             planes[1][y0:y1, cx + 16:cx + 128] = False      # the way out: run through the right leg
         self.masks_np = planes
+        self.grid = planes[0][16::32, 16::32].astype(int).tolist()      # 32 px cells for the debug panel's agent view
+        self.rows, self.cols = len(self.grid), len(self.grid[0])
         self.masks = [(p.astype(np.uint8) * (1 + one_way.astype(np.uint8))).tobytes() for p in planes]
         self.angles = [[_angle_table(p, s) for s in (FLOOR, RIGHT, CEILING, LEFT)] for p in planes]
         self.tw = W // TILE + 1
@@ -314,7 +333,8 @@ class Level:
         self.waterfalls = list(d.get("waterfalls") or [])
         self.sign = tuple(d["sign"]) if d.get("sign") else None
         self.capsule = tuple(d["capsule"]) if d.get("capsule") else None
-        self.goals = [self.sign or self.capsule]
+        gx, gy = self.sign or self.capsule
+        self.goals = [SimpleNamespace(x=gx, y=gy, gObj=SimpleNamespace(x=gx, y=gy, active=True))]
         self.coins = points(d.get("rings"))
         self.objects = {k: points(d.get(k)) for k in (
             "rings", "spikes", "spring_up", "spring_up_red", "spring_side", "rock", "monitors", "lamp",
@@ -331,5 +351,5 @@ class Level:
 
 
 @lru_cache(maxsize=4)
-def load(name: str) -> Level:
-    return Level(name)
+def load(name: str, path: str | None = None) -> Level:
+    return Level(name, path)

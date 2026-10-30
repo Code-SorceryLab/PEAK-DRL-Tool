@@ -265,7 +265,7 @@ class SpeedyStats(_ScrollerStats):
 
     def _begin(self) -> None:
         self._start_x = self.pos()[0]
-        self._goal_x = float(self.core.level.goals[0][0])
+        self._goal_x = float(self.core.level.goals[0].x)
         self._level_coins = len(self.core.rings)
 
     end_status = SonicStats.end_status
