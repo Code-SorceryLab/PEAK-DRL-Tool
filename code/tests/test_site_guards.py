@@ -30,17 +30,11 @@ def repo(tmp_path, monkeypatch):
     return r
 
 
-def test_the_reproduce_tab_checks_out_the_commit_it_was_built_from():
+def test_the_reproduce_tab_names_no_repository_or_commit():
+    html = command_center.reproduce_page("mario", [])            # the site is anonymous
+    assert "github.com" not in html and "git clone" not in html and "git checkout" not in html
     sha = command_center._git(".", "rev-parse", "HEAD", check=False)
-    if not sha:
-        pytest.skip("not a git checkout (a cluster copy unpacked from a tar)")
-    html = command_center.reproduce_page("mario", [])
-    assert f"cd PEAK-DRL-Tool\ngit checkout {sha}\n" in html     # a clone alone is main
-
-
-def test_a_copy_outside_git_still_builds_the_reproduce_tab(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)                                  # no .git: there is no commit to name
-    assert "git checkout" not in command_center.reproduce_page("mario", [])
+    assert not sha or sha not in html
 
 
 def test_publish_names_its_source_commit_and_refuses_one_no_remote_has(repo, tmp_path):

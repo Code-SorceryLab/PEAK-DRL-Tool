@@ -352,17 +352,14 @@ def reproduce_page(game: str, agents: list[dict]) -> str:
             ("python -m code.neuro.command_center --open", "this Command Center, on your machine")]
     width = max(len(c) for c, _ in cmds) + 2
     rebuild = "\n".join(esc(f"{c.ljust(width)}# {why}") for c, why in cmds)
-    sha = _git(".", "rev-parse", "HEAD", check=False)       # a copy outside git (a cluster tar) has none to name
-    checkout = f"\ngit checkout {sha}" if sha else ""
     steps = f"""
 <h2><i class="ico sprout"></i>Reproduce: {esc(NAMES[game])}</h2>
 <p class="lede">Every agent below was trained with one of the seeds {", ".join(map(str, PAPER_SEEDS))}, the seeds
 behind the published numbers. Each one is a folder with its network (best.npz) and the settings it trained with
 (state.json). Levels are named as the game's files and the commands name them (0 is the first level of an indexed game).</p>
 <h3>1. Set up</h3>
-<pre><code>git clone https://github.com/Code-SorceryLab/PEAK-DRL-Tool.git
-cd PEAK-DRL-Tool{checkout}
-pip install -r requirements.txt</code></pre>
+<p>In a copy of the PEAK code:</p>
+<pre><code>pip install -r requirements.txt</code></pre>
 <h3>2. Get the agents</h3>
 <p>All {len(rows)} agents of this game: <a href="agents/{game}.zip" download>agents/{game}.zip</a>.
 Unpack it into the repository: <code>unzip {game}.zip -d agents</code>. Or take one agent's two files from the table.</p>
@@ -490,9 +487,9 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
     """Commit the built site on the branch checked out; with `push`, send that branch to origin's
     main, where .github/workflows/pages.yml deploys this folder alone (main is too large for a
     Pages runner to check out). Refuses while the results have uncommitted changes, so the site
-    only ever shows committed numbers and agents, and while HEAD is on no remote branch, since the
-    Reproduce tab tells readers to check it out. The push is never forced: a page someone pushed
-    meanwhile is never lost. Returns the commit that holds the site."""
+    only ever shows committed numbers and agents, and while HEAD is on no remote branch, so the
+    site is always built from code that is on GitHub. The push is never forced: a page someone
+    pushed meanwhile is never lost. Returns the commit that holds the site."""
     meta = (":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store")      # macOS metadata on exFAT, never a result
     dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", "runs/probes",
                  ":(glob)runs/*/state.json", *meta)                  # every run the How it works tab lists
@@ -502,8 +499,7 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
         raise SystemExit(f"no site in {site_dir}: build it first (python -m code.neuro.command_center)")
     sha = _git(repo, "rev-parse", "HEAD")
     if not _git(repo, "branch", "-r", "--contains", sha):
-        raise SystemExit(f"commit {sha} is on no remote branch, so readers cannot check out what the Reproduce tab "
-                         "names; push it first")
+        raise SystemExit(f"commit {sha} is on no remote branch; push it first")
     site = os.path.relpath(os.path.abspath(site_dir), os.path.abspath(repo))
     _git(repo, "add", "-A", "--", site, *meta)
     if _git(repo, "diff", "--cached", "--name-only", "--", site):
