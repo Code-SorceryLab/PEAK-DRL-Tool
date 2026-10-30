@@ -70,7 +70,7 @@ Seeds **1234, 2025, 31337**.
 | Sensor ablation: rays vs grid (40 generations) | 3 games × 6 personas | ✅ done |
 | Retraining on every mutant (200 generations) | 1038 tasks | ✅ done |
 | Playtests, replays, verdicts | 511 tasks + metrics | ✅ done |
-| Pilot user study | 5 participants | ✅ pilot done |
+| Pilot user study | 12 participants | ✅ pilot done |
 
 ---
 
@@ -165,10 +165,14 @@ flowchart LR
     W["5 min warm-up<br/>(not recorded)"] --> B["Evaluation level<br/>3 runs × 3 lives"] --> M["5 mutants<br/>once each<br/>random order"]
 ```
 
-| Participant | p1 | p2 | p3 | p4 | p5 |
-|---|---|---|---|---|---|
-| Game | Mario | Mega Man | Mario | Mega Man | Mario |
-| Runs (baseline + mutants) | 3 + 4 | 3 + 5 | 3 + 5 | 3 + 4 | 3 + 5 |
+| Game | p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Mario | ✅* | | ✅ | | ✅ | | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mega Man | | ✅ | | ✅* | ✅ | ✅ | | | | ✅ | | |
+| Meat Boy | | | | | | | | | ✅ | ✅ | | |
+| Bomberman | | | | | | | | | | ✅ | | |
+
+✅ baseline and mutation runs done. \* Only 4 of the 5 mutation runs.
 
 The participant is not told which mutant is which. Every life is a row in
 `runs/user_study/<participant>/<game>/<phase>/run<k>/episodes.csv`, with `mutant` and `mutant_class`.
@@ -436,7 +440,7 @@ Fisher only ("strict") 6 (17%); win rate outside the original's seed spread 4 of
    comparisons. `final` measures this again.
 8. **Mega Man** sections trained from new seeds sometimes fail outright (Street, Climb in earlier runs).
 9. **Replay-wall videos** (`runs/videos/`) show older agents.
-10. **Pilot study:** p1 and p4 have 4 of 5 mutation runs; Test1 and test111 (Meat Boy) are test sessions.
+10. **Pilot study:** p1 and p4 have 4 of 5 mutation runs; p9 has no Bomberman mutation runs (the session crashed).
 11. **The win-rate window is short:** 10 generations, 100 episodes.
 </details>
 
