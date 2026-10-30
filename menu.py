@@ -1215,8 +1215,8 @@ def publish_site():
     """Publish: build the Command Center and, after a yes, push it to GitHub Pages."""
     _refresh_screen()
     _section("TOOLS  ›  Publish to GitHub Pages")
-    print(_DIM("    Builds runs/site, puts it on the gh-pages branch as one commit (the old landing page stays"))
-    print(_DIM("    as tag landing-page-2026-03) and refuses while runs/balance or runs/ast have uncommitted changes.\n"))
+    print(_DIM("    Builds runs/site, commits it and pushes to main, where a GitHub Action puts it live."))
+    print(_DIM("    Refuses while runs/balance or runs/ast have uncommitted changes.\n"))
     if input(_BOLD("    ⟫ Publish to https://code-sorcerylab.github.io/PEAK-DRL-Tool/? [y/N]: ")).strip().lower() != "y":
         return
     subprocess.run([sys.executable, "-m", "code.neuro.command_center", "--publish", "--push"])

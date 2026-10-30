@@ -2,7 +2,7 @@
 
     python -m code.neuro.command_center                    # build runs/site/
     python -m code.neuro.command_center --serve --open     # build, serve on 127.0.0.1:8001, open it (menu 12)
-    python -m code.neuro.command_center --publish --push   # build, put it on gh-pages, push it live (menu 23)
+    python -m code.neuro.command_center --publish --push   # build, commit it, push it to main: a GitHub Action puts it live (menu 23)
 
 index.html holds the top bar (a game dropdown), the tabs and the replay wall: one looping video per
 persona, recorded once by code/neuro/wall_video.py into runs/videos/. Every other tab shows a
@@ -20,7 +20,6 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 import webbrowser
 import zipfile
 from datetime import datetime
@@ -480,9 +479,6 @@ def serve(out_dir: str, port: int, open_browser: bool) -> None:
         srv.server_close()
 
 
-LANDING_TAG = "landing-page-2026-03"   # the gh-pages landing page the Command Center replaced
-
-
 def _git(repo: str, *args: str, env: dict | None = None, check: bool = True) -> str:
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, env=env)
     if check and r.returncode:
@@ -491,11 +487,12 @@ def _git(repo: str, *args: str, env: dict | None = None, check: bool = True) -> 
 
 
 def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> str:
-    """Put the built site on gh-pages as one commit with no history (so the videos never pile up in
-    every clone), after keeping the old landing page as tag LANDING_TAG; with `push`, force-push it
-    to origin (GitHub Pages serves that branch). Refuses while the results have uncommitted changes,
-    so the site only ever shows committed numbers and agents, and while HEAD is on no remote branch,
-    since the Reproduce tab tells readers to check it out. Returns the new commit."""
+    """Commit the built site on the branch checked out; with `push`, send that branch to origin's
+    main, where .github/workflows/pages.yml deploys this folder alone (main is too large for a
+    Pages runner to check out). Refuses while the results have uncommitted changes, so the site
+    only ever shows committed numbers and agents, and while HEAD is on no remote branch, since the
+    Reproduce tab tells readers to check it out. The push is never forced: a page someone pushed
+    meanwhile is never lost. Returns the commit that holds the site."""
     meta = (":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store")      # macOS metadata on exFAT, never a result
     dirty = _git(repo, "status", "--porcelain", "--", "runs/balance", "runs/ast", "runs/probes",
                  ":(glob)runs/*/state.json", *meta)                  # every run the How it works tab lists
@@ -507,32 +504,13 @@ def publish(site_dir: str = SITE_DIR, push: bool = False, repo: str = ".") -> st
     if not _git(repo, "branch", "-r", "--contains", sha):
         raise SystemExit(f"commit {sha} is on no remote branch, so readers cannot check out what the Reproduce tab "
                          "names; push it first")
-    live = ""                                                            # the gh-pages commit origin serves now
+    site = os.path.relpath(os.path.abspath(site_dir), os.path.abspath(repo))
+    _git(repo, "add", "-A", "--", site, *meta)
+    if _git(repo, "diff", "--cached", "--name-only", "--", site):
+        _git(repo, "commit", "-q", "-m", f"PEAK Command Center {datetime.now():%Y-%m-%d %H:%M} from {sha}", "--", site)
     if push:
-        out = _git(repo, "ls-remote", "origin", "refs/heads/gh-pages")
-        live = out.split()[0] if out else ""
-        if live and not _git(repo, "ls-remote", "origin", f"refs/tags/{LANDING_TAG}"):
-            _git(repo, "fetch", "-q", "origin", "refs/heads/gh-pages")      # the live page, not a stale local copy
-            _git(repo, "tag", "-f", LANDING_TAG, live)
-    if not _git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{LANDING_TAG}", check=False):
-        old = next((r for r in ("refs/heads/gh-pages", "refs/remotes/origin/gh-pages")
-                    if _git(repo, "rev-parse", "--verify", "--quiet", r, check=False)), None)
-        if old:
-            _git(repo, "tag", LANDING_TAG, old)
-    with tempfile.TemporaryDirectory() as tmp:          # a private index: the branch checked out is untouched
-        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(tmp, "index"))
-        _git(repo, "--work-tree", os.path.abspath(site_dir), "add", "--force", "-A", "--", ":/",
-             ":(exclude,glob)**/._*", ":(exclude,glob)**/.DS_Store", env=env)   # macOS metadata on exFAT
-        tree = _git(repo, "write-tree", env=env)
-    commit = _git(repo, "commit-tree", tree, "-m", f"PEAK Command Center {datetime.now():%Y-%m-%d %H:%M} from {sha}")
-    _git(repo, "update-ref", "refs/heads/gh-pages", commit)
-    if push:
-        if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{LANDING_TAG}", check=False) and \
-                not _git(repo, "ls-remote", "origin", f"refs/tags/{LANDING_TAG}"):
-            _git(repo, "push", "origin", f"refs/tags/{LANDING_TAG}")
-        # replaces exactly the commit read above: a page someone pushed meanwhile is never lost
-        _git(repo, "push", f"--force-with-lease=refs/heads/gh-pages:{live}", "origin", "refs/heads/gh-pages:refs/heads/gh-pages")
-    return commit
+        _git(repo, "push", "origin", "HEAD:refs/heads/main")
+    return _git(repo, "rev-parse", "HEAD")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -542,13 +520,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--open", action="store_true", help="open it in the default browser")
     ap.add_argument("--serve", action="store_true", help="serve it on 127.0.0.1 (static files only)")
     ap.add_argument("--port", type=int, default=8001)
-    ap.add_argument("--publish", action="store_true", help="also put the site on the gh-pages branch (one commit)")
-    ap.add_argument("--push", action="store_true", help="with --publish: force-push gh-pages to origin (goes live)")
+    ap.add_argument("--publish", action="store_true", help="also commit the site on this branch")
+    ap.add_argument("--push", action="store_true", help="with --publish: push to origin's main (goes live)")
     args = ap.parse_args(argv)
     written = build_site(args.out, args.videos)
     print(f"wrote {len(written)} files to {args.out}")
     if args.publish:
-        print(f"gh-pages: {publish(args.out, push=args.push)}" + (" (pushed)" if args.push else " (local, not pushed)"))
+        print(f"site commit: {publish(args.out, push=args.push)}" + (" (pushed to main)" if args.push else " (local, not pushed)"))
     if args.serve:
         serve(args.out, args.port, args.open)
     elif args.open:

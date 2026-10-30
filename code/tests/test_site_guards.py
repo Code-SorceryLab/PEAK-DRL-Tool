@@ -48,7 +48,11 @@ def test_publish_names_its_source_commit_and_refuses_one_no_remote_has(repo, tmp
         command_center.publish(str(repo / "site"), repo=str(repo))
     clone = tmp_path / "clone"
     git(tmp_path, "clone", "-q", str(repo), str(clone))                    # origin/main now holds the commit
-    commit = command_center.publish(str(repo / "site"), repo=str(clone))
+    git(clone, "config", "user.email", "t@example.com")
+    git(clone, "config", "user.name", "T")
+    (clone / "site").mkdir()
+    (clone / "site" / "index.html").write_text("new")
+    commit = command_center.publish(str(clone / "site"), repo=str(clone))
     assert git(repo, "rev-parse", "HEAD") in git(clone, "log", "-1", "--format=%s", commit)
 
 

@@ -173,8 +173,7 @@ def git(repo, *args):
 
 @pytest.fixture
 def tmp_repo(tmp_path):
-    """A repo with committed results, a one-commit gh-pages (the old landing page), a built site
-    holding a macOS ._ file, and a bare origin."""
+    """A repo with committed results, a built site holding a macOS ._ file, and a bare origin."""
     repo, origin = tmp_path / "repo", tmp_path / "origin.git"
     git(tmp_path, "init", "--bare", "-q", str(origin))
     repo.mkdir()
@@ -185,11 +184,6 @@ def tmp_repo(tmp_path):
     (repo / "runs" / "balance" / "report_x.json").write_text("{}")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "results")
-    git(repo, "switch", "-q", "--orphan", "gh-pages")
-    (repo / "landing.html").write_text("old")
-    git(repo, "add", "landing.html")
-    git(repo, "commit", "-q", "-m", "landing page")
-    git(repo, "switch", "-q", "main")
     git(repo, "remote", "add", "origin", str(origin))
     git(repo, "push", "-q", "origin", "main")     # publish refuses a source commit no remote has
     (repo / "site" / "videos").mkdir(parents=True)
@@ -205,17 +199,30 @@ def test_publish_refuses_uncommitted_results(tmp_repo):
         command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
 
 
-def test_publish_makes_one_commit_and_keeps_the_old_page_as_a_tag(tmp_repo):
+def test_publish_commits_the_site_without_macos_files_and_does_not_push(tmp_repo):
     from code.neuro import command_center
-    old = git(tmp_repo, "rev-parse", "gh-pages")
-    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
-    assert git(tmp_repo, "rev-list", "--count", "gh-pages") == "1"
-    assert git(tmp_repo, "ls-tree", "--name-only", "gh-pages").split() == ["index.html"]     # no ._ file
-    assert git(tmp_repo, "rev-parse", "landing-page-2026-03^{commit}") == old
-    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)          # a second publish
-    assert git(tmp_repo, "rev-parse", "landing-page-2026-03^{commit}") == old
-    assert git(tmp_repo, "ls-remote", "origin", "refs/heads/gh-pages").split()[0] == git(tmp_repo, "rev-parse", "gh-pages")
-    assert git(tmp_repo, "ls-remote", "origin", "refs/tags/landing-page-2026-03").split()[0] == old
+    sent = git(tmp_repo, "rev-parse", "HEAD")
+    commit = command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
+    assert git(tmp_repo, "ls-tree", "-r", "--name-only", commit, "site").split() == ["site/index.html"]   # no ._ file
+    assert git(tmp_repo, "ls-remote", "origin", "refs/heads/main").split()[0] == sent
+
+
+def test_publish_with_push_sends_the_site_to_main(tmp_repo):
+    from code.neuro import command_center
+    commit = command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)
+    assert git(tmp_repo, "ls-remote", "origin", "refs/heads/main").split()[0] == commit
+
+
+def test_publish_never_overwrites_a_main_that_moved(tmp_repo, tmp_path):
+    from code.neuro import command_center
+    other = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(tmp_path / "origin.git"), str(other))
+    git(other, "config", "user.email", "o@example.com")
+    git(other, "config", "user.name", "O")
+    git(other, "commit", "-q", "--allow-empty", "-m", "someone else")
+    git(other, "push", "-q", "origin", "HEAD:main")
+    with pytest.raises(SystemExit, match="push"):
+        command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)
 
 
 def test_the_menu_lists_the_command_center_and_its_two_new_items():
@@ -228,18 +235,8 @@ def test_the_menu_lists_the_command_center_and_its_two_new_items():
 def test_publish_ignores_macos_metadata_in_the_results(tmp_repo):
     from code.neuro import command_center
     (tmp_repo / "runs" / "balance" / "._report_x.json").write_text("macOS metadata")   # exFAT writes these
-    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
-    assert git(tmp_repo, "rev-list", "--count", "gh-pages") == "1"
-
-
-def test_publish_keeps_the_live_landing_page_even_without_a_local_copy(tmp_repo):
-    from code.neuro import command_center
-    old = git(tmp_repo, "rev-parse", "gh-pages")
-    git(tmp_repo, "push", "-q", "origin", "gh-pages")                  # the live site
-    git(tmp_repo, "branch", "-q", "-D", "gh-pages")                    # a clone that never fetched it
-    git(tmp_repo, "update-ref", "-d", "refs/remotes/origin/gh-pages")
-    command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo), push=True)
-    assert git(tmp_repo, "ls-remote", "origin", "refs/tags/landing-page-2026-03").split()[0] == old
+    commit = command_center.publish(str(tmp_repo / "site"), repo=str(tmp_repo))
+    assert "results" not in git(tmp_repo, "log", "-1", "--format=%s", commit)
 
 
 def test_a_long_pass_still_shows_every_level():
