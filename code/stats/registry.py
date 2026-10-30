@@ -38,8 +38,8 @@ DIMENSIONS = {
 # is its own tier, listed by "completion per skill" but not one end of a gap.
 TIERS = {"novice": "novice", "expert": "experienced", "speedrunner": "speedrunner"}
 
-SCROLLERS = frozenset({"mario", "sonic"})
-ALL_GAMES = frozenset({"mario", "sonic", "meatboy", "bomberman", "megaman"})
+SCROLLERS = frozenset({"mario", "sonic", "speedy"})
+ALL_GAMES = frozenset({"mario", "sonic", "meatboy", "bomberman", "megaman", "speedy"})
 FAILED = ("DEAD", "STUCK")
 ENTROPY_BINS = 10
 ROUTE_BINS = 50        # side-scroller route profile: mean height in 50 slices across the level

@@ -255,6 +255,22 @@ class SonicStats(_ScrollerStats):
         return "DEAD"
 
 
+class SpeedyStats(_ScrollerStats):
+    def pos(self) -> tuple[float, float]:
+        p = self.core.player
+        return p.x / 256.0, p.y / 256.0
+
+    def speed(self) -> float:
+        return self.core.player.vx * 60 / 256.0
+
+    def _begin(self) -> None:
+        self._start_x = self.pos()[0]
+        self._goal_x = float(self.core.level.goals[0][0])
+        self._level_coins = len(self.core.rings)
+
+    end_status = SonicStats.end_status
+
+
 # ── Meat Boy: 2-D mazes, progress along the BFS shortest path ────────────────
 
 class MeatboyStats(EpisodeStats):
@@ -483,6 +499,7 @@ class MegamanStats(EpisodeStats):
 
 STATS_BY_GAME: dict[str, type[EpisodeStats]] = {
     "megaman": MegamanStats,
+    "speedy": SpeedyStats,
     "mario": MarioStats,
     "sonic": SonicStats,
     "meatboy": MeatboyStats,

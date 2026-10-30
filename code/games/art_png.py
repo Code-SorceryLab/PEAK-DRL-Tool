@@ -89,8 +89,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--force", action="store_true", help="rewrite every PNG from the text, losing edits")
     args = ap.parse_args()
-    from . import bomberman_art, mario_art, megaman_art
-    for game, mod in (("bomberman", bomberman_art), ("megaman", megaman_art), ("mario", mario_art)):
+    from . import bomberman_art, mario_art, megaman_art, speedy_art
+    for game, mod in (("bomberman", bomberman_art), ("megaman", megaman_art), ("mario", mario_art), ("speedy", speedy_art)):
         n = export(game, mod.all_sprites(), mod.PAL, args.force)
         print(f"{game}: {n} written to {os.path.join(ROOT, game)}")
     from . import meatboy_art

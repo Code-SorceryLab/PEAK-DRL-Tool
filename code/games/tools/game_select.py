@@ -28,7 +28,7 @@ parser.add_argument("--player", default=None, help="player label for --record")
 parser.add_argument("--study", action="store_true", help="run the User Study in this window")
 args = parser.parse_known_args()[0]   # menu.NO_RESTORE rides along on macOS
 
-NAMES = {"mario": "MARIO", "megaman": "MEGA MAN", "meatboy": "MEAT BOY", "bomberman": "BOMBERMAN"}
+NAMES = {"mario": "MARIO", "megaman": "MEGA MAN", "meatboy": "MEAT BOY", "bomberman": "BOMBERMAN", "speedy": "SPEEDY"}
 SIZE = (800, 600)
 ROWS = 8                          # list rows shown at once; longer lists scroll
 GOLD, GREY = (252, 188, 60), (188, 188, 188)

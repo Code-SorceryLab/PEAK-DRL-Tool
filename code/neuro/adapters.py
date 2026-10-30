@@ -48,7 +48,7 @@ class GameAdapter(Protocol):
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
 N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6}   # megaman: left, right, jump, up, down, fire
 N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "meatboy": 21}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
-OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels kept in the game's own, editor-owned file
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "speedy": "speedy_config.yaml"}  # named levels kept in the game's own file
 # Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,
 # but kept out of the menus and off the default sweep roster so they do not cost probe budget.
 ARCHIVED_GAMES = {"sonic"}
@@ -464,6 +464,114 @@ class SonicAdapter(_EventWeights):
 
     def set_level(self, level: str) -> None:
         _set_locked_level(self.core, level)
+
+
+class SpeedyAdapter(_EventWeights):
+    """Wraps SpeedyCore (the 1991 hedgehog platformer's Green Hill). Progress is the rightmost point
+    reached. Rings are the coins; a spike reads as an enemy on the rays, so a net can learn to clear it.
+
+    The console fires a jump on the press, so a net that simply holds the output would jump once and
+    never again: here a held output lets go for one frame after `jump_period` frames on the ground.
+    sprint has no meaning here: there is no run button."""
+
+    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
+                 sprint: bool = False, time_rate: float = 0.0) -> None:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        pygame.init()
+        from code.games.speedy_core import SpeedyCore
+        self.win_bonus = win_bonus
+        self.time_rate = time_rate
+        probe = SpeedyCore(render_mode="none", level=level)
+        tr = probe.cfg.get("training") or {}
+        self.core = SpeedyCore(render_mode="none", level=level, max_steps=max(max_frames, int(tr.get("max_frames", 0))),
+                               stall_frames=int(tr.get("stall_frames", 0)))
+        self.jump_period = max(1, int(tr.get("jump_period", 8)))
+        self.tile_size = int(self.core.tile_size)
+        self.reset()
+
+    @property
+    def x(self) -> float:
+        return self.core.player.x / 256.0
+
+    @property
+    def y(self) -> float:
+        return self.core.player.y / 256.0
+
+    @property
+    def vx(self) -> float:
+        return self.core.player.vx * 60 / 256.0
+
+    @property
+    def vy(self) -> float:
+        return self.core.player.vy * 60 / 256.0
+
+    @property
+    def grounded(self) -> bool:
+        return not self.core.player.air
+
+    @property
+    def can_jump(self) -> bool:
+        return not self.core.player.air
+
+    @property
+    def camera(self) -> tuple[float, float]:
+        return float(self.core.camera_x), float(self.core.camera_y)
+
+    def reset(self) -> None:
+        self.core.reset(fresh=True)
+        self.alive = True
+        self.won = False
+        self.status = "RUNNING"
+        self._end_xy: tuple[float, float] | None = None
+        self._held = 0
+        self._level_coins = len(self.core.rings)
+        self._level_enemies = sum(o.enemy for o in self.core.objs)
+
+    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
+        if not self.alive:
+            return
+        if jump:
+            self._held += 1
+            if self._held > self.jump_period and self.grounded:
+                jump, self._held = False, 0
+        else:
+            self._held = 0
+        _, _, terminated, truncated, info = self.core.step((move_x, int(jump), move_y))
+        if terminated or truncated:
+            self.alive = False
+            self._end_xy = (self.x, self.y)
+            self.won = bool(info.get("won"))
+            if self.won:
+                self.status = "WON"
+            elif truncated and not self.core.dead:
+                self.status = "STUCK"
+            else:
+                self.status = "DEAD"
+
+    def render(self, surface: pygame.Surface) -> None:
+        self.core.render(surface)
+
+    def solid_at(self, wx: float, wy: float) -> bool:
+        return self.core.solid_at(wx, wy)
+
+    def enemy_positions(self) -> list[tuple[float, float]]:
+        return [(float(o.x), float(o.y)) for o in self.core.hazards()]
+
+    def qblock_count_near(self, r_tiles: int) -> int:
+        """Rings within r tiles, the one thing here a player steers toward besides the goal."""
+        core, r = self.core, r_tiles * self.tile_size
+        px, py = core.player.px, core.player.py
+        return sum(1 for b in range((px - r) >> 6, ((px + r) >> 6) + 1) for i in core.ring_grid.get(b, ())
+                   if core.ring_on[i] and abs(core.rings[i][0] - px) <= r and abs(core.rings[i][1] - py) <= r)
+
+    def _progress_fitness(self) -> float:
+        return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
+
+    def episode_stats(self) -> dict:
+        return _episode_stats(self, self.core.max_x_seen)
+
+    def set_level(self, level: str) -> None:
+        self.core.level_name = str(level)
 
 
 class MeatboyAdapter(_EventWeights):
@@ -1281,6 +1389,7 @@ _ADAPTERS = {
     "meatboy": MeatboyAdapter,
     "bomberman": BombermanAdapter,
     "megaman": MegamanAdapter,
+    "speedy": SpeedyAdapter,
 }
 
 

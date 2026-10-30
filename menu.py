@@ -52,7 +52,7 @@ def _active_games() -> list[str]:
 GAMES = _active_games()
 INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
 CONFIG_KEY = {"mario": "platformer"}
-OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml"}  # named levels in the game's own, editor-owned file
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "speedy": "speedy_config.yaml"}  # named levels in the game's own file
 
 # ============================================================================
 # MAIN MENU — PEAK ENGINE
@@ -752,6 +752,8 @@ _PLAY_CONTROLS = {
     "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
     "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
                  ("I", "Toggle invincibility (debug)"), ("", "A controller works too: stick / d-pad, Cross, Square")],
+    "speedy": [("A / D  ← / →", "Run"), ("S / ↓", "Crouch, or roll while moving"), ("W / ↑", "Look up"),
+               ("SPACE / Z / J", "Jump")],
 }
 # What each NES button does, for the study's controller screen (code/games/tools/manual_play.py reads them).
 # The pixel font has letters, digits and $*-./:>_ only.
@@ -761,6 +763,7 @@ _PAD_CONTROLS = {
     "bomberman": {"dpad": "MOVE", "a": "DROP A BOMB", "b": "DETONATE: REMOTE ITEM", "select": "PAUSE",
                   "start": "NOT USED"},
     "megaman":   {"dpad": "MOVE / CLIMB LADDERS", "a": "JUMP", "b": "FIRE", "select": "PAUSE", "start": "NOT USED"},
+    "speedy":    {"dpad": "RUN / ROLL / LOOK UP", "a": "JUMP", "b": "JUMP", "select": "PAUSE", "start": "NOT USED"},
 }
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
                ("F4", "Hitboxes"), ("F5", "Agent max view"), ("F6", "Background grid"),
