@@ -31,6 +31,7 @@ _MAKE = {
     "ring": lambda: _seq(_fm(1319, 1319, 0.05, 1.0, 8), _fm(1760, 1760, 0.22, 1.0, 9)),
     "jump": lambda: _fm(440, 1100, 0.2, 1.5, 7),
     "roll": lambda: _fm(900, 300, 0.14, 2.5, 6),
+    "spin": lambda: _fm(500, 1500, 0.22, 2.0, 4),
     "skid": lambda: _noise(0.2, 9) * 0.6,
     "spring": lambda: _fm(330, 1500, 0.22, 3.0, 5),
     "hurt": lambda: _fm(700, 120, 0.4, 3.0, 4),

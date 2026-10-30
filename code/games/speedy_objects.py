@@ -295,7 +295,7 @@ class PowerUp:
         if k == "rings":
             core.add_rings(10)
         elif k == "life":
-            core.lives += 1
+            core.extra_lives += 1
             core.play("life")
         elif k == "shield":
             p.shield = True
@@ -343,8 +343,12 @@ class SpringUp(Obj):
         if self.t:
             self.t -= 1
             return
-        if self.solid(core, p, 16, 8) == "top":
-            p.y += 8 << 8
+        vx, hit = p.vx, self.solid(core, p, 16, 8)
+        if hit == "top" or (hit == "side" and not p.air):   # walking into one launches too, and keeps the run
+            if hit == "top":
+                p.y += 8 << 8
+            else:
+                p.vx = vx
             p.vy = -self.power
             p.air = True
             p.jumping = False
@@ -1021,7 +1025,9 @@ WALK_RUN = 0x600
 def animate_player(core, p) -> None:
     """Pose and rotation for this frame: the walk and run cycles speed up with ground speed."""
     speed = abs(p.gsp)
-    if p.routine == "dead":
+    if p.spin is not None:
+        p.pose = f"roll_{core.frames % 5}"
+    elif p.routine == "dead":
         p.pose = "dead_0"
     elif p.routine == "hurt":
         p.pose = "hurt_0"
@@ -1030,8 +1036,8 @@ def animate_player(core, p) -> None:
         p.anim_t += 1
         if p.anim_t > hold:
             p.anim_t = 0
-            p.frame = (p.frame + 1) % 5
-        p.pose = f"roll_{p.frame}"
+            p.frame += 1
+        p.pose = f"roll_{p.frame % 5}"              # the walk cycle shares this counter and runs well past 5
     elif p.air and p.spring_anim:
         p.pose = "spring_0"
         if p.vy > 0:
@@ -1095,7 +1101,7 @@ def draw_world(core, surf) -> None:
         rot = 0 if p.rolling or p.routine != "control" or not p.pose.startswith(("walk", "run")) \
             else ((p.angle + 0x10) >> 5) & 7
         s = art.hero(p.pose, rot, flip_x=p.facing < 0)
-        surf.blit(s, s.get_rect(center=(p.px - cx, p.py - cy)))
+        surf.blit(s, s.get_rect(center=(p.px - cx, p.py - cy + (5 if p.spin is not None else 0))))
     if p.shield:
         s = art.sprite(f"shield_{(frame >> 2) & 1}")
         surf.blit(s, s.get_rect(center=(p.px - cx, p.py - cy)))
@@ -1103,4 +1109,5 @@ def draw_world(core, surf) -> None:
         s = art.sprite(f"star_{(frame >> 2) & 3}")
         surf.blit(s, s.get_rect(center=(p.px - cx + int(16 * math.cos(frame * 0.4)),
                                         p.py - cy + int(16 * math.sin(frame * 0.4)))))
-    art.hud(surf, core.score, core.frames, core.rings_held, core.lives, bool(frame & 8))
+    art.hud(surf, core.score, core.frames, core.rings_held, 3 if core.hud_lives is None else core.hud_lives + 1,
+            bool(frame & 8))

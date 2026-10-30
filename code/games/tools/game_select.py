@@ -34,6 +34,7 @@ ROWS = 8                          # list rows shown at once; longer lists scroll
 GOLD, GREY = (252, 188, 60), (188, 188, 188)
 CLIP_BOX, CLIP_FPS, CLIP_S = (240, 200), 12, 6   # the gameplay clip: its decoded size, rate and length
 game_shown = None                # once the study has a game, its name heads every screen
+_window = None                   # see _draw
 _clips, _frames = {}, {}         # game -> (size, raw RGB frames) from the decoder thread; -> Surfaces
 
 
@@ -125,7 +126,11 @@ def _draw(title: str, items: list, choice: int | None, hint: str, size: int = 4,
         screen = pygame.display.set_mode(SIZE)
         pygame.display.set_caption("PEAK  User Study" if args.study else "PEAK  Manual Play")
         if sys.platform == "darwin":       # macOS leaves a reopened window without the keyboard
-            Window.from_display_module().focus()   # (on Windows the wrapper frees the window when dropped: a crash)
+            # held in a global: SDL keeps a raw pointer to this wrapper and pygame touches it on every window
+            # event, so a wrapper dropped here corrupts memory (on Windows it frees the window: a crash)
+            global _window
+            _window = Window.from_display_module()
+            _window.focus()
         if os.environ.get("PEAK_READY_FILE"):  # up: the menu's loading bar stops
             open(os.environ["PEAK_READY_FILE"], "a").close()
     screen.fill((0, 0, 0))

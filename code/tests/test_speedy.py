@@ -41,6 +41,19 @@ def test_levels_build_and_list():
         assert all(len(a) == len(L.angles[0][0]) for p in L.angles for a in p)
 
 
+@pytest.mark.parametrize("name", ["green_hill_1", "green_hill_2", "green_hill_3"])
+def test_no_hairline_a_body_could_stand_on_unseen(name):
+    import numpy as np
+    import pygame
+    L = lv.load(name)
+    solid = L.masks_np[0] | L.masks_np[1]
+    H, W = solid.shape
+    rgba = np.zeros((H, W, 4), np.uint8)
+    rgba[..., 3] = solid * 255
+    mask = pygame.mask.from_surface(pygame.image.frombuffer(rgba.tobytes(), (W, H), "RGBA"), 127)
+    assert min(c.count() for c in mask.connected_components(minimum=1)) >= 400
+
+
 def test_run_tops_out_at_six_pixels_a_frame():
     c = core()
     run(c, 160)
@@ -76,6 +89,63 @@ def test_full_speed_runs_the_loop():
         seen.add(c.player.plane)
     assert c.player.px > 5640 and seen == {0, 1}     # up the right side on plane 0, down the left on plane 1
     assert not c.player.air
+
+
+def test_a_half_pipe_turns_the_body_smoothly():
+    c = core()
+    p = c.player
+    p.x, p.y, p.air = 1500 << 8, 830 << 8, True
+    c.camera_x, c.camera_y = 1340, 730
+    seen = []
+    for _ in range(240):
+        p.invincible = 500
+        c.step((1, 0, 0))
+        if 1640 < p.px < 1880 and not p.air:
+            seen.append(p.angle)
+    steps = [min((a - b) & 255, (b - a) & 255) for a, b in zip(seen, seen[1:])]
+    assert len(seen) > 30 and max(steps) <= 16       # never a one-frame drop to flat on the slope
+
+
+def test_spin_dash_charges_then_fires_from_a_stand():
+    c = core()
+    p = c.player
+    run(c, 3, 0)
+    assert p.gsp == 0
+    c.step((0, 0, 1))
+    c.step((0, 1, 1))                            # down + jump starts the dash; it is not a jump
+    assert p.spin == 0.0 and not p.air
+    for _ in range(3):                           # three more presses charge it
+        c.step((0, 0, 1))
+        c.step((0, 1, 1))
+    charge = p.spin
+    assert 5 < charge <= 6 and p.gsp == 0 and p.vx == 0
+    c.step((0, 0, 0))                            # let go of down
+    assert p.spin is None and p.rolling and p.gsp == int((8 + int(charge) / 2) * 256)
+    c = core()
+    run(c, 3, 0)
+    c.step((0, 0, 1))
+    c.step((0, 1, 1))
+    c.step((0, 0, 0))
+    assert c.player.gsp == 8 * 256               # with no charge, the guide's slowest launch
+
+
+def test_jump_alone_is_still_a_jump():
+    c = core()
+    run(c, 3, 0)
+    c.step((0, 1, 0))
+    assert c.player.air and c.player.spin is None
+
+
+def test_walking_into_a_spring_launches():
+    c = core("green_hill_3")
+    p = c.player
+    p.x, p.y, p.air = 200 << 8, 930 << 8, True    # left of the first spring, at x=296
+    c.camera_x, c.camera_y = 40, 768
+    lowest = 0
+    for _ in range(120):
+        c.step((1, 0, 0))
+        lowest = min(lowest, p.vy)
+    assert lowest <= -0x900
 
 
 def test_tunnels_force_a_roll():
@@ -139,6 +209,38 @@ def test_spring_launches_at_ten():
         c.step((0, 0, 0))
         fastest = min(fastest, p.vy)
     assert fastest <= -0xA00 + 0x38
+
+
+def test_a_corridor_spring_goes_up_through_the_hill_and_lands_on_top():
+    c = core()
+    p = c.player
+    p.x, p.y, p.air, p.vy = 3504 << 8, 860 << 8, True, 0x100    # the spring in the spike corridor of Act 1
+    c.camera_x, c.camera_y = 3344, 764
+    run(c, 60, 0)
+    assert p.air and p.py < 720                  # the dirt over the corridor did not stop it
+    run(c, 60, -1)
+    assert not p.air and p.py < 720              # and the hill's top held the landing
+
+
+def test_a_ledge_still_holds_a_body_from_above_and_tunnels_stay_walled():
+    c = core()
+    p = c.player
+    teleport(c, 3400, 640)                       # on top of the hill over that corridor
+    assert not p.air and p.py < 720
+    run(c, 30, 0)
+    assert not p.air and p.py < 720
+    L = c.level
+    x, y = L.tubes[0][0] + 150, L.tubes[0][1] + 100
+    assert 2 not in L.masks[0][(y - 60) * L.px_w + x - 60:(y - 60) * L.px_w + x + 60]
+
+
+def test_a_steep_face_still_stops_a_body_in_the_air():
+    c = core("green_hill_2")
+    p = c.player
+    p.x, p.y, p.vx, p.vy, p.air = 2380 << 8, 600 << 8, 0x400, -0x100, True   # the wall of the bowl before x=2424
+    c.camera_x, c.camera_y = 2220, 504
+    run(c, 16, 1)
+    assert p.px < 2424 and p.routine == "control"
 
 
 def test_rolling_kills_a_badnik_and_chain_pays_more():
@@ -244,6 +346,32 @@ def test_adapter_runs_and_ends(sensors):
     assert a.episode_stats()["level_coins"] == 153
     a.reset()
     assert a.alive and a.core.frames == 0 and a.core.rings_held == 0
+
+
+def test_a_long_walk_does_not_break_the_roll_animation():
+    from code.games import speedy_art as art
+    from code.games.speedy_objects import animate_player
+    c = SpeedyCore(render_mode="sim")
+    p = c.player
+    p.frame, p.rolling, p.h, p.anim_t = 9, True, 14, 0
+    animate_player(c, p)
+    assert p.pose in art.SPRITES
+
+
+def test_the_screen_counts_lives_down():
+    import pygame
+    c = SpeedyCore(render_mode="sim")
+    view = pygame.Surface(c.VIEW)
+    seen = []
+    from code.games import speedy_art as art
+    real, art.hud = art.hud, lambda *a: seen.append(a[4])
+    try:
+        for left in (2, 1, 0):
+            c.hud_lives = left
+            c.render(pygame.Surface((c.WIDTH, c.HEIGHT)))
+    finally:
+        art.hud = real
+    assert seen == [3, 2, 1]
 
 
 def test_a_held_jump_output_repeats():

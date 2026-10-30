@@ -1,5 +1,9 @@
 """SPEEDY levels: the traced Green Hill acts (levels/speedy/*.yaml) built into collision data.
 
+A hill over a lower path is hollow with a solid top, as in the original: a mask holds 1 for solid on
+every side and 2 for the hollow part, which a body on the ground reads as solid and a body in the air
+only when landing on it, so a jump or a spring goes up through it. Steep faces keep a skin of 1s.
+
 A level file holds polygons and object positions, not tiles. This module rasterises them into the
 pixel masks and per-tile surface angles the original's sensors read. Two planes exist because a loop
 is solid on one side at a time (the player's plane flips at the top, as on the Mega Drive):
@@ -26,7 +30,12 @@ NO_ANGLE = 0xFF
 WALK_CLEARANCE = 128      # how much of a wall is open above a walkway drawn in front of it
 SHELL = 24                # solid kept under a surface above a carved walkway
 LUMP = 40                 # a "surface" this close over the path is a plant the tracing took for ground
+COS_CORNER = math.cos(math.radians(40))     # a turn sharper than this in the trace is a real corner
 GRASS = 10                # how far grass tips stand above the surface they grow on
+SLIVER = 2                # solid thinner than 2 * this + 1 px is a carving leftover
+SKIN = 8                  # how thick a steep face stays solid to a body in the air
+TUBE_WALL = 48            # how far around a tunnel the dirt stays solid on every side
+FIT_MIN = 8               # surface pixels a tile needs for an angle of its own
 TUBE_GROW = 4             # the traced band is the dark floor of the tunnel: the bore is this much wider
 FLOOR, RIGHT, CEILING, LEFT = 0, 1, 2, 3    # sensor directions, in the angle tables' order
 
@@ -40,6 +49,41 @@ def delta(text: str) -> list[tuple[int, int]]:
         x, y = x + dx, y + dy
         out.append((x, y))
     return out
+
+
+def curve(pts: list, closed: bool = True) -> list:
+    """A smooth line through traced points: the trace keeps one point per several tiles, so straight
+    segments between them would turn a half-pipe into facets. Corners sharper than CORNER stay corners."""
+    n = len(pts)
+
+    def seg(i: int) -> tuple:
+        a, b = pts[i % n], pts[(i + 1) % n]
+        return b[0] - a[0], b[1] - a[1], math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+
+    def tangent(i: int) -> tuple:
+        """Direction through point i, as a unit vector, or None at a corner or a free end."""
+        if not closed and (i == 0 or i == n - 1):
+            return None
+        ax, ay, al = seg(i - 1)
+        bx, by, bl = seg(i)
+        if (ax * bx + ay * by) / (al * bl) < COS_CORNER:
+            return None
+        tx, ty = ax * bl + bx * al, ay * bl + by * al       # the shorter neighbour weighs more
+        k = math.hypot(tx, ty) or 1.0
+        return tx / k, ty / k
+
+    out = []
+    for i in range(n if closed else n - 1):
+        x0, y0 = pts[i]
+        dx, dy, length = seg(i)
+        t0, t1 = tangent(i) or (dx / length, dy / length), tangent(i + 1) or (dx / length, dy / length)
+        steps = max(int(length // 6), 1)
+        for k in range(steps):
+            u = k / steps                                   # cubic Hermite between the two points
+            h1, h2, h3 = 3 * u * u - 2 * u ** 3, u ** 3 - 2 * u * u + u, u ** 3 - u * u
+            out.append((round(x0 + dx * h1 + length * (t0[0] * h2 + t1[0] * h3)),
+                        round(y0 + dy * h1 + length * (t0[1] * h2 + t1[1] * h3))))
+    return out if closed else out + [pts[-1]]
 
 
 def points(text: str | None) -> list[list]:
@@ -58,15 +102,39 @@ def _fill(size: tuple[int, int], polys: list) -> np.ndarray:
     return pygame.surfarray.array2d(surf).T.astype(bool)
 
 
-def _smooth(m: np.ndarray, r: int) -> np.ndarray:
-    """Round off stair steps: a pixel keeps the majority of the (2r+1) square around it."""
+def _box(m: np.ndarray, r: int) -> tuple:
+    """Solid pixels in the (2r+1) square around each pixel, and that square's area at the edges."""
     H, W = m.shape
     I = np.zeros((H + 1, W + 1), dtype=np.int32)
     I[1:, 1:] = np.cumsum(np.cumsum(m, axis=0, dtype=np.int32), axis=1, dtype=np.int32)
     y0, y1 = np.clip(np.arange(H) - r, 0, H), np.clip(np.arange(H) + r + 1, 0, H)
     x0, x1 = np.clip(np.arange(W) - r, 0, W), np.clip(np.arange(W) + r + 1, 0, W)
     total = I[y1[:, None], x1[None, :]] - I[y0[:, None], x1[None, :]] - I[y1[:, None], x0[None, :]] + I[y0[:, None], x0[None, :]]
-    return total * 2 >= (y1 - y0)[:, None] * (x1 - x0)[None, :]
+    return total, (y1 - y0)[:, None] * (x1 - x0)[None, :]
+
+
+def _skin(mask: np.ndarray) -> np.ndarray:
+    """Solid just inside a steep face: air close beside it, none close above it. Walls stay walls."""
+    air = ~mask
+    side, over = air.copy(), air.copy()
+    for k in range(1, SKIN + 1):
+        side[:, k:] |= air[:, :-k]
+        side[:, :-k] |= air[:, k:]
+    for k in range(1, 2 * SKIN + 1):
+        over[k:, :] |= air[:-k, :]
+    return mask & side & ~over
+
+
+def _open(m: np.ndarray, r: int) -> np.ndarray:
+    """Drop anything narrower than a (2r+1) square, keeping everything else as it was."""
+    total, area = _box(m, r)
+    return _box(total == area, r)[0] > 0
+
+
+def _smooth(m: np.ndarray, r: int) -> np.ndarray:
+    """Round off stair steps: a pixel keeps the majority of the square around it."""
+    total, area = _box(m, r)
+    return total * 2 >= area
 
 
 def _grow(m: np.ndarray, r: int) -> np.ndarray:
@@ -102,7 +170,7 @@ def _edge(mask: np.ndarray, x: int, y: int, step: int) -> int:
     return x + 12 * step
 
 
-def _carve_walk(mask: np.ndarray, line: list) -> None:
+def _carve_walk(mask: np.ndarray, one_way: np.ndarray, line: list) -> None:
     """Open the wall above a walkway: a grass strip with dirt over it is a path in front of a wall."""
     H, W = mask.shape
     # tracing stops short of the wall's edge: run on past both ends so no sliver is left standing
@@ -118,6 +186,9 @@ def _carve_walk(mask: np.ndarray, line: list) -> None:
                 roof = above + int(air[-1]) + 1
                 top = roof if y - roof <= LUMP else min(max(top, roof + SHELL), y)   # ...unless it is a fern on the path
             mask[top:y, x] = False
+            air = np.nonzero(~mask[:top, x])[0]
+            if air.size:                        # up to the next open air the dirt is scenery, passable from below
+                one_way[air[-1] + 1:top, x] = True
 
 
 def _angle_table(mask: np.ndarray, side: int) -> bytes:
@@ -138,19 +209,28 @@ def _angle_table(mask: np.ndarray, side: int) -> bytes:
     ys, xs = np.nonzero(edge)
     tw, th = W // TILE + 1, H // TILE + 1
     tid = (ys // TILE) * tw + xs // TILE
-    # a line through the pixels of one tile and its neighbours along the surface would blur corners
-    n = np.bincount(tid, minlength=tw * th).astype(np.float64)
-    fx, fy = (xs % TILE).astype(np.float64), (ys % TILE).astype(np.float64)
+    fx, fy = xs.astype(np.float64), ys.astype(np.float64)
     if side in (RIGHT, LEFT):
         fx, fy = fy, fx                         # fit x = m y + c on walls
-    sx = np.bincount(tid, fx, tw * th)
-    sy = np.bincount(tid, fy, tw * th)
-    sxx = np.bincount(tid, fx * fx, tw * th)
-    sxy = np.bincount(tid, fx * fy, tw * th)
-    den = n * sxx - sx * sx
-    ok = (n >= 3) & (den > 1e-6)
-    m = np.zeros_like(n)
-    m[ok] = (n[ok] * sxy[ok] - sx[ok] * sy[ok]) / den[ok]
+    sums = [np.bincount(tid, w, tw * th).astype(np.float64) for w in (None, fx, fy, fx * fx, fx * fy)]
+
+    def around(a: np.ndarray) -> np.ndarray:
+        """Each tile's total with its eight neighbours."""
+        g, out = a.reshape(th, tw), np.zeros((th, tw))
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                out[max(dy, 0):th + min(dy, 0), max(dx, 0):tw + min(dx, 0)] += \
+                    g[max(-dy, 0):th + min(-dy, 0), max(-dx, 0):tw + min(-dx, 0)]
+        return out.ravel()
+
+    def slope(n, sx, sy, sxx, sxy) -> np.ndarray:
+        den = n * sxx - sx * sx
+        return np.divide(n * sxy - sx * sy, den, out=np.zeros_like(n), where=den > 1e-6)
+
+    # a surface that only clips a tile's corner leaves too few pixels to fit: read those from the tiles around
+    n = sums[0]
+    m = np.where(n >= FIT_MIN, slope(*sums), slope(*[around(a) for a in sums]))
+    ok = n > 0
     if side == FLOOR:
         rad = np.arctan2(m, 1.0)
     elif side == CEILING:
@@ -187,23 +267,29 @@ class Level:
         self.camera_right = int(d["camera_right"])
         self.camera_bottom_max = 1536 - 224
         self.width = self.camera_right + 320                        # the level's playable right edge
-        polys = [delta(s) for s in d["solid"]]
+        self.polys = polys = [curve(delta(s)) for s in d["solid"]]
         H = max(y for p in polys for _, y in p)
         W = max(max(x for p in polys for x, _ in p), self.width + 64)
         self.px_w, self.px_h = W, H
         base = _fill((W, H), polys)
+        one_way = np.zeros_like(base)
         for line in _join([delta(s) for s in d.get("walk") or []]):
-            _carve_walk(base, line)
+            _carve_walk(base, one_way, curve(line, closed=False))
         # an object standing in front of a wall sits on a walkway, even where no grass shows between its legs
         for x0, x1, y in points(d.get("spikes")):
-            self._walk_under(base, x0, x1, y + 16)
+            self._walk_under(base, one_way, x0, x1, y + 16)
         for key, drop in (("monitors", 16), ("spring_up", 8), ("spring_up_red", 8), ("rock", 16)):
             for x, y, *_ in points(d.get(key)):
-                self._walk_under(base, x, x, y + drop)
+                self._walk_under(base, one_way, x, x, y + drop)
+        for x0, y0, x1, y1 in points(d.get("open")):        # a passage no trace can show, seen in play
+            base[y0:y1, x0:x1] = False
         self.tubes = [(x, y, x + 256, y + 288) for x, y in d.get("tubes") or []]
         if self.tubes:
             bore = _fill((W, H), [[(x + tx, y + ty) for tx, ty in tube] for x, y in d["tubes"]])
             base &= ~_grow(_smooth(bore, 9), TUBE_GROW)
+            one_way &= _box(bore, TUBE_WALL)[0] == 0        # a tunnel needs its walls to hold the body in
+        base = _open(base, SLIVER)                          # carving leaves hairlines: invisible, yet you can stand on them
+        one_way &= ~_skin(base)
         for x0, x1, y in d.get("bridges") or []:            # the logs are objects
             base[max(y - 32, 0):y + 24, x0 + 24:x1 - 23] = False
         self.loops = []
@@ -217,10 +303,11 @@ class Level:
             hole = ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1.0
             for p in planes:
                 p &= ~hole
+            one_way[y0 - GRASS:y1, cx - 128:cx + 128] = False   # a loop's ring holds the body too
             planes[0][y0:y1, cx - 128:cx - 16] = False      # the way in: run through the left leg
             planes[1][y0:y1, cx + 16:cx + 128] = False      # the way out: run through the right leg
         self.masks_np = planes
-        self.masks = [p.astype(np.uint8).tobytes() for p in planes]
+        self.masks = [(p.astype(np.uint8) * (1 + one_way.astype(np.uint8))).tobytes() for p in planes]
         self.angles = [[_angle_table(p, s) for s in (FLOOR, RIGHT, CEILING, LEFT)] for p in planes]
         self.tw = W // TILE + 1
         self.bridges = list(d.get("bridges") or [])
@@ -235,9 +322,9 @@ class Level:
             "flower", "sunflower")}
 
     @staticmethod
-    def _walk_under(mask: np.ndarray, x0: int, x1: int, y: int) -> None:
-        if mask[max(y - 56, 0), x0 - 16:x1 + 17].any():
-            _carve_walk(mask, [(x0 - 24, y), (x1 + 24, y)])
+    def _walk_under(mask: np.ndarray, one_way: np.ndarray, x0: int, x1: int, y: int) -> None:
+        if mask[max(y - 56, 0), x0:x1 + 1].any():           # dirt right over it: open sky means it stands in a pit
+            _carve_walk(mask, one_way, [(x0 - 24, y), (x1 + 24, y)])
 
     def solid(self, x: int, y: int, plane: int = 0) -> bool:
         return 0 <= x < self.px_w and 0 <= y < self.px_h and bool(self.masks[plane][y * self.px_w + x])

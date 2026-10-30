@@ -753,7 +753,7 @@ _PLAY_CONTROLS = {
     "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
                  ("I", "Toggle invincibility (debug)"), ("", "A controller works too: stick / d-pad, Cross, Square")],
     "speedy": [("A / D  ← / →", "Run"), ("S / ↓", "Crouch, or roll while moving"), ("W / ↑", "Look up"),
-               ("SPACE / Z / J", "Jump")],
+               ("SPACE / Z / J", "Jump"), ("S + SPACE", "Spin Dash: tap to charge, let go of S to fire")],
 }
 # What each NES button does, for the study's controller screen (code/games/tools/manual_play.py reads them).
 # The pixel font has letters, digits and $*-./:>_ only.

@@ -1241,7 +1241,7 @@ def _level_maps(level):
     """Whole-level masks, made once: what is solid in either plane, the tunnels' bores, and the wall left
     behind each carved walkway."""
     solid = level.masks_np[0] | level.masks_np[1]
-    polys = [speedy_level.delta(p) for p in level.data["solid"]]
+    polys = level.polys
     size = (level.px_w, level.px_h)
     bore = np.zeros(solid.shape, bool)
     if level.tubes:
@@ -1253,7 +1253,7 @@ def _level_maps(level):
         for x, y in level.data["tubes"]:
             bore[y - pad:y + 288 + pad, x - pad:x + 256 + pad] |= one
         bore &= ~solid
-    wall = speedy_level._fill(size, polys) & ~solid & ~bore
+    wall = speedy_level._open(speedy_level._fill(size, polys) & ~solid & ~bore, 3)   # a room, not a shaved edge
     for x0, x1, y in level.bridges:
         wall[max(y - 32, 0):y + 24, x0 + 24:x1 - 23] = False
     for cx, cy, r, _ in level.loops:

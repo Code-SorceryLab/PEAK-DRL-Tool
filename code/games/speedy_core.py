@@ -2,8 +2,8 @@
 
 The player routine keeps the console's order of operations and its fixed-point units: positions are
 in 1/256 px, speeds in 1/256 px per frame, angles in 1/256 of a turn. Numbers are written in the
-original's hex so they can be checked against the public physics guide. There is no Spin Dash:
-the 1991 game did not have one.
+original's hex so they can be checked against the public physics guide. The one addition is the
+Spin Dash, which the 1991 game did not have: it follows the guide's rule from the later games.
 
 Headless by default. render_mode="human" keeps the animation, effects and sound state; the physics
 do not depend on it, so a replay matches its training run.
@@ -52,7 +52,7 @@ def quadrant(a: int) -> int:
 class Player:
     __slots__ = ("x", "y", "vx", "vy", "gsp", "angle", "air", "rolling", "jumping", "roll_jump", "pushing",
                  "facing", "h", "w", "lock", "routine", "invuln", "invincible", "shoes", "shield", "plane",
-                 "on_obj", "balance", "spring_anim", "idle", "frame", "anim_t", "pose", "acc", "dec", "top")
+                 "on_obj", "spin", "balance", "spring_anim", "idle", "frame", "anim_t", "pose", "acc", "dec", "top")
 
     def __init__(self, x: int, y: int):
         self.x, self.y = x << 8, y << 8
@@ -67,6 +67,7 @@ class Player:
         self.shield = False
         self.plane = 0
         self.on_obj = None
+        self.spin = None                    # the Spin Dash charge, None when not crouched and charging
         self.balance = self.spring_anim = False
         self.idle = self.frame = self.anim_t = 0
         self.pose = "idle_0"
@@ -95,7 +96,7 @@ class SpeedyCore:
         self.names = list(self.cfg["levels"])
         self.level_name = level or self.names[0]
         self.max_steps, self.stall_frames = max_steps, stall_frames
-        self.lives = 3
+        self.extra_lives = 0                # manual_play moves these into its own count of lives
         self.score = 0
         self.won = False
         self.tile_size = COLS
@@ -120,6 +121,7 @@ class SpeedyCore:
         self.level = self.level_data = lv.load(self.level_name)
         L = self.level
         self.masks = list(L.masks)
+        self.hit = 3                            # the mask bits the wall and ceiling sensors can see
         self.collapsed: list = []
         self.W, self.H, self.tw = L.px_w, L.px_h, L.tw
         self.size = self.W * self.H
@@ -174,7 +176,7 @@ class SpeedyCore:
         before = self.score
         self.score += n
         if self.score // 50000 > before // 50000:
-            self.lives += 1
+            self.extra_lives += 1
             self.play("life")
 
     def add_rings(self, n: int) -> None:
@@ -184,7 +186,7 @@ class SpeedyCore:
         for mark in (100, 200):
             if before < mark <= self.rings_held and self.lives_awarded < mark:
                 self.lives_awarded = mark
-                self.lives += 1
+                self.extra_lives += 1
                 self.play("life")
         self.play("ring")
 
@@ -282,11 +284,11 @@ class SpeedyCore:
     def _ceiling(self, x: int, y: int) -> tuple[int, int]:
         if not (0 <= x < self.W and 0 <= y < self.H):
             return 32, lv.NO_ANGLE
-        m, W = self.masks[self.player.plane], self.W
+        m, W, hit = self.masks[self.player.plane], self.W, self.hit
         i = y * W + x
-        if m[i]:
+        if m[i] & hit:                   # hit is 1 in the air, where the inside of a hill does not count
             n = 1
-            while n < 32 and i + n * W < self.size and m[i + n * W]:
+            while n < 32 and i + n * W < self.size and m[i + n * W] & hit:
                 n += 1
             sy = y + n - 1
             return -n, self.level.angles[self.player.plane][lv.CEILING][(sy >> 4) * self.tw + (x >> 4)]
@@ -295,7 +297,7 @@ class SpeedyCore:
             j = i - n * W
             if j < 0:
                 return 32, lv.NO_ANGLE
-            if m[j]:
+            if m[j] & hit:
                 return n - 1, self.level.angles[self.player.plane][lv.CEILING][((y - n) >> 4) * self.tw + (x >> 4)]
             n += 1
         return 32, lv.NO_ANGLE
@@ -304,12 +306,12 @@ class SpeedyCore:
         """Distance to a wall on the right (right=True) or left of the sensor."""
         if not (0 <= y < self.H and 0 <= x < self.W):
             return 32, lv.NO_ANGLE
-        m, W = self.masks[self.player.plane], self.W
+        m, W, hit = self.masks[self.player.plane], self.W, self.hit
         i, s, side = y * W + x, (1 if right else -1), (lv.RIGHT if right else lv.LEFT)
         lo, hi = y * W, (y + 1) * W
-        if m[i]:
+        if m[i] & hit:
             n = 1
-            while n < 32 and lo <= i - n * s < hi and m[i - n * s]:
+            while n < 32 and lo <= i - n * s < hi and m[i - n * s] & hit:
                 n += 1
             return -n, self.level.angles[self.player.plane][side][(y >> 4) * self.tw + ((x - s * (n - 1)) >> 4)]
         n = 1
@@ -317,7 +319,7 @@ class SpeedyCore:
             j = i + n * s
             if not lo <= j < hi:
                 return 32, lv.NO_ANGLE
-            if m[j]:
+            if m[j] & hit:
                 return n - 1, self.level.angles[self.player.plane][side][(y >> 4) * self.tw + ((x + s * n) >> 4)]
             n += 1
         return 32, lv.NO_ANGLE
@@ -359,14 +361,16 @@ class SpeedyCore:
     # ── the player: ground and air, in the console's order ───────────────────
 
     def _control(self, p: Player) -> None:
+        self.hit = 1 if p.air else 3
         if p.air:
+            p.spin = None
             self._air(p)
         elif p.rolling:
             if not self._jump(p):
                 self._roll_repel(p)
                 self._roll_speed(p)
                 self._ground_end(p)
-        elif not self._jump(p):
+        elif not self._spin_dash(p) and not self._jump(p):
             self._slope_resist(p)
             self._move(p)
             self._roll(p)
@@ -417,6 +421,26 @@ class SpeedyCore:
             else:
                 p.angle = p.angle - 2 if p.angle >= 2 else 0
         self._floor_collide(p)
+
+    def _spin_dash(self, p: Player) -> bool:
+        """Down held at rest, jump starts and adds charge, letting go of down fires. True while it holds the body."""
+        press = self.keys[1] and not self.prev_keys[1]
+        if p.spin is None:
+            if not (press and self.keys[2] > 0 and p.gsp == 0 and not (p.angle + 0x20) & 0xC0):
+                return False
+            p.spin, press = 0.0, False                  # the press that starts it adds nothing
+        if self.keys[2] > 0:
+            p.spin -= int(p.spin / 0.125) / 256         # the charge drains, as air drag does
+            if press:
+                p.spin = min(p.spin + 2, 8.0)
+                self.play("spin")
+            p.vx = p.vy = 0
+        else:
+            p.gsp = int((8 + int(p.spin) / 2) * 256) * p.facing
+            p.spin = None
+            self._start_roll(p)
+        self._ground_end(p)
+        return True
 
     def _jump(self, p: Player) -> bool:
         if not (self.keys[1] and not self.prev_keys[1]):
@@ -601,7 +625,8 @@ class SpeedyCore:
         else:
             a, b = self._wall(x - h, y - w, False), self._wall(x - h, y + w, False)
         d, ang = b if b[0] <= a[0] else a
-        p.angle = ((p.angle + 0x20) & 0xC0) if ang & 1 else ang
+        if not ang & 1:             # no surface data here: keep the angle rather than jolt the body to flat
+            p.angle = ang
         if d == 0 or d < -14:
             return
         if d > 14:
@@ -776,6 +801,7 @@ class SpeedyCore:
         self.play("spikes" if spikes else "hurt")
 
     def _hurt(self, p: Player) -> None:
+        self.hit = 1
         p.x += p.vx
         p.y += p.vy
         p.vy += HURT_GRAVITY
