@@ -6,14 +6,14 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import numpy as np
 
-from code.neuro.cameras import Camera, frame_message, pick_models
+from code.neuro.cameras import TAG, Camera, frame_message, pick_models
 from code.neuro.evolution import GAConfig
 from code.neuro.net import make_net
 
 
 def _run(root, game, persona, level, seed, wins, max_frames=3600):
     """A fake probe run: state.json with `wins` per generation and random best.npz weights."""
-    d = os.path.join(root, game, persona, "p10g40", f"{level}_{seed}")
+    d = os.path.join(root, game, persona, TAG, f"{level}_{seed}")
     os.makedirs(d)
     cfg = GAConfig(pop_size=1, max_frames=max_frames, seed=seed)
     net = make_net(cfg)

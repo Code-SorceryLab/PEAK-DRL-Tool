@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/games.png" alt="The four games: Mario, Meat Boy, Bomberman and Mega Man" width="100%">
+  <img src="docs/img/games.gif" alt="Trained agents winning in the four games: Mario, Meat Boy, Bomberman and Mega Man" width="100%">
 </p>
 
 **PEAK** (Ontario Tech University, Master's program) evolves small neural networks that play four
@@ -29,7 +29,7 @@ compared.
 
 <table>
 <tr>
-<td width="50%" align="center"><img src="docs/img/first_win.gif" width="100%"><br><sub><b>The first win.</b> A population of 10 finds Mario 1-1's exit during evolution.</sub></td>
+<td width="50%" align="center"><img src="docs/img/mario_1-1.gif" width="100%"><br><sub><b>A trained agent wins.</b> The experienced persona's network (200 generations, Nibi run) reaches the flag of Mario 1-1.</sub></td>
 <td width="50%" align="center"><img src="docs/img/dashboard.png" width="100%"><br><sub><b>Live dashboard.</b> One agent with its raycasts, its inputs and its fitness.</sub></td>
 </tr>
 </table>
@@ -153,8 +153,8 @@ Bomberman's evaluation level is never solved, so it cannot be judged there.
 - Retraining with new seeds on a level that did not change raises a signal in **22 of 35** comparisons
   (63%). That is why retraining is not the detector.
 
-"Not counted" means the original's agents never won there: 4 Bomberman levels (its evaluation level
-among them) and the full Mega Man stage. Per-level numbers are in "All result numbers" below.
+A mutant is judged only where the original's agents win, so 4 Bomberman levels (its evaluation level
+among them) and the full Mega Man stage are left out. Per-level numbers are in "All result numbers" below.
 
 ---
 
@@ -333,8 +333,8 @@ noise. A mutant is flagged when any signal holds:
 | death cluster moved | failed end tiles (Chebyshev radius 3) move > 3 tiles, or appear |
 | new top cause | the most common cause of failure changes |
 
-Verdicts: **broken** (completion lost) · **changed** (any other signal) · **unchanged** · **not
-counted** (the original never wins there). A breaking or degrading mutant is caught when flagged; a
+Verdicts: **broken** (completion lost) · **changed** (any other signal) · **unchanged**. Where the
+original never wins, nothing is judged. A breaking or degrading mutant is caught when flagged; a
 neutral one is right when unchanged; the cosmetic one must match attempt for attempt. Also reported:
 win rate against the original's per-seed spread, a strict count (completion or Fisher only), and the
 rule's false-alarm rate on `base-reseeded`. The rule was fixed on 2026-10-25 after pilot replays, so
@@ -389,14 +389,17 @@ above. Mega Man's retrains (wins of 120 on section 3): `s3-seal_route` 0, `s3-wi
 
 **AST verdicts on the evaluation levels** (wins of 18 attempts; Mega Man: of 120, on section 3, Ledges)
 
-| Variant | Mario 1-1 | Meat Boy 2 | Bomberman 12 | Mega Man section 3 |
-|---|---|---|---|---|
-| original (`base`; Mega Man `base-retrained`) | 15/18 | 15/18 | 0/18 | 36/120 |
-| `seal_route`, replay | 0/18 **broken** | 0/18 **broken** | not counted | 0/120 **broken** |
-| `widen_gap` / `add_enemy`, replay | 11/18 **changed** | 2/18 **changed** | not counted | 1/120 **changed** |
-| `jump_velocity_down` / `fuse_down`, replay | 0/18 **broken** | 6/18 **changed** | not counted | see below |
-| `off_route`, replay | 15/18 unchanged | 15/18 unchanged | not counted | 36/120 unchanged |
-| `cosmetic_tile`, replay | 18/18 identical | 18/18 identical | 18/18 identical | 120/120 identical |
+| Variant | Mario 1-1 | Meat Boy 2 | Mega Man section 3 |
+|---|---|---|---|
+| original (`base`; Mega Man `base-retrained`) | 15/18 | 15/18 | 36/120 |
+| `seal_route`, replay | 0/18 **broken** | 0/18 **broken** | 0/120 **broken** |
+| `widen_gap`, replay | 11/18 **changed** | 2/18 **changed** | 1/120 **changed** |
+| `jump_velocity_down`, replay | 0/18 **broken** | 6/18 **changed** | see below |
+| `off_route`, replay | 15/18 unchanged | 15/18 unchanged | 36/120 unchanged |
+| `cosmetic_tile`, replay | 18/18 identical | 18/18 identical | 120/120 identical |
+
+Bomberman's evaluation level is left out: its original is never won (0/18), so no mutant there can be
+judged. Its cosmetic copy still replays identically (18/18).
 
 **Mega Man `m-jump_velocity_down`** (jump ×0.85 on the whole game), by section (wins of 120)
 
@@ -410,7 +413,6 @@ above. Mega Man's retrains (wins of 120 on section 3): `s3-seal_route` 0, `s3-wi
 | 6 Descent | 105 | 99 | 78 | changed |
 | 7 Corridor | 120 | 120 | 120 | unchanged |
 | 8 Boss | 80 | 76 | 83 | unchanged |
-| full stage | 0 | 0 | 0 | not counted |
 
 **False alarms** (`base-reseeded` against the original, 35 counted comparisons): completion lost 2,
 win rate changed 4, death cluster moved 17, top cause changed 9; any signal 22 (63%); completion or
@@ -421,7 +423,7 @@ Fisher only ("strict") 6 (17%); win rate outside the original's seed spread 4 of
 <summary><b>⚠️ Known limits and caveats</b></summary>
 
 1. **Bomberman's evaluation level (12, Bomberman II 1-1) was never solved**, in training and every
-   retrain: its comparisons are all "not counted". (An older version used level 8, "09 Two Balloms";
+   retrain, so its mutants cannot be judged. (An older version used level 8, "09 Two Balloms";
    `paper-ast/ast_rule.md` still says "Bomberman 09". The code and this run use 12.)
 2. **Mario `jump_velocity_down` acts as breaking for agents on 1-1** (0/18): with jump ×0.85 the
    4-tall pipe at column 57 cannot be cleared from the ground; only a Goomba bounce gets past it.

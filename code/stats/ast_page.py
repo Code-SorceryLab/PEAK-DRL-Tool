@@ -361,11 +361,11 @@ def _others_row(game: str, res: dict, placed: list[dict]) -> str:
         if not ms:
             continue
         tones = [detect(m, res)[1] for m in ms]
-        good, bad, wait = tones.count("good"), tones.count("bad"), tones.count("none")
+        good, bad = tones.count("good"), tones.count("bad")
         tone = "bad" if bad else "good" if good else "none"
         icon = {"good": '<i class="ico coin"></i>', "bad": '<i class="ico heartbreak"></i>'}.get(tone, "")
         word = f"right {good}/{good + bad}" if good + bad else "waiting"
-        label = f"{len(ms)} levels" + (f", {wait} waiting" if wait and good + bad else "")
+        label = f"{good + bad or len(ms)} levels"     # levels whose original is unsolved are left out
         rep = ""
         if not ms[0]["operator"].endswith("cosmetic_tile"):
             st = [solvable(m, res)[1] for m in ms]
@@ -556,7 +556,6 @@ def render(results: dict, only: str | None = None, nav: bool = True) -> str:
     strip = ('<div class="scorestrip">'
              f'<div class="frame good"><span class="label">Right</span><span class="num"><i class="ico coin"></i>{sc["good"]}</span></div>'
              f'<div class="frame bad"><span class="label">Wrong</span><span class="num"><i class="ico heartbreak"></i>{sc["bad"]}</span></div>'
-             f'<div class="frame none"><span class="label">Waiting</span><span class="num"><i class="ico hourglass"></i>{sc["none"]}</span></div>'
              '</div>')
     tabs = ('<div class="gametabs" role="tablist" aria-label="Games">'
             + "".join(f'<button class="btn g-{g}" role="tab" type="button" data-game="{g}" aria-controls="{g}">{_icon(g)}'

@@ -3,7 +3,7 @@
     python -m code.neuro.cameras            # http://127.0.0.1:8010/
 
 Each camera plays the saved full-sweep models of one game and persona (runs/probes/<game>/<persona>/
-p10g40/<level>_<seed>/best.npz), level after level in config order, with the best seed of each
+p10g200/<level>_<seed>/best.npz), level after level in config order, with the best seed of each
 level; Mega Man plays the full Cut Man stage as a relay (runs/megaman/relay.json). One process per
 game steps its cameras at 30 frames per second and sends small JPEGs; the camera being watched is
 sent at full size with its rays and sensor values. The page also shows the balance pages
@@ -45,7 +45,7 @@ GAMES = ["mario", "meatboy", "bomberman"]
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "theme.css"), encoding="utf-8") as _f:
     COLORS = dict(re.findall(r"--p-(\w+):\s*(#[0-9a-fA-F]{6})", _f.read()))   # the dashboards' persona colours
 ORDER = ["novice", "clumsy", "experienced", "speedrunner", "killer", "collector"]
-TAG = "p10g40"              # the full sweep's run tag (rays, pop 10, 40 generations)
+TAG = "p10g200"             # the main training's run tag (rays, pop 10, 200 generations, default GA)
 FPS = 30
 THUMB_EVERY = 4             # a small view refreshes every 4th frame (about 7 per second)
 STALL = 300                 # end an attempt after 10 s without progress, as the relay does
