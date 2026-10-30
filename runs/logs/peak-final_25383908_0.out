@@ -1,0 +1,255 @@
+[2026-10-29 23:05:16] START n=1 host=c325.nibi.sharcnet $PY -m code.stats.ast_metrics
+mario
+  VARIANT                          WINS  SOLVED   PROG   TIME  CLUSTER       CAUSE       VERDICT      REPLAY              SIGNALS
+  base                            15/18     yes    34%  38.2s  (69,15) 100%  Pit         -            -                   -
+  base-reseeded                   15/18     yes    34%  38.6s  (70,15) 100%  Pit         unchanged    -                   -
+  seal_route                       0/18      no    96%      -  (189,3) 78%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved, cause_changed
+  widen_gap                       15/18     yes    34%  38.5s  (70,15) 100%  Pit         unchanged    11/18 changed       none
+  jump_velocity_down               0/18      no    22%      -  (45,10) 56%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved, cause_changed
+  off_route                       15/18     yes    34%  38.2s  (69,15) 100%  Pit         unchanged    15/18 unchanged     none
+  cosmetic_tile                   15/18     yes    34%  38.2s  (69,15) 100%  Pit         unchanged    -                   replay 18/18 identical
+  base@Mario1-2                   11/18     yes    47%  35.4s  (171,5) 29%   Stall       -            -                   -
+  base-reseeded@Mario1-2          12/18     yes    31%  34.2s  (53,11) 33%   Enemy       changed      -                   cluster_moved, cause_changed
+  seal_route@Mario1-2              0/18      no    99%      -  (166,4) 72%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  widen_gap@Mario1-2              11/18     yes    48%  35.4s  (48,11) 29%   Enemy       changed      10/18 changed       cluster_moved, cause_changed
+  jump_velocity_down@Mario1-2      0/18      no    64%      -  (108,8) 39%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  cosmetic_tile@Mario1-2          11/18     yes    47%  35.4s  (171,5) 29%   Stall       unchanged    -                   replay 18/18 identical
+  base@Mario1-3                    2/18     yes    55%  20.4s  (94,15) 44%   Pit         -            -                   -
+  base-reseeded@Mario1-3           2/18     yes    61%  20.2s  (94,15) 31%   Pit         unchanged    -                   -
+  seal_route@Mario1-3              0/18      no    61%      -  (94,15) 39%   Pit         broken       0/18 broken         completion_lost
+  widen_gap@Mario1-3               2/18     yes    55%  20.4s  (94,15) 50%   Pit         unchanged    2/18 unchanged      none
+  jump_velocity_down@Mario1-3      0/18      no    28%      -  (44,15) 72%   Pit         broken       0/18 broken         completion_lost, cluster_moved
+  off_route@Mario1-3               2/18     yes    55%  20.4s  (94,15) 44%   Pit         unchanged    2/18 unchanged      none
+  cosmetic_tile@Mario1-3           2/18     yes    55%  20.4s  (94,15) 44%   Pit         unchanged    -                   replay 18/18 identical
+  base@Mario1-4                    7/18     yes    59%  21.2s  (83,9) 36%    Fire        -            -                   -
+  base-reseeded@Mario1-4           9/18     yes    53%  29.8s  (34,12) 33%   Fire        changed      -                   cluster_moved
+  seal_route@Mario1-4              0/18      no    59%      -  (139,6) 39%   Fire        broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  widen_gap@Mario1-4               9/18     yes    53%  30.0s  (16,11) 33%   Fire        changed      0/18 broken         cluster_moved
+  jump_velocity_down@Mario1-4     14/18     yes    34%  28.5s  (28,12) 25%   Fire        changed      2/18 changed        win_rate_changed, cluster_moved
+  off_route@Mario1-4               7/18     yes    59%  21.2s  (83,9) 36%    Fire        unchanged    7/18 unchanged      none
+  cosmetic_tile@Mario1-4           7/18     yes    59%  21.2s  (83,9) 36%    Fire        unchanged    -                   replay 18/18 identical
+
+meatboy
+  VARIANT                    WINS  SOLVED   PROG   TIME  CLUSTER       CAUSE       VERDICT      REPLAY              SIGNALS
+  base                      15/18     yes    46%   2.6s  (24,24) 100%  Pit         -            -                   -
+  base-reseeded             13/18     yes    59%   2.6s  (27,24) 100%  Pit         unchanged    -                   -
+  seal_route                 0/18      no      -      -  (9,18) 61%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved, cause_changed
+  widen_gap                  6/18     yes    59%   1.8s  (27,24) 100%  Pit         changed      2/18 changed        win_rate_changed
+  jump_velocity_down         6/18     yes    64%   1.3s  (25,24) 92%   Pit         changed      6/18 changed        win_rate_changed
+  off_route                 15/18     yes    46%   2.6s  (24,24) 100%  Pit         unchanged    15/18 unchanged     none
+  cosmetic_tile             15/18     yes    46%   2.6s  (24,24) 100%  Pit         unchanged    -                   replay 18/18 identical
+  base@0                    14/18     yes    12%   3.3s  (27,10) 50%   Stall       -            -                   -
+  base-reseeded@0           16/18     yes    18%   1.9s  (2,11) 50%    Stall       changed      -                   cluster_moved
+  seal_route@0               0/18      no      -      -  (2,14) 67%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  jump_velocity_down@0      11/18     yes     6%   3.3s  (27,11) 43%   Stall       unchanged    3/18 changed        none
+  off_route@0               14/18     yes    12%   3.3s  (27,10) 75%   Stall       unchanged    14/18 unchanged     none
+  cosmetic_tile@0           14/18     yes    12%   3.3s  (27,10) 50%   Stall       unchanged    -                   replay 18/18 identical
+  base@1                    10/18     yes    13%   6.8s  (11,25) 38%   Stall       -            -                   -
+  base-reseeded@1            3/18     yes     0%   5.6s  (31,22) 47%   Stall       changed      -                   win_rate_changed, cluster_moved
+  seal_route@1               0/18      no      -      -  (32,25) 39%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  jump_velocity_down@1      10/18     yes     0%   6.5s  (32,25) 38%   Stall       changed      5/18 changed        cluster_moved
+  off_route@1               10/18     yes     9%   6.8s  (11,25) 38%   Stall       unchanged    10/18 unchanged     none
+  cosmetic_tile@1           10/18     yes    13%   6.8s  (11,25) 38%   Stall       unchanged    -                   replay 18/18 identical
+  base@3                     3/18     yes    43%   9.6s  (12,30) 53%   Stall       -            -                   -
+  base-reseeded@3            2/18     yes    48%   7.2s  (10,28) 50%   Stall       unchanged    -                   -
+  seal_route@3               0/18      no      -      -  (10,34) 67%   Stall       broken       0/18 broken         completion_lost, cluster_moved
+  jump_velocity_down@3       7/18     yes    40%   9.8s  (13,30) 46%   Stall       unchanged    0/18 broken         none
+  off_route@3                3/18     yes    43%   9.6s  (12,30) 53%   Stall       unchanged    3/18 unchanged      none
+  cosmetic_tile@3            3/18     yes    43%   9.6s  (12,30) 53%   Stall       unchanged    -                   replay 18/18 identical
+  base@4                     7/18     yes    15%  13.3s  (28,26) 27%   Stall       -            -                   -
+  base-reseeded@4            3/18     yes    34%  10.7s  (29,46) 33%   Stall       changed      -                   cluster_moved
+  seal_route@4               0/18      no      -      -  (9,46) 67%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  jump_velocity_down@4       5/18     yes    37%  17.2s  (21,27) 23%   Stall       changed      2/18 changed        cluster_moved
+  off_route@4                7/18     yes    12%  13.3s  (29,46) 36%   Stall       changed      7/18 unchanged      cluster_moved
+  cosmetic_tile@4            7/18     yes    15%  13.3s  (28,26) 27%   Stall       unchanged    -                   replay 18/18 identical
+  base@5                     5/18     yes    37%   6.5s  (21,6) 38%    Stall       -            -                   -
+  base-reseeded@5            4/18     yes    37%   7.2s  (26,16) 36%   Saw         changed      -                   cluster_moved, cause_changed
+  seal_route@5               0/18      no      -      -  (13,19) 67%   Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  jump_velocity_down@5       7/18     yes    43%   8.7s  (23,8) 46%    Stall       unchanged    0/18 broken         none
+  off_route@5                5/18     yes    37%   6.5s  (21,6) 38%    Stall       unchanged    5/18 unchanged      none
+  cosmetic_tile@5            5/18     yes    37%   6.5s  (21,6) 38%    Stall       unchanged    -                   replay 18/18 identical
+  base@6                    12/18     yes     8%   6.4s  (11,9) 33%    Stall       -            -                   -
+  base-reseeded@6            8/18     yes     7%   6.5s  (-12,32) 40%  Stall       changed      -                   cluster_moved
+  seal_route@6               0/18      no      -      -  (5,26) 33%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  widen_gap@6               12/18     yes     8%   6.5s  (11,9) 33%    Stall       unchanged    9/18 changed        none
+  jump_velocity_down@6       4/18     yes     0%   6.1s  (15,26) 29%   Stall       changed      2/18 changed        win_rate_changed, cluster_moved
+  off_route@6               12/18     yes     8%   6.4s  (11,9) 33%    Stall       unchanged    12/18 unchanged     none
+  cosmetic_tile@6           12/18     yes     8%   6.4s  (11,9) 33%    Stall       unchanged    -                   replay 18/18 identical
+  base@7                     9/18     yes    38%   3.2s  (12,12) 44%   Saw         -            -                   -
+  base-reseeded@7            7/18     yes    38%   2.0s  (12,12) 73%   Saw         unchanged    -                   -
+  seal_route@7               0/18      no      -      -  (1,10) 67%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved, cause_changed
+  jump_velocity_down@7       7/18     yes    38%   3.0s  (12,12) 64%   Saw         unchanged    7/18 unchanged      none
+  off_route@7                9/18     yes    38%   3.2s  (12,12) 44%   Saw         unchanged    9/18 unchanged      none
+  cosmetic_tile@7            9/18     yes    38%   3.2s  (12,12) 44%   Saw         unchanged    -                   replay 18/18 identical
+  base@8                     6/18     yes    26%  12.7s  (27,31) 33%   Saw         -            -                   -
+  base-reseeded@8            1/18     yes    28%  12.3s  (30,20) 47%   Saw         changed      -                   cluster_moved
+  seal_route@8               0/18      no      -      -  (7,29) 67%    Stall       broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved, cause_changed
+  jump_velocity_down@8       4/18     yes    30%  10.6s  (31,19) 36%   Saw         changed      0/18 broken         cluster_moved
+  off_route@8                6/18     yes    26%  12.7s  (27,31) 33%   Saw         unchanged    6/18 unchanged      none
+  cosmetic_tile@8            6/18     yes    26%  12.7s  (27,31) 33%   Saw         unchanged    -                   replay 18/18 identical
+  base@9                     2/18     yes    65%  12.4s  (18,7) 50%    Saw         -            -                   -
+  base-reseeded@9            1/18     yes    76%  12.7s  (18,7) 53%    Saw         unchanged    -                   -
+  seal_route@9               0/18      no      -      -  (3,15) 67%    Stall       broken       0/18 broken         completion_lost, cluster_moved, cause_changed
+  jump_velocity_down@9       3/18     yes    72%  10.7s  (18,7) 53%    Saw         unchanged    0/18 broken         none
+  off_route@9                2/18     yes    65%  12.4s  (18,7) 50%    Saw         unchanged    2/18 unchanged      none
+  cosmetic_tile@9            2/18     yes    65%  12.4s  (18,7) 50%    Saw         unchanged    -                   replay 18/18 identical
+  base@10                    2/18     yes    18%   5.8s  (36,33) 38%   Fire        -            -                   -
+  base-reseeded@10           0/18      no     9%      -  (36,33) 50%   Fire        broken       -                   completion_lost
+  seal_route@10              0/18      no      -      -  (7,32) 67%    Stall       broken       0/18 broken         completion_lost, cluster_moved, cause_changed
+  widen_gap@10               2/18     yes    18%   5.8s  (36,33) 38%   Fire        unchanged    2/18 unchanged      none
+  jump_velocity_down@10      0/18      no    14%      -  (36,33) 39%   Fire        broken       0/18 broken         completion_lost
+  off_route@10               2/18     yes    18%   5.8s  (36,33) 38%   Fire        unchanged    2/18 unchanged      none
+  cosmetic_tile@10           2/18     yes    18%   5.8s  (36,33) 38%   Fire        unchanged    -                   replay 18/18 identical
+
+bomberman
+  VARIANT               WINS  SOLVED   PROG   TIME  CLUSTER       CAUSE       VERDICT      REPLAY              SIGNALS
+  base                  0/18      no    44%      -  (4,3) 89%     Bomb        -            -                   -
+  base-reseeded         0/18      no    48%      -  (3,5) 50%     Bomb        not counted  -                   -
+  seal_route            0/18      no     0%      -  (4,3) 61%     Bomb        not counted  0/18 not counted    none
+  add_enemy             0/18      no    48%      -  (3,5) 72%     Bomb        not counted  0/18 not counted    none
+  fuse_down             0/18      no    39%      -  (4,3) 94%     Bomb        not counted  0/18 not counted    none
+  off_route             0/18      no    44%      -  (4,3) 89%     Bomb        not counted  0/18 not counted    none
+  cosmetic_tile         0/18      no    44%      -  (4,3) 89%     Bomb        not counted  -                   replay 18/18 identical
+  base@0               16/18     yes    41%   6.0s  (1,2) 50%     Bomb        -            -                   -
+  base-reseeded@0      17/18     yes    77%   5.8s  (10,9) 100%   Bomb        changed      -                   cluster_moved
+  seal_route@0          0/18      no     0%      -  (13,9) 44%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  add_enemy@0          15/18     yes   100%  13.1s  (13,11) 100%  Enemy       changed      0/18 broken         cluster_moved, cause_changed
+  fuse_down@0          15/18     yes    91%   5.8s  (13,9) 67%    Bomb        changed      16/18 unchanged     cluster_moved
+  off_route@0          16/18     yes    41%   6.0s  (1,2) 50%     Bomb        unchanged    16/18 unchanged     none
+  cosmetic_tile@0      16/18     yes    41%   6.0s  (1,2) 50%     Bomb        unchanged    -                   replay 18/18 identical
+  base@1               15/18     yes    52%  16.2s  (11,5) 100%   Bomb        -            -                   -
+  base-reseeded@1       9/18     yes    67%  20.2s  (11,4) 78%    Bomb        unchanged    -                   -
+  seal_route@1          0/18      no     0%      -  (12,5) 83%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed
+  add_enemy@1           2/18     yes    65%  26.4s  (12,3) 81%    Bomb        changed      0/18 broken         win_rate_changed
+  fuse_down@1          14/18     yes    59%  16.4s  (13,5) 75%    Bomb        unchanged    0/18 broken         none
+  off_route@1          15/18     yes    52%  16.2s  (11,5) 100%   Bomb        unchanged    15/18 unchanged     none
+  cosmetic_tile@1      15/18     yes    52%  16.2s  (11,5) 100%   Bomb        unchanged    -                   replay 18/18 identical
+  base@2               12/18     yes    78%  19.0s  (11,11) 67%   Bomb        -            -                   -
+  base-reseeded@2       9/18     yes    93%  19.1s  (11,11) 100%  Bomb        unchanged    -                   -
+  seal_route@2          0/18      no     0%      -  (13,9) 44%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed
+  add_enemy@2           4/18     yes    74%  35.0s  (11,11) 57%   Bomb        changed      0/18 broken         win_rate_changed
+  fuse_down@2          10/18     yes    93%  13.4s  (11,11) 88%   Bomb        unchanged    0/18 broken         none
+  off_route@2          12/18     yes    78%  19.0s  (11,11) 67%   Bomb        unchanged    12/18 unchanged     none
+  cosmetic_tile@2      12/18     yes    78%  19.0s  (11,11) 67%   Bomb        unchanged    -                   replay 18/18 identical
+  base@3               12/18     yes    35%  12.4s  (5,1) 50%     Bomb        -            -                   -
+  base-reseeded@3       9/18     yes    67%  12.2s  (6,11) 89%    Bomb        changed      -                   cluster_moved
+  seal_route@3          0/18      no     0%      -  (7,4) 50%     Timeout     broken       0/18 broken         completion_lost, win_rate_changed
+  add_enemy@3           7/18     yes    59%  24.7s  (6,3) 46%     Bomb        unchanged    0/18 broken         none
+  fuse_down@3          10/18     yes    39%   8.8s  (6,1) 62%     Bomb        unchanged    6/18 unchanged      none
+  off_route@3          12/18     yes    35%  12.4s  (5,1) 50%     Bomb        unchanged    12/18 unchanged     none
+  cosmetic_tile@3      12/18     yes    35%  12.4s  (5,1) 50%     Bomb        unchanged    -                   replay 18/18 identical
+  base@4               15/18     yes     4%   9.3s  (5,7) 67%     Bomb        -            -                   -
+  base-reseeded@4      15/18     yes     0%   5.8s  (1,9) 67%     Bomb        changed      -                   cluster_moved
+  seal_route@4          0/18      no     0%      -  (9,9) 50%     Bomb        broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  add_enemy@4           0/18      no    55%      -  (13,1) 50%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  fuse_down@4          15/18     yes     0%   7.4s  (2,3) 67%     Bomb        changed      14/18 unchanged     cluster_moved
+  off_route@4          15/18     yes     4%   9.3s  (5,7) 67%     Bomb        unchanged    15/18 unchanged     none
+  cosmetic_tile@4      15/18     yes     4%   9.3s  (5,7) 67%     Bomb        unchanged    -                   replay 18/18 identical
+  base@5               11/18     yes    90%  20.0s  (13,10) 57%   Bomb        -            -                   -
+  base-reseeded@5       8/18     yes    90%  16.3s  (13,11) 70%   Bomb        unchanged    -                   -
+  seal_route@5          0/18      no     0%      -  (13,11) 44%   Bomb        broken       0/18 broken         completion_lost, win_rate_changed
+  add_enemy@5           2/18     yes    90%  59.8s  (12,11) 88%   Bomb        changed      0/18 broken         win_rate_changed
+  fuse_down@5           8/18     yes    90%  13.5s  (11,10) 80%   Bomb        unchanged    4/18 changed        none
+  off_route@5          11/18     yes    90%  20.0s  (13,10) 57%   Bomb        unchanged    11/18 unchanged     none
+  cosmetic_tile@5      11/18     yes    90%  20.0s  (13,10) 57%   Bomb        unchanged    -                   replay 18/18 identical
+  base@6                9/18     yes    57%  11.3s  (11,3) 33%    Enemy       -            -                   -
+  base-reseeded@6      11/18     yes    43%  10.8s  (3,9) 43%     Bomb        changed      -                   cluster_moved, cause_changed
+  seal_route@6          0/18      no     0%      -  (9,5) 56%     Bomb        broken       0/18 broken         completion_lost, win_rate_changed, cause_changed
+  add_enemy@6           7/18     yes    57%  18.5s  (8,7) 73%     Bomb        changed      0/18 broken         cluster_moved, cause_changed
+  fuse_down@6           9/18     yes    43%   6.4s  (3,9) 33%     Bomb        changed      0/18 broken         cluster_moved, cause_changed
+  off_route@6           9/18     yes    57%  11.3s  (11,3) 33%    Enemy       unchanged    9/18 unchanged      none
+  cosmetic_tile@6       9/18     yes    57%  11.3s  (11,3) 33%    Enemy       unchanged    -                   replay 18/18 identical
+  base@7                4/18     yes    66%  14.4s  (11,1) 43%    Enemy       -            -                   -
+  base-reseeded@7       6/18     yes    77%  14.1s  (11,11) 58%   Bomb        changed      -                   cluster_moved, cause_changed
+  seal_route@7          0/18      no     0%      -  (12,3) 67%    Bomb        broken       0/18 broken         completion_lost, cause_changed
+  add_enemy@7           2/18     yes    73%  29.7s  (9,9) 56%     Bomb        changed      0/18 broken         cluster_moved, cause_changed
+  fuse_down@7           5/18     yes   100%  16.1s  (13,11) 85%   Enemy       changed      0/18 broken         cluster_moved
+  off_route@7           4/18     yes    66%  14.4s  (11,1) 43%    Enemy       unchanged    4/18 unchanged      none
+  cosmetic_tile@7       4/18     yes    66%  14.4s  (11,1) 43%    Enemy       unchanged    -                   replay 18/18 identical
+  base@8                2/18     yes    75%  45.3s  (13,6) 94%    Bomb        -            -                   -
+  base-reseeded@8       3/18     yes    94%  38.0s  (13,6) 87%    Enemy       changed      -                   cause_changed
+  seal_route@8          0/18      no     0%      -  (13,5) 67%    Bomb        broken       0/18 broken         completion_lost
+  add_enemy@8           0/18      no    64%      -  (6,7) 56%     Bomb        broken       0/18 broken         completion_lost, cluster_moved
+  fuse_down@8           2/18     yes    69%  37.6s  (12,5) 81%    Bomb        unchanged    0/18 broken         none
+  off_route@8           2/18     yes    75%  45.3s  (13,6) 94%    Bomb        unchanged    2/18 unchanged      none
+  cosmetic_tile@8       2/18     yes    75%  45.3s  (13,6) 94%    Bomb        unchanged    -                   replay 18/18 identical
+  base@9                6/18     yes    70%  16.9s  (13,3) 42%    Bomb        -            -                   -
+  base-reseeded@9       4/18     yes    70%  21.1s  (13,3) 64%    Bomb        unchanged    -                   -
+  seal_route@9          0/18      no     0%      -  (7,10) 50%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed, cluster_moved
+  add_enemy@9           1/18     yes    70%  24.5s  (13,6) 65%    Bomb        unchanged    0/18 broken         none
+  fuse_down@9           0/18      no    70%      -  (13,6) 61%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed
+  off_route@9           6/18     yes    70%  16.9s  (13,3) 42%    Bomb        unchanged    6/18 unchanged      none
+  cosmetic_tile@9       6/18     yes    70%  16.9s  (13,3) 42%    Bomb        unchanged    -                   replay 18/18 identical
+  base@10               4/18     yes    73%  25.1s  (13,5) 29%    Bomb        -            -                   -
+  base-reseeded@10      0/18      no    85%      -  (10,9) 83%    Bomb        broken       -                   completion_lost, cluster_moved
+  seal_route@10         0/18      no     0%      -  (13,7) 50%    Bomb        broken       0/18 broken         completion_lost
+  add_enemy@10          1/18     yes    73%  27.2s  (13,5) 53%    Bomb        unchanged    0/18 broken         none
+  fuse_down@10          2/18     yes    73%  15.9s  (13,6) 69%    Bomb        unchanged    0/18 broken         none
+  off_route@10          4/18     yes    73%  25.1s  (13,5) 29%    Bomb        unchanged    4/18 unchanged      none
+  cosmetic_tile@10      4/18     yes    73%  25.1s  (13,5) 29%    Bomb        unchanged    -                   replay 18/18 identical
+  base@11               8/18     yes    58%  16.2s  (10,3) 70%    Bomb        -            -                   -
+  base-reseeded@11      8/18     yes    55%  25.8s  (13,4) 60%    Enemy       changed      -                   cause_changed
+  seal_route@11         0/18      no     0%      -  (11,6) 44%    Bomb        broken       0/18 broken         completion_lost, win_rate_changed
+  add_enemy@11          6/18     yes    41%  23.0s  (7,3) 42%     Bomb        unchanged    0/18 broken         none
+  fuse_down@11          4/18     yes    53%  22.3s  (10,3) 64%    Bomb        unchanged    1/18 changed        none
+  off_route@11          8/18     yes    58%  16.2s  (10,3) 70%    Bomb        unchanged    8/18 unchanged      none
+  cosmetic_tile@11      8/18     yes    58%  16.2s  (10,3) 70%    Bomb        unchanged    -                   replay 18/18 identical
+  base@13               0/18      no    62%      -  (1,4) 72%     Bomb        -            -                   -
+  base-reseeded@13      0/18      no    62%      -  (1,4) 78%     Bomb        not counted  -                   -
+  seal_route@13         0/18      no     0%      -  (1,4) 72%     Bomb        not counted  0/18 not counted    none
+  add_enemy@13          0/18      no    62%      -  (1,4) 94%     Bomb        not counted  0/18 not counted    none
+  fuse_down@13          0/18      no    62%      -  (1,4) 83%     Bomb        not counted  0/18 not counted    none
+  off_route@13          0/18      no    62%      -  (1,4) 72%     Bomb        not counted  0/18 not counted    none
+  cosmetic_tile@13      0/18      no    62%      -  (1,4) 72%     Bomb        not counted  -                   replay 18/18 identical
+  base@14               0/18      no    50%      -  (2,1) 100%    Bomb        -            -                   -
+  base-reseeded@14      0/18      no    46%      -  (2,1) 78%     Bomb        not counted  -                   -
+  seal_route@14         0/18      no     0%      -  (1,2) 100%    Bomb        not counted  0/18 not counted    none
+  add_enemy@14          0/18      no    50%      -  (2,1) 100%    Bomb        not counted  0/18 not counted    none
+  fuse_down@14          0/18      no    50%      -  (2,1) 94%     Bomb        not counted  0/18 not counted    none
+  off_route@14          0/18      no    50%      -  (2,1) 100%    Bomb        not counted  0/18 not counted    none
+  cosmetic_tile@14      0/18      no    50%      -  (2,1) 100%    Bomb        not counted  -                   replay 18/18 identical
+  base@15               0/18      no    44%      -  (9,3) 78%     Bomb        -            -                   -
+  base-reseeded@15      0/18      no    44%      -  (4,1) 72%     Bomb        not counted  -                   cluster_moved
+  seal_route@15         0/18      no     0%      -  (13,2) 50%    Bomb        not counted  0/18 not counted    cluster_moved
+  add_enemy@15          0/18      no    44%      -  (9,3) 67%     Bomb        not counted  0/18 not counted    none
+  fuse_down@15          0/18      no    28%      -  (11,2) 72%    Bomb        not counted  0/18 not counted    none
+  off_route@15          0/18      no    38%      -  (7,1) 83%     Bomb        not counted  0/18 not counted    none
+  cosmetic_tile@15      0/18      no    44%      -  (9,3) 78%     Bomb        not counted  -                   replay 18/18 identical
+
+megaman
+  VARIANT                                       WINS  SOLVED   PROG   TIME  CLUSTER       CAUSE       VERDICT      REPLAY              SIGNALS
+  base-retrained                               0/120      no    12%      -  (57,128) 39%  Stall       -            -                   -
+  base-retrained @ CutMan-1-Street            49/120     yes    73%  24.2s  (57,128) 66%  Stall       -            -                   -
+  base-retrained @ CutMan-2-Climb             97/120     yes    27%  25.5s  (50,115) 52%  Stall       -            -                   -
+  base-retrained @ CutMan-3-Ledges            36/120     yes    69%  21.6s  (88,68) 49%   Stall       -            -                   -
+  base-retrained @ CutMan-4-Shaft             55/120     yes    36%  23.0s  (85,51) 58%   Stall       -            -                   -
+  base-retrained @ CutMan-5-Rooftop          120/120     yes      -  12.1s  -             -           -            -                   -
+  base-retrained @ CutMan-6-Descent          105/120     yes    36%  21.0s  (121,42) 40%  Spike       -            -                   -
+  base-retrained @ CutMan-7-Corridor         120/120     yes      -  11.3s  -             -           -            -                   -
+  base-retrained @ CutMan-8-Boss              80/120     yes   100%  17.7s  (203,56) 82%  Cut Man     -            -                   -
+  base-reseeded                                0/120      no    12%      -  (56,128) 46%  Stall       not counted  -                   -
+  base-reseeded @ CutMan-1-Street             53/120     yes    79%  20.4s  (56,128) 82%  Stall       unchanged    -                   -
+  base-reseeded @ CutMan-2-Climb              82/120     yes    27%  25.4s  (50,113) 79%  Stall       changed      -                   win_rate_changed
+  base-reseeded @ CutMan-3-Ledges             40/120     yes    74%  23.1s  (88,67) 75%   Stall       unchanged    -                   -
+  base-reseeded @ CutMan-4-Shaft              49/120     yes    36%  23.3s  (92,51) 51%   Stall       changed      -                   cluster_moved
+  base-reseeded @ CutMan-5-Rooftop           119/120     yes     6%  12.7s  (91,23) 100%  Stall       changed      -                   cluster_moved, cause_changed
+  base-reseeded @ CutMan-6-Descent            92/120     yes    29%  19.3s  (118,33) 57%  Stall       changed      -                   win_rate_changed, cluster_moved, cause_changed
+  base-reseeded @ CutMan-7-Corridor          120/120     yes      -  11.2s  -             -           unchanged    -                   -
+  base-reseeded @ CutMan-8-Boss               98/120     yes   100%  18.4s  (203,56) 59%  Stall       changed      -                   win_rate_changed, cause_changed
+  s3-seal_route                                0/120      no      -      -  (51,116) 62%  Stall       broken       0/120 broken        completion_lost, win_rate_changed, cluster_moved
+  s3-widen_gap                                 0/120      no    51%      -  (75,75) 85%   Pit         broken       1/120 changed       completion_lost, win_rate_changed, cluster_moved, cause_changed
+  m-jump_velocity_down                         0/120      no    12%      -  (57,130) 38%  Stall       not counted  0/120 not counted   none
+  m-jump_velocity_down @ CutMan-1-Street      37/120     yes    73%  21.0s  (57,130) 55%  Stall       unchanged    1/120 changed       none
+  m-jump_velocity_down @ CutMan-2-Climb        0/120      no    90%      -  (56,80) 66%   Stall       broken       0/120 broken        completion_lost, win_rate_changed, cluster_moved
+  m-jump_velocity_down @ CutMan-3-Ledges      30/120     yes    69%  18.8s  (88,70) 43%   Stall       unchanged    9/120 changed       none
+  m-jump_velocity_down @ CutMan-4-Shaft        0/120      no    36%      -  (86,40) 48%   Stall       broken       0/120 broken        completion_lost, win_rate_changed, cluster_moved
+  m-jump_velocity_down @ CutMan-5-Rooftop    119/120     yes     0%  12.5s  (83,16) 100%  Stall       changed      120/120 unchanged   cluster_moved, cause_changed
+  m-jump_velocity_down @ CutMan-6-Descent     99/120     yes    29%  20.4s  (118,32) 76%  Stall       changed      78/120 changed      cluster_moved, cause_changed
+  m-jump_velocity_down @ CutMan-7-Corridor   120/120     yes      -  11.2s  -             -           unchanged    120/120 unchanged   none
+  m-jump_velocity_down @ CutMan-8-Boss        76/120     yes   100%  17.7s  (203,56) 98%  Stall       changed      83/120 unchanged    cause_changed
+  s3-off_route                                36/120     yes    69%  21.6s  (88,68) 49%   Stall       unchanged    36/120 unchanged    none
+  s3-cosmetic_tile                            36/120     yes    69%  21.6s  (88,68) 49%   Stall       unchanged    -                   replay 120/120 identical
+
+false alarms (base-reseeded vs the original, 35 comparisons): completion_lost 2, win_rate_changed 4, cluster_moved 17, cause_changed 9, detected 22, strict 6, beyond the seed spread 4/27
+wrote runs/ast/metrics.json
+[2026-10-29 23:05:51] END rc=0 $PY -m code.stats.ast_metrics

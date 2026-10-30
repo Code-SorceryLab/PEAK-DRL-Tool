@@ -6,3 +6,14 @@ balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [
   note: megaman level [CutMan-1-Street] has no coins — persona [collector] plays for the goal alone here
   note: megaman level [CutMan-1-Street] has no coins — persona [collector] plays for the goal alone here
   note: megaman level [CutMan-1-Street] has no coins — persona [collector] plays for the goal alone here
+[1/3] CutMan-1-Street seed 3333: best gen 133, win rate 1%, best_x 1000.0, 1:01:54
+[2/3] CutMan-1-Street seed 2222: best gen 117, win rate 0%, best_x 959.7, 1:20:01
+[3/3] CutMan-1-Street seed 1111: best gen 187, win rate 27%, best_x 1000.0, 1:27:12
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-1-Street2/3    gen 160.0±343.1gen 145.7±91.1         9% ±38%      Stall (79%)    986.6    79%  +0.1%/g  3:49:08  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/base-reseeded/report_megaman_collector_p30g200_best.json  (1:28:01 wall)
+[2026-10-29 17:46:02] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona collector --level CutMan-1-Street --workers $W

@@ -4,3 +4,13 @@
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [clumsy · p30g200_best · runs/ast/megaman/s3-widen_gap/probes]
 
 [1/3] CutMan-3-Ledges seed 31337: best gen 63, win rate 0%, best_x 660.6, 0:44:06
+[2/3] CutMan-3-Ledges seed 2025: best gen 195, win rate 0%, best_x 645.1, 0:45:53
+[3/3] CutMan-3-Ledges seed 1234: best gen 193, win rate 0%, best_x 735.4, 0:46:06
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-3-Ledges0/3             nevergen 150.3±187.9          0% ±0%        Pit (84%)    680.4    12%  +0.1%/g  2:16:06  FLAT/FLAT/IMPROVING
+
+saved runs/ast/megaman/s3-widen_gap/report_megaman_clumsy_p30g200_best.json  (0:47:36 wall)
+[2026-10-29 17:11:14] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant s3-widen_gap --persona clumsy --level CutMan-3-Ledges --workers $W

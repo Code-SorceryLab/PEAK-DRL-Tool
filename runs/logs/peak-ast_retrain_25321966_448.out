@@ -4,3 +4,13 @@
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p30g200_best · runs/ast/megaman/base-reseeded/probes]
 
 [1/3] CutMan-1-Street seed 3333: best gen 133, win rate 1%, best_x 1000.0, 0:58:05
+[2/3] CutMan-1-Street seed 2222: best gen 190, win rate 10%, best_x 1000.0, 1:12:29
+[3/3] CutMan-1-Street seed 1111: best gen 192, win rate 31%, best_x 1000.0, 1:23:52
+
+LEVEL BALANCE REPORT - megaman  (hardest first; win rate measured over the 10 generations after the first win)
+LEVEL          SOLVED     FIRST WIN     BEST GEN        WIN RATE   DOMINANT CAUSE   BEST X  STUCK     RATE     TIME  TREND
+--------------------------------------------------------------------------------------------------------------------------
+CutMan-1-Street3/3    gen 167.0±73.5gen 171.7±83.2        14% ±38%      Stall (79%)   1000.0    78%  +0.1%/g  3:34:27  IMPROVING/IMPROVING/IMPROVING
+
+saved runs/ast/megaman/base-reseeded/report_megaman_speedrunner_p30g200_best.json  (1:24:48 wall)
+[2026-10-29 17:31:30] END rc=0 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-reseeded --persona speedrunner --level CutMan-1-Street --workers $W
