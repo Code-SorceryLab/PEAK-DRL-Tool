@@ -1,0 +1,35 @@
+# The Command Center: GitHub Pages serves runs/site from main. Only that folder is checked out,
+# because main is about 48 GB and a Pages build from the branch would have to check out all of it.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["runs/site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: runs/site
+          filter: blob:none
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: runs/site
+      - id: deploy
+        uses: actions/deploy-pages@v4
