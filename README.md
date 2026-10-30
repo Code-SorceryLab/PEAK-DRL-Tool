@@ -523,8 +523,7 @@ The menu (`python menu.py`) runs all of these; option `u` runs the user study.
 
 ## Authors
 
-**Al (AI-Scripting)** · [LinkedIn](https://www.linkedin.com/in/al-mohamed-shifan-5266b924b/) &nbsp;·&nbsp;
-**Kevin Chu** · [LinkedIn](https://www.linkedin.com/in/kevincchua/)
+**Al (AI-Scripting)** &nbsp;·&nbsp; **Kevin Chu**
 
 Ontario Tech University, Master's program. Engines, evolution and dashboards built from scratch in
 Python, Pygame and numpy. Statistics-dashboard metrics designed with Amr Abdalla's statistics-observer
