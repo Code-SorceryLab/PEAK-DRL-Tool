@@ -57,7 +57,8 @@ python menu.py        # train, watch, play, sweep, mutate, run the user study, o
 
 ## The experiment at a glance
 
-One pipeline run on the **Nibi** cluster (Digital Research Alliance of Canada), started 2026-10-28.
+One pipeline run on the **Nibi** cluster (Digital Research Alliance of Canada), started 2026-10-28,
+ended 2026-10-29 at 11:06 pm. Every stage ended with exit code 0.
 Seeds **1234, 2025, 31337**.
 
 <p align="center"><img src="docs/img/pipeline.png" alt="The experiment pipeline and the state of each stage" width="900"></p>
@@ -68,7 +69,7 @@ Seeds **1234, 2025, 31337**.
 | GA sweep: 22 variants per game and persona (40 generations) | 24 sweeps | ✅ done |
 | Sensor ablation: rays vs grid (40 generations) | 3 games × 6 personas | ✅ done |
 | Retraining on every mutant (200 generations) | 1038 tasks | ✅ done |
-| Playtests, replays, verdicts | 511 tasks + metrics | ⏳ running |
+| Playtests, replays, verdicts | 511 tasks + metrics | ✅ done |
 | Pilot user study | 5 participants | ✅ pilot done |
 
 ---
@@ -143,8 +144,17 @@ Retrained agents never finish a **sealed** level (0 of 666 runs) and still finis
 **Degrading** changes make levels harder. Mario's weaker jump acts as **breaking** on 1-1 (0/18).
 Bomberman's evaluation level is never solved, so it cannot be judged there.
 
-> ⏳ The **detector** is replay: the original's frozen agents play each mutant. Its verdicts
-> (broken / changed / unchanged) arrive when the `ast_play` and `final` stages end.
+<p align="center"><img src="docs/img/fig_ast_verdicts.png" width="900"></p>
+
+**Replay is the detector**: the original's frozen agents play each mutant, so there is no seed noise.
+
+- It flags **every breaking** mutant it can judge (28 of 28) and **46 of 55 degrading** ones (84%).
+- It flags **no neutral** mutant (0 of 27). The cosmetic copy replays **identically** (678 of 678 attempts).
+- Retraining with new seeds on a level that did not change raises a signal in **22 of 35** comparisons
+  (63%). That is why retraining is not the detector.
+
+"Not counted" means the original's agents never won there: 4 Bomberman levels (its evaluation level
+among them) and the full Mega Man stage. Per-level numbers are in "All result numbers" below.
 
 ---
 
@@ -258,7 +268,7 @@ no enemies or coins gives a plain player. Clumsy's mistakes are seeded, so a rep
 <details>
 <summary><b>🏭 The pipeline stages (Nibi, 2026-10-28)</b></summary>
 
-Started 2026-10-28 4:05 am, resumed 2026-10-29 12:37 pm; 3 CPU cores per task; code commit
+Started 2026-10-28 4:05 am, resumed 2026-10-29 12:37 pm, ended 2026-10-29 11:06 pm; 3 CPU cores per task; code commit
 `79fc29691` (branch `USER-STUDY+SPRITIFY`).
 
 | # | Stage | What it does | Tasks |
@@ -373,8 +383,38 @@ only majority winners.
 | Meat Boy (21) | 54/198 (27%) · 12.3% | 9/198 (5%) · 1.4% |
 | Bomberman (16) | 62/288 (22%) · 11.9% | 27/288 (9%) · 6.6% |
 
-**Retraining on mutants:** the numbers are in the figure above (Mario, Meat Boy, Bomberman final;
-Mega Man still being copied).
+**Retraining on mutants:** the numbers for Mario, Meat Boy and Bomberman are in the retrain figure
+above. Mega Man's retrains (wins of 120 on section 3): `s3-seal_route` 0, `s3-widen_gap` 0, `s3-off_route`
+36; `m-jump_velocity_down` is in the "agents retrained on it" column below.
+
+**AST verdicts on the evaluation levels** (wins of 18 attempts; Mega Man: of 120, on section 3, Ledges)
+
+| Variant | Mario 1-1 | Meat Boy 2 | Bomberman 12 | Mega Man section 3 |
+|---|---|---|---|---|
+| original (`base`; Mega Man `base-retrained`) | 15/18 | 15/18 | 0/18 | 36/120 |
+| `seal_route`, replay | 0/18 **broken** | 0/18 **broken** | not counted | 0/120 **broken** |
+| `widen_gap` / `add_enemy`, replay | 11/18 **changed** | 2/18 **changed** | not counted | 1/120 **changed** |
+| `jump_velocity_down` / `fuse_down`, replay | 0/18 **broken** | 6/18 **changed** | not counted | see below |
+| `off_route`, replay | 15/18 unchanged | 15/18 unchanged | not counted | 36/120 unchanged |
+| `cosmetic_tile`, replay | 18/18 identical | 18/18 identical | 18/18 identical | 120/120 identical |
+
+**Mega Man `m-jump_velocity_down`** (jump ×0.85 on the whole game), by section (wins of 120)
+
+| Section | original | agents retrained on it | replay | replay verdict |
+|---|---|---|---|---|
+| 1 Street | 49 | 37 | 1 | changed |
+| 2 Climb | 97 | 0 | 0 | **broken** |
+| 3 Ledges | 36 | 30 | 9 | changed |
+| 4 Shaft | 55 | 0 | 0 | **broken** |
+| 5 Rooftop | 120 | 119 | 120 | unchanged |
+| 6 Descent | 105 | 99 | 78 | changed |
+| 7 Corridor | 120 | 120 | 120 | unchanged |
+| 8 Boss | 80 | 76 | 83 | unchanged |
+| full stage | 0 | 0 | 0 | not counted |
+
+**False alarms** (`base-reseeded` against the original, 35 counted comparisons): completion lost 2,
+win rate changed 4, death cluster moved 17, top cause changed 9; any signal 22 (63%); completion or
+Fisher only ("strict") 6 (17%); win rate outside the original's seed spread 4 of 27.
 </details>
 
 <details>
