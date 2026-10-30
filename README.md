@@ -25,14 +25,7 @@ compared.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    L["Level<br/>(ASCII file)"] --> G["Game engine<br/>Mario · Meat Boy<br/>Bomberman · Mega Man"]
-    G -->|"sensors:<br/>a few raycasts"| N["Neural net<br/>14 → 16 → 3<br/>(291 weights)"]
-    N -->|"buttons:<br/>left · right · jump"| G
-    G -->|"fitness: progress<br/>+ 5000 for a win"| E["Genetic algorithm<br/>10 nets per generation"]
-    E -->|"next generation"| N
-```
+<p align="center"><img src="docs/img/how_it_works.png" alt="The agent loop: level, game engine, sensors, neural network, buttons, fitness, genetic algorithm" width="900"></p>
 
 <table>
 <tr>
@@ -67,17 +60,7 @@ python menu.py        # train, watch, play, sweep, mutate, run the user study, o
 One pipeline run on the **Nibi** cluster (Digital Research Alliance of Canada), started 2026-10-28.
 Seeds **1234, 2025, 31337**.
 
-```mermaid
-flowchart LR
-    A["GA sweep<br/>40 gens<br/>one setting at a time"] --> B["ga_best.yaml<br/>(--best)"]
-    S["Sensor ablation<br/>rays vs grid"] -.-> R
-    B --> T["Training<br/>200 gens<br/>1116 runs"]
-    T --> R["Results"]
-    M["Mutants<br/>5 per level"] --> RT["Retrain on each mutant<br/>1038 tasks"]
-    RT --> P["Playtests + replays<br/>511 tasks"]
-    T --> P
-    P --> V["Verdicts<br/>broken · changed · unchanged"]
-```
+<p align="center"><img src="docs/img/pipeline.png" alt="The experiment pipeline and the state of each stage" width="900"></p>
 
 | Experiment | Size | State |
 |---|---|---|
