@@ -70,7 +70,7 @@ def test_quitting_mid_life_still_records_it():
 def test_inputs_log_a_jump_key_as_a_not_up(monkeypatch):
     """W jumps in Mario and Meat Boy (the up arrow too in Meat Boy): it is logged as A."""
     keys = lift("JUMP_KEYS =", pygame=pygame)["JUMP_KEYS"]
-    monkeypatch.setattr(gamepad, "pad", None)
+    monkeypatch.setattr(gamepad, "pads", [])
 
     def held(game, key):
         press(monkeypatch, key)

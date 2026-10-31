@@ -4,7 +4,7 @@ import sys
 import pygame
 from pygame._sdl2 import controller as sdl_controller
 
-pad = None                       # the first connected game controller, if any
+pads = []                        # every connected game controller: any of them plays
 # SDL's GameController layout gives every common pad (Xbox, PlayStation, Switch, 8BitDo...) Xbox-style
 # names: A is Cross on a PlayStation pad, B is Circle, X is Square.
 PAD_JUMP = (pygame.CONTROLLER_BUTTON_A,)
@@ -45,12 +45,15 @@ def _read_nes():
 
 
 def release_pad() -> None:
-    """Let go of the USB NES pad: macOS gives it to one process at a time, so a game launched from here
-    could not read it. open_pad() takes it back."""
-    global _nes, _nes_dev
+    """Let go of every controller: macOS gives the USB NES pad to one process at a time and SDL keeps a
+    PlayStation pad open from here, so a game launched from here could miss them. open_pad() takes them back."""
+    global _nes, _nes_dev, pads
     if _nes_dev:
         _nes_dev.close()
     _nes = _nes_dev = None
+    pads = []
+    sdl_controller.quit()
+    pygame.joystick.quit()
 
 
 def _open_nes() -> bool:
@@ -69,40 +72,41 @@ def _open_nes() -> bool:
 
 
 def open_pad(quiet: bool = False) -> None:
-    """(Re)open the first controller; called at start and whenever one is plugged or unplugged."""
-    global pad
+    """(Re)open every controller; called at start and whenever one is plugged or unplugged."""
+    global pads
+    pygame.joystick.init()       # release_pad shut it
     sdl_controller.init()
     nes = _open_nes()            # then SDL's copy of it (Apple's framework, name "usb gamepad") is left out
-    ids = [i for i in range(sdl_controller.get_count()) if sdl_controller.is_controller(i)
-           and not (nes and sdl_controller.name_forindex(i).strip() == "usb gamepad")]
     try:
-        # the USB NES pad first: a paired DualSense or Xbox pad listed before it would otherwise take its place
-        idx = min(ids, key=lambda i: pygame.joystick.Joystick(i).get_guid() != NES_GUID, default=None)
         # shortcut: a pad missing from SDL's mapping database is ignored, add a raw-joystick fallback if one turns up
-        pad = sdl_controller.Controller(idx) if idx is not None else None
+        pads = [sdl_controller.Controller(i) for i in range(sdl_controller.get_count())
+                if sdl_controller.is_controller(i)
+                and not (nes and sdl_controller.name_forindex(i).strip() == "usb gamepad")]
+        for p in pads:
+            if p.as_joystick().get_guid() == NES_GUID:
+                # USB NES pad (0810:e501): SDL's SNES-clone mapping wants A on b2, which this pad lacks.
+                # Swap a/b here if A and B feel reversed.
+                p.set_mapping({"a": "b1", "b": "b0", "back": "b8", "start": "b9", "leftx": "a0", "lefty": "a1",
+                               "dpleft": "-a0", "dpright": "+a0", "dpup": "-a1", "dpdown": "+a1"})
     except pygame.error:         # a pad left while counted (unplugged, or a wireless one fell asleep):
-        pad = None               # its JOYDEVICEREMOVED event calls open_pad again
-    if pad and pad.as_joystick().get_guid() == NES_GUID:
-        # USB NES pad (0810:e501): SDL's SNES-clone mapping wants A on b2, which this pad lacks.
-        # Swap a/b here if A and B feel reversed.
-        pad.set_mapping({"a": "b1", "b": "b0", "back": "b8", "start": "b9", "leftx": "a0", "lefty": "a1",
-                         "dpleft": "-a0", "dpright": "+a0", "dpup": "-a1", "dpdown": "+a1"})
-    if (pad or nes) and not quiet:
-        print(f"[Play] Controller: {pad.name if pad else 'USB NES pad'} (stick / d-pad move, A/Cross jump, "
+        pads = []                # its JOYDEVICEREMOVED event calls open_pad again
+    names = [p.name for p in pads] + ["USB NES pad"] * nes
+    if names and not quiet:
+        print(f"[Play] Controller: {', '.join(names)} (stick / d-pad move, A/Cross jump, "
               f"B/Circle fire, B, X/Square or RB run; Mega Man fires with X/Square too)")
 
 
 def button(btn) -> bool:
-    return bool(pad and pad.get_button(btn)) or btn in _nes_held()
+    return any(p.get_button(btn) for p in pads) or btn in _nes_held()
 
 
 def pad_state() -> tuple[int, int, bool, bool, bool]:
     """(dx, dy, jump, fire, run) from the controller: left stick or d-pad, plus the face buttons."""
-    if pad is None and not _read_nes():
+    if not pads and not _read_nes():
         return 0, 0, False, False, False
     held = lambda ids: any(button(b) for b in ids)
-    x = pad.get_axis(pygame.CONTROLLER_AXIS_LEFTX) / 32767 if pad else 0.0
-    y = pad.get_axis(pygame.CONTROLLER_AXIS_LEFTY) / 32767 if pad else 0.0
+    x = max((p.get_axis(pygame.CONTROLLER_AXIS_LEFTX) / 32767 for p in pads), key=abs, default=0.0)
+    y = max((p.get_axis(pygame.CONTROLLER_AXIS_LEFTY) / 32767 for p in pads), key=abs, default=0.0)
     dx = (held((pygame.CONTROLLER_BUTTON_DPAD_RIGHT,)) - held((pygame.CONTROLLER_BUTTON_DPAD_LEFT,))
           or (x > PAD_DEADZONE) - (x < -PAD_DEADZONE))
     dy = (held((pygame.CONTROLLER_BUTTON_DPAD_DOWN,)) - held((pygame.CONTROLLER_BUTTON_DPAD_UP,))

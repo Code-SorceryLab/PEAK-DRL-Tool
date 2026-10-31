@@ -15,6 +15,8 @@ from code.games.modules.System import music
 from code.games.modules.System.nes_font import nes_text
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
+# SDL drops pad input while this window is unfocused, and a window opened from another process may start that way.
+os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 # A small arena would lose its bottom rows under the controls card: these games get a band below it
 OVERLAY_BAND = {"bomberman": 72}
 
