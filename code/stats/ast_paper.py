@@ -18,8 +18,8 @@ from code.stats import ast_metrics as am
 from code.stats import ast_page
 
 OUT = "paper-ast"
-GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman II 1-1", "megaman": "Mega Man Cut Man", "speedy": "SPEEDY Green Hill 1"}
-NAME = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man", "speedy": "SPEEDY"}
+GAME = {"mario": "Mario 1-1", "meatboy": "Meat Boy 1-3", "bomberman": "Bomberman II 1-1", "megaman": "Mega Man Cut Man", "sonic": "Sonic Green Hill 1"}
+NAME = {"mario": "Mario", "meatboy": "Meat Boy", "bomberman": "Bomberman", "megaman": "Mega Man", "sonic": "Sonic"}
 NEAR = 3                                   # tiles: the death cluster's own radius
 MODES = ("static", "random", "replay")              # the detectors compared; retraining only answers "still solvable?"
 HEAD = {"static": "Static", "random": "Random", "replay": "Replay (detector)", "solvable": "Still solvable (retrained)"}
@@ -31,8 +31,8 @@ def where(game: str, level: str | None) -> str:
         return GAME[game]
     if game == "mario":
         return f"Mario {level.replace('Mario', '')}"
-    if game == "speedy":
-        return f"SPEEDY Green Hill {level[-1]}"
+    if game == "sonic":
+        return f"Sonic Green Hill {level[-1]}"
     if game == "meatboy":
         return f"Meat Boy 1-{int(level) + 1}"
     n = os.path.splitext(os.path.basename(eval_mutants.level_file(game, level)))[0].split("_")  # 09_two_balloms, bm2_1_2

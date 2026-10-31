@@ -172,7 +172,7 @@ def _level_file(game: str, level: str) -> str | None:
             return os.path.join(GAMES_DIR, "levels", f) if f else None
         with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        section = {"mario": cfg, "sonic": cfg.get("sonic", {})}.get(game, {})
+        section = {"mario": cfg}.get(game, {})
         for key in ("levels", "disabled_levels"):
             entry = (section.get(key) or {}).get(level)
             if isinstance(entry, dict) and "file" in entry:
@@ -235,7 +235,7 @@ def _level_config(game: str, level: str, grid: list[str] | None) -> list[tuple[s
         else:
             with open(os.path.join(GAMES_DIR, "game_config.yaml"), encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
-            g = {"mario": cfg, "sonic": cfg.get("sonic", {})}.get(game, {})
+            g = {"mario": cfg}.get(game, {})
             entry = ((g.get("levels") or {}).get(level) or (g.get("disabled_levels") or {}).get(level) or {})
     except Exception:
         return sections

@@ -246,16 +246,6 @@ class MarioStats(_ScrollerStats):
 
 
 class SonicStats(_ScrollerStats):
-    @staticmethod
-    def end_status(core, terminated, truncated, info) -> str:
-        if info.get("won"):  # core.reached_goal is wiped by the mid-step level reload
-            return "WON"
-        if core.death_cause == "Stall" or (truncated and not terminated):
-            return "STUCK"
-        return "DEAD"
-
-
-class SpeedyStats(_ScrollerStats):
     def pos(self) -> tuple[float, float]:
         p = self.core.player
         return p.x / 256.0, p.y / 256.0
@@ -268,7 +258,13 @@ class SpeedyStats(_ScrollerStats):
         self._goal_x = float(self.core.level.goals[0].x)
         self._level_coins = len(self.core.rings)
 
-    end_status = SonicStats.end_status
+    @staticmethod
+    def end_status(core, terminated, truncated, info) -> str:
+        if info.get("won"):  # core.reached_goal is wiped by the mid-step level reload
+            return "WON"
+        if core.death_cause == "Stall" or (truncated and not terminated):
+            return "STUCK"
+        return "DEAD"
 
 
 # ── Meat Boy: 2-D mazes, progress along the BFS shortest path ────────────────
@@ -499,9 +495,8 @@ class MegamanStats(EpisodeStats):
 
 STATS_BY_GAME: dict[str, type[EpisodeStats]] = {
     "megaman": MegamanStats,
-    "speedy": SpeedyStats,
-    "mario": MarioStats,
     "sonic": SonicStats,
+    "mario": MarioStats,
     "meatboy": MeatboyStats,
     "bomberman": BombermanStats,
 }

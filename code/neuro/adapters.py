@@ -46,12 +46,9 @@ class GameAdapter(Protocol):
 
 
 INDEXED_GAMES = {"meatboy", "bomberman"}     # level ids are list indices, not names
-N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6, "speedy": 5}   # megaman: left, right, jump, up, down, fire
+N_OUTPUTS_BY_GAME = {"bomberman": 5, "megaman": 6, "sonic": 5}   # megaman: left, right, jump, up, down, fire
 N_INPUTS_BY_GAME = {"bomberman": 16, "megaman": 26, "meatboy": 21}   # ray-mode games with their own sense(): see the adapter's SENSOR_LABELS
-OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "speedy": "speedy_config.yaml"}  # named levels kept in the game's own file
-# Archived: still fully playable and trainable by name (--game sonic), and old runs still replay,
-# but kept out of the menus and off the default sweep roster so they do not cost probe budget.
-ARCHIVED_GAMES = {"sonic"}
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "sonic": "sonic_config.yaml"}  # named levels kept in the game's own file
 
 
 def _set_locked_level(core, level: str) -> None:
@@ -79,7 +76,7 @@ def list_levels(game: str, include_disabled: bool = False) -> list[str]:
             (list((data.get("disabled_levels") or {}).keys()) if include_disabled else [])
     with open(os.path.join(games_dir, "game_config.yaml"), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    sections = {"mario": data, "sonic": data.get("sonic", {})}
+    sections = {"mario": data}
     if game not in sections:
         raise SystemExit(f"unknown game '{game}' (available: {', '.join(_ADAPTERS)})")
     section = sections[game]
@@ -335,139 +332,7 @@ class MarioAdapter(_EventWeights):
 
 
 class SonicAdapter(_EventWeights):
-    """Wraps SonicCore. Goal does NOT terminate the core's episode — we end it on info['won']."""
-
-    _MOVE_MD = {-1: 1, 0: 0, 1: 3}
-
-    def __init__(self, level: str | None, max_frames: int, win_bonus: float,
-                 sprint: bool = False, time_rate: float = 0.0) -> None:
-        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-        from code.games.sonic_core import SonicCore
-        from code.games.modules.Parameters.Map_parameters import (
-            TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK, TILE_SIZE,
-        )
-        self._solid_codes = {TILE_GROUND, TILE_PLATFORM, TILE_QBLOCK}
-        self.tile_size = TILE_SIZE
-        self.win_bonus = win_bonus
-        self.sprint = sprint        # persona capability: run/sprint action variants
-        self.time_rate = time_rate  # persona objective: fitness per second left on a win
-        level_kw = {"world": level} if level else {}
-        self.core = SonicCore(
-            render_mode="none",
-            **level_kw,
-            lock_level=True,
-            curriculum_enabled=False,
-            anti_stall=True,  # required: max_x_seen only updates inside the stall tracker
-            max_steps=max_frames,
-        )
-        self.core.max_lives = 1  # lives>1 soft-resets mid-episode and corrupts fitness
-        self.core.lives = 1
-        self.alive = True
-        self.won = False
-        self.status = "RUNNING"
-        self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
-        self._level_enemies = self._count_enemies()
-
-    @property
-    def x(self) -> float:
-        g = self.core.player.gObj
-        return g.x + g.width / 2.0
-
-    @property
-    def y(self) -> float:
-        g = self.core.player.gObj
-        return g.y + g.height / 2.0
-
-    @property
-    def vx(self) -> float:
-        return float(self.core.player.vx)
-
-    @property
-    def vy(self) -> float:
-        return float(self.core.player.vy)
-
-    @property
-    def grounded(self) -> bool:
-        return bool(self.core.player.on_ground)
-
-    @property
-    def can_jump(self) -> bool:
-        p = self.core.player
-        return bool(p.on_ground or p.coyote > 0)
-
-    @property
-    def camera(self) -> tuple[float, float]:
-        return float(self.core.camera_x), float(self.core.camera_y)
-
-    def reset(self) -> None:
-        self.core.reset()
-        self.core.lives = 1
-        self.alive = True
-        self.won = False
-        self.status = "RUNNING"
-        self._end_xy: tuple[float, float] | None = None
-        self._level_coins = _count_coins(self.core)
-        self._level_enemies = self._count_enemies()
-        self.kills = 0
-
-    def step(self, move_x: int, jump: bool, move_y: int = 0) -> None:
-        if not self.alive:
-            return
-        _, _, terminated, truncated, info = self.core.step([_move_md(move_x, self.sprint), int(jump), 0])
-        self.kills += int(getattr(self.core, "kills_step", 0) or 0)
-        won = bool(info.get("won"))  # core.reached_goal is wiped by the mid-step level reload
-        if won or terminated or truncated:
-            self.alive = False
-            self._end_xy = (self.x, self.y)
-            self.won = won
-            if won:
-                self.status = "WON"
-            elif self.core.death_cause == "Stall" or (truncated and not terminated):
-                self.status = "STUCK"
-            else:
-                self.status = "DEAD"
-
-    def render(self, surface: pygame.Surface) -> None:
-        # Headless SonicCore never updates its camera — mirror the human-mode logic here.
-        core = self.core
-        if core.player:
-            core.camera_x = max(0.0, min(self.x - core.WIDTH / 2.0, core.level_data.width - core.WIDTH))
-            core.camera_y = max(0.0, min(self.y - core.HEIGHT / 2.0, core.level_data.height - core.HEIGHT))
-        core.render(surface, blit_only=True)
-
-    def solid_at(self, wx: float, wy: float) -> bool:
-        ld = self.core.level_data
-        tx, ty = int(wx // self.tile_size), int(wy // self.tile_size)
-        if tx < 0:
-            return True
-        if tx >= ld.cols or ty < 0 or ty >= ld.rows:
-            return False
-        return ld.grid[ty][tx] in self._solid_codes
-
-    def enemy_positions(self) -> list[tuple[float, float]]:
-        out = []
-        for e in self.core.badniks:
-            g = e.gObj
-            if g.active:
-                out.append((g.x + g.width / 2.0, g.y + g.height / 2.0))
-        return out
-
-    def qblock_count_near(self, r_tiles: int) -> int:
-        return 0
-
-    def _progress_fitness(self) -> float:
-        return float(self.core.max_x_seen) + ((self.win_bonus + _win_time_bonus(self)) if self.won else 0.0)
-
-    def episode_stats(self) -> dict:
-        return _episode_stats(self,self.core.max_x_seen)
-
-    def set_level(self, level: str) -> None:
-        _set_locked_level(self.core, level)
-
-
-class SpeedyAdapter(_EventWeights):
-    """Wraps SpeedyCore (the 1991 hedgehog platformer's Green Hill). Progress is the rightmost point
+    """Wraps SonicCore (the 1991 hedgehog platformer's Green Hill). Progress is the rightmost point
     reached. Rings are the coins; a spike reads as an enemy on the rays, so a net can learn to clear it.
 
     The console fires a jump on the press, so a net that simply holds the output would jump once and
@@ -478,12 +343,12 @@ class SpeedyAdapter(_EventWeights):
                  sprint: bool = False, time_rate: float = 0.0) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         pygame.init()
-        from code.games.speedy_core import SpeedyCore
+        from code.games.sonic_core import SonicCore
         self.win_bonus = win_bonus
         self.time_rate = time_rate
-        probe = SpeedyCore(render_mode="none", level=level)
+        probe = SonicCore(render_mode="none", level=level)
         tr = probe.cfg.get("training") or {}
-        self.core = SpeedyCore(render_mode="none", level=level, max_steps=max(max_frames, int(tr.get("max_frames", 0))),
+        self.core = SonicCore(render_mode="none", level=level, max_steps=max(max_frames, int(tr.get("max_frames", 0))),
                                stall_frames=int(tr.get("stall_frames", 0)))
         self.jump_period = max(1, int(tr.get("jump_period", 8)))
         self.tile_size = int(self.core.tile_size)
@@ -1385,17 +1250,16 @@ class MegamanAdapter(_EventWeights):
 
 _ADAPTERS = {
     "mario": MarioAdapter,
-    "sonic": SonicAdapter,
     "meatboy": MeatboyAdapter,
     "bomberman": BombermanAdapter,
     "megaman": MegamanAdapter,
-    "speedy": SpeedyAdapter,
+    "sonic": SonicAdapter,
 }
 
 
 def active_games() -> list[str]:
-    """The games menus and sweeps offer by default — every adapter except the archived ones."""
-    return [g for g in _ADAPTERS if g not in ARCHIVED_GAMES]
+    """The games menus and sweeps offer by default."""
+    return list(_ADAPTERS)
 
 
 def make_adapter(game: str, level: str | None, max_frames: int, win_bonus: float,

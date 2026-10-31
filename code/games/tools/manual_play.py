@@ -134,7 +134,7 @@ def _megaman_action(keys) -> list:
     return [dx, dy, int(bool(k[pygame.K_SPACE]) or pjump), int(bool(k[pygame.K_z] or k[pygame.K_j]) or pfire)]
 
 
-def _speedy_action(keys) -> list:
+def _sonic_action(keys) -> list:
     """[dx, jump, dy]: arrows / WASD, SPACE, Z or J jumps (the console's three buttons all jump)."""
     k = pygame.key.get_pressed()
     px, py, pjump, pfire, prun = gamepad.pad_state()
@@ -147,7 +147,7 @@ ACTION_MAPPING = {
     "platformer": _platformer_action,
     "bomberman": _bomberman_action,
     "megaman": _megaman_action,
-    "speedy": _speedy_action,
+    "sonic": _sonic_action,
     "mario": _platformer_action,
     "meatboy": _meatboy_action,
 }
@@ -165,7 +165,7 @@ def _random_action() -> list:
         return [random.randrange(-1, 2), random.randrange(-1, 2), int(random.random() < 0.05)]
     if args.game == "megaman":
         return [random.randrange(-1, 2), random.randrange(-1, 2), random.randrange(2), random.randrange(2)]
-    if args.game == "speedy":
+    if args.game == "sonic":
         return [random.randrange(-1, 2), random.randrange(2), 0]
     return [random.randrange(5), random.randrange(2), random.randrange(2)]
 
@@ -191,7 +191,7 @@ elif args.game == "megaman":
     if args.game == "megaman" and level_file:
         env_kwargs["level_file"] = level_file   # the core loads an unlisted file itself
         print(f"[Play] Loaded editor file: {Path(level_file).name}")
-elif args.game == "speedy":
+elif args.game == "sonic":
     env_kwargs = {"level": level_id} if level_id else {}
 elif level_id:
     env_kwargs['world'] = level_id
@@ -268,7 +268,7 @@ class _Recorder:
 
     def _xy(self) -> tuple[float, float]:
         p = core_game.player
-        if args.game == "speedy":
+        if args.game == "sonic":
             return p.x / 256.0, p.y / 256.0            # its positions are the console's 1/256 px
         g = getattr(p, "gObj", p)
         return g.x + g.width / 2.0, g.y + g.height / 2.0
@@ -603,7 +603,7 @@ def _toggle_panel() -> None:
 
 # What A and B do in each game, for the controls overlay
 PAD_LABELS = {"platformer": ("Jump", "Run · Fire"), "megaman": ("Jump", "Fire"), "bomberman": ("Bomb", "Remote"),
-              "speedy": ("Jump", "Jump")}
+              "sonic": ("Jump", "Jump")}
 
 
 def _draw_controls(state) -> None:
@@ -804,7 +804,7 @@ while running:
             _banner("Recording starts now", (120, 230, 150))
         if args.quit_after:
             _draw_timer(int(args.quit_after * 60000) - play_ms, "TIME LEFT")
-        elif args.game not in ("meatboy", "speedy"):   # these two show the attempt's time themselves
+        elif args.game not in ("meatboy", "sonic"):   # these two show the attempt's time themselves
             _draw_timer(attempt_ms, "TIME")
     pygame.display.flip()
 

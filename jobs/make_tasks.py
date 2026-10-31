@@ -18,7 +18,7 @@ from code.neuro.adapters import list_levels
 from code.neuro.ast_eval import PERSONA_ORDER as PERSONAS
 from code.neuro.relay import stage_legs
 
-GAMES = os.environ.get("PEAK_GAMES", "mario meatboy bomberman megaman").split()    # PEAK_GAMES=speedy: only that game
+GAMES = os.environ.get("PEAK_GAMES", "mario meatboy bomberman megaman").split()    # PEAK_GAMES=sonic: only that game
 GAMES_2D = tuple(g for g in GAMES if g != "megaman")
 SEEDS = "1234 2025 31337"
 SECTIONS = [leg.level for leg in stage_legs(ast_eval.MEGAMAN_STAGE)]

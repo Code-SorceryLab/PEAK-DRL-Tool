@@ -38,13 +38,11 @@ CHIME_PATH = Path("chime.wav")
 
 # Adapter keys → game_config.yaml section key (platformer sits at the root).
 def _active_games() -> list[str]:
-    """Roster minus archived games (code/neuro/adapters.py). Read without importing numpy/pygame."""
+    """The roster in code/neuro/adapters.py, read without importing numpy/pygame."""
     try:
         import re
         src = (Path(__file__).parent / "code" / "neuro" / "adapters.py").read_text(encoding="utf-8")
-        archived = set(re.findall(r'"(\w+)"', re.search(r"ARCHIVED_GAMES = \{([^}]*)\}", src).group(1)))
-        order = re.findall(r'^    "(\w+)": \w+Adapter,', src, re.M)
-        return [g for g in order if g not in archived] or ["mario", "meatboy", "bomberman"]
+        return re.findall(r'^    "(\w+)": \w+Adapter,', src, re.M) or ["mario", "meatboy", "bomberman"]
     except Exception:
         return ["mario", "meatboy", "bomberman"]
 
@@ -52,7 +50,7 @@ def _active_games() -> list[str]:
 GAMES = _active_games()
 INDEXED_GAMES = {"meatboy", "bomberman"}  # levels are list indices (their own <game>_config.yaml)
 CONFIG_KEY = {"mario": "platformer"}
-OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "speedy": "speedy_config.yaml"}  # named levels in the game's own file
+OWN_LEVEL_FILES = {"megaman": "megaman_levels.yaml", "sonic": "sonic_config.yaml"}  # named levels in the game's own file
 
 # ============================================================================
 # MAIN MENU — PEAK ENGINE
@@ -752,7 +750,7 @@ _PLAY_CONTROLS = {
     "bomberman": [("W A S D  ↑ ← ↓ →", "Move"), ("SPACE / Z", "Drop a bomb"), ("", "Exit opens once every enemy is dead")],
     "megaman": [("A / D  ← / →", "Move"), ("W / S  ↑ / ↓", "Climb ladder"), ("SPACE", "Jump"), ("Z / J", "Fire"),
                  ("I", "Toggle invincibility (debug)"), ("", "A controller works too: stick / d-pad, Cross, Square")],
-    "speedy": [("A / D  ← / →", "Run"), ("S / ↓", "Crouch, or roll while moving"), ("W / ↑", "Look up"),
+    "sonic": [("A / D  ← / →", "Run"), ("S / ↓", "Crouch, or roll while moving"), ("W / ↑", "Look up"),
                ("SPACE / Z / J", "Jump"), ("S + SPACE", "Spin Dash: tap to charge, let go of S to fire")],
 }
 # What each NES button does, for the study's controller screen (code/games/tools/manual_play.py reads them).
@@ -763,7 +761,7 @@ _PAD_CONTROLS = {
     "bomberman": {"dpad": "MOVE", "a": "DROP A BOMB", "b": "DETONATE: REMOTE ITEM", "select": "PAUSE",
                   "start": "NOT USED"},
     "megaman":   {"dpad": "MOVE / CLIMB LADDERS", "a": "JUMP", "b": "FIRE", "select": "PAUSE", "start": "NOT USED"},
-    "speedy":    {"dpad": "RUN / ROLL / LOOK UP", "a": "JUMP", "b": "JUMP", "select": "PAUSE", "start": "NOT USED"},
+    "sonic":    {"dpad": "RUN / ROLL / LOOK UP", "a": "JUMP", "b": "JUMP", "select": "PAUSE", "start": "NOT USED"},
 }
 _DEBUG_KEYS = [("F1", "Sensor rays"), ("F2", "Free camera (I J K L to pan)"), ("F3", "Slow motion"),
                ("F4", "Hitboxes"), ("F5", "Agent max view"), ("F6", "Background grid"),
@@ -777,7 +775,7 @@ def _print_controls(game, level):
     print(f"    {_BOLD('Controls')}   {_WHT(game)}  ·  {_WHT(level or 'auto')}")
     for key, what in _PLAY_CONTROLS[game] + [("ESC", "Quit")]:
         print(f"    {_YEL(f'{key:<16}')}{what}")
-    if game == "speedy" or (game != "bomberman" and game not in OWN_LEVEL_FILES):  # the others have no debug manager
+    if game == "sonic" or (game != "bomberman" and game not in OWN_LEVEL_FILES):  # the others have no debug manager
         print()
         print(f"    {_BOLD('Debug overlays')}")
         for key, what in _DEBUG_KEYS:
@@ -1307,7 +1305,7 @@ def run_full_sweep():
 # MUTATE — the AST evaluation (code/games/eval_mutants.py, code/neuro/ast_eval.py, code/stats/ast_metrics.py)
 # ============================================================================
 
-AST_GAMES = ["mario", "meatboy", "bomberman", "megaman", "speedy"]
+AST_GAMES = ["mario", "meatboy", "bomberman", "megaman", "sonic"]
 
 
 def _ast_games():

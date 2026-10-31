@@ -1,0 +1,162 @@
+{
+  "game": "sonic",
+  "stage": "green_hill_3",
+  "base_file": "sonic/green_hill_3.yaml",
+  "mutants": [
+    {
+      "id": "seal_route@green_hill_3",
+      "game": "sonic",
+      "stage": "green_hill_3",
+      "section": null,
+      "operator": "seal_route",
+      "class": "breaking",
+      "direction": "harder",
+      "description": "A full-height wall 64 px before the goal: it can no longer be reached",
+      "retrain": true,
+      "base_file": "sonic/green_hill_3.yaml",
+      "base_sha1": "6ead4845198c6db53deed32ffa90994e6775f9ec",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          342,
+          28
+        ]
+      ],
+      "location": {
+        "col": 342,
+        "row": 28
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "wall_x": 10952,
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "widen_gap@green_hill_3",
+      "game": "sonic",
+      "stage": "green_hill_3",
+      "section": null,
+      "operator": "widen_gap",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "The act's first log bridge removed: its gap must be jumped",
+      "retrain": true,
+      "base_file": "sonic/green_hill_3.yaml",
+      "base_sha1": "6ead4845198c6db53deed32ffa90994e6775f9ec",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          34,
+          19
+        ]
+      ],
+      "location": {
+        "col": 34,
+        "row": 19
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "bridge": [
+        1000,
+        1239,
+        636
+      ],
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "jump_velocity_down@green_hill_3",
+      "game": "sonic",
+      "stage": "green_hill_3",
+      "section": null,
+      "operator": "jump_velocity_down",
+      "class": "degrading",
+      "direction": "harder",
+      "description": "Jump velocity x0.85: physics.jump 1664 -> 1414",
+      "retrain": true,
+      "base_file": "sonic/green_hill_3.yaml",
+      "base_sha1": "6ead4845198c6db53deed32ffa90994e6775f9ec",
+      "family": "mechanics",
+      "level_file": null,
+      "cells": [],
+      "location": null,
+      "config": {
+        "physics.jump": 1414
+      },
+      "parameter": {
+        "key": "physics.jump",
+        "from": 1664,
+        "to": 1414
+      },
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "off_route@green_hill_3",
+      "game": "sonic",
+      "stage": "green_hill_3",
+      "section": null,
+      "operator": "off_route",
+      "class": "neutral",
+      "direction": "none",
+      "description": "A 16 px hole inside solid dirt, closed on every side",
+      "retrain": true,
+      "base_file": "sonic/green_hill_3.yaml",
+      "base_sha1": "6ead4845198c6db53deed32ffa90994e6775f9ec",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [
+        [
+          74,
+          46
+        ]
+      ],
+      "location": {
+        "col": 74,
+        "row": 46
+      },
+      "parameter": {
+        "tiles": 1
+      },
+      "checks": {
+        "plays": true
+      }
+    },
+    {
+      "id": "cosmetic_tile@green_hill_3",
+      "game": "sonic",
+      "stage": "green_hill_3",
+      "section": null,
+      "operator": "cosmetic_tile",
+      "class": "neutral",
+      "direction": "none",
+      "description": "A comment in the level file: the level parses the same",
+      "retrain": false,
+      "base_file": "sonic/green_hill_3.yaml",
+      "base_sha1": "6ead4845198c6db53deed32ffa90994e6775f9ec",
+      "family": "level",
+      "level_file": "level.yaml",
+      "config": null,
+      "cells": [],
+      "location": null,
+      "parameter": {
+        "tiles": 0
+      },
+      "checks": {
+        "plays": true
+      }
+    }
+  ],
+  "skipped": []
+}

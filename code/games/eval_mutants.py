@@ -43,7 +43,7 @@ EVAL_LEVELS = {
     "meatboy": ("2", "Super Meat Boy 1-3 The Gap"),
     "bomberman": ("12", "Bomberman II 1-1"),
     "megaman": ("CutMan", "Mega Man, the Cut Man stage"),
-    "speedy": ("green_hill_1", "SPEEDY, Green Hill Act 1"),
+    "sonic": ("green_hill_1", "Sonic, Green Hill Act 1"),
 }
 MEGAMAN_SET = ["s3-seal_route", "s3-widen_gap", "m-jump_velocity_down", "s3-off_route", "s3-cosmetic_tile"]
 
@@ -115,8 +115,8 @@ CHANGES = {
 }
 
 # What the running game uses for each mechanics key, read from a built core
-# SPEEDY's levels are polygons, not cells: code/games/speedy_mutants.py places these on each act by rule.
-CHANGES["speedy"] = ("speedy/green_hill_1.yaml", [
+# Sonic's levels are polygons, not cells: code/games/sonic_mutants.py places these on each act by rule.
+CHANGES["sonic"] = ("sonic/green_hill_1.yaml", [
     ("seal_route", "breaking", [], "A full-height wall 64 px before the goal: it can no longer be reached", None),
     ("widen_gap", "degrading", [], "The act's first log bridge removed: its gap must be jumped", None),
     ("jump_velocity_down", "degrading", [], "Jump velocity x0.85: physics.jump 1664 -> 1414", None),
@@ -151,8 +151,8 @@ def out_dir(game: str) -> str:
 def level_file(game: str, level: str) -> str:
     """The level's file under LEVELS_DIR, as the game's config names it (disabled levels too)."""
     import yaml
-    if game == "speedy":
-        return f"speedy/{level}.yaml"
+    if game == "sonic":
+        return f"sonic/{level}.yaml"
     games = os.path.dirname(LEVELS_DIR)
     if game == "mario":
         with open(os.path.join(games, "game_config.yaml"), encoding="utf-8") as f:
@@ -171,7 +171,7 @@ def level_name(game: str, level: str) -> str:
     stem = os.path.splitext(os.path.basename(level_file(game, level)))[0]
     if game == "mario":
         return f"Super Mario Bros. {level.replace('Mario', '')}"
-    if game == "speedy":
+    if game == "sonic":
         return f"Green Hill Act {stem[-1]}"
     if game == "meatboy":
         world, n, *rest = stem.replace("world", "", 1).split("_")
@@ -417,10 +417,10 @@ def build(game: str, out: str | None = None, level: str | None = None) -> dict:
     out = out or out_dir(game)
     level = level or EVAL_LEVELS[game][0]
     hand = level == EVAL_LEVELS[game][0]
-    if game == "speedy":
-        from . import speedy_mutants
+    if game == "sonic":
+        from . import sonic_mutants
         os.makedirs(out, exist_ok=True)
-        return speedy_mutants.build(CHANGES[game][1], out, level, hand)
+        return sonic_mutants.build(CHANGES[game][1], out, level, hand)
     file, specs = CHANGES[game] if hand else (level_file(game, level), None)
     path = os.path.join(LEVELS_DIR, file)
     with open(path, encoding="utf-8") as f:

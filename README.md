@@ -53,22 +53,22 @@ pip install -r requirements.txt
 python menu.py        # train, watch, play, sweep, mutate, run the user study, open the Command Center
 ```
 
-### SPEEDY: a fifth game, not in the results yet
+### Sonic: a fifth game, not in the results yet
 
-SPEEDY rebuilds the first zone of the 1991 Mega Drive hedgehog platformer on this engine: Green Hill,
+Sonic rebuilds the first zone of the 1991 Mega Drive hedgehog platformer on this engine: Green Hill,
 Acts 1 to 3 with the boss. The player routine keeps the console's order of operations and its 1/256 px
 units, including loops, S-tunnels, ring scatter and the 1991 spike behaviour. The Spin Dash (hold down,
 press jump to charge, let go to fire) comes from the later games. The Special Stage is not included.
 
-The levels are geometry and object positions traced from public maps (`code/games/levels/speedy/`).
+The levels are geometry and object positions traced from public maps (`code/games/levels/sonic/`).
 Every sprite and the music are our own, made in code, in the look and style of the original. To use art
-or audio you own, put it in `speedy-data/` (ignored by git): `speedy-data/art/<sprite>.png` replaces a
-sprite and `speedy-data/speedy.ogg` replaces the tune.
+or audio you own, put it in `sonic-data/` (ignored by git): `sonic-data/art/<sprite>.png` replaces a
+sprite and `sonic-data/sonic.ogg` replaces the tune.
 
 ```bash
-python -m code.games.tools.manual_play --game speedy
-python -m code.neuro.trainer --game speedy --level green_hill_1
-python -m code.neuro.balance --game speedy
+python -m code.games.tools.manual_play --game sonic
+python -m code.neuro.trainer --game sonic --level green_hill_1
+python -m code.neuro.balance --game sonic
 ```
 
 ---

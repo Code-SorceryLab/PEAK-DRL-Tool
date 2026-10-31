@@ -25,7 +25,7 @@ _SEMI = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
 _ACC = {"#": 1, "b": -1}
 
 TUNES = {
-    "speedy": {   # SPEEDY: sunny syncopated pop in A on FM, slap bass and pushed chord stabs
+    "sonic": {   # Sonic: sunny syncopated pop in A on FM, slap bass and pushed chord stabs
         "bpm": 144, "form": "abac", "lead": ("fm", 1.2), "gate": 0.88,
         "a": (["amaj7", "f#m7", "dmaj7", "e", "amaj7", "c#m7", "dmaj7", "e7"],
               "c#6 - - e6 - - c#6 - b5 - a5 - - - e5 - | . . a5 b5 c#6 - - e6 - - c#6 - b5 - a5 - | "
@@ -276,7 +276,7 @@ def render(name: str, sr: int = 44100) -> np.ndarray:
 
 
 _sounds, _playing = {}, None
-_OWN_AUDIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "speedy-data")
+_OWN_AUDIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "sonic-data")
 
 
 def play(name: str) -> None:
