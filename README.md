@@ -29,7 +29,7 @@ compared.
 
 <table>
 <tr>
-<td width="50%" align="center"><img src="docs/img/mario_1-1.gif" width="100%"><br><sub><b>A trained agent wins.</b> The experienced persona's network (200 generations, Nibi run) reaches the flag of Mario 1-1.</sub></td>
+<td width="50%" align="center"><img src="docs/img/mario_1-1.gif" width="100%"><br><sub><b>A trained agent wins.</b> The experienced persona's network (200 generations) reaches the flag of Mario 1-1.</sub></td>
 <td width="50%" align="center"><img src="docs/img/dashboard.png" width="100%"><br><sub><b>Live dashboard.</b> One agent with its raycasts, its inputs and its fitness.</sub></td>
 </tr>
 </table>
@@ -57,7 +57,7 @@ python menu.py        # train, watch, play, sweep, mutate, run the user study, o
 
 ## The experiment at a glance
 
-One pipeline run on the **Nibi** cluster (Digital Research Alliance of Canada), started 2026-10-28,
+One pipeline run on a computing cluster, started 2026-10-28,
 ended 2026-10-29 at 11:06 pm. Every stage ended with exit code 0.
 Seeds **1234, 2025, 31337**.
 
@@ -270,7 +270,7 @@ no enemies or coins gives a plain player. Clumsy's mistakes are seeded, so a rep
 </details>
 
 <details>
-<summary><b>🏭 The pipeline stages (Nibi, 2026-10-28)</b></summary>
+<summary><b>🏭 The pipeline stages (2026-10-28)</b></summary>
 
 Started 2026-10-28 4:05 am, resumed 2026-10-29 12:37 pm, ended 2026-10-29 11:06 pm; 3 CPU cores per task; code commit
 `79fc29691` (branch `USER-STUDY+SPRITIFY`).
@@ -456,7 +456,7 @@ Fisher only ("strict") 6 (17%); win rate outside the original's seed spread 4 of
 | `runs/ast/metrics.json` | AST metrics and verdicts (after `final`) |
 | `runs/user_study/<participant>/<game>/<phase>/run<k>/` | Pilot study: `episodes.csv`, `inputs.csv` |
 | `runs/manual/<game>/<player>/` | Free manual play with `--record` |
-| `runs/logs/` | Slurm logs of every Nibi stage |
+| `runs/logs/` | Slurm logs of every stage |
 | `runs/videos/<game>/<persona>.webm` | Replay-wall videos |
 | `code/neuro/ga_best.yaml` | `--best` per game, with every sweep's numbers |
 | `code/games/levels/mutants/<game>/<id>/` | Each mutant: `mutant.json` (change, class, why) + level file |
