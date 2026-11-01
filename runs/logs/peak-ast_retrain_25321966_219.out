@@ -1,5 +1,5 @@
-[2026-10-29 14:14:45] START n=220 host=c17.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@9 --persona collector --workers $W
->>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@9 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 9 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@9/probes --out runs/ast/bomberman/fuse_down@9 --workers 3
+[2026-10-29 14:14:45] START n=220 host=c17 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@9 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@9 /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 9 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@9/probes --out runs/ast/bomberman/fuse_down@9 --workers 3
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200 · runs/ast/bomberman/fuse_down@9/probes]
 
   note: bomberman level [9] has no coins — persona [collector] plays for the goal alone here

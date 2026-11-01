@@ -1,5 +1,5 @@
-[2026-10-28 17:47:48] START n=280 host=c31.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant widen_gap@6 --persona speedrunner --workers $W
->>> PEAK_MUTANT=runs/meatboy/mutants/widen_gap@6 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona speedrunner --levels 6 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/widen_gap@6/probes --out runs/ast/meatboy/widen_gap@6 --best --workers 3
+[2026-10-28 17:47:48] START n=280 host=c31 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant widen_gap@6 --persona speedrunner --workers $W
+>>> PEAK_MUTANT=runs/meatboy/mutants/widen_gap@6 /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona speedrunner --levels 6 --seeds 1234 2025 31337 --gens 200 --root runs/ast/meatboy/widen_gap@6/probes --out runs/ast/meatboy/widen_gap@6 --best --workers 3
 --best: meatboy -> {'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p10g200_best · runs/ast/meatboy/widen_gap@6/probes]
 

@@ -1,4 +1,4 @@
-[2026-10-28 04:38:53] START n=38 host=c165.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona killer --levels CutMan-6-Descent --gens 40 --seeds 1234 2025 31337 --workers $W
+[2026-10-28 04:38:53] START n=38 host=c165 $PY -m code.neuro.gasweep --game megaman --persona killer --levels CutMan-6-Descent --gens 40 --seeds 1234 2025 31337 --workers $W
 GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens each, ~34x one balance sweep, 12 worker(s)  [megaman · killer · rays]
 
 [1/69] p10g40_b8cc78_hidden-8 · CutMan-6-Descent seed 2025: best gen 28, win rate 0%, best_x 100.9, 0:01:20
@@ -71,7 +71,7 @@ GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens
 [68/69] p100g40_b8cc78_pop_size-100 · CutMan-6-Descent seed 2025: best gen 20, win rate 0%, best_x 387.9, 0:56:50
 [69/69] p100g40_b8cc78_pop_size-100 · CutMan-6-Descent seed 31337: best gen 36, win rate 0%, best_x 465.5, 1:00:58
 
-wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+wrote /scratch/user/peak/code/neuro/ga_best.yaml
   bomberman  (2 sweep(s))  baseline wins every knob
   mario      (6 sweep(s))  anneal_factor 0.3
   meatboy    (6 sweep(s))  anneal_factor 0.3

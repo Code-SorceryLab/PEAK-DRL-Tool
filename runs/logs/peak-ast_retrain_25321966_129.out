@@ -1,5 +1,5 @@
-[2026-10-29 13:34:00] START n=130 host=c221.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@6 --persona collector --workers $W
->>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@6 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 6 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@6/probes --out runs/ast/bomberman/fuse_down@6 --best --workers 3
+[2026-10-29 13:34:00] START n=130 host=c221 $PY -m code.neuro.ast_eval retrain --game bomberman --mutant fuse_down@6 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/bomberman/mutants/fuse_down@6 /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game bomberman --persona collector --levels 6 --seeds 1234 2025 31337 --gens 200 --root runs/ast/bomberman/fuse_down@6/probes --out runs/ast/bomberman/fuse_down@6 --best --workers 3
 --best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p30g200_best · runs/ast/bomberman/fuse_down@6/probes]
 

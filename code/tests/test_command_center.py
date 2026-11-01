@@ -13,7 +13,7 @@ from code.stats import ast_metrics, ast_page
 
 PAPER = {"1234", "2025", "31337"}
 # the trained runs/ some tests read (probes, reports, Mega Man's relay) are not on every branch: USER-STUDY reset
-# them (30a070eb4), and the Narval pipeline in jobs/README.md writes them again
+# them (30a070eb4), and the cluster pipeline in jobs/README.md writes them again
 TRAINED = os.path.join(balance.PROBES_ROOT, "mario", "novice", "p10g40", "Mario1-1_1234", "state.json")
 needs_runs = pytest.mark.skipif(not os.path.exists(TRAINED), reason="needs the trained runs/ data")
 needs_reports = pytest.mark.skipif(not glob.glob(os.path.join(balance.BALANCE_DIR, "report_bomberman_*.json")),

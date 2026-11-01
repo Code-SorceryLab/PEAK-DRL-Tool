@@ -83,10 +83,10 @@ a time, and that never stalls.
 | Video content | Per game and persona, the agents the live wall plays today (`cameras.pick_models`: per level, the paper seed with the best record, p10g40 full-sweep models); Mega Man plays the Cut Man stage as a relay of that persona's section agents: its best paper-seed `base-retrained` run per section, for every persona (`ast_eval.persona_legs`; changed after the final review from `runs/megaman/relay.json` for experienced, whose legs are seeds 4002 to 5201, against AL's paper-seed decision). An attempt that outruns its level's share of the 5400 frames ends as a stall, so every level appears | my call |
 | Video format | WebM (VP9) through ffmpeg (installed), 30 fps, about 480 px wide, `<video autoplay muted loop playsinline>`; one attempt per level in level order, then the loop restarts | my call |
 | Where videos live | A git-ignored cache (`runs/videos/<game>/<persona>.webm`) filled by its own record command (a new menu item), not by menu 12, because recording is heavy. The build copies the cache into the site; a persona without a video gets a "not recorded yet" tile | my call |
-| Where the work happens | A new branch `AL-command-center` from `AL-ast-eval` (it needs the Mega Man persona code), in the main checkout. The Narval results are committed on `AL-ast-eval` between tasks and merged in. (Changed while planning from a separate worktree: a second checkout is 34,458 files and 12 GB on the exFAT drive.) | my call |
+| Where the work happens | A new branch `AL-command-center` from `AL-ast-eval` (it needs the Mega Man persona code), in the main checkout. The cluster results are committed on `AL-ast-eval` between tasks and merged in. (Changed while planning from a separate worktree: a second checkout is 34,458 files and 12 GB on the exFAT drive.) | my call |
 | Publishing | A script builds the site folder and puts it on `gh-pages` as one new commit with no history (the branch is replaced each time, so 50 MB of videos never pile up in every clone; `.git` is already 2.6 GB). Before the first publish, the old landing page's commit is kept as tag `landing-page-2026-03`. The script refuses to publish while `runs/balance/` or `runs/ast/` have uncommitted changes. The force-push itself is a separate step that AL approves each time | my call |
 | New results | The build reads the working tree, never runs `rebuild()`, and a run's own report JSON (balance.py and gasweep.py write one at the end of every run) is how new results arrive. Menu 12 no longer folds probe folders into reports | my call |
-| Mega Man data | Balance: the committed `runs/ast/megaman/base-retrained/report_megaman_<persona>_p10g200.json`. GA sweep: "not run" until Narval jobs 7434840 and 7434841 come home. Ablation: "not run". The base-retrained training for all six personas finished on Narval on 2026-10-26, so all six Mega Man videos can be recorded once those results are committed | my call |
+| Mega Man data | Balance: the committed `runs/ast/megaman/base-retrained/report_megaman_<persona>_p10g200.json`. GA sweep: "not run" until cluster jobs 7434840 and 7434841 come home. Ablation: "not run". The base-retrained training for all six personas finished on the cluster on 2026-10-26, so all six Mega Man videos can be recorded once those results are committed | my call |
 
 ## What exists to build on
 
@@ -111,7 +111,7 @@ a time, and that never stalls.
 - The page keeps today's look (`theme.css`); the new top bar replaces `_nav()`'s page links.
 - The repo is public and the AST paper is double-blind: the paper must not link to this site; an
   anonymous copy is a separate decision for later.
-- Narval jobs 7425515, 7433368, 7434840 and 7434841 write Mega Man results that will come home on
+- Cluster jobs 7425515, 7433368, 7434840 and 7434841 write Mega Man results that will come home on
   `AL-ast-eval`; the Command Center reads them after they are committed there and merged.
 
 ## Left to the builder

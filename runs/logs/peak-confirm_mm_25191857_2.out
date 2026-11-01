@@ -1,4 +1,4 @@
-[2026-10-28 06:40:34] START n=3 host=c350.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona experienced --levels CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss --gens 40 --seeds 1234 2025 31337 --workers $W --axes --confirm
+[2026-10-28 06:40:34] START n=3 host=c350 $PY -m code.neuro.gasweep --game megaman --persona experienced --levels CutMan-1-Street CutMan-2-Climb CutMan-3-Ledges CutMan-4-Shaft CutMan-5-Rooftop CutMan-6-Descent CutMan-7-Corridor CutMan-8-Boss --gens 40 --seeds 1234 2025 31337 --workers $W --axes --confirm
 
 confirm: probing the composite {'pop_size': 30, 'anneal_factor': 0.3, 'elite': 1, 'hidden': 8, 'init_sigma': 0.25, 'memory': 3, 'mutation_rate': 0.5}
 GA sweep [confirm]: 1 configs x 8 levels x 3 seeds = 24 probes, budget 40 gens each, ~3x one balance sweep, 12 worker(s)  [megaman · experienced · rays]
@@ -28,7 +28,7 @@ GA sweep [confirm]: 1 configs x 8 levels x 3 seeds = 24 probes, budget 40 gens e
 [23/24] p30g40_b8cc78_best · CutMan-8-Boss seed 31337: best gen 33, win rate 1%, best_x 1000.0, 0:15:58
 [24/24] p30g40_b8cc78_best · CutMan-8-Boss seed 1234: best gen 14, win rate 0%, best_x 1000.0, 0:17:06
 
-wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+wrote /scratch/user/peak/code/neuro/ga_best.yaml
   bomberman  (6 sweep(s))  pop_size 30 · tournament_k 8 · anneal_factor 0.3
   mario      (6 sweep(s))  anneal_factor 0.3
   meatboy    (6 sweep(s))  anneal_factor 0.3

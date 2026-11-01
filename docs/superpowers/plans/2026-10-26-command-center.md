@@ -19,12 +19,12 @@
 - No change to `paper-ast/`, to `ast_metrics` results or to `ast_paper` output.
 - Look: `code/neuro/web/theme.css` (black and red); blue only in the Mega Man icon.
 - No em dashes or en dashes in code, docs or commit messages; commit messages carry no Co-Authored-By line.
-- Work on branch `AL-command-center`, created from `AL-ast-eval`, in the main checkout (a second worktree would be 34,458 files and 12 GB on the exFAT drive). Narval results are committed on `AL-ast-eval` between tasks and merged in.
+- Work on branch `AL-command-center`, created from `AL-ast-eval`, in the main checkout (a second worktree would be 34,458 files and 12 GB on the exFAT drive). Cluster results are committed on `AL-ast-eval` between tasks and merged in.
 - Test command: `SDL_VIDEODRIVER=dummy .venv/bin/python -m pytest code/tests -q -p no:debugging`.
 
 ## Review Focus
 
-1. A tab with no data for a game (Mega Man GA sweep until Narval jobs 7434840/7434841 come home; Mega Man ablation always): the tab shows a "not run" panel, never a blank frame or a 404. Pinned in Task 3 and Task 4.
+1. A tab with no data for a game (Mega Man GA sweep until cluster jobs 7434840/7434841 come home; Mega Man ablation always): the tab shows a "not run" panel, never a blank frame or a 404. Pinned in Task 3 and Task 4.
 2. A persona with no video: a "not recorded yet" tile in its place, the other five still play. Pinned in Task 4.
 3. A hash that names no game or tab (`#zelda/x`, `#`, `#mario`): the page opens on Mario, Replay wall (or the named game's first tab). Pinned in Task 4 (browser check).
 4. Opening `runs/site/index.html` straight from disk (`file://`, no server): every tab and video works. Pinned in Task 4 (browser check).
@@ -430,7 +430,7 @@ git commit -m "Command Center: publish the site to gh-pages as one commit, old l
 
 **Files:** none new.
 
-- [ ] **Step 1: Bring the Narval results in**
+- [ ] **Step 1: Bring the cluster results in**
 
 On `AL-ast-eval`, once jobs 7425515 and 7433368 are done and their results committed there (the copy-home step outside this plan), run: `git merge AL-ast-eval` on `AL-command-center`.
 Expected: a merge with no conflict in `code/`.

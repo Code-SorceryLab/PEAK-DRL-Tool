@@ -1,5 +1,5 @@
-[2026-10-28 15:37:58] START n=48 host=c373.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-2 --persona collector --workers $W
->>> PEAK_MUTANT=runs/mario/mutants/widen_gap@Mario1-2 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona collector --levels Mario1-2 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/widen_gap@Mario1-2/probes --out runs/ast/mario/widen_gap@Mario1-2 --best --workers 3
+[2026-10-28 15:37:58] START n=48 host=c373 $PY -m code.neuro.ast_eval retrain --game mario --mutant widen_gap@Mario1-2 --persona collector --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/widen_gap@Mario1-2 /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game mario --persona collector --levels Mario1-2 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/widen_gap@Mario1-2/probes --out runs/ast/mario/widen_gap@Mario1-2 --best --workers 3
 --best: mario -> {'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200_best · runs/ast/mario/widen_gap@Mario1-2/probes]
 

@@ -1,5 +1,5 @@
-[2026-10-29 15:44:49] START n=405 host=c149.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona speedrunner --level CutMan-5-Rooftop --workers $W
->>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona speedrunner --levels CutMan-5-Rooftop --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/base-retrained/probes --out runs/ast/megaman/base-retrained --best --workers 3
+[2026-10-29 15:44:49] START n=405 host=c149 $PY -m code.neuro.ast_eval retrain --game megaman --mutant base-retrained --persona speedrunner --level CutMan-5-Rooftop --workers $W
+>>> PEAK_MUTANT= /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game megaman --persona speedrunner --levels CutMan-5-Rooftop --seeds 1234 2025 31337 --gens 200 --root runs/ast/megaman/base-retrained/probes --out runs/ast/megaman/base-retrained --best --workers 3
 --best: megaman -> {'pop_size': 30, 'elite': 1, 'mutation_rate': 0.5, 'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [speedrunner · p30g200_best · runs/ast/megaman/base-retrained/probes]
 

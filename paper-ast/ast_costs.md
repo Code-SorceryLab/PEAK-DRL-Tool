@@ -5,7 +5,7 @@ Measured 2026-10-25 from the committed runs.
 - **Retrain** times are `train_time_s` from `runs/ast/<game>/<variant>/report_*.json` (and, for the
   originals, `runs/balance/report_*` rows of the evaluation level). That is the summed wall time of
   every seed's generations, one core per seed, so it is CPU time.
-  - The runs were on Narval (Alliance), 3 cores per task.
+  - The runs were on a computing cluster, 3 cores per task.
   - Training stops early once it wins, so an unsolvable mutant (a sealed route) costs the full 200
     generations.
 - **Replay** times are wall time on the PC (AMD Ryzen 5 5600X, one core, Idle priority), including
@@ -14,7 +14,7 @@ Measured 2026-10-25 from the committed runs.
     agent on every retrained mutant.
   - Mega Man's replay also picks the best of three runs per section, as its relay does.
 
-## Retrain: CPU-hours per mutant (Narval)
+## Retrain: CPU-hours per mutant (cluster)
 
 | Game | seal_route | widen_gap / add_enemy | jump_velocity_down / fuse_down | off_route | all four | the original, same level |
 |---|---:|---:|---:|---:|---:|---:|
@@ -41,7 +41,7 @@ takes about 36 CPU-hours.
 
 ## Not measured yet
 
-- Playtests of the retrained agents ran on Narval (job 7130198); their logs were not copied home.
+- Playtests of the retrained agents ran on the cluster (job 7130198); their logs were not copied home.
 - `base-reseeded`, the false-alarm check, should cost about what the originals did: about
   13 CPU-hours (0.56 + 0.23 + 2.65 + 9.27).
 - The outline's "one laptop, no GPU" holds for replay. For retraining it holds only as a few

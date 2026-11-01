@@ -1,4 +1,4 @@
-[2026-10-28 10:01:14] START n=252 host=c300.nibi.sharcnet $PY -m code.neuro.balance --game bomberman --persona experienced --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
+[2026-10-28 10:01:14] START n=252 host=c300 $PY -m code.neuro.balance --game bomberman --persona experienced --levels 3 --gens 200 --seeds 1234 2025 31337 --workers $W --out runs/balance_stage --best
 --best: bomberman -> {'pop_size': 30, 'tournament_k': 8, 'anneal_factor': 0.3}
 skip runs/probes/bomberman/experienced/p30g200_best/2_31337/state.json: unreadable ([Errno 116] Stale file handle)
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [experienced · p30g200_best · runs/probes]

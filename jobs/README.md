@@ -1,10 +1,10 @@
-# Narval jobs
+# Cluster jobs
 
 Everything runs from `$SCRATCH/peak` (a sparse copy of `code/`, **never run git there**) through one
 array runner: each task runs one line of a task file. `jobs/make_tasks.py` writes the task files;
 `jobs/run_tasks.sh` runs them (`rc=$?` logged on every END line). Submit ≤18 cores and ≤3 h per task so
-backfill starts them. The scripts suit any Alliance cluster (account `def-polako_cpu`); on Narval
-`export EXCLUDE=nc10901` (its /cvmfs fails: rc=126 at once).
+backfill starts them. The scripts suit any Slurm cluster: `export SBATCH_ACCOUNT=<your account>` first. If one node fails
+every task at once (rc=126), `export EXCLUDE=<node>`.
 
     mkdir -p runs/logs && .venv/bin/python -m jobs.make_tasks          # all task files, with their sizes
     sub() { sbatch --parsable ${DEP:+--dependency=${AFTER:-afterany}:$DEP} ${EXCLUDE:+--exclude=$EXCLUDE} -J "peak-$1" -c "$2" -t "${4:-3:00:00}" \
@@ -12,10 +12,10 @@ backfill starts them. The scripts suit any Alliance cluster (account `def-polako
             jobs/run_tasks.sh "jobs/tasks/$1.txt"; }       # sub <stage> <cores> [array] [time]; DEP=<jobid> waits (AFTER=afterok: only if it succeeded)
     check() { sacct -j "$1" -X -n -P -o State | sed 's/ by.*//' | sort | uniq -c; grep -L "END rc=0" runs/logs/*_"$1"_*.out; }
 
-Before uploading: strip CR from every `.sh` (`tr -d '\r'`), then on Narval `bash -n` it and check
+Before uploading: strip CR from every `.sh` (`tr -d '\r'`), then on the cluster `bash -n` it and check
 `tr -cd '\r' < f | wc -c` is 0. Upload only the files that differ (md5 both sides).
 
-## Step 6: does it train on Narval?
+## Step 6: does it train on the cluster?
 
     sub test 3 0-3 0:30:00            # one 5-gen probe per game into runs/_test; then: ls runs/_test/balance
 

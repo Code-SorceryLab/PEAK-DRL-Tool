@@ -1,5 +1,5 @@
-[2026-10-28 16:34:07] START n=150 host=c20.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game meatboy --mutant base-reseeded@0 --persona collector --workers $W
->>> PEAK_MUTANT= /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona collector --levels 0 --seeds 1111 2222 3333 --gens 200 --root runs/ast/meatboy/base-reseeded@0/probes --out runs/ast/meatboy/base-reseeded@0 --best --workers 3
+[2026-10-28 16:34:07] START n=150 host=c20 $PY -m code.neuro.ast_eval retrain --game meatboy --mutant base-reseeded@0 --persona collector --workers $W
+>>> PEAK_MUTANT= /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game meatboy --persona collector --levels 0 --seeds 1111 2222 3333 --gens 200 --root runs/ast/meatboy/base-reseeded@0/probes --out runs/ast/meatboy/base-reseeded@0 --best --workers 3
 --best: meatboy -> {'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [collector · p10g200_best · runs/ast/meatboy/base-reseeded@0/probes]
 

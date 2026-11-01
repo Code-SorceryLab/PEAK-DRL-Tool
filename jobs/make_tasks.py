@@ -1,4 +1,4 @@
-"""Write the Narval task files, one shell command per line, for jobs/run_tasks.sh (order: jobs/README.md).
+"""Write the cluster task files, one shell command per line, for jobs/run_tasks.sh (order: jobs/README.md).
 
     .venv/bin/python -m jobs.make_tasks            # every stage into jobs/tasks/<stage>.txt
     .venv/bin/python -m jobs.make_tasks ast_play   # one stage (the AST stages read the mutants on disk)

@@ -1,5 +1,5 @@
-[2026-10-28 16:07:13] START n=95 host=c179.nibi.sharcnet $PY -m code.neuro.ast_eval retrain --game mario --mutant seal_route@Mario1-4 --persona killer --workers $W
->>> PEAK_MUTANT=runs/mario/mutants/seal_route@Mario1-4 /scratch/alotu/peak/.venv/bin/python -m code.neuro.balance --game mario --persona killer --levels Mario1-4 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/seal_route@Mario1-4/probes --out runs/ast/mario/seal_route@Mario1-4 --best --workers 3
+[2026-10-28 16:07:13] START n=95 host=c179 $PY -m code.neuro.ast_eval retrain --game mario --mutant seal_route@Mario1-4 --persona killer --workers $W
+>>> PEAK_MUTANT=runs/mario/mutants/seal_route@Mario1-4 /scratch/user/peak/.venv/bin/python -m code.neuro.balance --game mario --persona killer --levels Mario1-4 --seeds 1234 2025 31337 --gens 200 --root runs/ast/mario/seal_route@Mario1-4/probes --out runs/ast/mario/seal_route@Mario1-4 --best --workers 3
 --best: mario -> {'anneal_factor': 0.3}
 balance probe: 1 levels x 3 seeds = 3 jobs, budget 200 gens each, 3 worker(s)  [killer · p10g200_best · runs/ast/mario/seal_route@Mario1-4/probes]
 

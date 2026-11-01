@@ -1,4 +1,4 @@
-[2026-10-28 04:26:30] START n=11 host=c380.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona clumsy --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
+[2026-10-28 04:26:30] START n=11 host=c380 $PY -m code.neuro.gasweep --game megaman --persona clumsy --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
 GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens each, ~34x one balance sweep, 12 worker(s)  [megaman · clumsy · rays]
 
 [1/69] p10g40_b8cc78_base · CutMan-3-Ledges seed 31337: best gen 23, win rate 0%, best_x 700.5, 0:03:31
@@ -78,7 +78,7 @@ skip runs/gasweep/megaman/clumsy/p100g40_b8cc78_pop_size-100/CutMan-8-Boss_1234:
 skip runs/gasweep/megaman/clumsy/p100g40_b8cc78_pop_size-100/CutMan-8-Boss_2025: unfinished (gen 29 of 40)
 skip runs/gasweep/megaman/clumsy/p100g40_b8cc78_pop_size-100/CutMan-8-Boss_31337: unfinished (gen 29 of 40)
 
-wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+wrote /scratch/user/peak/code/neuro/ga_best.yaml
   mario      (6 sweep(s))  anneal_factor 0.3
   megaman    (6 sweep(s))  pop_size 100 · mutation_rate 0.5 · anneal_factor 0.3 · action_feedback True
 

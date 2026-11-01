@@ -1,4 +1,4 @@
-[2026-10-28 04:43:05] START n=43 host=c335.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona collector --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
+[2026-10-28 04:43:05] START n=43 host=c335 $PY -m code.neuro.gasweep --game megaman --persona collector --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
 GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens each, ~34x one balance sweep, 12 worker(s)  [megaman · collector · rays]
 
   note: megaman level [CutMan-3-Ledges] has no coins — persona [collector] plays for the goal alone here
@@ -141,7 +141,7 @@ GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens
 [69/69] p100g40_b8cc78_pop_size-100 · CutMan-3-Ledges seed 1234: best gen 16, win rate 0%, best_x 814.5, 0:49:43
 skip runs/gasweep/megaman/collector/p100g40_b8cc78_pop_size-100/CutMan-1-Street_2025: unfinished (gen 39 of 40)
 
-wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+wrote /scratch/user/peak/code/neuro/ga_best.yaml
   bomberman  (2 sweep(s))  baseline wins every knob
   mario      (6 sweep(s))  anneal_factor 0.3
   meatboy    (6 sweep(s))  anneal_factor 0.3

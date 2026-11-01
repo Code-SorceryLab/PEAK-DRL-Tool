@@ -1,4 +1,4 @@
-[2026-10-28 04:34:43] START n=27 host=c186.nibi.sharcnet $PY -m code.neuro.gasweep --game megaman --persona speedrunner --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
+[2026-10-28 04:34:43] START n=27 host=c186 $PY -m code.neuro.gasweep --game megaman --persona speedrunner --levels CutMan-3-Ledges --gens 40 --seeds 1234 2025 31337 --workers $W
 GA sweep [ablation]: 23 configs x 1 levels x 3 seeds = 69 probes, budget 40 gens each, ~34x one balance sweep, 12 worker(s)  [megaman · speedrunner · rays]
 
 [1/69] p10g40_b8cc78_hidden-8 · CutMan-3-Ledges seed 2025: best gen 34, win rate 0%, best_x 512.1, 0:03:46
@@ -82,7 +82,7 @@ skip runs/gasweep/megaman/speedrunner/p10g40_b8cc78_memory-2/CutMan-1-Street_313
 skip runs/gasweep/megaman/speedrunner/p10g40_b8cc78_memory-3/CutMan-1-Street_2025: unfinished (gen 30 of 40)
 skip runs/gasweep/megaman/speedrunner/p10g40_b8cc78_memory-3/CutMan-1-Street_31337: unfinished (gen 35 of 40)
 
-wrote /scratch/alotu/peak/code/neuro/ga_best.yaml
+wrote /scratch/user/peak/code/neuro/ga_best.yaml
   mario      (6 sweep(s))  anneal_factor 0.3
   meatboy    (3 sweep(s))  pop_size 30 · elite 1 · tournament_k 8 · crossover_rate 0.0 · mutation_rate 0.5 · mutation_sigma 0.5 · anneal_factor 0.3 · action_feedback True
   megaman    (6 sweep(s))  pop_size 100 · elite 1 · mutation_rate 0.5 · anneal_factor 0.3 · init_sigma 0.25 · memory 3
