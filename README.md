@@ -16,7 +16,7 @@
   <img src="docs/img/games.gif" alt="Trained agents winning in the four games: Mario, Meat Boy, Bomberman and Mega Man" width="100%">
 </p>
 
-**PEAK** (Ontario Tech University, Master's program) evolves small neural networks that play four
+**PEAK** evolves small neural networks that play four
 2D games like six kinds of player. It measures how hard every level is, then changes one tile of a
 level and checks whether a playtest notices. People play the same levels, so humans and agents can be
 compared.
@@ -529,6 +529,5 @@ The menu (`python menu.py`) runs all of these; option `u` runs the user study.
 
 **Al (AI-Scripting)** &nbsp;·&nbsp; **Kevin Chu**
 
-Ontario Tech University, Master's program. Engines, evolution and dashboards built from scratch in
-Python, Pygame and numpy. Statistics-dashboard metrics designed with Amr Abdalla's statistics-observer
-work. The earlier deep-RL version (stable-baselines3 PPO) is on the `archive/drl-sb3-final` branch.
+Engines, evolution and dashboards built from scratch in Python, Pygame and numpy. The earlier deep-RL
+version (stable-baselines3 PPO) is on the `archive/drl-sb3-final` branch.
