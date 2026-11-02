@@ -1,7 +1,7 @@
 # PEAK Balance Metrics & Tooling
 
 *The balance-measurement system: every metric, where it comes from, and how to read the
-report. This implements the team balance-metrics table (Amr's doc) on the neuroevolution
+report. This implements the team balance-metrics table on the neuroevolution
 probes.*
 
 ## The pipeline
@@ -305,7 +305,7 @@ Every training run and balance probe now appends one row per finished episode to
 `<run_dir>/episodes.csv` in the stats-dashboard schema (`persona, game, world,
 cause_of_death, jump_count, coins_collected, avg_vx, progress_ratio, route,
 enemies_killed, elapsed_time` — `route` is a sampled `(x, y)` trace, ~7.5 points/s).
-Amr's Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer line)
+The Streamlit dashboard (`code/stats/dashboard/`, from the statistics-observer line)
 reads those CSVs recursively from `runs/` (configured in
 `code/stats/MarioThresholds.yaml`) and computes B1 challenge calibration, B2 punishment
 severity, and B3 strategy diversity (route clustering) with per-level target bands and a

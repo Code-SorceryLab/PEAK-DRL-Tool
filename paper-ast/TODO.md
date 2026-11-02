@@ -5,7 +5,7 @@
   to it).
 - **Pipeline everyone is building toward:** design the game → train the agents → play (manual or
   automated) → measure telemetry metrics. A regression check runs it twice and compares.
-- **Owners:** Kevin = games, Al = NN training, Amr = telemetry.
+- **Owners:** Kevin = games, Al = NN training, telemetry owner = telemetry.
 - Dates are proposals; adjust them together.
 
 ## Milestones
@@ -25,12 +25,12 @@
 Goal: the 14 evaluation levels exist, are deterministic, and can be mutated automatically.
 
 - [ ] **Super Mario Bros., World 1 (4 levels).** 1-1 and 1-2 are active; enable 1-3; build 1-4.
-      Decide with Cristiano whether 1-4 includes the boss or ends at the goal.
+      Decide with the project lead whether 1-4 includes the boss or ends at the goal.
 - [ ] **Super Meat Boy, first chapter (6 levels).** Check the first six existing levels against the
       original. Confirm which chapter we clone: The Forest (what the repository has) or Chipper
-      Grove (the link Cristiano sent).
+      Grove (the shared link).
 - [ ] **Bomberman NES, stages 1–4.** The current 12 levels are a teaching ladder, not the NES
-      stages. Decide with Cristiano: seeded generator (bricks, exit, power-up, and enemy start
+      stages. Decide with the project lead: seeded generator (bricks, exit, power-up, and enemy start
       positions random per seed, as in the original) or fixed layouts per stage.
 - [ ] **Register the 14 levels** in the configs so the trainer and manual play list exactly them.
 - [ ] **Determinism.** Same level + same seed + same actions gives the same episode, on all three
@@ -60,7 +60,7 @@ learning.
 
 - [ ] **Test-run command** (section 3.4). Load saved models (`best.npz`), play a given level
       headless at full speed for a fixed number of attempts, one life each, with a given game seed,
-      and hand each finished episode to Amr's telemetry writer. No learning, no looping, no
+      and hand each finished episode to the telemetry writer. No learning, no looping, no
       advancing to the next level. The current `--replay` is a viewer and does none of this.
 - [ ] **Seed everything in a test run.** The *bad* persona's input slips use an unseeded random
       generator in replay; give it a seed so its runs repeat.
@@ -85,7 +85,7 @@ and the pilot (Mario 1-1, ten mutants) runs end to end in both modes.
 
 ---
 
-## Amr — telemetry (the recording half of stage 3, Play, and stage 4, Measure)
+## Telemetry (the recording half of stage 3, Play, and stage 4, Measure)
 
 Goal: one telemetry format for agents and humans, the metrics computed from it, and the comparison
 that produces a verdict.
@@ -109,7 +109,7 @@ that produces a verdict.
 - [ ] **Comparison command** (section 3.6). Two telemetry sets in (baseline and changed game),
       one verdict per level and persona out: *unchanged*, *changed but playable* (with the
       differences listed), or *broken*; non-zero exit when something is flagged. Agree the flagging
-      rule with Cristiano before the mutant runs and do not change it afterwards.
+      rule with the project lead before the mutant runs and do not change it afterwards.
 - [ ] **Localization.** For a flagged level, report whether the new death cluster falls on the
       changed tiles (uses Kevin's mutant record).
 - [ ] **Human recordings.** Make sure `--record` works with a real keyboard on all three games;
@@ -129,9 +129,9 @@ comparison command gives a verdict for the pilot mutants.
 
 | Hand-off | From | To | Agree on |
 |---|---|---|---|
-| Level and mutant files, with the record of what changed | Kevin | Al, Amr | file layout and the mutant record format |
-| Finished episodes from a test run | Al | Amr | the telemetry row and where files are written |
-| Verdicts and metrics | Amr | paper | the flagging rule |
+| Level and mutant files, with the record of what changed | Kevin | Al, telemetry owner | file layout and the mutant record format |
+| Finished episodes from a test run | Al | Telemetry owner | the telemetry row and where files are written |
+| Verdicts and metrics | Telemetry owner | paper | the flagging rule |
 
 - Agree these three formats first (by Mon 12 Oct); everything else can then proceed in parallel.
 
@@ -145,7 +145,7 @@ comparison command gives a verdict for the pilot mutants.
 - [ ] Remove `.DS_Store` from the repository and ignore it.
 - [ ] Writing: turn `paper.md` into prose, then LaTeX.
 
-## Open decisions (Cristiano)
+## Open decisions
 
 - Headline finding (see "Main goal and headline finding" in `paper.md`); the pilot decides.
 - Super Meat Boy chapter; Mario 1-4 boss; Bomberman generator or fixed layouts.

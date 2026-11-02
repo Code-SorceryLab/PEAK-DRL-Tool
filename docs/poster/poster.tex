@@ -1,5 +1,5 @@
-% PEAK poster -- CSER 2026 Fall (York University, 2026-11-09, co-located with CASCON)
-% Format: CSER uses the CASCON poster specification: portrait, at most 36 in wide x 48 in high
+% PEAK poster
+% Format: portrait, at most 36 in wide x 48 in high
 % (92 cm x 122 cm). You print it and bring it; boards are supplied.
 % Compiles with pdfLaTeX (the Overleaf default) and XeLaTeX. Figures: docs/img (img/ on Overleaf).
 \documentclass[final,t]{beamer}
@@ -11,12 +11,11 @@
 \newcommand{\PosterAuthors}{First Author \quad$\cdot$\quad Second Author \quad$\cdot$\quad Supervisor Name}
 \newcommand{\PosterAffil}{Institution}
 \newcommand{\PosterContact}{first.author@example.org}
-\newcommand{\PosterRepo}{https://github.com/Code-SorceryLab/PEAK-DRL-Tool}
 % -------------------------------------------------------------------------------------
 
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage{graphicx,booktabs,tabularx,qrcode,tikz,tcolorbox}
+\usepackage{graphicx,booktabs,tabularx,tikz,tcolorbox}
 \usetikzlibrary{arrows.meta,positioning}
 \tcbuselibrary{skins}
 \graphicspath{{img/}{../img/}}
@@ -68,18 +67,8 @@
   \begin{tcolorbox}[enhanced,sharp corners,boxrule=0pt,colback=peakink,width=\paperwidth,
     left=\gutter,right=\gutter,top=5mm,bottom=5mm,nobeforeafter,
     borderline north={3mm}{0pt}{peakred}]
-    \begin{minipage}[c]{0.065\linewidth}
-      \begin{tcolorbox}[boxrule=0pt,sharp corners,colback=white,left=2mm,right=2mm,top=2mm,bottom=2mm,
-        width=\linewidth,nobeforeafter]\qrcode[height=\linewidth]{\PosterRepo}\end{tcolorbox}
-    \end{minipage}\hfill
-    \begin{minipage}[c]{0.62\linewidth}\color{white}\raggedright
-      {\large\bfseries Code, data, and every figure on this poster}\par\vspace{1mm}
-      {\large\ttfamily github.com/Code-SorceryLab/PEAK-DRL-Tool}\par\vspace{3mm}
+    \begin{minipage}[c]{\linewidth}\color{white}\raggedright
       {\small\color{peakrose} Python + Pygame + numpy, built from scratch. 76 tests. No GPU.\par}
-    \end{minipage}\hfill
-    \begin{minipage}[c]{0.28\linewidth}\color{white}\raggedleft
-      {\large\bfseries CSER 2026 Fall}\par\vspace{1mm}
-      {\normalsize\color{peakrose} York University, Toronto\\ 9 November 2026\par}
     \end{minipage}
   \end{tcolorbox}}
 

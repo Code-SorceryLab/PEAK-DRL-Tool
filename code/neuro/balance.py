@@ -163,7 +163,7 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
     causes: dict[str, int] = {}
     stuck = 0
 
-    # Amr's balance-metric table: completion, punishment severity, triangularity
+    # team balance-metric table: completion, punishment severity, triangularity
     all_eps = [e for r in hist for e in r["envs"]]
     total_eps = len(all_eps)
     won_eps = [e for e in all_eps if e["status"] == "WON"]
@@ -224,7 +224,7 @@ def summarize(hist: list[dict], pop_size: int, level: str, seed: int,
         "trend": trend,
         "improvement_rate": round(rate, 4) if rate is not None else None,
         "train_time_s": round(sum(r.get("duration") or 0.0 for r in hist), 1),
-        # Amr's table
+        # team balance-metric table
         "completion_rate": round(len(won_eps) / total_eps, 3) if total_eps else 0.0,
         "mean_completion_time": round(statistics.fmean(win_times), 1) if win_times else None,
         "completion_time_stddev": round(statistics.stdev(win_times), 1) if len(win_times) > 1 else 0.0,
@@ -308,7 +308,7 @@ def aggregate(cells: list[dict]) -> dict:
         "trends": [c["trend"] for c in cells],
         "improvement_rate_mean": round(statistics.fmean(rates), 4) if rates else None,
         "train_time_s": round(sum(c.get("train_time_s") or 0.0 for c in cells), 1),
-        # Amr's table, aggregated
+        # team balance-metric table, aggregated
         "completion_rate_mean": round(statistics.fmean(c["completion_rate"] for c in cells), 3),
         "mean_completion_time": round(statistics.fmean(comp_times), 1) if comp_times else None,
         "completion_time_stddev": round(statistics.fmean(comp_sd), 1) if comp_sd else None,

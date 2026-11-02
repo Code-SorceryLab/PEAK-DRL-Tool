@@ -397,7 +397,7 @@ def _pack(route: list) -> list[int]:
 
 
 def _cluster_strategies(won_routes: list[list[list[float]]]) -> tuple[int, float] | None:
-    """Amr's B3: 50-bin height profiles, greedy centroid clustering (threshold 96px)."""
+    """B3: 50-bin height profiles, greedy centroid clustering (threshold 96px)."""
     try:
         import numpy as np
     except ImportError:

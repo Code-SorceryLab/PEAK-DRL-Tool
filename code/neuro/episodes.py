@@ -2,7 +2,7 @@
 import csv
 import os
 
-# Stats-dashboard schema (Amr's): one row per finished episode.
+# Stats-dashboard schema: one row per finished episode.
 HEADER = ["persona", "game", "world", "cause_of_death", "jump_count",
           "coins_collected", "avg_vx", "progress_ratio", "route",
           "enemies_killed", "bricks_destroyed", "elapsed_time"]

@@ -95,7 +95,7 @@ class EnvSlot:
         self.last_rays: list = []
         self.last_tiles: list = []
         self.last_sensors: np.ndarray = np.zeros(net.n_inputs, dtype=np.float32)
-        # per-episode telemetry for the balance CSV (Amr's stats schema)
+        # per-episode telemetry for the balance CSV (stats-dashboard schema)
         self.route: list[tuple[float, float]] = []
         self.jump_count = 0
         self.prev_jump = False
@@ -353,7 +353,7 @@ class Trainer:
                     slot.jump_count += 1
                 slot.prev_jump = bool(jump)
                 slot.vx_sum += slot.adapter.vx
-                if slot.frames % 8 == 0:  # ~7.5 route samples/s, matches Amr's density
+                if slot.frames % 8 == 0:  # ~7.5 route samples/s, matches the dashboard's density
                     slot.route.append((round(slot.adapter.x, 1), round(slot.adapter.y, 1)))
                 # trainer-side stuck kill (faster than the core's 20s stall watchdog)
                 fit = slot.adapter.fitness()

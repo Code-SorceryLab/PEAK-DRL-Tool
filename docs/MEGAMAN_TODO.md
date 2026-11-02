@@ -22,7 +22,7 @@ list is `paper-ast/TODO.md`; this file is only the queue for the `megaman` game 
         (`--seed-from runs/megaman/<section>/imitation`).
   - [ ] Compare tested win rates and relay results with and without the head start; show the
         human's own attempts beside the agents' on the dashboard.
-  - Needs from Cristiano: a few clean playthroughs of the baseline Cut Man stage, some beating
+  - Needs from the project lead: a few clean playthroughs of the baseline Cut Man stage, some beating
     the boss.
 
 - [ ] **Regression check on mutants** (paper section 3.6).
@@ -67,7 +67,7 @@ list is `paper-ast/TODO.md`; this file is only the queue for the `megaman` game 
     server, or decide whether it goes in the repo (it is derived from the ROM's layout).
   - Pin Python and numpy versions on both sides; run a baseline and its mutants on the same
     machine so "identical telemetry" holds.
-  - Needs from Cristiano: core count, scheduler or plain SSH, how to log in.
+  - Needs from the project lead: core count, scheduler or plain SSH, how to log in.
 
 - [ ] **Telemetry gaps.**
   - Only `megaman` writes through the new writer (`code/stats/`); the other games still use the
